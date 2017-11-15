@@ -14,5 +14,8 @@ GoScript is a project to build a **type-aware** and **modular** Go to JavaScript
  - Compiles Go packages one-to-one to JavaScript modules.
  - Generates TypeScript definitions for generated code.
  - Allows TypeScript or JavaScript code to efficiently call Go functions.
+ - Generates Go definitions for TypeScript code.
 
-It's currently an experimental project, and not ready for production yet.
+It's currently an experimental project, and not ready for production.
+
+
