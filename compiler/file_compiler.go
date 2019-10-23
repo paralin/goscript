@@ -2,12 +2,10 @@ package compiler
 
 import (
 	"context"
+	"go/ast"
+	"golang.org/x/tools/go/packages"
 	"os"
 	"path/filepath"
-	//"go/format"
-	"go/parser"
-	//"go/token"
-	"io/ioutil"
 )
 
 // fileImport is an import in a file.
@@ -19,9 +17,10 @@ type fileImport struct {
 // FileCompiler is the root compiler for a file.
 type FileCompiler struct {
 	compilerConfig *Config
-	pkgPath        string
-	fullPath       string
 	codeWriter     *TSCodeWriter
+	pkg            *packages.Package
+	ast            *ast.File
+	fullPath       string
 
 	imports map[string]fileImport
 }
@@ -29,12 +28,14 @@ type FileCompiler struct {
 // NewFileCompiler builds a new FileCompiler
 func NewFileCompiler(
 	compilerConf *Config,
-	pkgPath string,
+	pkg *packages.Package,
+	ast *ast.File,
 	fullPath string,
 ) (*FileCompiler, error) {
 	return &FileCompiler{
 		compilerConfig: compilerConf,
-		pkgPath:        pkgPath,
+		pkg:            pkg,
+		ast:            ast,
 		fullPath:       fullPath,
 
 		imports: make(map[string]fileImport),
@@ -43,17 +44,10 @@ func NewFileCompiler(
 
 // Compile compiles a file.
 func (c *FileCompiler) Compile(ctx context.Context) error {
-	fread, err := ioutil.ReadFile(c.fullPath)
-	if err != nil {
-		return err
-	}
+	f := c.ast
 
-	f, err := parser.ParseFile(c.compilerConfig.fset, c.fullPath, string(fread), parser.ParseComments|parser.AllErrors)
-	if err != nil {
-		return err
-	}
-
-	outputFilePath := translateGoFilePathToTypescriptFilePath(c.pkgPath, filepath.Base(c.fullPath))
+	pkgPath := c.pkg.PkgPath
+	outputFilePath := translateGoFilePathToTypescriptFilePath(pkgPath, filepath.Base(c.fullPath))
 	outputFilePathAbs := filepath.Join(c.compilerConfig.OutputPathRoot, outputFilePath)
 
 	if err := os.MkdirAll(filepath.Dir(outputFilePathAbs), 0755); err != nil {

@@ -97,7 +97,7 @@ figure out how to determine if let is required here
 // WriteStmtAssign writes an assign statement.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 	// TODO: determine if anything special is required here
-	c.tsw.WriteComment(exp.Tok.String())
+	// c.tsw.WriteComment(exp.Tok.String())
 	if exp.Tok == token.DEFINE {
 		c.tsw.WriteLiterally("let ")
 	}

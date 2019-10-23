@@ -9,13 +9,60 @@
 
 ## Introduction
 
-GoScript is a project to build a **type-aware** and **modular** Go to JavaScript compiler. GoScript:
-
- - Compiles Go packages one-to-one to JavaScript modules.
- - Generates TypeScript definitions for generated code.
- - Allows TypeScript or JavaScript code to efficiently call Go functions.
- - Generates Go definitions for TypeScript code.
+GoScript is a Go to TypeScript compiler. It allows Go programs to run in the
+browser after being checked and optimized by the TypeScript compiler.
 
 It's currently an experimental project, and not ready for production.
 
+## Generated Code
+
+Below is a simple example of how code is generated:
+
+```go
+package main
+
+import (
+	"os"
+)
+
+func main() {
+	os.Stdout.WriteString("Hello world!\n")
+}
+```
+
+Generated with `goscript compile .`:
+
+```typescript
+import * as os from "@go/os";
+function main() {
+	os.Stdout.WriteString("Hello world!\n");
+}
+```
+
+Code is compiled with `GOARCH=js`. Code designed to work with `syscall/js` and
+wasm /should/ work correctly with GoScript out of the box.
+
+All Go import paths are prefixed with `@go/` and can be imported in TypeScript:
+
+```typescript
+import { MyFunction, MyStruct } from '@go/github.com/myorg/mypackage';
+
+MyFunction();
+let myThing = new MyStruct();
+myThing.DoSometing();
+```
+
+Go structs are converted into classes.
+
+## Roadmap
+
+ - [ ] Sample programs compile & run
+ - [ ] Generate init() function to recursively initialize packages
+ - [ ] Tooling to integrate with typescript compiler
+ - [ ] "go test" implementation with Go -> Ts transformation
+ - [ ] performance testing
+ - [ ] examples of calling Go code from TypeScript
+
+At the moment, some of the Go ast is not implemented. This work will be
+completed first before tackling the above features.
 

@@ -2,31 +2,79 @@ package compiler
 
 import (
 	"context"
+	"os"
 
 	"github.com/sirupsen/logrus"
+	"golang.org/x/tools/go/packages"
 )
 
 // Compiler is the root compiler for a project.
 type Compiler struct {
 	le     *logrus.Entry
 	config Config
+	opts   packages.Config
 }
 
 // NewCompiler builds a new Compiler
-func NewCompiler(conf *Config, le *logrus.Entry) (*Compiler, error) {
+// opts can be nil
+func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compiler, error) {
 	if err := conf.Validate(); err != nil {
 		return nil, err
 	}
 
-	return &Compiler{config: *conf, le: le}, nil
+	if opts == nil {
+		opts = &packages.Config{Env: os.Environ()}
+	}
+	// opts.Logf = c.le.Debugf
+	opts.Tests = false
+	opts.Env = append(opts.Env, "GOOS=js", "GOARCH=wasm")
+
+	// NeedName adds Name and PkgPath.
+	// NeedFiles adds GoFiles and OtherFiles.
+	// NeedCompiledGoFiles adds CompiledGoFiles.
+	// NeedImports adds Imports. If NeedDeps is not set, the Imports field will contain
+	// "placeholder" Packages with only the ID set.
+	// NeedDeps adds the fields requested by the LoadMode in the packages in Imports.
+	// NeedExportsFile adds ExportsFile.
+	// NeedTypes adds Types, Fset, and IllTyped.
+	// NeedSyntax adds Syntax.
+	// NeedTypesInfo adds TypesInfo.
+	// NeedTypesSizes adds TypesSizes.
+	// TODO: disable these if not needed
+	opts.Mode |= packages.NeedName |
+		packages.NeedFiles |
+		packages.NeedCompiledGoFiles |
+		packages.NeedImports |
+		packages.NeedDeps |
+		packages.NeedExportsFile |
+		packages.NeedTypes |
+		packages.NeedSyntax |
+		packages.NeedTypesInfo |
+		packages.NeedTypesSizes
+
+	return &Compiler{config: *conf, le: le, opts: *opts}, nil
 }
 
-// CompilePackage attempts to build a particular package in the gopath.
-func (c *Compiler) CompilePackage(ctx context.Context, pkgPath string) error {
-	pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkgPath)
+// CompilePackages attempts to build packages.
+func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) error {
+	opts := c.opts
+	opts.Context = ctx
+
+	pkgs, err := packages.Load(&opts, patterns...)
 	if err != nil {
 		return err
 	}
 
-	return pkgCompiler.Compile(ctx)
+	for _, pkg := range pkgs {
+		pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkg)
+		if err != nil {
+			return err
+		}
+
+		if err := pkgCompiler.Compile(ctx); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

@@ -10,7 +10,6 @@ import (
 func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) {
 	cw := c.tsw
 	for _, decl := range decls {
-		cw.WriteComment(litter.Sdump(decl))
 		switch d := decl.(type) {
 		case *ast.GenDecl:
 			if d.Doc != nil {
@@ -21,6 +20,8 @@ func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) {
 			}
 		case *ast.FuncDecl:
 			c.WriteDeclFunc(d)
+		default:
+			cw.WriteComment(litter.Sdump(decl))
 		}
 		cw.WriteSectionTail()
 	}

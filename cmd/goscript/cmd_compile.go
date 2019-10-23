@@ -25,7 +25,7 @@ var CompileCommands = []cli.Command{
 			logger := logrus.New()
 			logger.SetLevel(logrus.DebugLevel)
 			le := logrus.NewEntry(logger)
-			cliCompiler, err = compiler.NewCompiler(&cliCompilerConfig, le)
+			cliCompiler, err = compiler.NewCompiler(&cliCompilerConfig, le, nil)
 			return
 		},
 		Flags: []cli.Flag{
@@ -56,5 +56,5 @@ func compilePackage(c *cli.Context) error {
 		return errors.New("package must be specified")
 	}
 
-	return cliCompiler.CompilePackage(context.Background(), cliCompilerPkg)
+	return cliCompiler.CompilePackages(context.Background(), cliCompilerPkg)
 }

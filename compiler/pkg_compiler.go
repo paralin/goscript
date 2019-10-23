@@ -2,35 +2,32 @@ package compiler
 
 import (
 	"context"
-	"io/ioutil"
-	"path/filepath"
-	"strings"
+	"go/ast"
 
 	"github.com/paralin/goscript/output"
 	"github.com/sirupsen/logrus"
+	"golang.org/x/tools/go/packages"
 )
 
 // PackageCompiler compiles an entire package.
 type PackageCompiler struct {
-	le              *logrus.Entry
-	compilerConf    *Config
-	pkgPath         string
-	outputPath      string
-	computedPkgPath string
+	le           *logrus.Entry
+	compilerConf *Config
+	outputPath   string
+	pkg          *packages.Package
 }
 
 // NewPackageCompiler builds a new PackageCompiler.
 func NewPackageCompiler(
 	le *logrus.Entry,
 	compilerConf *Config,
-	pkgPath string,
+	pkg *packages.Package,
 ) (*PackageCompiler, error) {
 	res := &PackageCompiler{
-		le:              le,
-		compilerConf:    compilerConf,
-		pkgPath:         pkgPath,
-		outputPath:      output.ComputeModulePath(compilerConf.OutputPathRoot, pkgPath),
-		computedPkgPath: compilerConf.ComputePackagePath(pkgPath),
+		le:           le,
+		pkg:          pkg,
+		compilerConf: compilerConf,
+		outputPath:   output.ComputeModulePath(compilerConf.OutputPathRoot, pkg.PkgPath),
 	}
 
 	return res, nil
@@ -41,23 +38,11 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 	// Collect the Go files we need to compile
 	// var goFilePaths []string
 
-	files, err := ioutil.ReadDir(c.computedPkgPath)
-	if err != nil {
-		return err
-	}
-	for _, f := range files {
-		if f.IsDir() {
-			continue
-		}
-		fileName := f.Name()
-		if !strings.HasSuffix(fileName, ".go") {
-			continue
-		}
-		if strings.HasPrefix(fileName, ".") {
-			continue
-		}
-		c.le.WithField("file", f.Name()).Debug("compiling file")
-		if err := c.CompileFile(ctx, f.Name()); err != nil {
+	for i, f := range c.pkg.Syntax {
+		fileName := c.pkg.CompiledGoFiles[i]
+		// fileName := f.Name()
+		c.le.WithField("file", fileName).Debug("compiling file")
+		if err := c.CompileFile(ctx, fileName, f); err != nil {
 			return err
 		}
 	}
@@ -66,9 +51,8 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 }
 
 // CompileFile compiles a file.
-func (p *PackageCompiler) CompileFile(ctx context.Context, name string) error {
-	fullPath := filepath.Join(p.computedPkgPath, name)
-	fileCompiler, err := NewFileCompiler(p.compilerConf, p.pkgPath, fullPath)
+func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File) error {
+	fileCompiler, err := NewFileCompiler(p.compilerConf, p.pkg, syntax, name)
 	if err != nil {
 		return err
 	}
