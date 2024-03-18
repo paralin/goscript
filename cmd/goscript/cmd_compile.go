@@ -6,7 +6,7 @@ import (
 	"github.com/paralin/goscript/compiler"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli"
+	"github.com/urfave/cli/v2"
 )
 
 var cliCompiler *compiler.Compiler
@@ -15,11 +15,11 @@ var cliCompilerPkg string
 var test1, test2 = 1, 2
 
 // CompileCommands are commands related to compiling code.
-var CompileCommands = []cli.Command{
-	cli.Command{
+var CompileCommands = []*cli.Command{
+	&cli.Command{
 		Name:     "compile",
 		Category: "compile",
-		Usage:    "builds a particular Go package",
+		Usage:    "compile a Go package to TypeScript",
 		Action:   compilePackage,
 		Before: func(c *cli.Context) (err error) {
 			logger := logrus.New()
@@ -29,18 +29,18 @@ var CompileCommands = []cli.Command{
 			return
 		},
 		Flags: []cli.Flag{
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:        "package",
 				Usage:       "the package to compile",
 				Destination: &cliCompilerPkg,
 			},
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:        "gopath",
 				Usage:       "the gopath / go root to use",
 				Destination: &cliCompilerConfig.GoPathRoot,
-				EnvVar:      "GOPATH",
+				EnvVars:     []string{"GOPATH"},
 			},
-			cli.StringFlag{
+			&cli.StringFlag{
 				Name:        "output",
 				Usage:       "the output typescript path to use",
 				Destination: &cliCompilerConfig.OutputPathRoot,
