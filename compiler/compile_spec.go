@@ -114,6 +114,6 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 		importPath: translateGoPathToTypescriptPath(impPath),
 		importVars: make(map[string]struct{}),
 	}
-	c.imports.Store(impName, imp)
+	c.imports[impName] = imp
 	c.tsw.WriteImport(impName, imp.importPath)
 }
