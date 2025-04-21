@@ -9,8 +9,9 @@
 
 ## Introduction
 
-GoScript is a Go to TypeScript compiler. It allows Go programs to run in the
-browser after being checked and optimized by the TypeScript compiler.
+GoScript is a Go to TypeScript compiler / translater.
+
+It works on translating Go to TypeScript on the AST level.
 
 GoScript intends to compile a subset of the Go language to TypeScript in a
 non-spec-compliant way. It is intended only for bringing over high-level logic
