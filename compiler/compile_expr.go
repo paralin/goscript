@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	"unicode"
 
 	"github.com/paralin/goscript/types"
 	"github.com/sanity-io/litter"
@@ -23,7 +24,10 @@ func (c *GoToTSCompiler) WriteExpr(a ast.Expr, interpretType bool) {
 		c.WriteExprFunc(exp, interpretType)
 	case *ast.CallExpr:
 		c.WriteExprCall(exp)
-	//case *ast.UnaryExpr:
+	case *ast.UnaryExpr:
+		c.WriteExprUnary(exp, interpretType)
+	case *ast.BinaryExpr:
+		c.WriteExprBinary(exp, interpretType)
 	case *ast.BasicLit:
 		c.WriteExprBasicLiteral(exp, interpretType)
 	case *ast.CompositeLit:
@@ -31,23 +35,39 @@ func (c *GoToTSCompiler) WriteExpr(a ast.Expr, interpretType bool) {
 	case *ast.KeyValueExpr:
 		c.WriteExprKeyValue(exp, interpretType)
 	default:
-		c.tsw.WriteComment(fmt.Sprintf("expr: %s", litter.Sdump(exp)))
+		c.tsw.WriteCommentLine(fmt.Sprintf("expr: %s", litter.Sdump(exp)))
 	}
 }
 
-// WriteExprCompositeLit writes a composite literal expression.
+// Rewrite composite literals as inline object literals or constructor calls
 func (c *GoToTSCompiler) WriteExprCompositeLit(exp *ast.CompositeLit, interpretType bool) {
-	c.WriteExpr(exp.Type, interpretType)
-	c.tsw.WriteLiterally("{")
-	if len(exp.Elts) > 0 {
-		c.tsw.WriteLine("")
-		c.tsw.Indent(1)
-		for _, elm := range exp.Elts {
-			c.WriteExpr(elm, interpretType)
+	// if literal has a type (e.g., MyStruct{...}), emit constructor call
+	if exp.Type != nil {
+		// new Type({...})
+		c.tsw.WriteLiterally("new ")
+		c.WriteExpr(exp.Type, false)
+		c.tsw.WriteLiterally("(")
+		// object literal args
+		c.tsw.WriteLiterally("{")
+		for i, elm := range exp.Elts {
+			if i != 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteExpr(elm, false)
 		}
-		c.tsw.Indent(-1)
+		c.tsw.WriteLiterally("}")
+		c.tsw.WriteLiterally(")")
+		return
 	}
-	c.tsw.WriteLine("}")
+	// untyped literal: inline object
+	c.tsw.WriteLiterally("{")
+	for i, elm := range exp.Elts {
+		if i != 0 {
+			c.tsw.WriteLiterally(", ")
+		}
+		c.WriteExpr(elm, false)
+	}
+	c.tsw.WriteLiterally("}")
 }
 
 // WriteExprBasicLiteral writes a basic literal.
@@ -89,7 +109,14 @@ func (c *GoToTSCompiler) WriteExprFunc(exp *ast.FuncType, interpretType bool) {
 func (c *GoToTSCompiler) WriteExprSelector(exp *ast.SelectorExpr, interpretType bool) {
 	c.WriteExpr(exp.X, interpretType)
 	c.tsw.WriteLiterally(".")
-	c.WriteExpr(exp.Sel, interpretType)
+	sel := exp.Sel
+	if sel.IsExported() {
+		r := []rune(sel.Name)
+		r[0] = unicode.ToLower(r[0])
+		c.tsw.WriteLiterally(string(r))
+	} else {
+		c.WriteExpr(sel, interpretType)
+	}
 }
 
 // WriteExprIdent writes an ident expr.
@@ -99,10 +126,10 @@ func (c *GoToTSCompiler) WriteExprIdent(exp *ast.Ident, interpretType bool) {
 		tsname, ok := types.GoBuiltinToTypescript(name)
 		if ok {
 			name = tsname
-		} /* else {
-			c.tsw.WriteComment(fmt.Sprintf("unknown type: %s", name))
+		} else {
+			c.tsw.WriteCommentInline(fmt.Sprintf("unknown type: %q", name))
 			return
-		}*/
+		}
 	}
 
 	c.tsw.WriteLiterally(name)
@@ -115,15 +142,22 @@ func (c *GoToTSCompiler) WriteExprIdent(exp *ast.Ident, interpretType bool) {
 
 // WriteExprKeyValue writes a key value expression to the output.
 func (c *GoToTSCompiler) WriteExprKeyValue(exp *ast.KeyValueExpr, interpretType bool) {
-	c.WriteExpr(exp.Key, interpretType)
+	if keyIdent, ok := exp.Key.(*ast.Ident); ok {
+		r := []rune(keyIdent.Name)
+		r[0] = unicode.ToLower(r[0])
+		c.tsw.WriteLiterally(string(r))
+	} else {
+		c.WriteExpr(exp.Key, interpretType)
+	}
 	c.tsw.WriteLiterally(": ")
-	c.WriteExpr(exp.Value, interpretType)
+	c.WriteExpr(exp.Value, false)
 }
 
 // WriteExprStar writes a star expression.
 func (c *GoToTSCompiler) WriteExprStar(exp *ast.StarExpr, interpretType bool) {
-	// todo: determine pointers and copy on write
-	c.WriteExpr(exp.X, interpretType)
+	// pointer dereference -> shallow clone
+	c.WriteExpr(exp.X, false)
+	c.tsw.WriteLiterally(".clone()")
 }
 
 // WriteExprStructType writes a structtype expr.
@@ -134,4 +168,16 @@ func (c *GoToTSCompiler) WriteExprStructType(exp *ast.StructType) {
 	}
 
 	c.WriteFieldList(exp.Fields, false)
+}
+
+// WriteExprUnary handles unary expressions like & and * by emitting the inner expression
+func (c *GoToTSCompiler) WriteExprUnary(exp *ast.UnaryExpr, interpretType bool) {
+	c.WriteExpr(exp.X, false)
+}
+
+// WriteExprBinary handles binary expressions
+func (c *GoToTSCompiler) WriteExprBinary(exp *ast.BinaryExpr, interpretType bool) {
+	c.WriteExpr(exp.X, false)
+	c.tsw.WriteLiterally(" " + exp.Op.String() + " ")
+	c.WriteExpr(exp.Y, false)
 }

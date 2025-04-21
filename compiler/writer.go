@@ -57,12 +57,19 @@ func (w *TSCodeWriter) WriteImport(symbolName, importPath string) {
 	w.WriteLinef("import * as %s from %q;", symbolName, importPath)
 }
 
-// WriteComment writes a comment.
-func (w *TSCodeWriter) WriteComment(commentText string) {
+// WriteCommentLine writes a comment as a // line.
+func (w *TSCodeWriter) WriteCommentLine(commentText string) {
 	lines := strings.Split(commentText, "\n")
 	for _, line := range lines {
 		w.WriteLinef("// %s", line)
 	}
+}
+
+// WriteCommentInline write a comment within /* */.
+func (w *TSCodeWriter) WriteCommentInline(commentText string) {
+	w.w.Write([]byte("/* "))
+	w.w.Write([]byte(commentText))
+	w.w.Write([]byte(" */"))
 }
 
 // WriteLiterally writes something to the output without processing

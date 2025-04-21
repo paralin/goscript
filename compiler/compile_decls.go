@@ -21,7 +21,7 @@ func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) {
 		case *ast.FuncDecl:
 			c.WriteDeclFunc(d)
 		default:
-			cw.WriteComment(litter.Sdump(decl))
+			cw.WriteCommentLine(litter.Sdump(decl))
 		}
 		cw.WriteSectionTail()
 	}

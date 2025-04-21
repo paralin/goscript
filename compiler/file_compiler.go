@@ -3,9 +3,10 @@ package compiler
 import (
 	"context"
 	"go/ast"
-	"golang.org/x/tools/go/packages"
 	"os"
 	"path/filepath"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // fileImport is an import in a file.
@@ -61,7 +62,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	defer of.Close()
 
 	c.codeWriter = NewTSCodeWriter(of)
-	goWriter := NewGoToTSCompiler(c.codeWriter)
+	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg)
 	goWriter.WriteDecls(f.Decls)
 
 	return nil

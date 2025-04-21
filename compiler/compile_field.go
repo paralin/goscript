@@ -75,7 +75,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 			// write tag comment if any
 			if field.Tag != nil {
 				c.tsw.WriteLiterally(";")
-				c.tsw.WriteComment(fmt.Sprintf("tag: %s", field.Tag.Value))
+				c.tsw.WriteCommentLine(fmt.Sprintf("tag: %s", field.Tag.Value))
 			} else {
 				c.tsw.WriteLine(";")
 			}

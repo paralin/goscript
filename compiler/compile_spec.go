@@ -28,25 +28,36 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) {
 		c.WriteDoc(a.Comment)
 	}
 
-	isTypeAlias := false
-	switch a.Type.(type) {
+	switch t := a.Type.(type) {
 	case *ast.StructType:
+		// write the class definition
 		c.tsw.WriteLiterally("class ")
+		c.WriteExpr(a.Name, false)
+		c.tsw.WriteLine(" {")
+		c.tsw.Indent(1)
+
+		// className is the name of the class type
+		className := a.Name.Name
+		for _, field := range t.Fields.List {
+			c.WriteField(field, false)
+		}
+		// constructor and clone using Object.assign for compactness
+		c.tsw.WriteLine("")
+		c.tsw.WriteLinef("constructor(init?: Partial<%s>) { if (init) Object.assign(this, init as any); }", className)
+		c.tsw.WriteLinef("public clone(): %s { return Object.assign(Object.create(%s.prototype) as %s, this); }", className, className, className)
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("}")
 	case *ast.InterfaceType:
 		c.tsw.WriteLiterally("interface ")
+		c.WriteExpr(a.Name, false)
+		c.tsw.WriteLine(" ")
+		c.WriteExpr(a.Type, false)
 	default:
-		isTypeAlias = true
+		// type alias
 		c.tsw.WriteLiterally("type ")
-	}
-
-	c.WriteExpr(a.Name, false)
-	c.tsw.WriteLiterally(" ")
-	if isTypeAlias {
-		c.tsw.WriteLiterally("= ")
-	}
-
-	c.WriteExpr(a.Type, false)
-	if isTypeAlias {
+		c.WriteExpr(a.Name, false)
+		c.tsw.WriteLiterally(" = ")
+		c.WriteExpr(a.Type, false)
 		c.tsw.WriteLine(";")
 	}
 }

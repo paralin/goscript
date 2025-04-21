@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	gtypes "go/types"
 
 	"github.com/paralin/goscript/types"
 	"github.com/sanity-io/litter"
@@ -23,7 +24,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 	case *ast.ExprStmt:
 		c.WriteStmtExpr(exp)
 	default:
-		c.tsw.WriteComment(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
+		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
 }
 
@@ -86,27 +87,70 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt) {
 
 // WriteStmtAssign writes an assign statement.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
-	// TODO: determine if anything special is required here
-	// c.tsw.WriteComment(exp.Tok.String())
+	// skip blank-identifier assignments: ignore single `_ = ...` assignments
+	if len(exp.Lhs) == 1 {
+		if ident, ok := exp.Lhs[0].(*ast.Ident); ok && ident.Name == "_" {
+			return
+		}
+	}
+	// filter out blank identifiers for multi-value assignments: remove any `_` slots
+	lhs, rhs := filterBlankIdentifiers(exp.Lhs, exp.Rhs)
+	if len(lhs) == 0 {
+		return
+	}
+	// special-case define assignments (`:=`):
+	// - emit a TypeScript `let` declaration
+	// - apply .clone() on non-pointer struct values for Go value-copy semantics
 	if exp.Tok == token.DEFINE {
 		c.tsw.WriteLiterally("let ")
+		for i, l := range lhs {
+			if i != 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteExpr(l, false)
+			c.tsw.WriteLiterally(" = ")
+			// clone value types for struct (shallow copy), keep pointers as-is
+			if ident, ok := rhs[i].(*ast.Ident); ok {
+				if tv, found := c.pkg.TypesInfo.Types[ident]; found {
+					t := tv.Type
+					// pointer types are direct assignment; non-pointers clone
+					if _, isPtr := t.(*gtypes.Pointer); !isPtr {
+						c.WriteExpr(ident, false)
+						c.tsw.WriteLiterally(".clone()")
+					} else {
+						c.WriteExpr(ident, false)
+					}
+				} else {
+					c.WriteExpr(ident, false)
+				}
+			} else {
+				c.WriteExpr(rhs[i], false)
+			}
+		}
+		c.tsw.WriteLine(";")
+		return
 	}
-	for i, l := range exp.Lhs {
+	// fallback for other assignment tokens (`=`, `+=`, etc):
+	// - write LHS, operator mapping, and RHS expressions directly
+	for i, l := range lhs {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		c.WriteExpr(l, true)
+		c.WriteExpr(l, false)
 	}
 	c.tsw.WriteLiterally(" ")
 	tokStr, ok := types.TokenToTs(exp.Tok)
 	if !ok {
 		c.tsw.WriteLiterally("?= ")
-		c.tsw.WriteComment("Unknown token " + exp.Tok.String())
+		c.tsw.WriteCommentLine("Unknown token " + exp.Tok.String())
 	} else {
 		c.tsw.WriteLiterally(tokStr)
 	}
 	c.tsw.WriteLiterally(" ")
-	for _, r := range exp.Rhs {
+	for i, r := range rhs {
+		if i != 0 {
+			c.tsw.WriteLiterally(", ")
+		}
 		c.WriteExpr(r, true)
 	}
 	c.tsw.WriteLine(";")
