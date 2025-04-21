@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        go: ['1.22']
+        go: ['1.24']
     timeout-minutes: 10
     steps:
       - name: Harden Runner

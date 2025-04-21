@@ -25,9 +25,7 @@ jobs:
       fail-fast: false
       matrix:
         language: [ 'go' ]
-        go: ['1.22']
-        # CodeQL supports [ 'cpp', 'csharp', 'go', 'java', 'javascript', 'python', 'ruby' ]
-        # Learn more about CodeQL language support at https://aka.ms/codeql-docs/language-support
+        go: ['1.24']
 
     steps:
     - name: Harden Runner
