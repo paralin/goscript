@@ -33,26 +33,36 @@ Below is a simple example of how code is generated:
 ```go
 package main
 
-import (
-	"os"
-)
+// MyStruct is converted into a class.
+type MyStruct struct {
+	// MyInt is a public integer field, initialized to zero.
+	MyInt int
+	// myBool is a private boolean field, intialized to false.
+	myBool bool
+}
 
 func main() {
-	os.Stdout.WriteString("Hello world!\n")
+	println("Hello world")
 }
 ```
 
 Generated with `goscript compile .`:
 
 ```typescript
-import * as os from "@go/os";
-function main() {
-	os.Stdout.WriteString("Hello world!\n");
+// MyStruct is converted into a class.
+class MyStruct {
+	// MyInt is a public integer field, initialized to zero.
+	public myInt: number = 0;
+	// myBool is a private boolean field, intialized to false.
+	private myBool: boolean = false;
+}
+
+export function main() {
+	console.log("Hello world");
 }
 ```
 
-Code is compiled with `GOARCH=js`. Code designed to work with `syscall/js` and
-wasm /should/ work correctly with GoScript out of the box.
+Code is compiled with `GOARCH=js` and uses a 32-bit environment similar to wasm.
 
 All Go import paths are prefixed with `@go/` and can be imported in TypeScript:
 
@@ -63,8 +73,6 @@ MyFunction();
 let myThing = new MyStruct();
 myThing.DoSometing();
 ```
-
-Go structs are converted into classes.
 
 ## Roadmap
 
