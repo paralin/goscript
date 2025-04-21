@@ -13,8 +13,8 @@ GoScript is a Go to TypeScript compiler. It allows Go programs to run in the
 browser after being checked and optimized by the TypeScript compiler.
 
 GoScript intends to compile a subset of the Go language to TypeScript in a
-non-spec-compliant way. It is intended for bringing over high-level logic from
-Go to TypeScript only, so not all programs will compile or run correctly:
+non-spec-compliant way. It is intended only for bringing over high-level logic
+from Go to TypeScript, so not all programs will work correctly:
 
 - Numbers (ints) use the "number" type in JavaScript is different than Go int32.
 - Pointer arithmetic (uintptr) and unsafe are not supported
