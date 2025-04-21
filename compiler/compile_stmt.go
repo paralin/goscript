@@ -116,3 +116,23 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) {
 	c.WriteExpr(exp.X, true)
 }
+
+// WriteZeroValue writes the TypeScript zero‐value for a Go type.
+func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		switch t.Name {
+		case "int", "float64":
+			c.tsw.WriteLiterally("0")
+		case "string":
+			c.tsw.WriteLiterally(`""`)
+		case "bool":
+			c.tsw.WriteLiterally("false")
+		default:
+			c.tsw.WriteLiterally("null")
+		}
+	default:
+		// everything else defaults to null in TS
+		c.tsw.WriteLiterally("null")
+	}
+}

@@ -41,21 +41,38 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		}
 	}
 	for _, name := range field.Names {
-		if name.IsExported() || isArguments {
-			if !isArguments {
-				c.tsw.WriteLiterally("public ")
+		isExported := name.IsExported()
+
+		// argument names: always lowercase and no access modifier
+		if isArguments {
+			c.tsw.WriteLiterally(string([]rune{unicode.ToLower(rune(name.Name[0]))}))
+			if len(name.Name) > 1 {
+				c.tsw.WriteLiterally(name.Name[1:])
 			}
+
+		} else if isExported {
+			// exported struct fields become public
+			c.tsw.WriteLiterally("public ")
 			c.tsw.WriteLiterally(string([]rune{unicode.ToLower(rune(name.Name[0]))}))
 			if len(name.Name) > 1 {
 				c.tsw.WriteLiterally(name.Name[1:])
 			}
 		} else {
 			c.tsw.WriteLiterally("private ")
+			// unexported struct fields become private with explicit type
 			c.tsw.WriteLiterally(name.Name)
-			c.tsw.WriteLiterally(": ")
-			c.WriteExpr(field.Type, true)
 		}
+
+		// write type
+		c.tsw.WriteLiterally(": ")
+		c.WriteExpr(field.Type, true)
+
 		if !isArguments {
+			// write initializer with zero value
+			c.tsw.WriteLiterally(" = ")
+			c.WriteZeroValue(field.Type)
+
+			// write tag comment if any
 			if field.Tag != nil {
 				c.tsw.WriteLiterally(";")
 				c.tsw.WriteComment(fmt.Sprintf("tag: %s", field.Tag.Value))

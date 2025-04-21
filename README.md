@@ -12,6 +12,17 @@
 GoScript is a Go to TypeScript compiler. It allows Go programs to run in the
 browser after being checked and optimized by the TypeScript compiler.
 
+GoScript intends to compile a subset of the Go language to TypeScript in a
+non-spec-compliant way. It is intended for bringing over high-level logic from
+Go to TypeScript only, so not all programs will compile or run correctly:
+
+- Numbers (ints) use the "number" type in JavaScript is different than Go int32.
+- Pointer arithmetic (uintptr) and unsafe are not supported
+- Reflection is not supported
+
+If you want to guarantee your program runs exactly the same in the browser as
+natively, you should instead use wasm or gopherjs.
+
 It's currently an experimental project, and not ready for production.
 
 ## Generated Code
@@ -56,13 +67,13 @@ Go structs are converted into classes.
 
 ## Roadmap
 
- - [ ] Sample programs compile & run
+ - [X] Simple programs compile & run
+ - [ ] Function coloring and async logic
+ - [ ] Work our way up to more complex programs
  - [ ] Generate init() function to recursively initialize packages
  - [ ] Tooling to integrate with typescript compiler
  - [ ] "go test" implementation with Go -> Ts transformation
+    - vitest
  - [ ] performance testing
  - [ ] examples of calling Go code from TypeScript
-
-At the moment, some of the Go ast is not implemented. This work will be
-completed first before tackling the above features.
 
