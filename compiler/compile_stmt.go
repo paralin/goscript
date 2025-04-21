@@ -84,16 +84,6 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt) {
 	}
 }
 
-/*TODO:
-
-// CompilePackage attempts to build a particular package in the gopath.
-Compiler.prototype.CompilePackage = function(ctx: context.Context, pkgPath: string) {
-	pkgCompiler, err = // expr: &ast.CallExpr{
-
-figure out how to determine if let is required here
-
-*/
-
 // WriteStmtAssign writes an assign statement.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 	// TODO: determine if anything special is required here

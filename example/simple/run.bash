@@ -1,8 +1,6 @@
 #!/bin/bash
 set -eo pipefail
 
-if ! [ -d ./output/@go ]; then
-    bash build.bash
-fi
+bash build.bash
 
 tsx --tsconfig ./tsconfig.json ./main.ts

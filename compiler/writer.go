@@ -23,7 +23,7 @@ func NewTSCodeWriter(w io.Writer) *TSCodeWriter {
 func (w *TSCodeWriter) WriteLinePreamble() {
 	w.sectionWrittenFlag = true
 	w.lineWritten = false
-	for i := 0; i < w.indentLevel; i++ {
+	for range w.indentLevel {
 		w.w.Write([]byte{byte('\t')})
 	}
 }
@@ -39,7 +39,7 @@ func (w *TSCodeWriter) WriteLine(line string) {
 }
 
 // WriteLinef writes a formatted line of code to the output.
-func (w *TSCodeWriter) WriteLinef(line string, args ...interface{}) {
+func (w *TSCodeWriter) WriteLinef(line string, args ...any) {
 	l := fmt.Sprintf(line, args...)
 	w.WriteLine(l)
 }
@@ -54,7 +54,7 @@ func (w *TSCodeWriter) Indent(count int) {
 
 // WriteImport writes a TypeScript import.
 func (w *TSCodeWriter) WriteImport(symbolName, importPath string) {
-	w.WriteLinef("import * as %s from \"%s\";", symbolName, importPath)
+	w.WriteLinef("import * as %s from %q;", symbolName, importPath)
 }
 
 // WriteComment writes a comment.

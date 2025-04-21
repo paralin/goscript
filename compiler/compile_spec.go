@@ -105,15 +105,18 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 	if a.Comment != nil {
 		c.WriteDoc(a.Comment)
 	}
-	impPath := a.Path.Value[1 : len(a.Path.Value)-1]
-	impName := packageNameFromGoPath(impPath)
+
+	goPath := a.Path.Value[1 : len(a.Path.Value)-1]
+	impName := packageNameFromGoPath(goPath)
 	if a.Name != nil && a.Name.Name != "" {
 		impName = a.Name.Name
 	}
-	imp := &fileImport{
-		importPath: translateGoPathToTypescriptPath(impPath),
+
+	importPath := translateGoPathToTypescriptPath(goPath)
+	c.imports[impName] = &fileImport{
+		importPath: importPath,
 		importVars: make(map[string]struct{}),
 	}
-	c.imports[impName] = imp
-	c.tsw.WriteImport(impName, imp.importPath)
+
+	c.tsw.WriteImport(impName, importPath)
 }

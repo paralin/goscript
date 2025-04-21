@@ -58,7 +58,15 @@ func (c *GoToTSCompiler) WriteExprBasicLiteral(exp *ast.BasicLit, interpretType 
 
 // WriteExprCall writes a call expression.
 func (c *GoToTSCompiler) WriteExprCall(exp *ast.CallExpr) {
-	c.WriteExpr(exp.Fun, true)
+	expFun := exp.Fun // ast.Expr
+	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent && funIdent.String() == "println" {
+		// rewrite println to console.log
+		c.tsw.WriteLiterally("console.log")
+	} else {
+		// write the function call for non-printf cases
+		c.WriteExpr(expFun, true)
+	}
+
 	c.tsw.WriteLiterally("(")
 	for i, arg := range exp.Args {
 		if i != 0 {

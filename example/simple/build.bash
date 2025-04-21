@@ -2,7 +2,7 @@
 set -eo pipefail
 set -x
 
-pkgs=( "os" "." )
+pkgs=( "." )
 for pkg in ${pkgs[@]}; do
     go run -v github.com/paralin/goscript/cmd/goscript \
          compile \

@@ -34,11 +34,14 @@ func (c *GoToTSCompiler) WriteDeclFunc(decl *ast.FuncDecl) {
 	}
 	// TODO: bind this to recv name
 	isRecv := decl.Recv != nil && len(decl.Recv.List) > 0
+	isExport := decl.Name.IsExported()
 	if isRecv {
 		c.WriteExpr(decl.Recv.List[0].Type, false)
 		c.tsw.WriteLiterally(".prototype.")
 		c.WriteExpr(decl.Name, false)
 		c.tsw.WriteLiterally(" = ")
+	} else if isExport || decl.Name.String() == "main" || decl.Name.String() == "init" {
+		c.tsw.WriteLiterally("export ")
 	}
 	c.tsw.WriteLiterally("function")
 	if decl.Name != nil && !isRecv {
