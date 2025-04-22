@@ -1,16 +1,18 @@
 package compiler
 
 import (
-	"github.com/pkg/errors"
 	"go/token"
-	"path/filepath"
+
+	"github.com/pkg/errors"
 )
 
 // Config is the configuration for the compiler
+// Dir is the working directory for the compiler. If empty, uses the current working directory.
 type Config struct {
 	fset *token.FileSet
-	// GoPathRoot is the GOPATH root.
-	GoPathRoot string
+
+	// Dir is the working directory for the compiler. If empty, uses the current working directory.
+	Dir string
 	// OutputPathRoot is the output path root.
 	OutputPathRoot string
 }
@@ -23,16 +25,8 @@ func (c *Config) Validate() error {
 	if c == nil {
 		return errors.New("config cannot be nil")
 	}
-	if c.GoPathRoot == "" {
-		return errors.New("go path root must be specified")
-	}
 	if c.OutputPathRoot == "" {
 		return errors.New("output path root must be specified")
 	}
 	return nil
-}
-
-// ComputePackagePath computes the path to a package in the gopath.
-func (c *Config) ComputePackagePath(pkgPath string) string {
-	return filepath.Join(c.GoPathRoot, "src", pkgPath)
 }

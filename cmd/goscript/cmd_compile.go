@@ -33,16 +33,16 @@ var CompileCommands = []*cli.Command{{
 			Destination: &cliCompilerPkg,
 		},
 		&cli.StringFlag{
-			Name:        "gopath",
-			Usage:       "the go root to use",
-			Destination: &cliCompilerConfig.GoPathRoot,
-			EnvVars:     []string{"GOPATH"},
-		},
-		&cli.StringFlag{
 			Name:        "output",
 			Usage:       "the output typescript path to use",
 			Destination: &cliCompilerConfig.OutputPathRoot,
 			Value:       "./output",
+		},
+		&cli.StringFlag{
+			Name:        "dir",
+			Usage:       "the working directory to use for the compiler (default: current directory)",
+			Destination: &cliCompilerConfig.Dir,
+			Value:       "",
 		},
 	},
 }}

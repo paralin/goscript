@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Launch test function",
+            "type": "go",
+            "request": "launch",
+            "mode": "test",
+            "program": "${workspaceFolder}/compliance",
+            "args": ["-test.v"]
+        },
+        {
             "name": "Compile example program",
             "type": "go",
             "request": "launch",

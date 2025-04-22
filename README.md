@@ -114,7 +114,6 @@ func main() {
 
 	// Configure the compiler
 	conf := &compiler.Config{
-		GoPathRoot:     "/path/to/your/gopath", // Or project root if not using GOPATH
 		OutputPathRoot: "./ts_output",          // Directory for generated TypeScript files
 	}
 	if err := conf.Validate(); err != nil {

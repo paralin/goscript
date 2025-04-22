@@ -206,6 +206,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 			if i != 0 {
 				c.tsw.WriteLiterally(", ")
 			}
+
 			c.WriteValueExpr(l) // LHS is a value
 			c.tsw.WriteLiterally(" = ")
 

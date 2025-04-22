@@ -25,7 +25,6 @@ func TestBuildRunExampleSimple(t *testing.T) {
 	le := logrus.NewEntry(logger)
 
 	conf := &compiler.Config{
-		GoPathRoot:     projectDir,
 		OutputPathRoot: outputDir,
 	}
 	if err := conf.Validate(); err != nil {
