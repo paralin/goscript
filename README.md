@@ -74,6 +74,72 @@ let myThing = new MyStruct();
 myThing.DoSometing();
 ```
 
+## Usage
+
+### Command Line
+
+Compile a package using the CLI tool:
+
+```bash
+goscript compile --package <go_package_path> --gopath <path_to_gopath> --output <output_directory>
+```
+
+For example, to compile the simple example:
+
+```bash
+cd example/simple
+go run ../../cmd/goscript compile --package . --output ./output
+```
+
+### As a Library
+
+You can also use the compiler directly within your Go code. Here's a basic example:
+
+```go
+package main
+
+import (
+	"context"
+	"log"
+
+	"github.com/paralin/goscript/compiler"
+	"github.com/sirupsen/logrus"
+)
+
+func main() {
+	// Initialize logger (optional)
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel) // Adjust log level as needed
+	le := logrus.NewEntry(logger)
+
+	// Configure the compiler
+	conf := &compiler.Config{
+		GoPathRoot:     "/path/to/your/gopath", // Or project root if not using GOPATH
+		OutputPathRoot: "./ts_output",          // Directory for generated TypeScript files
+	}
+	if err := conf.Validate(); err != nil {
+		log.Fatalf("invalid compiler config: %v", err)
+	}
+
+	// Create a new compiler instance
+	comp, err := compiler.NewCompiler(conf, le, nil) // Pass nil for default package loading options
+	if err != nil {
+		log.Fatalf("failed to create compiler: %v", err)
+	}
+
+	// Compile the desired Go package(s)
+	// Replace "." with the specific Go import path of the package you want to compile
+	if err := comp.CompilePackages(context.Background(), "your/go/package/path"); err != nil {
+		log.Fatalf("compilation failed: %v", err)
+	}
+
+	log.Println("Compilation successful!")
+}
+
+```
+
+This example initializes the compiler with basic configuration, creates a compiler instance, and then calls `CompilePackages` to translate the specified Go package into TypeScript files within the designated output directory.
+
 ## Roadmap
 
  - [X] Simple programs compile & run
