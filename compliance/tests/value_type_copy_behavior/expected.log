@@ -1,0 +1,3 @@
+valueCopy1: Expected: value copy 1, Actual: value copy 1
+dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: original dereferenced copy modified
+valueCopy2: Expected: value copy 2, Actual: value copy 2

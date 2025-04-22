@@ -3,6 +3,7 @@ package compliance
 import (
 	"bytes"
 	"context"
+	"fmt" // Added for Sprintf
 	"io"
 	"os"
 	"os/exec"
@@ -90,8 +91,22 @@ func CompileGoToTypeScript(t *testing.T, tempDir, outputDir string, le *logrus.E
 // WriteTypeScriptRunner writes a runner.ts file to tempDir.
 func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
 	t.Helper()
+
+	// Find the Go source file in the temp directory
+	goFiles, err := filepath.Glob(filepath.Join(tempDir, "*.go"))
+	if err != nil || len(goFiles) == 0 {
+		t.Fatalf("could not find Go source file in temp dir %s: %v", tempDir, err)
+	}
+	if len(goFiles) > 1 {
+		// For simplicity, assume only one relevant Go file per test case for now.
+		t.Logf("warning: found multiple Go files in %s, using the first one: %s", tempDir, goFiles[0])
+	}
+	goSourceBase := filepath.Base(goFiles[0])
+	tsFileName := strings.TrimSuffix(goSourceBase, ".go") + ".gs.ts"
+	tsImportPath := fmt.Sprintf("./output/@go/tempmod/%s", tsFileName)
+
 	tsRunner := filepath.Join(tempDir, "runner.ts")
-	runnerContent := "import { main } from './output/@go/tempmod/main.gs.js';\nmain();\n"
+	runnerContent := fmt.Sprintf("import { main } from %q;\nmain();\n", tsImportPath) // Use dynamic path
 	if err := os.WriteFile(tsRunner, []byte(runnerContent), 0644); err != nil {
 		t.Fatalf("failed to write runner: %v", err)
 	}
@@ -133,7 +148,5 @@ func RunGoScriptTestDir(t *testing.T, testDir string) {
 	exp := strings.TrimSpace(expected)
 	if actual != exp {
 		t.Fatalf("output mismatch\nExpected:\n%s\nActual:\n%s", exp, actual)
-	} else {
-		le.Infof("output correct: %s", actual)
 	}
 }

@@ -1,0 +1,2 @@
+Original struct literal: Expected: composite literal, Actual: composite literal
+Modified struct literal copy: Expected: modified composite literal copy, Actual: modified composite literal copy

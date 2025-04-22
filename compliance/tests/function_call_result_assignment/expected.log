@@ -1,0 +1,2 @@
+Original struct from function: Expected: function result, Actual: function result
+Modified struct from function copy: Expected: modified function result copy, Actual: modified function result copy

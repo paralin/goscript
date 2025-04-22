@@ -1,0 +1,2 @@
+Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: hello world
+Simple Dereferenced Copy: Expected: modified dereferenced copy, Actual: modified dereferenced copy

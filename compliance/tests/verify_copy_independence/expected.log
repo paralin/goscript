@@ -1,0 +1,4 @@
+pointerCopy (points to original structPointer): Expected: hello world, Actual: hello world
+dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: original dereferenced copy modified
+valueCopy1: Expected: value copy 1, Actual: value copy 1
+valueCopy2: Expected: value copy 2, Actual: value copy 2
