@@ -142,7 +142,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) {
 			c.tsw.WriteLinef("const %s = this", recvName)
 			// write method body without outer braces
 			for _, stmt := range decl.Body.List {
-				c.WriteStmt(stmt, true)
+				c.WriteStmt(stmt)
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
@@ -150,7 +150,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) {
 		}
 	}
 	// no named receiver, write whole body
-	c.WriteStmt(decl.Body, true)
+	c.WriteStmt(decl.Body)
 }
 
 // WriteValueSpec writes the value specification to the output.

@@ -5,21 +5,14 @@ import (
 	"go/ast"
 	"go/token"
 	gtypes "go/types"
+	"strings"
 
-	gstypes "github.com/paralin/goscript/types" // Explicit alias for goscript types
+	gstypes "github.com/paralin/goscript/types"
 	"github.com/sanity-io/litter"
 )
 
-// WriteStmt writes a statement to the output, including associated comments if writeComments is true.
-func (c *GoToTSCompiler) WriteStmt(a ast.Stmt, writeComments bool) {
-	if writeComments {
-		if comments := c.cmap[a]; comments != nil {
-			for _, cg := range comments {
-				c.WriteDoc(cg)
-			}
-		}
-	}
-
+// WriteStmt writes a statement to the output.
+func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 	switch exp := a.(type) {
 	case *ast.BlockStmt:
 		c.WriteStmtBlock(exp)
@@ -38,7 +31,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt, writeComments bool) {
 
 // Overload for backward compatibility
 func (c *GoToTSCompiler) WriteStmtCompat(a ast.Stmt) {
-	c.WriteStmt(a, true)
+	c.WriteStmt(a)
 }
 
 // WriteStmtIf writes an if statement.
@@ -47,7 +40,7 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) {
 		s.tsw.WriteLiterally("{")
 		s.tsw.Indent(1)
 
-		s.WriteStmt(exp.Init, false) // Do not write comments for Init
+		s.WriteStmt(exp.Init)
 
 		defer func() {
 			s.tsw.Indent(-1)
@@ -110,18 +103,40 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt) {
 
 	// 1. For each statement: write its leading comments, blank space, then the stmt
 	for _, stmt := range exp.List {
-		// leading comments for stmt
+		// Get statement's end line and position for inline comment check
+		stmtEndLine := 0
+		stmtEndPos := token.NoPos
+		if file != nil && stmt.End().IsValid() {
+			stmtEndLine = file.Line(stmt.End())
+			stmtEndPos = stmt.End()
+		}
+
+		// Process leading comments for stmt
 		comments := c.cmap.Filter(stmt).Comments()
 		for _, cg := range comments {
-			start := 0
-			if file != nil && cg.Pos().IsValid() {
-				start = file.Line(cg.Pos())
+			// Check if this comment group is an inline comment for the current statement
+			isInlineComment := false
+			if file != nil && cg.Pos().IsValid() && stmtEndPos.IsValid() {
+				commentStartLine := file.Line(cg.Pos())
+				// Inline if starts on same line as stmt end AND starts after stmt end position
+				if commentStartLine == stmtEndLine && cg.Pos() > stmtEndPos {
+					isInlineComment = true
+				}
 			}
-			writeBlank(lastLine, start)
-			c.WriteDoc(cg)
-			if file != nil && cg.End().IsValid() {
-				lastLine = file.Line(cg.End())
+
+			// If it's NOT an inline comment for this statement, write it here
+			if !isInlineComment {
+				start := 0
+				if file != nil && cg.Pos().IsValid() {
+					start = file.Line(cg.Pos())
+				}
+				writeBlank(lastLine, start)
+				c.WriteDoc(cg) // WriteDoc will handle the actual comment text
+				if file != nil && cg.End().IsValid() {
+					lastLine = file.Line(cg.End())
+				}
 			}
+			// If it IS an inline comment, skip it. The statement writer will handle it.
 		}
 
 		// the statement itself
@@ -130,8 +145,12 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt) {
 			stmtStart = file.Line(stmt.Pos())
 		}
 		writeBlank(lastLine, stmtStart)
-		c.WriteStmt(stmt, false)
+		// Call the specific statement writer (e.g., WriteStmtAssign).
+		// It is responsible for handling its own inline comment.
+		c.WriteStmt(stmt)
+
 		if file != nil && stmt.End().IsValid() {
+			// Update lastLine based on the statement's end, *including* potential inline comment handled by WriteStmt*
 			lastLine = file.Line(stmt.End())
 		}
 	}
@@ -178,6 +197,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 	if len(lhs) == 0 {
 		return
 	}
+
+	// Write the core assignment statement (LHS, operator, RHS)
 	// special-case define assignments (`:=`):
 	if exp.Tok == token.DEFINE {
 		c.tsw.WriteLiterally("let ")
@@ -196,6 +217,22 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 				c.WriteValueExpr(rhs[i]) // RHS is a value
 			}
 		}
+
+		// Handle trailing inline comment AFTER writing the statement but BEFORE the newline
+		if c.pkg != nil && c.pkg.Fset != nil && exp.End().IsValid() {
+			if file := c.pkg.Fset.File(exp.End()); file != nil {
+				endLine := file.Line(exp.End())
+				for _, cg := range c.cmap[exp] {
+					if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
+						commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
+						c.tsw.WriteLiterally(" // " + commentText)
+						break
+					}
+				}
+			}
+		}
+
+		// Write the newline to finish the statement line
 		c.tsw.WriteLine("")
 		return
 	}
@@ -222,13 +259,60 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 		}
 		c.WriteValueExpr(r) // RHS is a value
 	}
+
+	// Handle trailing inline comment AFTER writing the statement but BEFORE the newline
+	if c.pkg != nil && c.pkg.Fset != nil && exp.End().IsValid() {
+		if file := c.pkg.Fset.File(exp.End()); file != nil {
+			endLine := file.Line(exp.End())
+			for _, cg := range c.cmap[exp] {
+				if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
+					commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
+					c.tsw.WriteLiterally(" // " + commentText)
+					break
+				}
+			}
+		}
+	}
+
+	// Write the newline to finish the statement line
 	c.tsw.WriteLine("")
 }
 
 // WriteStmtExpr writes an expr statement.
 func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) {
 	c.WriteValueExpr(exp.X) // Expression statement evaluates a value
-	c.tsw.WriteLine(";")
+
+	// Handle potential inline comment for ExprStmt
+	inlineCommentWritten := false
+	if c.pkg != nil && c.pkg.Fset != nil && exp.End().IsValid() {
+		if file := c.pkg.Fset.File(exp.End()); file != nil {
+			endLine := file.Line(exp.End())
+			// Check comments associated *directly* with the ExprStmt node
+			for _, cg := range c.cmap[exp] {
+				if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
+					commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
+					c.tsw.WriteLiterally(" // " + commentText)
+					inlineCommentWritten = true
+					break
+				}
+			}
+			// Also check comments associated with the underlying expression X
+			// This might be necessary if the comment map links it to X instead of ExprStmt
+			if !inlineCommentWritten {
+				for _, cg := range c.cmap[exp.X] {
+					if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
+						commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
+						c.tsw.WriteLiterally(" // " + commentText)
+						inlineCommentWritten = true
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// Add semicolon according to design doc (omit semicolons) - REMOVED semicolon
+	c.tsw.WriteLine("") // Finish with a newline
 }
 
 // WriteZeroValue writes the TypeScript zero‐value for a Go type.

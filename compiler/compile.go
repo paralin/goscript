@@ -16,5 +16,10 @@ type GoToTSCompiler struct {
 
 // NewGoToTSCompiler builds a new GoToTSCompiler
 func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, cmap ast.CommentMap) *GoToTSCompiler {
-	return &GoToTSCompiler{tsw: tsw, imports: make(map[string]*fileImport), pkg: pkg, cmap: cmap}
+	return &GoToTSCompiler{
+		tsw:     tsw,
+		imports: make(map[string]*fileImport),
+		pkg:     pkg,
+		cmap:    cmap,
+	}
 }

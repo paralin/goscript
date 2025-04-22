@@ -10,6 +10,7 @@ func (c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup) {
 	if doc == nil {
 		return
 	}
+
 	for _, comment := range doc.List {
 		// Preserve original comment style (// or /*)
 		if strings.HasPrefix(comment.Text, "//") {

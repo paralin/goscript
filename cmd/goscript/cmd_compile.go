@@ -12,7 +12,6 @@ import (
 var cliCompiler *compiler.Compiler
 var cliCompilerConfig compiler.Config
 var cliCompilerPkg string
-var test1, test2 = 1, 2
 
 // CompileCommands are commands related to compiling code.
 var CompileCommands = []*cli.Command{{

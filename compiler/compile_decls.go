@@ -50,5 +50,5 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) {
 	c.WriteValueExpr(decl.Name) // Function name is a value identifier
 	c.WriteFuncType(decl.Type)  // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
-	c.WriteStmt(decl.Body, true) // Write function body, pass writeComments=true
+	c.WriteStmt(decl.Body)
 }
