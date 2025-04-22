@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/urfave/cli/v2"
+	"github.com/aperturerobotics/cli"
 )
 
 func main() {

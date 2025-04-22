@@ -3,10 +3,10 @@ package main
 import (
 	"context"
 
+	"github.com/aperturerobotics/cli"
 	"github.com/paralin/goscript/compiler"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-	"github.com/urfave/cli/v2"
 )
 
 var cliCompiler *compiler.Compiler
