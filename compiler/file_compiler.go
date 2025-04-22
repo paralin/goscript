@@ -30,13 +30,13 @@ type FileCompiler struct {
 func NewFileCompiler(
 	compilerConf *Config,
 	pkg *packages.Package,
-	ast *ast.File,
+	astFile *ast.File,
 	fullPath string,
 ) (*FileCompiler, error) {
 	return &FileCompiler{
 		compilerConfig: compilerConf,
 		pkg:            pkg,
-		ast:            ast,
+		ast:            astFile,
 		fullPath:       fullPath,
 
 		imports: make(map[string]fileImport),
@@ -62,7 +62,10 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	defer of.Close()
 
 	c.codeWriter = NewTSCodeWriter(of)
-	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg)
+	// Create comment map
+	cmap := ast.NewCommentMap(c.pkg.Fset, f, f.Comments)
+	// Pass comment map to compiler
+	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg, cmap)
 	goWriter.WriteDecls(f.Decls)
 
 	return nil

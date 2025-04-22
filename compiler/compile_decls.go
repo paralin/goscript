@@ -1,54 +1,54 @@
 package compiler
 
 import (
+	"fmt"
 	"go/ast"
-
-	"github.com/sanity-io/litter"
 )
 
 // WriteDecls writes a slice of declarations.
 func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) {
-	cw := c.tsw
 	for _, decl := range decls {
 		switch d := decl.(type) {
-		case *ast.GenDecl:
-			if d.Doc != nil {
-				c.WriteDoc(d.Doc)
+		case *ast.FuncDecl:
+			// Only handle top-level functions here. Methods are handled within WriteTypeSpec.
+			if d.Recv == nil {
+				c.WriteFuncDeclAsFunction(d)
+				c.tsw.WriteLine("") // Add space after function
 			}
+		case *ast.GenDecl:
 			for _, spec := range d.Specs {
 				c.WriteSpec(spec)
+				c.tsw.WriteLine("") // Add space after spec
 			}
-		case *ast.FuncDecl:
-			c.WriteDeclFunc(d)
 		default:
-			cw.WriteCommentLine(litter.Sdump(decl))
+			fmt.Printf("unknown decl: %#v\n", decl)
 		}
-		cw.WriteSectionTail()
 	}
 }
 
-// WriteDeclFunc writes a function declaration
-func (c *GoToTSCompiler) WriteDeclFunc(decl *ast.FuncDecl) {
+// WriteFuncDeclAsFunction writes a function declaration
+// NOTE: This function now ONLY handles regular functions, not methods (functions with receivers).
+// Method generation is handled within the type definition writer (e.g., for structs).
+func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) {
+	if decl.Recv != nil {
+		// This function should not be called for methods.
+		// Methods are handled by WriteFuncDeclAsMethod within WriteTypeSpec.
+		return
+	}
+
 	if decl.Doc != nil {
 		c.WriteDoc(decl.Doc)
 	}
-	// TODO: bind this to recv name
-	isRecv := decl.Recv != nil && len(decl.Recv.List) > 0
-	isExport := decl.Name.IsExported()
-	if isRecv {
-		c.WriteExpr(decl.Recv.List[0].Type, false)
-		c.tsw.WriteLiterally(".prototype.")
-		c.WriteExpr(decl.Name, false)
-		c.tsw.WriteLiterally(" = ")
-	} else if isExport || decl.Name.String() == "main" || decl.Name.String() == "init" {
+
+	// Exported functions start with uppercase in Go, or special-case "main" entry point
+	isExported := decl.Name.IsExported() || decl.Name.Name == "main"
+	if isExported {
 		c.tsw.WriteLiterally("export ")
 	}
-	c.tsw.WriteLiterally("function")
-	if decl.Name != nil && !isRecv {
-		c.tsw.WriteLiterally(" ")
-		c.WriteExpr(decl.Name, false)
-	}
-	c.WriteExpr(decl.Type, false)
+
+	c.tsw.WriteLiterally("function ")
+	c.WriteValueExpr(decl.Name) // Function name is a value identifier
+	c.WriteFuncType(decl.Type)  // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
-	c.WriteStmt(decl.Body)
+	c.WriteStmt(decl.Body, true) // Write function body, pass writeComments=true
 }

@@ -1,6 +1,8 @@
 package compiler
 
 import (
+	"go/ast"
+
 	"golang.org/x/tools/go/packages"
 )
 
@@ -9,9 +11,10 @@ type GoToTSCompiler struct {
 	tsw     *TSCodeWriter
 	imports map[string]*fileImport
 	pkg     *packages.Package
+	cmap    ast.CommentMap
 }
 
 // NewGoToTSCompiler builds a new GoToTSCompiler
-func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package) *GoToTSCompiler {
-	return &GoToTSCompiler{tsw: tsw, imports: make(map[string]*fileImport), pkg: pkg}
+func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, cmap ast.CommentMap) *GoToTSCompiler {
+	return &GoToTSCompiler{tsw: tsw, imports: make(map[string]*fileImport), pkg: pkg, cmap: cmap}
 }
