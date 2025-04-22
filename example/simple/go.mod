@@ -5,7 +5,7 @@ go 1.24
 replace github.com/paralin/goscript => ../../
 
 require (
-	github.com/paralin/goscript v0.0.0-20250421030831-d43902ff27e1
+	github.com/paralin/goscript v0.0.0-20250421235527-0180cae519d3
 	github.com/sirupsen/logrus v1.9.3
 )
 
