@@ -12,6 +12,10 @@
       "matchManagers": ["gomod"],
       "matchDepTypes": ["replace"],
       "enabled": false
+    },
+    {
+      "matchPackageNames": ["github.com/paralin/goscript"],
+      "enabled": false
     }
   ]
 }
