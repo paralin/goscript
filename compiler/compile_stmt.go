@@ -57,6 +57,16 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) {
 	} else {
 		s.tsw.WriteLine("{}")
 	}
+	// handle else branch
+	if exp.Else != nil {
+		s.tsw.WriteLiterally(" else ")
+		switch elseStmt := exp.Else.(type) {
+		case *ast.BlockStmt:
+			s.WriteStmtBlock(elseStmt)
+		case *ast.IfStmt:
+			s.WriteStmtIf(elseStmt)
+		}
+	}
 }
 
 // WriteStmtReturn writes a return statement.

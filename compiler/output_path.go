@@ -22,8 +22,8 @@ func packageNameFromGoPath(goPkgPath string) string {
 	return pts[len(pts)-1]
 }
 
-// translateGoFilePathToTypescriptFilePath converts the go package path and typescript filename to output path within the typescript output dir
-func translateGoFilePathToTypescriptFilePath(goPkgPath, goCodeFilename string) string {
+// TranslateGoFilePathToTypescriptFilePath converts the go package path and typescript filename to output path within the typescript output dir
+func TranslateGoFilePathToTypescriptFilePath(goPkgPath, goCodeFilename string) string {
 	op := translateGoPathToTypescriptPath(goPkgPath)
 	baseFilename := goCodeFilename[:len(goCodeFilename)-3]
 	baseFilename = fmt.Sprintf("%s.gs.ts", baseFilename)

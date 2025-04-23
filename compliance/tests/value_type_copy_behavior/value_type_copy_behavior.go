@@ -21,4 +21,5 @@ func main() {
 	println("dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: " + dereferencedStructCopy.MyString)
 	// Expected: "value copy 2"
 	println("valueCopy2: Expected: value copy 2, Actual: " + valueCopy2.MyString)
+	_ = pointerCopy
 }

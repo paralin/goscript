@@ -9,9 +9,11 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var cliCompiler *compiler.Compiler
-var cliCompilerConfig compiler.Config
-var cliCompilerPkg string
+var (
+	cliCompiler       *compiler.Compiler
+	cliCompilerConfig compiler.Config
+	cliCompilerPkg    string
+)
 
 // CompileCommands are commands related to compiling code.
 var CompileCommands = []*cli.Command{{

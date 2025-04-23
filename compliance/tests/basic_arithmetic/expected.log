@@ -1,0 +1,5 @@
+Addition: Expected: 5, Actual: 5
+Subtraction: Expected: 6, Actual: 6
+Multiplication: Expected: 42, Actual: 42
+Division: Expected: 4, Actual: 4
+Modulus: Expected: 2, Actual: 2

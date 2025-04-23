@@ -1,0 +1,2 @@
+MyInt: Expected: 42, Actual: 42
+MyString: Expected: foo, Actual: foo

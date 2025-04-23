@@ -48,14 +48,14 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	f := c.ast
 
 	pkgPath := c.pkg.PkgPath
-	outputFilePath := translateGoFilePathToTypescriptFilePath(pkgPath, filepath.Base(c.fullPath))
+	outputFilePath := TranslateGoFilePathToTypescriptFilePath(pkgPath, filepath.Base(c.fullPath))
 	outputFilePathAbs := filepath.Join(c.compilerConfig.OutputPathRoot, outputFilePath)
 
-	if err := os.MkdirAll(filepath.Dir(outputFilePathAbs), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(outputFilePathAbs), 0o755); err != nil {
 		return err
 	}
 
-	of, err := os.OpenFile(outputFilePathAbs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0644)
+	of, err := os.OpenFile(outputFilePathAbs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
 	if err != nil {
 		return err
 	}

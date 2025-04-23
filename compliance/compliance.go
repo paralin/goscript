@@ -32,7 +32,7 @@ func PrepareTempTestDir(t *testing.T, testDir string) string {
 
 	goModPath := filepath.Join(tempDir, "go.mod")
 	goModContent := []byte("module tempmod\n\ngo 1.24\n")
-	if err := os.WriteFile(goModPath, goModContent, 0644); err != nil {
+	if err := os.WriteFile(goModPath, goModContent, 0o644); err != nil {
 		os.RemoveAll(tempDir)
 		t.Fatalf("failed to write go.mod: %v", err)
 	}
@@ -50,7 +50,7 @@ func PrepareTempTestDir(t *testing.T, testDir string) string {
 			os.RemoveAll(tempDir)
 			t.Fatalf("failed to read %s: %v", src, err)
 		}
-		if err := os.WriteFile(dst, data, 0644); err != nil {
+		if err := os.WriteFile(dst, data, 0o644); err != nil {
 			os.RemoveAll(tempDir)
 			t.Fatalf("failed to write %s: %v", dst, err)
 		}
@@ -79,6 +79,23 @@ func CompileGoToTypeScript(t *testing.T, tempDir, outputDir string, le *logrus.E
 	if err := conf.Validate(); err != nil {
 		t.Fatalf("invalid compiler config: %v", err)
 	}
+
+	// Log each .go file and its mapped .gs.ts output file and contents
+	goFiles, err := filepath.Glob(filepath.Join(tempDir, "*.go"))
+	if err != nil || len(goFiles) == 0 {
+		t.Fatalf("no .go files found in %s: %v", tempDir, err)
+	}
+	for _, src := range goFiles {
+		base := filepath.Base(src)
+		out := filepath.Join(outputDir, compiler.TranslateGoFilePathToTypescriptFilePath("tempmod", base))
+		t.Logf("Compiling Go file: %s => %s", src, out)
+		if data, err := os.ReadFile(src); err == nil {
+			t.Logf("Source %s:\n%s", src, string(data))
+		} else {
+			t.Logf("could not read source %s: %v", src, err)
+		}
+	}
+
 	comp, err := compiler.NewCompiler(conf, le, nil)
 	if err != nil {
 		t.Fatalf("failed to create compiler: %v", err)
@@ -86,6 +103,22 @@ func CompileGoToTypeScript(t *testing.T, tempDir, outputDir string, le *logrus.E
 	if err := comp.CompilePackages(context.Background(), "."); err != nil {
 		t.Fatalf("compilation failed: %v", err)
 	}
+
+	// Log generated TypeScript files
+	filepath.WalkDir(outputDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			t.Logf("error walking path %s: %v", path, err)
+			return nil
+		}
+		if strings.HasSuffix(path, ".ts") {
+			if data, err := os.ReadFile(path); err == nil {
+				t.Logf("Generated %s:\n%s", path, string(data))
+			} else {
+				t.Logf("could not read output %s: %v", path, err)
+			}
+		}
+		return nil
+	})
 }
 
 // WriteTypeScriptRunner writes a runner.ts file to tempDir.
@@ -107,7 +140,7 @@ func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
 
 	tsRunner := filepath.Join(tempDir, "runner.ts")
 	runnerContent := fmt.Sprintf("import { main } from %q;\nmain();\n", tsImportPath) // Use dynamic path
-	if err := os.WriteFile(tsRunner, []byte(runnerContent), 0644); err != nil {
+	if err := os.WriteFile(tsRunner, []byte(runnerContent), 0o644); err != nil {
 		t.Fatalf("failed to write runner: %v", err)
 	}
 	return tsRunner
