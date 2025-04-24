@@ -21,10 +21,10 @@ func TestCompliance(t *testing.T) {
 			continue
 		}
 		testPath := filepath.Join(testsDir, dir.Name())
-		expectedLogPath := filepath.Join(testPath, "expected.log")
-		if _, err := os.Stat(expectedLogPath); err != nil {
-			continue // skip if no expected.log
-		}
+		// expectedLogPath := filepath.Join(testPath, "expected.log")
+		// if _, err := os.Stat(expectedLogPath); err != nil {
+		//	continue // skip if no expected.log
+		//}
 		goFiles, err := filepath.Glob(filepath.Join(testPath, "*.go"))
 		if err != nil || len(goFiles) == 0 {
 			t.Errorf("no .go files found in %s", testPath)

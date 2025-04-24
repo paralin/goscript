@@ -1,1 +1,1 @@
-When making Git commits, write your commit message into `./.git/pending-commit` and then commit with `git commit -s -F ./.git/pending-commit` and wlways use short and descriptive git commit messages in all lowercase with the lines limited at 80 characters wrapped.
+When making Git commits, first add files with `git add`, then write your commit message into `./.git/pending-commit` and then commit with `git commit -s -F ./.git/pending-commit` and always use short and descriptive git commit messages in all lowercase with the lines limited at 80 characters wrapped.

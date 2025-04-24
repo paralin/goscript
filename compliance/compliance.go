@@ -251,8 +251,6 @@ func RunGoScriptTestDir(t *testing.T, testDir string) {
 		t.Fatalf("failed to write tsconfig.json to temp dir: %v", err)
 	}
 
-	expected := ReadExpectedLog(t, testDir)
-
 	outputDir := filepath.Join(tempDir, "output")
 	CompileGoToTypeScript(t, testDir, tempDir, outputDir, le) // Pass testDir to enable copying output files back to the test directory
 
@@ -267,8 +265,25 @@ func RunGoScriptTestDir(t *testing.T, testDir string) {
 
 	tsRunner := WriteTypeScriptRunner(t, tempDir)
 	actual := strings.TrimSpace(RunTypeScriptRunner(t, tempDir, tsRunner))
-	exp := strings.TrimSpace(expected)
-	if actual != exp {
-		t.Fatalf("output mismatch\nExpected:\n%s\nActual:\n%s", exp, actual)
+
+	expectedLogPath := filepath.Join(testDir, "expected.log")
+	expected, err := os.ReadFile(expectedLogPath)
+	if os.IsNotExist(err) {
+		// If expected.log doesn't exist, write the actual output to it
+		t.Logf("expected.log not found, writing actual output to %s", expectedLogPath)
+		if writeErr := os.WriteFile(expectedLogPath, []byte(actual), 0o644); writeErr != nil {
+			t.Fatalf("failed to write expected.log: %v", writeErr)
+		}
+		// Test passes on the first run if expected.log is generated
+		t.Logf("Generated expected.log for %s", filepath.Base(testDir))
+	} else if err != nil {
+		// If there was another error reading expected.log, fail the test
+		t.Fatalf("failed to read expected.log in %s: %v", testDir, err)
+	} else {
+		// If expected.log exists, compare actual output to expected
+		exp := strings.TrimSpace(string(expected))
+		if actual != exp {
+			t.Fatalf("output mismatch\nExpected:\n%s\nActual:\n%s", exp, actual)
+		}
 	}
 }
