@@ -15,7 +15,7 @@ import (
 func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 	switch exp := a.(type) {
 	case *ast.BlockStmt:
-		c.WriteStmtBlock(exp)
+		c.WriteStmtBlock(exp, false)
 	case *ast.AssignStmt:
 		c.WriteStmtAssign(exp)
 	case *ast.ReturnStmt:
@@ -24,6 +24,21 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 		c.WriteStmtIf(exp)
 	case *ast.ExprStmt:
 		c.WriteStmtExpr(exp)
+	case *ast.DeclStmt:
+		// Handle declarations within a statement list (e.g., short variable declarations)
+		// This typically contains a GenDecl
+		if genDecl, ok := exp.Decl.(*ast.GenDecl); ok {
+			for _, spec := range genDecl.Specs {
+				// Value specs within a declaration statement
+				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
+					c.WriteValueSpec(valueSpec)
+				} else {
+					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled spec in DeclStmt: %T", spec))
+				}
+			}
+		} else {
+			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled declaration type in DeclStmt: %T", exp.Decl))
+		}
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
@@ -53,16 +68,18 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) {
 	s.tsw.WriteLiterally(") ")
 
 	if exp.Body != nil {
-		s.WriteStmtBlock(exp.Body)
+		s.WriteStmtBlock(exp.Body, exp.Else != nil)
 	} else {
-		s.tsw.WriteLine("{}")
+		// Handle nil body case using WriteStmtBlock with an empty block
+		s.WriteStmtBlock(&ast.BlockStmt{}, exp.Else != nil)
 	}
+
 	// handle else branch
 	if exp.Else != nil {
 		s.tsw.WriteLiterally(" else ")
 		switch elseStmt := exp.Else.(type) {
 		case *ast.BlockStmt:
-			s.WriteStmtBlock(elseStmt)
+			s.WriteStmtBlock(elseStmt, false)
 		case *ast.IfStmt:
 			s.WriteStmtIf(elseStmt)
 		}
@@ -82,9 +99,12 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) {
 }
 
 // WriteStmtBlock writes a block statement, preserving comments and blank lines.
-func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt) {
+func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool) {
 	if exp == nil {
-		c.tsw.WriteLine("{}")
+		c.tsw.WriteLiterally("{}")
+		if !suppressNewline {
+			c.tsw.WriteLine("")
+		}
 		return
 	}
 
@@ -191,7 +211,11 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt) {
 
 	// Closing brace
 	c.tsw.Indent(-1)
-	c.tsw.WriteLine("}")
+	c.tsw.WriteLiterally("}")
+
+	if !suppressNewline {
+		c.tsw.WriteLine("")
+	}
 }
 
 // WriteStmtAssign writes an assign statement.

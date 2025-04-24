@@ -69,8 +69,7 @@ func ReadExpectedLog(t *testing.T, testDir string) string {
 	return string(expected)
 }
 
-// CompileGoToTypeScript compiles Go files in tempDir to TypeScript outputDir.
-func CompileGoToTypeScript(t *testing.T, tempDir, outputDir string, le *logrus.Entry) {
+func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le *logrus.Entry) {
 	t.Helper()
 	conf := &compiler.Config{
 		Dir:            tempDir,
@@ -104,18 +103,52 @@ func CompileGoToTypeScript(t *testing.T, tempDir, outputDir string, le *logrus.E
 		t.Fatalf("compilation failed: %v", err)
 	}
 
-	// Log generated TypeScript files
+	// Log generated TypeScript files and copy them back to testDir
 	filepath.WalkDir(outputDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			t.Logf("error walking path %s: %v", path, err)
 			return nil
 		}
-		if strings.HasSuffix(path, ".ts") {
-			if data, err := os.ReadFile(path); err == nil {
-				t.Logf("Generated %s:\n%s", path, string(data))
-			} else {
-				t.Logf("could not read output %s: %v", path, err)
+		if strings.HasSuffix(path, ".gs.ts") { // Look specifically for .gs.ts files
+			// Determine the destination path in the original testDir
+			relPath, err := filepath.Rel(outputDir, path)
+			if err != nil {
+				t.Logf("failed to get relative path for %s: %v", path, err)
+				return nil // Continue walking
 			}
+			// relPath is like "@go/tempmod/file.gs.ts", so extract the base file name
+			parts := strings.Split(relPath, string(filepath.Separator))
+			if len(parts) < 3 {
+				t.Logf("unexpected path structure for %s", path)
+				return nil // Continue walking
+			}
+			fileName := parts[len(parts)-1]
+			destPath := filepath.Join(testDir, fileName)
+
+			// Read the generated content
+			generatedContent, err := os.ReadFile(path)
+			if err != nil {
+				t.Logf("could not read generated file %s: %v", path, err)
+				return nil // Continue walking
+			}
+
+			// Determine the original Go file name
+			goFileName := strings.TrimSuffix(fileName, ".gs.ts") + ".go"
+
+			// Construct the comment
+			comment := fmt.Sprintf("// Generated file based on %s\n// Updated when compliance tests are re-run, DO NOT EDIT!\n\n", goFileName)
+
+			// Prepend the comment to the generated content
+			finalContent := append([]byte(comment), generatedContent...)
+
+			t.Logf("Writing generated file with comment to %s", destPath)
+			if err := os.WriteFile(destPath, finalContent, 0o644); err != nil {
+				t.Logf("failed to write file %s: %v", destPath, err)
+				return err
+			}
+
+			// Log the final content written
+			t.Logf("Final content written to %s:\n%s", destPath, string(finalContent))
 		}
 		return nil
 	})
@@ -160,6 +193,38 @@ func RunTypeScriptRunner(t *testing.T, tempDir, tsRunner string) string {
 	return outBuf.String()
 }
 
+// copyFile copies a file from src to dst.
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file %s: %w", src, err)
+	}
+	defer sourceFile.Close()
+
+	// Ensure destination directory exists
+	destDir := filepath.Dir(dst)
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create destination directory %s: %w", destDir, err)
+	}
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
+	}
+	defer destFile.Close()
+
+	if _, err := io.Copy(destFile, sourceFile); err != nil {
+		return fmt.Errorf("failed to copy file content from %s to %s: %w", src, dst, err)
+	}
+
+	// Ensure data is synced to disk
+	if err := destFile.Sync(); err != nil {
+		return fmt.Errorf("failed to sync destination file %s: %w", dst, err)
+	}
+
+	return nil
+}
+
 // RunGoScriptTestDir compiles all .go files in testDir, runs the generated TypeScript, and compares output to expected.log.
 func RunGoScriptTestDir(t *testing.T, testDir string) {
 	t.Helper()
@@ -174,7 +239,7 @@ func RunGoScriptTestDir(t *testing.T, testDir string) {
 	expected := ReadExpectedLog(t, testDir)
 
 	outputDir := filepath.Join(tempDir, "output")
-	CompileGoToTypeScript(t, tempDir, outputDir, le)
+	CompileGoToTypeScript(t, testDir, tempDir, outputDir, le) // Pass testDir to enable copying output files back to the test directory
 
 	tsRunner := WriteTypeScriptRunner(t, tempDir)
 	actual := strings.TrimSpace(RunTypeScriptRunner(t, tempDir, tsRunner))

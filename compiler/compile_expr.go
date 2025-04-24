@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	gtypes "go/types"
 
 	gstypes "github.com/paralin/goscript/types"
 )
@@ -23,7 +24,11 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 		c.WriteInterfaceType(exp)
 	case *ast.FuncType:
 		c.WriteFuncType(exp)
-	// Add cases for ArrayType, MapType, ChanType etc.
+	case *ast.ArrayType:
+		// Translate [N]T to T[]
+		c.WriteTypeExpr(exp.Elt)
+		c.tsw.WriteLiterally("[]")
+	// Add cases for MapType, ChanType etc.
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled type expr: %T", exp))
 	}
@@ -50,7 +55,18 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) {
 		c.WriteCompositeLitValue(exp)
 	case *ast.KeyValueExpr:
 		c.WriteKeyValueExprValue(exp)
-	// Add cases for IndexExpr, SliceExpr etc.
+	case *ast.IndexExpr:
+		// Translate X[Index] to X[Index]
+		c.WriteValueExpr(exp.X)
+		c.tsw.WriteLiterally("[")
+		c.WriteValueExpr(exp.Index)
+		c.tsw.WriteLiterally("]")
+	case *ast.ParenExpr:
+		// Translate (X) to (X)
+		c.tsw.WriteLiterally("(")
+		c.WriteValueExpr(exp.X)
+		c.tsw.WriteLiterally(")")
+	// Add cases for SliceExpr etc.
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled value expr: %T", exp))
 	}
@@ -241,21 +257,103 @@ func (c *GoToTSCompiler) WriteBasicLitValue(exp *ast.BasicLit) {
 	c.tsw.WriteLiterally(exp.Value)
 }
 
-// WriteCompositeLitValue writes a composite literal value.
+/*
+WriteCompositeLitValue writes a composite literal value.
+For array literals, uses type information to determine array length and element type,
+and fills uninitialized elements with the correct zero value.
+*/
 func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
 	if exp.Type != nil {
-		// Typed literal, likely a struct: new Type({...})
-		c.tsw.WriteLiterally("new ")
-		c.WriteTypeExpr(exp.Type)
-		c.tsw.WriteLiterally("({ ") // Use object literal syntax
-		for i, elm := range exp.Elts {
-			if i != 0 {
-				c.tsw.WriteLiterally(", ")
+		if arrType, isArrayType := exp.Type.(*ast.ArrayType); isArrayType {
+			c.tsw.WriteLiterally("[")
+			// Use type info to get array length and element type
+			var arrayLen int
+			var elemType ast.Expr
+			var goElemType interface{}
+			if typ := c.pkg.TypesInfo.TypeOf(exp.Type); typ != nil {
+				if at, ok := typ.Underlying().(*gtypes.Array); ok {
+					arrayLen = int(at.Len())
+					goElemType = at.Elem()
+				}
 			}
-			c.WriteValueExpr(elm) // Elements are likely KeyValueExpr
+			if arrType.Len != nil {
+				// Try to evaluate the length from the AST if not available from type info
+				if bl, ok := arrType.Len.(*ast.BasicLit); ok && bl.Kind == token.INT {
+					fmt.Sscan(bl.Value, &arrayLen)
+				}
+			}
+			elemType = arrType.Elt
+
+			// Map of index -> value
+			elements := make(map[int]ast.Expr)
+			orderedCount := 0
+			maxIndex := -1
+			hasKeyedElements := false
+
+			for _, elm := range exp.Elts {
+				if kv, ok := elm.(*ast.KeyValueExpr); ok {
+					if lit, ok := kv.Key.(*ast.BasicLit); ok && lit.Kind == token.INT {
+						var index int
+						fmt.Sscan(lit.Value, &index)
+						elements[index] = kv.Value
+						if index > maxIndex {
+							maxIndex = index
+						}
+						hasKeyedElements = true
+					} else {
+						c.tsw.WriteCommentInline("unhandled keyed array literal key type")
+						c.WriteValueExpr(elm)
+					}
+				} else {
+					elements[orderedCount] = elm
+					if orderedCount > maxIndex {
+						maxIndex = orderedCount
+					}
+					orderedCount++
+				}
+			}
+
+			// Determine array length
+			if arrayLen == 0 {
+				// If length is not set, infer from max index or number of elements
+				if hasKeyedElements {
+					arrayLen = maxIndex + 1
+				} else {
+					arrayLen = len(exp.Elts)
+				}
+			}
+
+			for i := 0; i < arrayLen; i++ {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				if elm, ok := elements[i]; ok && elm != nil {
+					c.WriteValueExpr(elm)
+				} else {
+					// Write zero value for element type
+					if goElemType != nil {
+						c.WriteZeroValueForType(goElemType)
+					} else {
+						c.WriteZeroValueForType(elemType)
+					}
+				}
+			}
+			c.tsw.WriteLiterally("]")
+			return
+		} else {
+			// Typed literal, likely a struct: new Type({...})
+			c.tsw.WriteLiterally("new ")
+			c.WriteTypeExpr(exp.Type)
+			c.tsw.WriteLiterally("({ ")
+			for i, elm := range exp.Elts {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteValueExpr(elm)
+			}
+			c.tsw.WriteLiterally(" })")
+			return
 		}
-		c.tsw.WriteLiterally(" })")
-		return
 	}
 
 	// Untyped composite literal. Could be array, slice, map.
@@ -288,6 +386,63 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
 		c.tsw.WriteLiterally(" ]")
 	}
 	c.tsw.WriteCommentInline("untyped composite literal, type guessed")
+}
+
+/*
+WriteZeroValueForType writes the zero value for a given type.
+Handles array types recursively.
+*/
+func (c *GoToTSCompiler) WriteZeroValueForType(typ interface{}) {
+	switch t := typ.(type) {
+	case *gtypes.Array:
+		c.tsw.WriteLiterally("[")
+		for i := 0; i < int(t.Len()); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteZeroValueForType(t.Elem())
+		}
+		c.tsw.WriteLiterally("]")
+	case *ast.ArrayType:
+		// Try to get length from AST
+		length := 0
+		if bl, ok := t.Len.(*ast.BasicLit); ok && bl.Kind == token.INT {
+			fmt.Sscan(bl.Value, &length)
+		}
+		c.tsw.WriteLiterally("[")
+		for i := 0; i < length; i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteZeroValueForType(t.Elt)
+		}
+		c.tsw.WriteLiterally("]")
+	case *gtypes.Basic:
+		switch t.Kind() {
+		case gtypes.Bool:
+			c.tsw.WriteLiterally("false")
+		case gtypes.String:
+			c.tsw.WriteLiterally(`""`)
+		default:
+			c.tsw.WriteLiterally("0")
+		}
+	case *ast.Ident:
+		// Try to map Go builtins
+		if tsname, ok := gstypes.GoBuiltinToTypescript(t.Name); ok {
+			switch tsname {
+			case "boolean":
+				c.tsw.WriteLiterally("false")
+			case "string":
+				c.tsw.WriteLiterally(`""`)
+			default:
+				c.tsw.WriteLiterally("0")
+			}
+		} else {
+			c.tsw.WriteLiterally("null")
+		}
+	default:
+		c.tsw.WriteLiterally("null")
+	}
 }
 
 // WriteKeyValueExprValue writes a key-value pair.

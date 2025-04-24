@@ -1,3 +1,4 @@
 Follow the design and existing code patterns, see /design/DESIGN.md for details.
 Follow the pattern for functions that write AST or types: when we write something from Go ast to TypeScript: for example *ast.FuncDecl, the function name should be WriteFuncDecl (try to make a 1-1 match). Avoid hiding logic in unexported functions.
 Avoid splitting functions unless the logic is reused elsewhere or the function becomes excessively long and complex or if doing so would adhere to the existing patterns defined in the codebase.
+Avoid leaving undecided implementation details in the code. Make a decision and add a comment explaining the choice if necessary.
