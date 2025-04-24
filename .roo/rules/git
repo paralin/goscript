@@ -1,0 +1,1 @@
+Always use short and descriptive git commit messages in all lowercase with the lines limited at 80 characters wrapped and always use the -s signoff parameter: for example, `git commit -sm 'feat: added support for loops'`
