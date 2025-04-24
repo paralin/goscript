@@ -68,7 +68,7 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
     *   Maps (`map[K]V`, `make`, `delete`)
     *   Struct Embedding
 *   **Functions:**
-    *   Multiple return values (definition tested, but assignment/usage needs more)
+    *   Multiple return values (including assignment and usage with blank identifier).
     *   Variadic functions (`...T`)
     *   Closures
     *   Recursion

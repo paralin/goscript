@@ -161,6 +161,9 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 // WriteStmtReturn writes a return statement.
 func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 	c.tsw.WriteLiterally("return ")
+	if len(exp.Results) > 1 {
+		c.tsw.WriteLiterally("[")
+	}
 	for i, res := range exp.Results {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
@@ -169,7 +172,10 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 			return err
 		}
 	}
-	c.tsw.WriteLine("")
+	if len(exp.Results) > 1 {
+		c.tsw.WriteLiterally("]")
+	}
+	c.tsw.WriteLine(";") // Add semicolon
 	return nil
 }
 
@@ -333,17 +339,54 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 }
 
 // WriteStmtAssign writes an assign statement.
-func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
-	// Handle multi-variable assignment by translating each pair individually.
-	// This correctly handles blank identifiers and expressions on the RHS.
+func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
+	// Handle multi-variable assignment from a single function call returning multiple values.
+	if len(exp.Lhs) > 1 && len(exp.Rhs) == 1 {
+		if callExpr, ok := exp.Rhs[0].(*ast.CallExpr); ok {
+			// This is a multi-variable assignment from a function call.
+			// Translate to a TypeScript destructuring assignment.
 
-	// Ensure LHS and RHS have the same length for valid Go code
-	if len(exp.Lhs) != len(exp.Rhs) {
-		c.tsw.WriteCommentLine(fmt.Sprintf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs)))
-		return
+			// Determine if 'let' or 'const' is needed for :=
+			if exp.Tok == token.DEFINE {
+				// For simplicity, use 'let' for := in multi-variable assignments.
+				// More advanced analysis might be needed to determine if const is possible.
+				c.tsw.WriteLiterally("let ")
+			}
+
+			// Write the left-hand side as a destructuring pattern
+			c.tsw.WriteLiterally("[")
+			for i, lhsExpr := range exp.Lhs {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				// Write the variable name, omitting '_' for blank identifier
+				if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name != "_" {
+					c.WriteIdentValue(ident)
+				} else if !ok {
+					// Should not happen for valid Go code in this context, but handle defensively
+					c.tsw.WriteCommentInline(fmt.Sprintf("unhandled LHS expression in destructuring: %T", lhsExpr))
+				}
+			}
+			c.tsw.WriteLiterally("] = ")
+
+			// Write the right-hand side (the function call)
+			if err := c.WriteValueExpr(callExpr); err != nil {
+				return fmt.Errorf("failed to write RHS call expression in assignment: %w", err)
+			}
+
+			c.tsw.WriteLine(";") // Add semicolon for the statement
+			return nil
+		}
 	}
 
-	// Process each assignment pair
+	// Handle all other assignment cases (one-to-one, multiple RHS expressions, etc.)
+	// Ensure LHS and RHS have the same length for valid Go code in these cases
+	if len(exp.Lhs) != len(exp.Rhs) {
+		c.tsw.WriteCommentLine(fmt.Sprintf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs)))
+		return fmt.Errorf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs))
+	}
+
+	// Process each assignment pair using the core writer
 	for i := range exp.Lhs {
 		lhsExpr := exp.Lhs[i]
 		rhsExpr := exp.Rhs[i]
@@ -351,10 +394,12 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 		// Check for blank identifier on the left-hand side
 		if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name == "_" {
 			// Blank identifier: evaluate the RHS for side effects, but discard the value.
-			c.WriteValueExpr(rhsExpr)
+			if err := c.WriteValueExpr(rhsExpr); err != nil {
+				return fmt.Errorf("failed to write RHS for blank identifier assignment: %w", err)
+			}
 			c.tsw.WriteCommentInline("discarded value")
-			c.tsw.WriteLine("") // Each assignment gets its own line
-			continue            // Move to the next pair
+			c.tsw.WriteLine(";") // Each assignment gets its own line
+			continue             // Move to the next pair
 		}
 
 		// Not a blank identifier: generate an assignment statement.
@@ -367,24 +412,10 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 			c.tsw.WriteLiterally("let ")
 		}
 
-		// Write the left-hand side
-		c.WriteValueExpr(lhsExpr)
-
-		// Write the assignment operator
-		tokStr, ok := gstypes.TokenToTs(exp.Tok)
-		if !ok {
-			c.tsw.WriteLiterally("?= ")
-			c.tsw.WriteCommentLine("Unknown assignment token " + exp.Tok.String())
-		} else {
-			c.tsw.WriteLiterally(" " + tokStr + " ")
-		}
-
-		// Write the right-hand side, applying clone if necessary
-		if shouldApplyClone(c.pkg, rhsExpr) {
-			c.WriteValueExpr(rhsExpr)
-			c.tsw.WriteLiterally(".clone()")
-		} else {
-			c.WriteValueExpr(rhsExpr)
+		// Write the core assignment (LHS = RHS)
+		// Pass single-element slices for LHS and RHS to writeAssignmentCore
+		if err := c.writeAssignmentCore([]ast.Expr{lhsExpr}, []ast.Expr{rhsExpr}, exp.Tok); err != nil {
+			return fmt.Errorf("failed to write core assignment: %w", err)
 		}
 
 		// Handle trailing inline comment for this specific assignment line
@@ -409,8 +440,10 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 		}
 
 		// Write the newline to finish the statement line
-		c.tsw.WriteLine("")
+		c.tsw.WriteLine(";") // Add semicolon
 	}
+
+	return nil
 }
 
 // filterBlankIdentifiers is no longer needed with the new WriteStmtAssign logic.
