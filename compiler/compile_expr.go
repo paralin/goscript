@@ -16,7 +16,9 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	case *ast.Ident:
 		c.WriteIdentType(exp)
 	case *ast.SelectorExpr:
-		c.WriteSelectorExprType(exp)
+		if err := c.WriteSelectorExprType(exp); err != nil {
+			c.tsw.WriteCommentInline(fmt.Sprintf("error writing selector expr type: %v", err))
+		}
 	case *ast.StarExpr:
 		c.WriteStarExprType(exp)
 	case *ast.StructType:
@@ -106,13 +108,19 @@ func (c *GoToTSCompiler) WriteIdentType(exp *ast.Ident) {
 		// Robust checking requires type information.
 		if obj := exp.Obj; obj != nil && obj.Kind != ast.Typ {
 			c.tsw.WriteCommentInline(fmt.Sprintf("ident %q used as type? kind=%s", name, obj.Kind))
-		} else if obj == nil {
-			// If obj is nil, it might be a type from an import or undefined.
-			// Type checking pass should resolve this.
-			// c.tsw.WriteCommentInline(fmt.Sprintf("unresolved ident %q used as type", name))
 		}
+
+		// TODO use type information to check
+
+		//else if obj == nil {
+		// If obj is nil, it might be a type from an import or undefined.
+		// Type checking pass should resolve this.
+		// c.tsw.WriteCommentInline(fmt.Sprintf("unresolved ident %q used as type", name))
+		//}
+
 		// Assume it's a valid custom type name for now.
 	}
+
 	c.tsw.WriteLiterally(name)
 }
 
@@ -407,7 +415,9 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 			if arrType.Len != nil {
 				// Try to evaluate the length from the AST if not available from type info
 				if bl, ok := arrType.Len.(*ast.BasicLit); ok && bl.Kind == token.INT {
-					fmt.Sscan(bl.Value, &arrayLen)
+					if _, err := fmt.Sscan(bl.Value, &arrayLen); err != nil {
+						return fmt.Errorf("failed to parse array length from basic literal: %w", err)
+					}
 				}
 			}
 			elemType = arrType.Elt
@@ -422,7 +432,9 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 				if kv, ok := elm.(*ast.KeyValueExpr); ok {
 					if lit, ok := kv.Key.(*ast.BasicLit); ok && lit.Kind == token.INT {
 						var index int
-						fmt.Sscan(lit.Value, &index)
+						if _, err := fmt.Sscan(lit.Value, &index); err != nil {
+							return fmt.Errorf("failed to parse array index from basic literal: %w", err)
+						}
 						elements[index] = kv.Value
 						if index > maxIndex {
 							maxIndex = index
@@ -541,7 +553,9 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ interface{}) {
 		// Try to get length from AST
 		length := 0
 		if bl, ok := t.Len.(*ast.BasicLit); ok && bl.Kind == token.INT {
-			fmt.Sscan(bl.Value, &length)
+			if _, err := fmt.Sscan(bl.Value, &length); err != nil {
+				c.tsw.WriteCommentInline(fmt.Sprintf("error parsing array length for zero value: %v", err))
+			}
 		}
 		c.tsw.WriteLiterally("[")
 		for i := 0; i < length; i++ {

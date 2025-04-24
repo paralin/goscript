@@ -1,4 +1,4 @@
-package array_literal
+package main
 
 func main() {
 	// Test basic array literal

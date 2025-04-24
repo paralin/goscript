@@ -12,11 +12,12 @@ func main() {
 	app.Authors = []*cli.Author{
 		{Name: "Christian Stewart", Email: "christian@aperture.us"},
 	}
-	app.Usage = "GoScript compiles Go to Typescript and vise-versa."
 
+	app.Usage = "GoScript compiles Go to Typescript."
 	app.Commands = append(app.Commands, CompileCommands...)
 
 	if err := app.Run(os.Args); err != nil {
-		os.Stderr.WriteString(err.Error() + "\n")
+		_, _ = os.Stderr.WriteString(err.Error() + "\n")
+		os.Exit(1)
 	}
 }

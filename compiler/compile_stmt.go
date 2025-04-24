@@ -17,7 +17,9 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 	switch exp := a.(type) {
 	case *ast.BlockStmt:
 		// WriteStmtBlock does not currently return an error, assuming it's safe for now.
-		c.WriteStmtBlock(exp, false)
+		if err := c.WriteStmtBlock(exp, false); err != nil {
+			return fmt.Errorf("failed to write block statement: %w", err)
+		}
 	case *ast.AssignStmt:
 		if err := c.WriteStmtAssign(exp); err != nil {
 			return fmt.Errorf("failed to write assignment statement: %w", err)
@@ -42,7 +44,9 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 				// Value specs within a declaration statement
 				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
 					// WriteValueSpec does not currently return an error, assuming it's safe for now.
-					c.WriteValueSpec(valueSpec)
+					if err := c.WriteValueSpec(valueSpec); err != nil {
+						return fmt.Errorf("failed to write value spec in declaration statement: %w", err)
+					}
 				} else {
 					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled spec in DeclStmt: %T", spec))
 				}
@@ -52,18 +56,19 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		}
 	case *ast.ForStmt:
 		// WriteStmtFor does not currently return an error, assuming it's safe for now.
-		c.WriteStmtFor(exp)
+		if err := c.WriteStmtFor(exp); err != nil {
+			return fmt.Errorf("failed to write for statement: %w", err)
+		}
 	case *ast.RangeStmt:
 		// Generate TS for for…range loops, log if something goes wrong
 		if err := c.WriteStmtRange(exp); err != nil {
-			// Log the error and continue, as the original code did.
-			c.tsw.WriteCommentLine(fmt.Sprintf("error writing range loop: %v", err))
-			// Decide whether to return the error or just log. For now, matching original behavior by logging.
-			// return fmt.Errorf("failed to write range statement: %w", err)
+			return fmt.Errorf("failed to write range statement: %w", err)
 		}
 	case *ast.SwitchStmt:
 		// WriteStmtSwitch does not currently return an error, assuming it's safe for now.
-		c.WriteStmtSwitch(exp)
+		if err := c.WriteStmtSwitch(exp); err != nil {
+			return fmt.Errorf("failed to write switch statement: %w", err)
+		}
 	case *ast.IncDecStmt:
 		// Handle increment/decrement (e.g., i++ or i--)
 		if err := c.WriteValueExpr(exp.X); err != nil { // The expression (e.g., i)
@@ -112,7 +117,9 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error {
 	for _, stmt := range exp.Body.List {
 		if caseClause, ok := stmt.(*ast.CaseClause); ok {
 			// WriteCaseClause does not currently return an error, assuming it's safe for now.
-			c.WriteCaseClause(caseClause)
+			if err := c.WriteCaseClause(caseClause); err != nil {
+				return fmt.Errorf("failed to write case clause in switch statement: %w", err)
+			}
 		} else {
 			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled statement in switch body: %T", stmt))
 		}
@@ -170,7 +177,9 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 		s.tsw.WriteLiterally("{")
 		s.tsw.Indent(1)
 
-		s.WriteStmt(exp.Init)
+		if err := s.WriteStmt(exp.Init); err != nil {
+			return err
+		}
 
 		defer func() {
 			s.tsw.Indent(-1)
@@ -185,10 +194,14 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 	s.tsw.WriteLiterally(") ")
 
 	if exp.Body != nil {
-		s.WriteStmtBlock(exp.Body, exp.Else != nil)
+		if err := s.WriteStmtBlock(exp.Body, exp.Else != nil); err != nil {
+			return fmt.Errorf("failed to write if body block statement: %w", err)
+		}
 	} else {
 		// Handle nil body case using WriteStmtBlock with an empty block
-		s.WriteStmtBlock(&ast.BlockStmt{}, exp.Else != nil)
+		if err := s.WriteStmtBlock(&ast.BlockStmt{}, exp.Else != nil); err != nil {
+			return fmt.Errorf("failed to write empty block statement in if statement: %w", err)
+		}
 	}
 
 	// handle else branch
@@ -196,9 +209,13 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 		s.tsw.WriteLiterally(" else ")
 		switch elseStmt := exp.Else.(type) {
 		case *ast.BlockStmt:
-			s.WriteStmtBlock(elseStmt, false)
+			if err := s.WriteStmtBlock(elseStmt, false); err != nil {
+				return fmt.Errorf("failed to write else block statement in if statement: %w", err)
+			}
 		case *ast.IfStmt:
-			s.WriteStmtIf(elseStmt)
+			if err := s.WriteStmtIf(elseStmt); err != nil {
+				return fmt.Errorf("failed to write else if statement in if statement: %w", err)
+			}
 		}
 	}
 	return nil
@@ -397,7 +414,9 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 
 		// Write the TypeScript code for the type assertion.
 		c.tsw.WriteLiterally("let ok: boolean = (")
-		c.WriteValueExpr(interfaceExpr)
+		if err := c.WriteValueExpr(interfaceExpr); err != nil {
+			return fmt.Errorf("failed to write interface expression in type assertion (ok check): %w", err)
+		}
 		c.tsw.WriteLiterally(" as any) satisfies ")
 		c.WriteTypeExpr(assertedType)
 		c.tsw.WriteLine("")
@@ -405,7 +424,9 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		c.tsw.WriteLiterally("let assertedValue: ")
 		c.WriteTypeExpr(assertedType)
 		c.tsw.WriteLiterally(" | null = ok ? (")
-		c.WriteValueExpr(interfaceExpr)
+		if err := c.WriteValueExpr(interfaceExpr); err != nil {
+			return fmt.Errorf("failed to write interface expression in type assertion (value assignment): %w", err)
+		}
 		c.tsw.WriteLiterally(" as ")
 		c.WriteTypeExpr(assertedType)
 		c.tsw.WriteLiterally(") : null")
@@ -591,7 +612,7 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 					if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
 						commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
 						c.tsw.WriteLiterally(" // " + commentText)
-						inlineCommentWritten = true
+						inlineCommentWritten = true //nolint:ineffassign
 						break
 					}
 				}
@@ -797,7 +818,9 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		// If both key and value are provided, use an index loop and assign both
 		if exp.Key != nil && exp.Value != nil {
 			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
-			c.WriteValueExpr(exp.X) // Write the expression for the iterable
+			if err := c.WriteValueExpr(exp.X); err != nil { // Write the expression for the iterable
+				return fmt.Errorf("failed to write range loop array/slice expression (key and value): %w", err)
+			}
 			c.tsw.WriteLiterally(fmt.Sprintf(".length; %s++) {", indexVarName))
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
@@ -820,7 +843,10 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			c.tsw.WriteLine("}")
 		} else if exp.Key != nil && exp.Value == nil { // Only key provided
 			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
-			c.WriteValueExpr(exp.X) // Write the expression for the iterable
+			// Write the expression for the iterable
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write expression for the iterable: %w", err)
+			}
 			c.tsw.WriteLiterally(fmt.Sprintf(".length; %s++) {", indexVarName))
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")

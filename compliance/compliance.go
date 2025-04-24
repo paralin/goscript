@@ -33,13 +33,13 @@ func PrepareTempTestDir(t *testing.T, testDir string) string {
 	goModPath := filepath.Join(tempDir, "go.mod")
 	goModContent := []byte("module tempmod\n\ngo 1.24\n")
 	if err := os.WriteFile(goModPath, goModContent, 0o644); err != nil {
-		os.RemoveAll(tempDir)
+		os.RemoveAll(tempDir) //nolint:errcheck
 		t.Fatalf("failed to write go.mod: %v", err)
 	}
 
 	goFiles, err := filepath.Glob(filepath.Join(testDir, "*.go"))
 	if err != nil || len(goFiles) == 0 {
-		os.RemoveAll(tempDir)
+		os.RemoveAll(tempDir) //nolint:errcheck
 		t.Fatalf("no .go files found in %s", testDir)
 	}
 	for _, src := range goFiles {
@@ -47,11 +47,11 @@ func PrepareTempTestDir(t *testing.T, testDir string) string {
 		dst := filepath.Join(tempDir, base)
 		data, err := os.ReadFile(src)
 		if err != nil {
-			os.RemoveAll(tempDir)
+			os.RemoveAll(tempDir) //nolint:errcheck
 			t.Fatalf("failed to read %s: %v", src, err)
 		}
 		if err := os.WriteFile(dst, data, 0o644); err != nil {
-			os.RemoveAll(tempDir)
+			os.RemoveAll(tempDir) //nolint:errcheck
 			t.Fatalf("failed to write %s: %v", dst, err)
 		}
 	}
@@ -104,7 +104,7 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 	}
 
 	// Log generated TypeScript files and copy them back to testDir
-	filepath.WalkDir(outputDir, func(path string, d os.DirEntry, err error) error {
+	if err := filepath.WalkDir(outputDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			t.Logf("error walking path %s: %v", path, err)
 			return nil
@@ -151,7 +151,9 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 			t.Logf("Final content written to %s:\n%s", destPath, string(finalContent))
 		}
 		return nil
-	})
+	}); err != nil {
+		t.Fatalf("error while walking: %v", err.Error())
+	}
 }
 
 // WriteTypeScriptRunner writes a runner.ts file to tempDir.
@@ -200,7 +202,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file %s: %w", src, err)
 	}
-	defer sourceFile.Close()
+	defer sourceFile.Close() //nolint:errcheck
 
 	// Ensure destination directory exists
 	destDir := filepath.Dir(dst)
@@ -212,7 +214,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create destination file %s: %w", dst, err)
 	}
-	defer destFile.Close()
+	defer destFile.Close() //nolint:errcheck
 
 	if _, err := io.Copy(destFile, sourceFile); err != nil {
 		return fmt.Errorf("failed to copy file content from %s to %s: %w", src, dst, err)
@@ -227,7 +229,7 @@ func copyFile(src, dst string) error {
 }
 
 // RunGoScriptTestDir compiles all .go files in testDir, runs the generated TypeScript, and compares output to expected.log.
-func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) { // Added workspaceDir parameter
+func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	t.Helper()
 
 	log := logrus.New()

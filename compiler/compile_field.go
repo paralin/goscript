@@ -75,7 +75,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		if !isArguments {
 			// write initializer with zero value for struct fields
 			c.tsw.WriteLiterally(" = ")
-			c.WriteZeroValue(field.Type)
+			c.WriteZeroValueForType(field.Type)
 
 			// write tag comment if any for struct fields
 			if field.Tag != nil {

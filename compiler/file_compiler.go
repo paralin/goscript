@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"context"
+	"fmt"
 	"go/ast"
 	"os"
 	"path/filepath"
@@ -59,7 +60,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	defer of.Close()
+	defer of.Close() //nolint:errcheck
 
 	c.codeWriter = NewTSCodeWriter(of)
 	// Create comment map
@@ -71,7 +72,9 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	c.codeWriter.WriteLine("import * as goscript from \"@go/builtin\";")
 	c.codeWriter.WriteLine("") // Add a newline after the import
 
-	goWriter.WriteDecls(f.Decls)
+	if err := goWriter.WriteDecls(f.Decls); err != nil {
+		return fmt.Errorf("failed to write declarations: %w", err)
+	}
 
 	return nil
 }

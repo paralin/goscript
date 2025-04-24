@@ -24,7 +24,7 @@ func (w *TSCodeWriter) WriteLinePreamble() {
 	w.sectionWrittenFlag = true
 	w.lineWritten = false
 	for range w.indentLevel {
-		w.w.Write([]byte{byte('\t')})
+		w.w.Write([]byte{byte('\t')}) //nolint:errcheck
 	}
 }
 
@@ -33,8 +33,8 @@ func (w *TSCodeWriter) WriteLine(line string) {
 	if w.lineWritten {
 		w.WriteLinePreamble()
 	}
-	w.w.Write([]byte(line))
-	w.w.Write([]byte{byte('\n')})
+	w.w.Write([]byte(line))       //nolint:errcheck
+	w.w.Write([]byte{byte('\n')}) //nolint:errcheck
 	w.lineWritten = true
 }
 
@@ -67,9 +67,9 @@ func (w *TSCodeWriter) WriteCommentLine(commentText string) {
 
 // WriteCommentInline write a comment within /* */.
 func (w *TSCodeWriter) WriteCommentInline(commentText string) {
-	w.w.Write([]byte("/* "))
-	w.w.Write([]byte(commentText))
-	w.w.Write([]byte(" */"))
+	w.w.Write([]byte("/* "))       //nolint:errcheck
+	w.w.Write([]byte(commentText)) //nolint:errcheck
+	w.w.Write([]byte(" */"))       //nolint:errcheck
 }
 
 // WriteLiterally writes something to the output without processing

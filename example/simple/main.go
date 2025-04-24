@@ -25,6 +25,7 @@ func (m *MyStruct) GetMyBool() bool {
 func NewMyStruct(s string) MyStruct {
 	return MyStruct{MyString: s}
 }
+
 func vals() (int, int) {
 	return 1, 2
 }
