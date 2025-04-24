@@ -159,7 +159,9 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 			c.tsw.WriteLinef("const %s = this", recvName)
 			// write method body without outer braces
 			for _, stmt := range decl.Body.List {
-				c.WriteStmt(stmt)
+				if err := c.WriteStmt(stmt); err != nil {
+					return fmt.Errorf("failed to write statement in function body: %w", err)
+				}
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
@@ -167,7 +169,9 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 		}
 	}
 	// no named receiver, write whole body
-	c.WriteStmt(decl.Body)
+	if err := c.WriteStmt(decl.Body); err != nil {
+		return fmt.Errorf("failed to write function body: %w", err)
+	}
 	return nil
 }
 

@@ -53,10 +53,13 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 
 	c.tsw.WriteLiterally("function ")
 	if err := c.WriteValueExpr(decl.Name); err != nil { // Function name is a value identifier
-		return err
+		return fmt.Errorf("failed to write function name: %w", err)
 	}
+	// WriteFuncType does not currently return an error, assuming it's safe for now.
 	c.WriteFuncType(decl.Type) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
-	c.WriteStmt(decl.Body)
+	if err := c.WriteStmt(decl.Body); err != nil {
+		return fmt.Errorf("failed to write function body: %w", err)
+	}
 	return nil
 }

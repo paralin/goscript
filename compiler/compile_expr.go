@@ -51,31 +51,22 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		c.WriteIdentValue(exp)
 		return nil
 	case *ast.SelectorExpr:
-		c.WriteSelectorExprValue(exp)
-		return nil
+		return c.WriteSelectorExprValue(exp)
 	case *ast.StarExpr:
-		c.WriteStarExprValue(exp)
-		return nil
+		return c.WriteStarExprValue(exp)
 	case *ast.CallExpr:
-		if err := c.WriteCallExpr(exp); err != nil {
-			return err
-		}
-		return nil
+		return c.WriteCallExpr(exp)
 	case *ast.UnaryExpr:
-		c.WriteUnaryExprValue(exp)
-		return nil
+		return c.WriteUnaryExprValue(exp)
 	case *ast.BinaryExpr:
-		c.WriteBinaryExprValue(exp)
-		return nil
+		return c.WriteBinaryExprValue(exp)
 	case *ast.BasicLit:
 		c.WriteBasicLitValue(exp)
 		return nil
 	case *ast.CompositeLit:
-		c.WriteCompositeLitValue(exp)
-		return nil
+		return c.WriteCompositeLitValue(exp)
 	case *ast.KeyValueExpr:
-		c.WriteKeyValueExprValue(exp)
-		return nil
+		return c.WriteKeyValueExprValue(exp)
 	case *ast.IndexExpr:
 		// Translate X[Index] to X[Index]
 		if err := c.WriteValueExpr(exp.X); err != nil {
@@ -131,19 +122,24 @@ func (c *GoToTSCompiler) WriteIdentValue(exp *ast.Ident) {
 }
 
 // WriteSelectorExprType writes a selector expression used as a type (e.g., pkg.Type).
-func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) {
+func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) error {
 	// Assuming X is a package identifier. Needs refinement with type info.
-	c.WriteValueExpr(exp.X) // Package name is treated as a value
+	if err := c.WriteValueExpr(exp.X); err != nil { // Package name is treated as a value
+		return fmt.Errorf("failed to write selector expression package identifier: %w", err)
+	}
 	c.tsw.WriteLiterally(".")
 	c.WriteTypeExpr(exp.Sel) // The selected identifier is treated as a type
+	return nil
 }
 
 // WriteSelectorExprValue writes a selector expression used as a value (e.g., obj.Field).
-func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) {
-	c.WriteValueExpr(exp.X)
+func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write selector expression object: %w", err)
+	}
 	c.tsw.WriteLiterally(".")
-	// Keep original Go casing
 	c.WriteIdentValue(exp.Sel)
+	return nil
 }
 
 // WriteStarExprType writes a pointer type (e.g., *MyStruct).
@@ -154,11 +150,14 @@ func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 }
 
 // WriteStarExprValue writes a pointer dereference value (e.g., *myVar).
-func (c *GoToTSCompiler) WriteStarExprValue(exp *ast.StarExpr) {
+func (c *GoToTSCompiler) WriteStarExprValue(exp *ast.StarExpr) error {
 	// Dereferencing a pointer in Go (*p) gets the value.
 	// In TS, if p is MyStruct | null, accessing the value means just using p.
 	// Cloning to emulate value semantics happens during assignment (see WriteStmtAssign).
-	c.WriteValueExpr(exp.X)
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write star expression operand: %w", err)
+	}
+	return nil
 }
 
 // WriteStructType writes a struct type definition.
@@ -338,13 +337,15 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 }
 
 // WriteUnaryExprValue writes a unary operation on a value.
-func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) {
+func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) error {
 	if exp.Op == token.AND {
 		// Address-of operator (&) might translate to just the value in TS,
 		// or potentially involve reference objects if complex pointer logic is needed.
 		// For now, just write the operand.
-		c.WriteValueExpr(exp.X)
-		return
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write unary expression operand for address-of: %w", err)
+		}
+		return nil
 	}
 
 	tokStr, ok := gstypes.TokenToTs(exp.Op)
@@ -353,12 +354,17 @@ func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) {
 	} else {
 		c.tsw.WriteLiterally(tokStr)
 	}
-	c.WriteValueExpr(exp.X)
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write unary expression operand: %w", err)
+	}
+	return nil
 }
 
 // WriteBinaryExprValue writes a binary operation on values.
-func (c *GoToTSCompiler) WriteBinaryExprValue(exp *ast.BinaryExpr) {
-	c.WriteValueExpr(exp.X)
+func (c *GoToTSCompiler) WriteBinaryExprValue(exp *ast.BinaryExpr) error {
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write binary expression left operand: %w", err)
+	}
 	c.tsw.WriteLiterally(" ")
 	tokStr, ok := gstypes.TokenToTs(exp.Op)
 	if !ok {
@@ -368,7 +374,10 @@ func (c *GoToTSCompiler) WriteBinaryExprValue(exp *ast.BinaryExpr) {
 		c.tsw.WriteLiterally(tokStr)
 	}
 	c.tsw.WriteLiterally(" ")
-	c.WriteValueExpr(exp.Y)
+	if err := c.WriteValueExpr(exp.Y); err != nil {
+		return fmt.Errorf("failed to write binary expression right operand: %w", err)
+	}
+	return nil
 }
 
 // WriteBasicLitValue writes a basic literal value.
@@ -381,7 +390,7 @@ WriteCompositeLitValue writes a composite literal value.
 For array literals, uses type information to determine array length and element type,
 and fills uninitialized elements with the correct zero value.
 */
-func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
+func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 	if exp.Type != nil {
 		if arrType, isArrayType := exp.Type.(*ast.ArrayType); isArrayType {
 			c.tsw.WriteLiterally("[")
@@ -421,7 +430,9 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
 						hasKeyedElements = true
 					} else {
 						c.tsw.WriteCommentInline("unhandled keyed array literal key type")
-						c.WriteValueExpr(elm)
+						if err := c.WriteValueExpr(elm); err != nil {
+							return fmt.Errorf("failed to write keyed array literal element with unhandled key type: %w", err)
+						}
 					}
 				} else {
 					elements[orderedCount] = elm
@@ -447,7 +458,9 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
 					c.tsw.WriteLiterally(", ")
 				}
 				if elm, ok := elements[i]; ok && elm != nil {
-					c.WriteValueExpr(elm)
+					if err := c.WriteValueExpr(elm); err != nil {
+						return fmt.Errorf("failed to write array literal element: %w", err)
+					}
 				} else {
 					// Write zero value for element type
 					if goElemType != nil {
@@ -458,7 +471,7 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
 				}
 			}
 			c.tsw.WriteLiterally("]")
-			return
+			return nil
 		} else {
 			// Typed literal, likely a struct: new Type({...})
 			c.tsw.WriteLiterally("new ")
@@ -468,10 +481,12 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				c.WriteValueExpr(elm)
+				if err := c.WriteValueExpr(elm); err != nil {
+					return fmt.Errorf("failed to write struct literal field: %w", err)
+				}
 			}
 			c.tsw.WriteLiterally(" })")
-			return
+			return nil
 		}
 	}
 
@@ -496,21 +511,21 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		c.WriteValueExpr(elm)
+		if err := c.WriteValueExpr(elm); err != nil {
+			return fmt.Errorf("failed to write untyped composite literal element: %w", err)
+		}
 	}
-
 	if isLikelyObject {
 		c.tsw.WriteLiterally(" }")
 	} else {
 		c.tsw.WriteLiterally(" ]")
 	}
-	c.tsw.WriteCommentInline("untyped composite literal, type guessed")
+	// c.tsw.WriteCommentInline("untyped composite literal, type guessed")
+	return nil
 }
 
-/*
-WriteZeroValueForType writes the zero value for a given type.
-Handles array types recursively.
-*/
+// WriteZeroValueForType writes the zero value for a given type.
+// Handles array types recursively.
 func (c *GoToTSCompiler) WriteZeroValueForType(typ interface{}) {
 	switch t := typ.(type) {
 	case *gtypes.Array:
@@ -563,12 +578,17 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ interface{}) {
 		c.tsw.WriteLiterally("null")
 	}
 }
-// Note: this implements zero‐value logic; for AST‐based cases see WriteZeroValue in compile_stmt.go
 
 // WriteKeyValueExprValue writes a key-value pair.
-func (c *GoToTSCompiler) WriteKeyValueExprValue(exp *ast.KeyValueExpr) {
+// Returns an error if writing the key or value fails.
+func (c *GoToTSCompiler) WriteKeyValueExprValue(exp *ast.KeyValueExpr) error {
 	// Keep original Go casing for keys
-	c.WriteValueExpr(exp.Key)
+	if err := c.WriteValueExpr(exp.Key); err != nil {
+		return fmt.Errorf("failed to write key-value expression key: %w", err)
+	}
 	c.tsw.WriteLiterally(": ")
-	c.WriteValueExpr(exp.Value)
+	if err := c.WriteValueExpr(exp.Value); err != nil {
+		return fmt.Errorf("failed to write key-value expression value: %w", err)
+	}
+	return nil
 }

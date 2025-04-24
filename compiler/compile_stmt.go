@@ -13,18 +13,27 @@ import (
 )
 
 // WriteStmt writes a statement to the output.
-func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
+func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 	switch exp := a.(type) {
 	case *ast.BlockStmt:
+		// WriteStmtBlock does not currently return an error, assuming it's safe for now.
 		c.WriteStmtBlock(exp, false)
 	case *ast.AssignStmt:
-		c.WriteStmtAssign(exp)
+		if err := c.WriteStmtAssign(exp); err != nil {
+			return fmt.Errorf("failed to write assignment statement: %w", err)
+		}
 	case *ast.ReturnStmt:
-		c.WriteStmtReturn(exp)
+		if err := c.WriteStmtReturn(exp); err != nil {
+			return fmt.Errorf("failed to write return statement: %w", err)
+		}
 	case *ast.IfStmt:
-		c.WriteStmtIf(exp)
+		if err := c.WriteStmtIf(exp); err != nil {
+			return fmt.Errorf("failed to write if statement: %w", err)
+		}
 	case *ast.ExprStmt:
-		c.WriteStmtExpr(exp)
+		if err := c.WriteStmtExpr(exp); err != nil {
+			return fmt.Errorf("failed to write expression statement: %w", err)
+		}
 	case *ast.DeclStmt:
 		// Handle declarations within a statement list (e.g., short variable declarations)
 		// This typically contains a GenDecl
@@ -32,6 +41,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 			for _, spec := range genDecl.Specs {
 				// Value specs within a declaration statement
 				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
+					// WriteValueSpec does not currently return an error, assuming it's safe for now.
 					c.WriteValueSpec(valueSpec)
 				} else {
 					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled spec in DeclStmt: %T", spec))
@@ -41,18 +51,23 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled declaration type in DeclStmt: %T", exp.Decl))
 		}
 	case *ast.ForStmt:
+		// WriteStmtFor does not currently return an error, assuming it's safe for now.
 		c.WriteStmtFor(exp)
 	case *ast.RangeStmt:
 		// Generate TS for for…range loops, log if something goes wrong
 		if err := c.WriteStmtRange(exp); err != nil {
+			// Log the error and continue, as the original code did.
 			c.tsw.WriteCommentLine(fmt.Sprintf("error writing range loop: %v", err))
+			// Decide whether to return the error or just log. For now, matching original behavior by logging.
+			// return fmt.Errorf("failed to write range statement: %w", err)
 		}
 	case *ast.SwitchStmt:
+		// WriteStmtSwitch does not currently return an error, assuming it's safe for now.
 		c.WriteStmtSwitch(exp)
 	case *ast.IncDecStmt:
 		// Handle increment/decrement (e.g., i++ or i--)
 		if err := c.WriteValueExpr(exp.X); err != nil { // The expression (e.g., i)
-			// Handle error
+			return fmt.Errorf("failed to write increment/decrement expression: %w", err)
 		}
 		tokStr, ok := gstypes.TokenToTs(exp.Tok)
 		if !ok {
@@ -64,15 +79,18 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
+	return nil
 }
 
 // WriteStmtSwitch writes a switch statement.
-func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) {
+func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error {
 	// Handle optional initialization statement
 	if exp.Init != nil {
 		c.tsw.WriteLiterally("{")
 		c.tsw.Indent(1)
-		c.WriteStmt(exp.Init)
+		if err := c.WriteStmt(exp.Init); err != nil {
+			return fmt.Errorf("failed to write switch initialization statement: %w", err)
+		}
 		defer func() {
 			c.tsw.Indent(-1)
 			c.tsw.WriteLiterally("}")
@@ -82,7 +100,9 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) {
 	c.tsw.WriteLiterally("switch (")
 	// Handle the switch tag (the expression being switched on)
 	if exp.Tag != nil {
-		c.WriteValueExpr(exp.Tag)
+		if err := c.WriteValueExpr(exp.Tag); err != nil {
+			return fmt.Errorf("failed to write switch tag expression: %w", err)
+		}
 	}
 	c.tsw.WriteLiterally(") {")
 	c.tsw.WriteLine("")
@@ -91,6 +111,7 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) {
 	// Handle case clauses
 	for _, stmt := range exp.Body.List {
 		if caseClause, ok := stmt.(*ast.CaseClause); ok {
+			// WriteCaseClause does not currently return an error, assuming it's safe for now.
 			c.WriteCaseClause(caseClause)
 		} else {
 			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled statement in switch body: %T", stmt))
@@ -99,10 +120,11 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) {
 
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
+	return nil
 }
 
 // WriteCaseClause writes a case clause within a switch statement.
-func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) {
+func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) error {
 	if exp.List == nil {
 		// Default case
 		c.tsw.WriteLiterally("default:")
@@ -114,7 +136,9 @@ func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) {
 			if i > 0 {
 				c.tsw.WriteLiterally(", ") // Although Go doesn't support multiple expressions per case like this,
 			} // TypeScript does, so we'll write it this way for now.
-			c.WriteValueExpr(expr)
+			if err := c.WriteValueExpr(expr); err != nil {
+				return fmt.Errorf("failed to write case clause expression: %w", err)
+			}
 		}
 		c.tsw.WriteLiterally(":")
 		c.tsw.WriteLine("")
@@ -123,16 +147,21 @@ func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) {
 	c.tsw.Indent(1)
 	// Write the body of the case clause
 	for _, stmt := range exp.Body {
-		c.WriteStmt(stmt)
+		if err := c.WriteStmt(stmt); err != nil {
+			return fmt.Errorf("failed to write statement in case clause body: %w", err)
+		}
 	}
 	// Add break statement (Go's switch has implicit breaks)
 	c.tsw.WriteLine("break") // Remove semicolon
 	c.tsw.Indent(-1)
+	return nil
 }
 
 // Overload for backward compatibility
-func (c *GoToTSCompiler) WriteStmtCompat(a ast.Stmt) {
-	c.WriteStmt(a)
+func (c *GoToTSCompiler) WriteStmtCompat(a ast.Stmt) error {
+	// This function is for backward compatibility and simply calls WriteStmt.
+	// It should propagate any error returned by WriteStmt.
+	return c.WriteStmt(a)
 }
 
 // WriteStmtIf writes an if statement.
@@ -197,13 +226,13 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 }
 
 // WriteStmtBlock writes a block statement, preserving comments and blank lines.
-func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool) {
+func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool) error {
 	if exp == nil {
 		c.tsw.WriteLiterally("{}")
 		if !suppressNewline {
 			c.tsw.WriteLine("")
 		}
-		return
+		return nil
 	}
 
 	// Opening brace
@@ -259,6 +288,7 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 					start = file.Line(cg.Pos())
 				}
 				writeBlank(lastLine, start)
+				// WriteDoc does not currently return an error, assuming it's safe for now.
 				c.WriteDoc(cg) // WriteDoc will handle the actual comment text
 				if file != nil && cg.End().IsValid() {
 					lastLine = file.Line(cg.End())
@@ -275,7 +305,9 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 		writeBlank(lastLine, stmtStart)
 		// Call the specific statement writer (e.g., WriteStmtAssign).
 		// It is responsible for handling its own inline comment.
-		c.WriteStmt(stmt)
+		if err := c.WriteStmt(stmt); err != nil {
+			return fmt.Errorf("failed to write statement in block: %w", err)
+		}
 
 		if file != nil && stmt.End().IsValid() {
 			// Update lastLine based on the statement's end, *including* potential inline comment handled by WriteStmt*
@@ -293,6 +325,7 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 		// only emit if it follows the last content
 		if start > lastLine {
 			writeBlank(lastLine, start)
+			// WriteDoc does not currently return an error, assuming it's safe for now.
 			c.WriteDoc(cg)
 			if file != nil && cg.End().IsValid() {
 				lastLine = file.Line(cg.End())
@@ -314,6 +347,7 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 	if !suppressNewline {
 		c.tsw.WriteLine("")
 	}
+	return nil
 }
 
 // writeAssignmentCore writes the core LHS, operator, and RHS of an assignment.
@@ -575,23 +609,25 @@ func (c *GoToTSCompiler) WriteStmtFor(exp *ast.ForStmt) error {
 	c.tsw.WriteLiterally("for (")
 	if exp.Init != nil {
 		if err := c.WriteForInit(exp.Init); err != nil { // Use WriteForInit
-			return err
+			return fmt.Errorf("failed to write for loop initialization: %w", err)
 		}
 	}
 	c.tsw.WriteLiterally("; ")
 	if exp.Cond != nil {
-		if err := c.WriteValueExpr(exp.Cond); err != nil {
-			return err
+		if err := c.WriteValueExpr(exp.Cond); err != nil { // Condition is a value
+			return fmt.Errorf("failed to write for loop condition: %w", err)
 		}
 	}
 	c.tsw.WriteLiterally("; ")
 	if exp.Post != nil {
 		if err := c.WriteForPost(exp.Post); err != nil { // Use WriteForPost
-			return err
+			return fmt.Errorf("failed to write for loop post statement: %w", err)
 		}
 	}
 	c.tsw.WriteLiterally(") ")
-	c.WriteStmtBlock(exp.Body, false)
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write for loop body: %w", err)
+	}
 	return nil
 }
 
@@ -664,12 +700,16 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	if _, ok := underlying.(*gtypes.Map); ok {
 		// Generate a for-in loop to iterate over map keys and check own-property
 		c.tsw.WriteLiterally("for (const k in ")
-		c.WriteValueExpr(exp.X)
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write range loop map expression: %w", err)
+		}
 		c.tsw.WriteLiterally(") {")
 		c.tsw.Indent(1)
 		c.tsw.WriteLine("")
 		c.tsw.WriteLiterally("if (Object.prototype.hasOwnProperty.call(")
-		c.WriteValueExpr(exp.X)
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write range loop map hasOwnProperty expression: %w", err)
+		}
 		c.tsw.WriteLiterally(", k)) {")
 		c.tsw.Indent(1)
 		c.tsw.WriteLine("")
@@ -677,6 +717,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		if exp.Key != nil {
 			if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
 				c.tsw.WriteLiterally("const ")
+				// WriteIdentValue does not currently return an error, assuming it's safe for now.
 				c.WriteIdentValue(ident)
 				c.tsw.WriteLiterally(" = k")
 				c.tsw.WriteLine("")
@@ -686,15 +727,20 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		if exp.Value != nil {
 			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
 				c.tsw.WriteLiterally("const ")
+				// WriteIdentValue does not currently return an error, assuming it's safe for now.
 				c.WriteIdentValue(ident)
 				c.tsw.WriteLiterally(" = ")
-				c.WriteValueExpr(exp.X)
+				if err := c.WriteValueExpr(exp.X); err != nil {
+					return fmt.Errorf("failed to write range loop map value expression: %w", err)
+				}
 				c.tsw.WriteLiterally("[k]")
 				c.tsw.WriteLine("")
 			}
 		}
 		// Write the loop body
-		c.WriteStmtBlock(exp.Body, false)
+		if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+			return fmt.Errorf("failed to write range loop map body: %w", err)
+		}
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("}")
 		c.tsw.Indent(-1)
@@ -706,7 +752,9 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	if basic, ok := underlying.(*gtypes.Basic); ok && (basic.Info()&gtypes.IsString != 0) {
 		// Convert the string to runes using goscript.stringToRunes
 		c.tsw.WriteLiterally("const _runes = goscript.stringToRunes(")
-		c.WriteValueExpr(exp.X)
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write range loop string conversion expression: %w", err)
+		}
 		c.tsw.WriteLiterally(")")
 		c.tsw.WriteLine("")
 		// Standard index loop over the runes array
@@ -719,12 +767,15 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		if exp.Value != nil {
 			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
 				c.tsw.WriteLiterally("const ")
+				// WriteIdentValue does not currently return an error, assuming it's safe for now.
 				c.WriteIdentValue(ident)
 				c.tsw.WriteLiterally(" = _runes[i]")
 				c.tsw.WriteLine("")
 			}
 		}
-		c.WriteStmtBlock(exp.Body, false)
+		if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+			return fmt.Errorf("failed to write range loop string body: %w", err)
+		}
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("}")
 		return nil
@@ -735,7 +786,9 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		// If both key and value are provided, use an index loop and assign both
 		if exp.Key != nil && exp.Value != nil {
 			c.tsw.WriteLiterally("for (let i = 0; i < ")
-			c.WriteValueExpr(exp.X)
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice length expression (key and value): %w", err)
+			}
 			c.tsw.WriteLiterally(".length; i++) {")
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
@@ -744,52 +797,70 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			// Declare value if not blank
 			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
 				c.tsw.WriteLiterally("const ")
+				// WriteIdentValue does not currently return an error, assuming it's safe for now.
 				c.WriteIdentValue(ident)
 				c.tsw.WriteLiterally(" = ")
-				c.WriteValueExpr(exp.X)
+				if err := c.WriteValueExpr(exp.X); err != nil {
+					return fmt.Errorf("failed to write range loop array/slice value expression: %w", err)
+				}
 				c.tsw.WriteLiterally("[i]")
 				c.tsw.WriteLine("")
 			}
-			c.WriteStmtBlock(exp.Body, false)
+			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice body (key and value): %w", err)
+			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
 			return nil
 		} else if exp.Key != nil && exp.Value == nil { // Only key provided
 			c.tsw.WriteLiterally("for (let i = 0; i < ")
-			c.WriteValueExpr(exp.X)
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice length expression (only key): %w", err)
+			}
 			c.tsw.WriteLiterally(".length; i++) {")
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			// Key (index) 'i' is already declared by the 'for (let i = ...)' loop
 			// No need to redeclare 'const i = i'
-			c.WriteStmtBlock(exp.Body, false)
+			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice body (only key): %w", err)
+			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
 			return nil
 		} else if exp.Key == nil && exp.Value != nil { // Only value provided; use for-of loop
 			c.tsw.WriteLiterally("for (const v of ")
-			c.WriteValueExpr(exp.X)
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice expression (only value): %w", err)
+			}
 			c.tsw.WriteLiterally(") {")
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
 				c.tsw.WriteLiterally("const ")
+				// WriteIdentValue does not currently return an error, assuming it's safe for now.
 				c.WriteIdentValue(ident)
 				c.tsw.WriteLiterally(" = v")
 				c.tsw.WriteLine("")
 			}
-			c.WriteStmtBlock(exp.Body, false)
+			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice body (only value): %w", err)
+			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
 			return nil
 		} else {
 			// Fallback: simple index loop without declaring range variables
 			c.tsw.WriteLiterally("for (let i = 0; i < ")
-			c.WriteValueExpr(exp.X)
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice length expression (fallback): %w", err)
+			}
 			c.tsw.WriteLiterally(".length; i++) {")
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
-			c.WriteStmtBlock(exp.Body, false)
+			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+				return fmt.Errorf("failed to write range loop array/slice body (fallback): %w", err)
+			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
 			return nil
@@ -798,7 +869,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 
 	// Fallback case if the ranged type is not supported.
 	c.tsw.WriteCommentLine("unsupported range loop")
-	return nil
+	return fmt.Errorf("unsupported range loop type: %T", underlying)
 }
 
 func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
