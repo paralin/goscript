@@ -3,6 +3,7 @@ package compliance
 import (
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -12,6 +13,9 @@ func TestCompliance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to read tests dir: %v", err)
 	}
+
+	// First collect all test paths
+	var testPaths []string
 	for _, dir := range dirs {
 		if !dir.IsDir() {
 			continue
@@ -26,8 +30,21 @@ func TestCompliance(t *testing.T) {
 			t.Errorf("no .go files found in %s", testPath)
 			continue
 		}
-		t.Run(dir.Name(), func(t *testing.T) {
-			RunGoScriptTestDir(t, testPath)
-		})
+		testPaths = append(testPaths, testPath)
 	}
+
+	// Now run tests in parallel with goroutines
+	var wg sync.WaitGroup
+	for _, testPath := range testPaths {
+		wg.Add(1)
+		go func(path string) {
+			defer wg.Done()
+			t.Run(filepath.Base(path), func(t *testing.T) {
+				RunGoScriptTestDir(t, path)
+			})
+		}(testPath)
+	}
+
+	// Wait for all tests to complete
+	wg.Wait()
 }
