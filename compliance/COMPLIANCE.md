@@ -64,44 +64,49 @@ Based on the existing tests, GoScript aims to support the following Go features:
 
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
-*   **Basic Types & Values:**
-   *   `float32`, `float64`, `complex64`, `complex128`
-   *   `rune` (and string/rune conversions)
-   *   Constants (`const`) - Note: Handling of large integer constants (exceeding standard JavaScript number limits) is currently not fully compliant.
-   *   `iota`
 *   **Data Structures:**
     *   Maps (`map[K]V`, `make`, `delete`)
-    *   Interfaces (`interface{}`) - Definition tested, but usage (assignment, type assertions `v.(T)`) needs tests.
     *   Struct Embedding
-    *   Generics (Type parameters, constraints)
+*   **Functions:**
+    *   Multiple return values (definition tested, but assignment/usage needs more)
+    *   Variadic functions (`...T`)
+    *   Closures
+    *   Recursion
+*   **Basic Types & Values:**
+   *   `rune` (and string/rune conversions)
+   *   `iota` consts
 *   **Control Flow:**
     *   `for` loops (basic counter-based covered; `range`, condition-only, infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)
     *   `select` statement (for channel operations)
     *   `defer` statement
     *   `panic` / `recover`
-    *   `goto` (less common, but part of the language)
 *   **Concurrency:**
     *   Goroutines (`go func()`)
     *   Channels (`chan T`, `make`, send `<-`, receive `<-`, buffered/unbuffered, closing)
     *   Mutexes (`sync.Mutex`)
-    *   WaitGroups (`sync.WaitGroup`)
-    *   Atomic Counters (`sync/atomic`)
-    *   Rate Limiting concepts
-    *   Worker Pools
-    *   Stateful Goroutines
-*   **Functions:**
-    *   Multiple return values (definition tested, but assignment/usage needs more)
-    *   Variadic functions (`...T`)
-    *   Closures
-    *   Recursion
-*   **Packages & Imports:**
-    *   Import aliasing (`import alias "path"`)
-    *   Dot imports (`import . "path"`) - Generally discouraged.
-    *   Handling standard library packages (e.g., `fmt`, `math`, `time`, `os`, `net/http`, `encoding/json`, `regexp`, etc.) - Requires runtime shims or direct translation.
 *   **Error Handling:**
     *   `error` interface usage
-    *   Custom error types
+*   **Packages & Imports:**
+    *   Import aliasing (`import alias "path"`)
+
+This list helps identify areas where GoScript's feature coverage can be expanded and verified through new compliance tests.
+
+## Ignored or Not-planned Go Language Constructs
+
+These are the not-planned features that we should NOT waste time adding yet:
+
+* complex number support (complex64, etc.)
+*   **Reflection:** (`reflect` package) - Likely out of scope for direct translation.
+*   **Testing:** (`testing` package) - Test files themselves are usually not translated.
+*   Constants (`const`) - handling of large integer constants (exceeding standard JavaScript number limits) is currently not fully compliant.
+*   Interfaces (`interface{}`) - Definition tested, but usage (assignment, type assertions `v.(T)`) is not
+*   Generics (Type parameters, constraints)
+*   `goto` (less common, but part of the language)
+*   **Directives:**
+    *   `//go:embed`
+*   Dot imports (`import . "path"`) - Generally discouraged.
+*   Handling standard library packages (e.g., `fmt`, `math`, `time`, `os`, `net/http`, `encoding/json`, `regexp`, etc.) - Requires runtime shims or direct translation.
 *   **Input/Output & System:**
     *   File I/O (`os.ReadFile`, `os.WriteFile`, etc.)
     *   Command-line arguments/flags (`os.Args`, `flag` package)
@@ -109,9 +114,8 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
     *   Executing processes (`os/exec`)
     *   Signals (`os/signal`)
     *   Context (`context`)
-*   **Reflection:** (`reflect` package) - Likely out of scope for direct translation.
-*   **Testing:** (`testing` package) - Test files themselves are usually not translated.
-*   **Directives:**
-    *   `//go:embed`
-
-This list helps identify areas where GoScript's feature coverage can be expanded and verified through new compliance tests.
+*   WaitGroups (`sync.WaitGroup`)
+*   Atomic Counters (`sync/atomic`)
+*   Rate Limiting concepts
+*   Worker Pools
+*   Stateful Goroutines
