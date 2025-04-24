@@ -6,21 +6,26 @@ import (
 )
 
 // WriteSpec writes a specification to the output.
-func (c *GoToTSCompiler) WriteSpec(a ast.Spec) {
+func (c *GoToTSCompiler) WriteSpec(a ast.Spec) error {
 	switch d := a.(type) {
 	case *ast.ImportSpec:
 		c.WriteImportSpec(d)
 	case *ast.ValueSpec:
-		c.WriteValueSpec(d)
+		if err := c.WriteValueSpec(d); err != nil {
+			return err
+		}
 	case *ast.TypeSpec:
-		c.WriteTypeSpec(d)
+		if err := c.WriteTypeSpec(d); err != nil {
+			return err
+		}
 	default:
-		fmt.Printf("unknown spec: %#v\n", a)
+		return fmt.Errorf("unknown spec type: %T", a)
 	}
+	return nil
 }
 
 // WriteTypeSpec writes the type specification to the output.
-func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) {
+func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 	if a.Doc != nil {
 		c.WriteDoc(a.Doc)
 	}
@@ -32,7 +37,9 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) {
 	case *ast.StructType:
 		// write the class definition
 		c.tsw.WriteLiterally("class ")
-		c.WriteValueExpr(a.Name) // Class name is a value identifier
+		if err := c.WriteValueExpr(a.Name); err != nil { // Class name is a value identifier
+			return err
+		}
 		c.tsw.WriteLine(" {")
 		c.tsw.Indent(1)
 
@@ -62,7 +69,9 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) {
 				if ident, ok := recvType.(*ast.Ident); ok && ident.Name == className {
 					// Found a method for this struct
 					c.tsw.WriteLine("") // Add space between methods
-					c.WriteFuncDeclAsMethod(funcDecl)
+					if err := c.WriteFuncDeclAsMethod(funcDecl); err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -75,22 +84,27 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) {
 		c.tsw.WriteLine("}")
 	case *ast.InterfaceType:
 		c.tsw.WriteLiterally("interface ")
-		c.WriteValueExpr(a.Name) // Interface name is a value identifier
+		if err := c.WriteValueExpr(a.Name); err != nil { // Interface name is a value identifier
+			return err
+		}
 		c.tsw.WriteLine(" ")
 		c.WriteTypeExpr(a.Type) // The interface definition itself is a type
 	default:
 		// type alias
 		c.tsw.WriteLiterally("type ")
-		c.WriteValueExpr(a.Name) // Type alias name is a value identifier
+		if err := c.WriteValueExpr(a.Name); err != nil { // Type alias name is a value identifier
+			return err
+		}
 		c.tsw.WriteLiterally(" = ")
 		c.WriteTypeExpr(a.Type) // The aliased type
 		c.tsw.WriteLine(";")
 	}
+	return nil
 }
 
 // WriteFuncDeclAsMethod writes a TypeScript method declaration from a Go FuncDecl.
 // Assumes it's called only for functions with receivers.
-func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) {
+func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	if decl.Doc != nil {
 		c.WriteDoc(decl.Doc)
 	}
@@ -98,7 +112,9 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) {
 	// Methods are typically public in the TS output
 	c.tsw.WriteLiterally("public ")
 	// Keep original Go casing for method names
-	c.WriteValueExpr(decl.Name) // Method name is a value identifier
+	if err := c.WriteValueExpr(decl.Name); err != nil { // Method name is a value identifier
+		return err
+	}
 
 	// Write signature (parameters and return type)
 	// We adapt the logic from WriteFuncType here, but without the 'function' keyword
@@ -146,15 +162,16 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) {
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
-			return
+			return nil
 		}
 	}
 	// no named receiver, write whole body
 	c.WriteStmt(decl.Body)
+	return nil
 }
 
 // WriteValueSpec writes the value specification to the output.
-func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) {
+func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 	if a.Doc != nil {
 		c.WriteDoc(a.Doc)
 	}
@@ -175,7 +192,9 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				c.WriteValueExpr(val) // Initializer is a value
+				if err := c.WriteValueExpr(val); err != nil { // Initializer is a value
+					return err
+				}
 			}
 		}
 	} else {
@@ -193,10 +212,13 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) {
 			} else {
 				c.tsw.WriteLiterally(", ")
 			}
-			c.WriteValueExpr(val) // Initializers are values
+			if err := c.WriteValueExpr(val); err != nil { // Initializers are values
+				return err
+			}
 		}
 	}
 	c.tsw.WriteLine(";")
+	return nil
 }
 
 // WriteImportSpec writes an import specification to the output.

@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"errors"
 	"fmt"
 	"go/ast"
 	"go/token"
@@ -35,40 +36,60 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 }
 
 // WriteValueExpr writes an expression that represents a value.
-func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) {
+func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	switch exp := a.(type) {
 	case *ast.Ident:
 		c.WriteIdentValue(exp)
+		return nil
 	case *ast.SelectorExpr:
 		c.WriteSelectorExprValue(exp)
+		return nil
 	case *ast.StarExpr:
 		c.WriteStarExprValue(exp)
+		return nil
 	case *ast.CallExpr:
-		c.WriteCallExpr(exp)
+		if err := c.WriteCallExpr(exp); err != nil {
+			return err
+		}
+		return nil
 	case *ast.UnaryExpr:
 		c.WriteUnaryExprValue(exp)
+		return nil
 	case *ast.BinaryExpr:
 		c.WriteBinaryExprValue(exp)
+		return nil
 	case *ast.BasicLit:
 		c.WriteBasicLitValue(exp)
+		return nil
 	case *ast.CompositeLit:
 		c.WriteCompositeLitValue(exp)
+		return nil
 	case *ast.KeyValueExpr:
 		c.WriteKeyValueExprValue(exp)
+		return nil
 	case *ast.IndexExpr:
 		// Translate X[Index] to X[Index]
-		c.WriteValueExpr(exp.X)
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return err
+		}
 		c.tsw.WriteLiterally("[")
-		c.WriteValueExpr(exp.Index)
+		if err := c.WriteValueExpr(exp.Index); err != nil {
+			return err
+		}
 		c.tsw.WriteLiterally("]")
+		return nil
 	case *ast.ParenExpr:
 		// Translate (X) to (X)
 		c.tsw.WriteLiterally("(")
-		c.WriteValueExpr(exp.X)
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return err
+		}
 		c.tsw.WriteLiterally(")")
+		return nil
 	// Add cases for SliceExpr etc.
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled value expr: %T", exp))
+		return nil
 	}
 }
 
@@ -201,50 +222,44 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType) {
 }
 
 // WriteCallExpr writes a function call.
-func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) {
+func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
 	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
 		switch funIdent.String() {
 		case "println":
-			c.tsw.WriteLiterally("console.log")
+			c.tsw.WriteLiterally("console.log(")
+			for i, arg := range exp.Args {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				if err := c.WriteValueExpr(arg); err != nil {
+					return err
+				}
+			}
+			c.tsw.WriteLiterally(")")
+			return nil
 		case "len":
 			// Translate len(arg) to goscript.len(arg)
 			if len(exp.Args) == 1 {
 				c.tsw.WriteLiterally("goscript.len(")
-				c.WriteValueExpr(exp.Args[0])
-				c.tsw.WriteLiterally(")")
-				return // Handled len
-			}
-			c.tsw.WriteCommentInline("unhandled len call with incorrect number of arguments")
-			c.WriteValueExpr(expFun) // Write "len" identifier
-			c.tsw.WriteLiterally("(")
-			for i, arg := range exp.Args {
-				if i != 0 {
-					c.tsw.WriteLiterally(", ")
+				if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+					return err
 				}
-				c.WriteValueExpr(arg)
+				c.tsw.WriteLiterally(")")
+				return nil // Handled len
 			}
-			c.tsw.WriteLiterally(")")
-			return // Handled unhandled len call
+			return errors.New("unhandled len call with incorrect number of arguments")
 		case "cap":
 			// Translate cap(arg) to goscript.cap(arg)
 			if len(exp.Args) == 1 {
 				c.tsw.WriteLiterally("goscript.cap(")
-				c.WriteValueExpr(exp.Args[0])
-				c.tsw.WriteLiterally(")")
-				return // Handled cap
-			}
-			c.tsw.WriteCommentInline("unhandled cap call with incorrect number of arguments")
-			c.WriteValueExpr(expFun) // Write "cap" identifier
-			c.tsw.WriteLiterally("(")
-			for i, arg := range exp.Args {
-				if i != 0 {
-					c.tsw.WriteLiterally(", ")
+				if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+					return err
 				}
-				c.WriteValueExpr(arg)
+				c.tsw.WriteLiterally(")")
+				return nil // Handled cap
 			}
-			c.tsw.WriteLiterally(")")
-			return // Handled unhandled cap call
+			return errors.New("unhandled cap call with incorrect number of arguments")
 		case "make":
 			// Handle make for slices: make([]T, len, cap) or make([]T, len)
 			if len(exp.Args) >= 2 {
@@ -256,56 +271,61 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) {
 						underlyingType := typ.Underlying()
 						c.tsw.WriteLiterally(fmt.Sprintf("%q", underlyingType.String()))
 					} else {
-						c.tsw.WriteCommentInline("could not determine element type for makeSlice")
-						c.WriteTypeExpr(arrayType.Elt) // Fallback to writing type expr
+						// If type info is not available, this is an error condition for makeSlice
+						return errors.New("could not determine element type for makeSlice")
 					}
 					c.tsw.WriteLiterally(", ")
-					c.WriteValueExpr(exp.Args[1]) // Length
+					if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+						return err
+					}
 					if len(exp.Args) == 3 {
 						c.tsw.WriteLiterally(", ")
-						c.WriteValueExpr(exp.Args[2]) // Capacity
+						if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+							return err
+						}
+					} else if len(exp.Args) > 3 {
+						return errors.New("makeSlice expects 2 or 3 arguments")
 					}
 					c.tsw.WriteLiterally(")")
-					return // Handled make for slice
+					return nil // Handled make for slice
 				}
 			}
 			// Fallthrough for unhandled make calls (e.g., maps, channels)
-			c.tsw.WriteCommentInline("unhandled make call")
-			c.WriteValueExpr(expFun) // Write "make" identifier
-			c.tsw.WriteLiterally("(")
-			for i, arg := range exp.Args {
-				if i != 0 {
-					c.tsw.WriteLiterally(", ")
-				}
-				c.WriteValueExpr(arg)
-			}
-			c.tsw.WriteLiterally(")")
-			return // Handled unhandled make call
+			return errors.New("unhandled make call")
 		default:
 			// Not a special built-in, treat as a regular function call
-			c.WriteValueExpr(expFun)
+			if err := c.WriteValueExpr(expFun); err != nil {
+				return err
+			}
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				c.WriteValueExpr(arg)
+				if err := c.WriteValueExpr(arg); err != nil {
+					return err
+				}
 			}
 			c.tsw.WriteLiterally(")")
-			return // Handled regular function call
+			return nil // Handled regular function call
 		}
 	} else {
 		// Not an identifier (e.g., method call on a value)
-		c.WriteValueExpr(expFun)
+		if err := c.WriteValueExpr(expFun); err != nil {
+			return err
+		}
 	}
 	c.tsw.WriteLiterally("(")
 	for i, arg := range exp.Args {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		c.WriteValueExpr(arg)
+		if err := c.WriteValueExpr(arg); err != nil {
+			return err
+		}
 	}
 	c.tsw.WriteLiterally(")")
+	return nil
 }
 
 // WriteUnaryExprValue writes a unary operation on a value.

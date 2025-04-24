@@ -53,7 +53,7 @@ func (c *GoToTSCompiler) WriteStmtCompat(a ast.Stmt) {
 }
 
 // WriteStmtIf writes an if statement.
-func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) {
+func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 	if exp.Init != nil {
 		s.tsw.WriteLiterally("{")
 		s.tsw.Indent(1)
@@ -67,7 +67,9 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) {
 	}
 
 	s.tsw.WriteLiterally("if (")
-	s.WriteValueExpr(exp.Cond) // Condition is a value
+	if err := s.WriteValueExpr(exp.Cond); err != nil { // Condition is a value
+		return err
+	}
 	s.tsw.WriteLiterally(") ")
 
 	if exp.Body != nil {
@@ -87,18 +89,22 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) {
 			s.WriteStmtIf(elseStmt)
 		}
 	}
+	return nil
 }
 
 // WriteStmtReturn writes a return statement.
-func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) {
+func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 	c.tsw.WriteLiterally("return ")
 	for i, res := range exp.Results {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		c.WriteValueExpr(res) // Return results are values
+		if err := c.WriteValueExpr(res); err != nil { // Return results are values
+			return err
+		}
 	}
 	c.tsw.WriteLine("")
+	return nil
 }
 
 // WriteStmtBlock writes a block statement, preserving comments and blank lines.
@@ -223,12 +229,14 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 
 // writeAssignmentCore writes the core LHS, operator, and RHS of an assignment.
 // It does NOT handle blank identifiers, 'let' keyword, or trailing semicolons/comments/newlines.
-func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token) {
+func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token) error {
 	for i, l := range lhs {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		c.WriteValueExpr(l) // LHS is a value
+		if err := c.WriteValueExpr(l); err != nil { // LHS is a value
+			return err
+		}
 	}
 	c.tsw.WriteLiterally(" ")
 	tokStr, ok := gstypes.TokenToTs(tok) // Use explicit gstypes alias
@@ -245,12 +253,17 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		}
 		// Check if we should apply clone for value-type semantics
 		if shouldApplyClone(c.pkg, r) {
-			c.WriteValueExpr(r) // RHS is a value
+			if err := c.WriteValueExpr(r); err != nil { // RHS is a value
+				return err
+			}
 			c.tsw.WriteLiterally(".clone()")
 		} else {
-			c.WriteValueExpr(r) // RHS is a value
+			if err := c.WriteValueExpr(r); err != nil { // RHS is a value
+				return err
+			}
 		}
 	}
+	return nil
 }
 
 // WriteStmtAssign writes an assign statement.
@@ -384,8 +397,10 @@ func shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool {
 }
 
 // WriteStmtExpr writes an expr statement.
-func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) {
-	c.WriteValueExpr(exp.X) // Expression statement evaluates a value
+func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
+	if err := c.WriteValueExpr(exp.X); err != nil { // Expression statement evaluates a value
+		return err
+	}
 
 	// Handle potential inline comment for ExprStmt
 	inlineCommentWritten := false
@@ -418,28 +433,36 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) {
 
 	// Add semicolon according to design doc (omit semicolons) - REMOVED semicolon
 	c.tsw.WriteLine("") // Finish with a newline
+	return nil
 }
 
 // WriteStmtFor writes a for statement.
-func (c *GoToTSCompiler) WriteStmtFor(exp *ast.ForStmt) {
+func (c *GoToTSCompiler) WriteStmtFor(exp *ast.ForStmt) error {
 	c.tsw.WriteLiterally("for (")
 	if exp.Init != nil {
-		c.WriteForInit(exp.Init) // Use WriteForInit
+		if err := c.WriteForInit(exp.Init); err != nil { // Use WriteForInit
+			return err
+		}
 	}
 	c.tsw.WriteLiterally("; ")
 	if exp.Cond != nil {
-		c.WriteValueExpr(exp.Cond)
+		if err := c.WriteValueExpr(exp.Cond); err != nil {
+			return err
+		}
 	}
 	c.tsw.WriteLiterally("; ")
 	if exp.Post != nil {
-		c.WriteForPost(exp.Post) // Use WriteForPost
+		if err := c.WriteForPost(exp.Post); err != nil { // Use WriteForPost
+			return err
+		}
 	}
 	c.tsw.WriteLiterally(") ")
 	c.WriteStmtBlock(exp.Body, false)
+	return nil
 }
 
 // WriteForInit writes the initialization part of a for loop header.
-func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) {
+func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.AssignStmt:
 		// Handle assignment in init (e.g., i := 0 or i = 0)
@@ -450,21 +473,28 @@ func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) {
 		// Write the core assignment without trailing syntax
 		// Blank identifiers should already be handled by filterBlankIdentifiers if needed,
 		// but for init statements they are less common. Let's assume simple assignments for now.
-		c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok)
+		if err := c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok); err != nil {
+			return err
+		}
 	case *ast.ExprStmt:
 		// Handle expression statement in init (less common, but possible)
-		c.WriteValueExpr(s.X)
+		if err := c.WriteValueExpr(s.X); err != nil {
+			return err
+		}
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled for loop init statement: %T", stmt))
 	}
+	return nil
 }
 
 // WriteForPost writes the post part of a for loop header.
-func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) {
+func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.IncDecStmt:
 		// Handle increment/decrement (e.g., i++)
-		c.WriteValueExpr(s.X) // The expression (e.g., i)
+		if err := c.WriteValueExpr(s.X); err != nil { // The expression (e.g., i)
+			return err
+		}
 		tokStr, ok := gstypes.TokenToTs(s.Tok)
 		if !ok {
 			c.tsw.WriteLiterally("/* unknown incdec token */")
@@ -475,13 +505,18 @@ func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) {
 		// Handle assignment in post (e.g., i = i + 1)
 		// No 'let' keyword here
 		// Blank identifiers should already be handled by filterBlankIdentifiers if needed.
-		c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok)
+		if err := c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok); err != nil {
+			return err
+		}
 	case *ast.ExprStmt:
 		// Handle expression statement in post (less common)
-		c.WriteValueExpr(s.X)
+		if err := c.WriteValueExpr(s.X); err != nil {
+			return err
+		}
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled for loop post statement: %T", stmt))
 	}
+	return nil
 }
 
 // WriteZeroValue writes the TypeScript zero‐value for a Go type.

@@ -6,34 +6,39 @@ import (
 )
 
 // WriteDecls writes a slice of declarations.
-func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) {
+func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) error {
 	for _, decl := range decls {
 		switch d := decl.(type) {
 		case *ast.FuncDecl:
 			// Only handle top-level functions here. Methods are handled within WriteTypeSpec.
 			if d.Recv == nil {
-				c.WriteFuncDeclAsFunction(d)
+				if err := c.WriteFuncDeclAsFunction(d); err != nil {
+					return err
+				}
 				c.tsw.WriteLine("") // Add space after function
 			}
 		case *ast.GenDecl:
 			for _, spec := range d.Specs {
-				c.WriteSpec(spec)
+				if err := c.WriteSpec(spec); err != nil {
+					return err
+				}
 				c.tsw.WriteLine("") // Add space after spec
 			}
 		default:
 			fmt.Printf("unknown decl: %#v\n", decl)
 		}
 	}
+	return nil
 }
 
 // WriteFuncDeclAsFunction writes a function declaration
 // NOTE: This function now ONLY handles regular functions, not methods (functions with receivers).
 // Method generation is handled within the type definition writer (e.g., for structs).
-func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) {
+func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	if decl.Recv != nil {
 		// This function should not be called for methods.
 		// Methods are handled by WriteFuncDeclAsMethod within WriteTypeSpec.
-		return
+		return nil
 	}
 
 	if decl.Doc != nil {
@@ -47,8 +52,11 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) {
 	}
 
 	c.tsw.WriteLiterally("function ")
-	c.WriteValueExpr(decl.Name) // Function name is a value identifier
-	c.WriteFuncType(decl.Type)  // Write signature (params, return type)
+	if err := c.WriteValueExpr(decl.Name); err != nil { // Function name is a value identifier
+		return err
+	}
+	c.WriteFuncType(decl.Type) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
 	c.WriteStmt(decl.Body)
+	return nil
 }
