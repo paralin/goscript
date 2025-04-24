@@ -203,9 +203,99 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType) {
 // WriteCallExpr writes a function call.
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) {
 	expFun := exp.Fun
-	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent && funIdent.String() == "println" {
-		c.tsw.WriteLiterally("console.log")
+	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
+		switch funIdent.String() {
+		case "println":
+			c.tsw.WriteLiterally("console.log")
+		case "len":
+			// Translate len(arg) to goscript.len(arg)
+			if len(exp.Args) == 1 {
+				c.tsw.WriteLiterally("goscript.len(")
+				c.WriteValueExpr(exp.Args[0])
+				c.tsw.WriteLiterally(")")
+				return // Handled len
+			}
+			c.tsw.WriteCommentInline("unhandled len call with incorrect number of arguments")
+			c.WriteValueExpr(expFun) // Write "len" identifier
+			c.tsw.WriteLiterally("(")
+			for i, arg := range exp.Args {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteValueExpr(arg)
+			}
+			c.tsw.WriteLiterally(")")
+			return // Handled unhandled len call
+		case "cap":
+			// Translate cap(arg) to goscript.cap(arg)
+			if len(exp.Args) == 1 {
+				c.tsw.WriteLiterally("goscript.cap(")
+				c.WriteValueExpr(exp.Args[0])
+				c.tsw.WriteLiterally(")")
+				return // Handled cap
+			}
+			c.tsw.WriteCommentInline("unhandled cap call with incorrect number of arguments")
+			c.WriteValueExpr(expFun) // Write "cap" identifier
+			c.tsw.WriteLiterally("(")
+			for i, arg := range exp.Args {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteValueExpr(arg)
+			}
+			c.tsw.WriteLiterally(")")
+			return // Handled unhandled cap call
+		case "make":
+			// Handle make for slices: make([]T, len, cap) or make([]T, len)
+			if len(exp.Args) >= 2 {
+				if arrayType, ok := exp.Args[0].(*ast.ArrayType); ok {
+					c.tsw.WriteLiterally("goscript.makeSlice(")
+					// Get and write the string representation of the element type
+					if typ := c.pkg.TypesInfo.TypeOf(arrayType.Elt); typ != nil {
+						// Use the underlying type for basic types like int, string, etc.
+						underlyingType := typ.Underlying()
+						c.tsw.WriteLiterally(fmt.Sprintf("%q", underlyingType.String()))
+					} else {
+						c.tsw.WriteCommentInline("could not determine element type for makeSlice")
+						c.WriteTypeExpr(arrayType.Elt) // Fallback to writing type expr
+					}
+					c.tsw.WriteLiterally(", ")
+					c.WriteValueExpr(exp.Args[1]) // Length
+					if len(exp.Args) == 3 {
+						c.tsw.WriteLiterally(", ")
+						c.WriteValueExpr(exp.Args[2]) // Capacity
+					}
+					c.tsw.WriteLiterally(")")
+					return // Handled make for slice
+				}
+			}
+			// Fallthrough for unhandled make calls (e.g., maps, channels)
+			c.tsw.WriteCommentInline("unhandled make call")
+			c.WriteValueExpr(expFun) // Write "make" identifier
+			c.tsw.WriteLiterally("(")
+			for i, arg := range exp.Args {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteValueExpr(arg)
+			}
+			c.tsw.WriteLiterally(")")
+			return // Handled unhandled make call
+		default:
+			// Not a special built-in, treat as a regular function call
+			c.WriteValueExpr(expFun)
+			c.tsw.WriteLiterally("(")
+			for i, arg := range exp.Args {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteValueExpr(arg)
+			}
+			c.tsw.WriteLiterally(")")
+			return // Handled regular function call
+		}
 	} else {
+		// Not an identifier (e.g., method call on a value)
 		c.WriteValueExpr(expFun)
 	}
 	c.tsw.WriteLiterally("(")

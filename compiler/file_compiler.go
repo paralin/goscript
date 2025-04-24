@@ -66,6 +66,11 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	cmap := ast.NewCommentMap(c.pkg.Fset, f, f.Comments)
 	// Pass comment map to compiler
 	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg, cmap)
+
+	// Add import for the goscript runtime using namespace import and alias
+	c.codeWriter.WriteLine("import * as goscript from \"@go/builtin\";")
+	c.codeWriter.WriteLine("") // Add a newline after the import
+
 	goWriter.WriteDecls(f.Decls)
 
 	return nil

@@ -9,6 +9,7 @@ import (
 
 	gstypes "github.com/paralin/goscript/types"
 	"github.com/sanity-io/litter"
+	"golang.org/x/tools/go/packages"
 )
 
 // WriteStmt writes a statement to the output.
@@ -254,42 +255,132 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 // WriteStmtAssign writes an assign statement.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
-	// skip blank-identifier assignments: ignore single `_ = ...` assignments
-	if len(exp.Lhs) == 1 {
-		if ident, ok := exp.Lhs[0].(*ast.Ident); ok && ident.Name == "_" {
-			return
-		}
-	}
-	// filter out blank identifiers for multi-value assignments: remove any `_` slots
-	lhs, rhs := filterBlankIdentifiers(exp.Lhs, exp.Rhs)
-	if len(lhs) == 0 {
+	// Handle multi-variable assignment by translating each pair individually.
+	// This correctly handles blank identifiers and expressions on the RHS.
+
+	// Ensure LHS and RHS have the same length for valid Go code
+	if len(exp.Lhs) != len(exp.Rhs) {
+		c.tsw.WriteCommentLine(fmt.Sprintf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs)))
 		return
 	}
 
-	// special-case define assignments (`:=`):
-	if exp.Tok == token.DEFINE {
-		c.tsw.WriteLiterally("let ")
-	}
+	// Process each assignment pair
+	for i := range exp.Lhs {
+		lhsExpr := exp.Lhs[i]
+		rhsExpr := exp.Rhs[i]
 
-	// Write the core assignment
-	c.writeAssignmentCore(lhs, rhs, exp.Tok)
+		// Check for blank identifier on the left-hand side
+		if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name == "_" {
+			// Blank identifier: evaluate the RHS for side effects, but discard the value.
+			c.WriteValueExpr(rhsExpr)
+			c.tsw.WriteCommentInline("discarded value")
+			c.tsw.WriteLine("") // Each assignment gets its own line
+			continue            // Move to the next pair
+		}
 
-	// Handle trailing inline comment AFTER writing the statement but BEFORE the newline
-	if c.pkg != nil && c.pkg.Fset != nil && exp.End().IsValid() {
-		if file := c.pkg.Fset.File(exp.End()); file != nil {
-			endLine := file.Line(exp.End())
-			for _, cg := range c.cmap[exp] {
-				if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
-					commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
-					c.tsw.WriteLiterally(" // " + commentText)
-					break
+		// Not a blank identifier: generate an assignment statement.
+
+		// Handle short variable declaration (:=)
+		if exp.Tok == token.DEFINE {
+			// Use 'let' for the first declaration of a variable.
+			// More sophisticated analysis might be needed to determine if it's truly the first declaration
+			// in the current scope, but for now, assume := implies a new variable.
+			c.tsw.WriteLiterally("let ")
+		}
+
+		// Write the left-hand side
+		c.WriteValueExpr(lhsExpr)
+
+		// Write the assignment operator
+		tokStr, ok := gstypes.TokenToTs(exp.Tok)
+		if !ok {
+			c.tsw.WriteLiterally("?= ")
+			c.tsw.WriteCommentLine("Unknown assignment token " + exp.Tok.String())
+		} else {
+			c.tsw.WriteLiterally(" " + tokStr + " ")
+		}
+
+		// Write the right-hand side, applying clone if necessary
+		if shouldApplyClone(c.pkg, rhsExpr) {
+			c.WriteValueExpr(rhsExpr)
+			c.tsw.WriteLiterally(".clone()")
+		} else {
+			c.WriteValueExpr(rhsExpr)
+		}
+
+		// Handle trailing inline comment for this specific assignment line
+		// This is more complex with multi-variable assignments. For simplicity,
+		// we'll associate any comment immediately following the *entire* Go statement
+		// with the *last* generated TypeScript assignment line.
+		// A more accurate approach would require mapping comments to specific LHS/RHS pairs.
+		if i == len(exp.Lhs)-1 { // Only process for the last assignment in the group
+			if c.pkg != nil && c.pkg.Fset != nil && exp.End().IsValid() {
+				if file := c.pkg.Fset.File(exp.End()); file != nil {
+					endLine := file.Line(exp.End())
+					// Check comments associated *directly* with the AssignStmt node
+					for _, cg := range c.cmap[exp] {
+						if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
+							commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
+							c.tsw.WriteLiterally(" // " + commentText)
+							break // Assume only one inline comment per statement
+						}
+					}
 				}
 			}
 		}
+
+		// Write the newline to finish the statement line
+		c.tsw.WriteLine("")
+	}
+}
+
+// filterBlankIdentifiers is no longer needed with the new WriteStmtAssign logic.
+// Keeping it commented out for now in case it's referenced elsewhere or for future use.
+/*
+func filterBlankIdentifiers(lhs, rhs []ast.Expr) ([]ast.Expr, []ast.Expr) {
+	filteredLhs := []ast.Expr{}
+	filteredRhs := []ast.Expr{}
+	for i := range lhs {
+		if ident, ok := lhs[i].(*ast.Ident); !ok || ident.Name != "_" {
+			filteredLhs = append(filteredLhs, lhs[i])
+			filteredRhs = append(filteredRhs, rhs[i])
+		}
+	}
+	return filteredLhs, filteredRhs
+}
+*/
+
+// shouldApplyClone determines if .clone() should be applied to the RHS of an assignment
+// to emulate Go's value semantics for structs.
+// This requires type information.
+func shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool {
+	if pkg == nil || pkg.TypesInfo == nil {
+		// Cannot determine type without type info, default to no clone
+		return false
 	}
 
-	// Write the newline to finish the statement line
-	c.tsw.WriteLine("")
+	// Get the type of the RHS expression
+	tv, found := pkg.TypesInfo.Types[rhs]
+	if !found || tv.Type == nil {
+		// Type information not found, default to no clone
+		return false
+	}
+
+	// Check if the underlying type is a struct
+	// Also check if it's a named type whose underlying type is a struct
+	switch t := tv.Type.Underlying().(type) {
+	case *gtypes.Struct:
+		// It's a struct, apply clone
+		return true
+	case *gtypes.Named:
+		// It's a named type, check its underlying type
+		if _, ok := t.Underlying().(*gtypes.Struct); ok {
+			return true
+		}
+	}
+
+	// Not a struct, do not apply clone
+	return false
 }
 
 // WriteStmtExpr writes an expr statement.

@@ -1,6 +1,8 @@
 // Generated file based on struct_field_access.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
@@ -11,7 +13,7 @@ class MyStruct {
 
 export function main(): void {
 	// === Struct Field Access ===
-	let ms = new MyStruct({ MyInt: 42, MyString: "foo" })
+	let ms = new MyStruct({ MyInt: 42, MyString: "foo" }).clone()
 	console.log("MyInt: Expected: 42, Actual:", ms.MyInt)
 	console.log("MyString: Expected: foo, Actual:", ms.MyString)
 }

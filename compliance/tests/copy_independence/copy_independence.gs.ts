@@ -1,6 +1,8 @@
 // Generated file based on copy_independence.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";

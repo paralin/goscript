@@ -1,6 +1,8 @@
 // Generated file based on float64.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 export function main(): void {
 	let a: number = 1.23;
 	let b = 4.56

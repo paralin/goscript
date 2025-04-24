@@ -1,0 +1,8 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@go/builtin": ["./builtin/builtin.ts"]
+    }
+  }
+}

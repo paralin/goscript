@@ -3,6 +3,7 @@ package compiler
 import (
 	"context"
 	"go/ast"
+	"os"
 	"path/filepath"
 
 	"github.com/paralin/goscript/output"
@@ -36,10 +37,19 @@ func NewPackageCompiler(
 
 // Compile compiles the package.
 func (c *PackageCompiler) Compile(ctx context.Context) error {
+	wd := c.compilerConf.Dir
+	if wd == "" {
+		var err error
+		wd, err = os.Getwd()
+		if err != nil {
+			return err
+		}
+	}
+
 	// Compile the files in the package one at a time
 	for i, f := range c.pkg.Syntax {
 		fileName := c.pkg.CompiledGoFiles[i]
-		relWdFileName, err := filepath.Rel(c.compilerConf.Dir, fileName)
+		relWdFileName, err := filepath.Rel(wd, fileName)
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,8 @@
 // Generated file based on basic_arithmetic.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 export function main(): void {
 	// === Basic Arithmetic ===
 	let add = 2 + 3

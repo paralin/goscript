@@ -1,6 +1,8 @@
 // Generated file based on value_type_copy_behavior.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
@@ -11,10 +13,12 @@ class MyStruct {
 }
 
 export function main(): void {
-	let dereferencedStructCopy = new MyStruct({ MyString: "original" })
+	let dereferencedStructCopy = new MyStruct({ MyString: "original" }).clone()
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.
-	let valueCopy1 = dereferencedStructCopy.clone(), valueCopy2 = dereferencedStructCopy.clone(), pointerCopy = dereferencedStructCopy
+	let valueCopy1 = dereferencedStructCopy.clone()
+	let valueCopy2 = dereferencedStructCopy.clone()
+	let pointerCopy = dereferencedStructCopy
 	// Modifications to one copy do not affect others or the original.
 	valueCopy1.MyString = "value copy 1"
 	dereferencedStructCopy.MyString = "original dereferenced copy modified" // Modify the source of the copies
@@ -25,5 +29,6 @@ export function main(): void {
 	console.log("dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: " + dereferencedStructCopy.MyString)
 	// Expected: "value copy 2"
 	console.log("valueCopy2: Expected: value copy 2, Actual: " + valueCopy2.MyString)
+	pointerCopy/* discarded value */
 }
 

@@ -1,6 +1,8 @@
 // Generated file based on array_literal.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 export function main(): void {
 	// Test basic array literal
 	let a: number[] = [1, 2, 3];

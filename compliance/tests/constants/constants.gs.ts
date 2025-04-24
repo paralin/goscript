@@ -1,6 +1,8 @@
 // Generated file based on constants.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 let Pi = 3.14;
 
 let Truth = false;

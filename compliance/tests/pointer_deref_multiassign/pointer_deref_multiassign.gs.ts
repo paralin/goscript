@@ -1,6 +1,8 @@
 // Generated file based on pointer_deref_multiassign.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
@@ -15,6 +17,11 @@ export function main(): void {
 	// === Pointer Dereference and Multi-Assignment ===
 	// Dereference structPointer to get a copy of the struct.
 	// Also demonstrates multi-variable assignment and the use of the blank identifier '_'.
-	let dereferencedStructCopy = structPointer.clone(), unusedString = "hello" // testing _ set
+	let dereferencedStructCopy = structPointer.clone()
+	structPointer.myBool/* discarded value */
+	structPointer.MyInt/* discarded value */
+	let unusedString = "hello" // testing _ set
+	unusedString/* discarded value */
+	dereferencedStructCopy/* discarded value */
 }
 

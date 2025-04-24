@@ -1,6 +1,8 @@
 // Generated file based on function_call_result_assignment.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
+import * as goscript from "@go/builtin";
+
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
@@ -18,7 +20,7 @@ export function NewMyStruct(s: string): MyStruct {
 export function main(): void {
 	// === Function Call Result Assignment (Value Copy) ===
 	// Assigning the result of a function that returns a struct creates a copy.
-	let structFromFunc = NewMyStruct("function result")
+	let structFromFunc = NewMyStruct("function result").clone()
 	let structFromFuncCopy = structFromFunc.clone()
 	structFromFuncCopy.MyString = "modified function result copy"
 	// Expected: "function result"

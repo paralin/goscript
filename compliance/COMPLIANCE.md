@@ -36,6 +36,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   `if`/`else` statements.
 *   **Data Structures:**
     *   Arrays (`[N]T`) - Including array literals and indexing.
+    *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`.
     *   `struct` definitions (including exported/unexported fields).
     *   Composite Literals for structs (`MyStruct{...}`).
 *   **Functions & Methods:**
@@ -67,7 +68,6 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
    *   Constants (`const`) - Note: Handling of large integer constants (exceeding standard JavaScript number limits) is currently not fully compliant.
    *   `iota`
 *   **Data Structures:**
-    *   Slices (`[]T`, `make`, `append`, `copy`, slicing operations `s[low:high]`)
     *   Maps (`map[K]V`, `make`, `delete`)
     *   Interfaces (`interface{}`) - Definition tested, but usage (assignment, type assertions `v.(T)`) needs tests.
     *   Struct Embedding

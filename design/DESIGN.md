@@ -3,8 +3,8 @@
 This is the typical package structure of the output TypeScript import path:
 
 ```
-@go/ # Typical Go workspace, all packages live here.
-  runtime
+@go/ # Typical Go workspace, all packages live here. Includes the '@go/builtin' alias for the runtime.
+  # Compiled Go packages go here (e.g., @go/my/package)
 ```
 
 # Go to TypeScript Compiler Design
@@ -44,6 +44,7 @@ Go's zero values are mapped as follows:
 ## Packages and Imports
 
 - Go packages are mapped to TypeScript modules under the `@go/` scope (e.g., `import { MyType } from '@go/my/package';`).
+- The GoScript runtime is imported using the `@go/builtin` alias, which maps to the `builtin/builtin.ts` file.
 - Standard Go library packages might require specific runtime implementations or shims.
 
 ## Code Generation Conventions

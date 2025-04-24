@@ -172,7 +172,8 @@ func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
 	tsImportPath := fmt.Sprintf("./output/@go/tempmod/%s", tsFileName)
 
 	tsRunner := filepath.Join(tempDir, "runner.ts")
-	runnerContent := fmt.Sprintf("import { main } from %q;\nmain();\n", tsImportPath) // Use dynamic path
+	// Import the goscript runtime and the main function from the compiled code
+	runnerContent := fmt.Sprintf("import { goscript } from \"./goscript\";\nimport { main } from %q;\nmain();\n", tsImportPath) // Use dynamic path
 	if err := os.WriteFile(tsRunner, []byte(runnerContent), 0o644); err != nil {
 		t.Fatalf("failed to write runner: %v", err)
 	}
@@ -236,10 +237,33 @@ func RunGoScriptTestDir(t *testing.T, testDir string) {
 	tempDir := PrepareTempTestDir(t, testDir)
 	defer os.RemoveAll(tempDir)
 
+	// Create tsconfig.json in the temporary directory for path aliases
+	tsconfigContent := `{
+	 "compilerOptions": {
+	   "baseUrl": ".",
+	   "paths": {
+	     "@go/builtin": ["/Users/cjs/repos/goscript/builtin/builtin.ts"]
+	   }
+	 }
+}`
+	tsconfigPath := filepath.Join(tempDir, "tsconfig.json")
+	if err := os.WriteFile(tsconfigPath, []byte(tsconfigContent), 0o644); err != nil {
+		t.Fatalf("failed to write tsconfig.json to temp dir: %v", err)
+	}
+
 	expected := ReadExpectedLog(t, testDir)
 
 	outputDir := filepath.Join(tempDir, "output")
 	CompileGoToTypeScript(t, testDir, tempDir, outputDir, le) // Pass testDir to enable copying output files back to the test directory
+
+	// Copy the goscript runtime file to the temp directory
+	// Use absolute path to avoid issues with changing working directories
+	workspaceDir := "/Users/cjs/repos/goscript" // Get this from environment details
+	runtimeSrc := filepath.Join(workspaceDir, "builtin/builtin.ts")
+	runtimeDst := filepath.Join(tempDir, "builtin.ts") // Rename to builtin.ts in temp dir
+	if err := copyFile(runtimeSrc, runtimeDst); err != nil {
+		t.Fatalf("failed to copy goscript runtime file: %v", err)
+	}
 
 	tsRunner := WriteTypeScriptRunner(t, tempDir)
 	actual := strings.TrimSpace(RunTypeScriptRunner(t, tempDir, tsRunner))
