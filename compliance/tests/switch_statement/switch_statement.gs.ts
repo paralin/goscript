@@ -9,16 +9,16 @@ export function main(): void {
 	switch (i) {
 		case 1:
 			console.log("one")
-			break;
+			break
 		case 2:
 			console.log("two")
-			break;
+			break
 		case 3:
 			console.log("three")
-			break;
+			break
 		default:
 			console.log("other integer")
-			break;
+			break
 	}
 	
 	let s = "hello"
@@ -26,13 +26,13 @@ export function main(): void {
 	switch (s) {
 		case "world":
 			console.log("world")
-			break;
+			break
 		case "hello":
 			console.log("hello")
-			break;
+			break
 		default:
 			console.log("other string")
-			break;
+			break
 	}
 }
 

@@ -42,6 +42,8 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 		}
 	case *ast.ForStmt:
 		c.WriteStmtFor(exp)
+	case *ast.RangeStmt:
+		_ = c.WriteStmtRange(exp) // Generate TS for for…range loops
 	case *ast.SwitchStmt:
 		c.WriteStmtSwitch(exp)
 	case *ast.IncDecStmt:
@@ -55,7 +57,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 		} else {
 			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++ or --)
 		}
-		c.tsw.WriteLine(";") // Add semicolon
+		c.tsw.WriteLine("")
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
@@ -121,7 +123,7 @@ func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) {
 		c.WriteStmt(stmt)
 	}
 	// Add break statement (Go's switch has implicit breaks)
-	c.tsw.WriteLine("break;")
+	c.tsw.WriteLine("break") // Remove semicolon
 	c.tsw.Indent(-1)
 }
 
@@ -187,7 +189,7 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 	if len(exp.Results) > 1 {
 		c.tsw.WriteLiterally("]")
 	}
-	c.tsw.WriteLine(";") // Add semicolon
+	c.tsw.WriteLine("") // Remove semicolon
 	return nil
 }
 
@@ -361,7 +363,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		c.WriteValueExpr(interfaceExpr)
 		c.tsw.WriteLiterally(" as any) satisfies ")
 		c.WriteTypeExpr(assertedType)
-		c.tsw.WriteLine(";")
+		c.tsw.WriteLine("")
 
 		c.tsw.WriteLiterally("let assertedValue: ")
 		c.WriteTypeExpr(assertedType)
@@ -369,7 +371,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		c.WriteValueExpr(interfaceExpr)
 		c.tsw.WriteLiterally(" as ")
 		c.WriteTypeExpr(assertedType)
-		c.tsw.WriteLiterally(") : null;")
+		c.tsw.WriteLiterally(") : null")
 		c.tsw.WriteLine("")
 
 		return nil
@@ -405,7 +407,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			return fmt.Errorf("failed to write RHS call expression in assignment: %w", err)
 		}
 
-		c.tsw.WriteLine(";") // Add semicolon for the statement
+		c.tsw.WriteLine("") // Remove semicolon
 		return nil
 	}
 
@@ -418,7 +420,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				return fmt.Errorf("failed to write RHS for blank identifier assignment: %w", err)
 			}
 			c.tsw.WriteCommentInline("discarded value")
-			c.tsw.WriteLine(";") // Each assignment gets its own line
+			c.tsw.WriteLine("") // Remove semicolon, each assignment gets its own line
 			return nil
 		}
 
@@ -460,7 +462,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		}
 
 		// Write the newline to finish the statement line
-		c.tsw.WriteLine(";") // Add semicolon
+		c.tsw.WriteLine("") // Remove semicolon
 		return nil
 	}
 
@@ -663,6 +665,153 @@ func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 }
 
 // WriteZeroValue writes the TypeScript zero‐value for a Go type.
+// WriteStmtRange writes a for…range loop by generating equivalent TypeScript code.
+func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
+	// Get the type of the iterable expression
+	iterType := c.pkg.TypesInfo.TypeOf(exp.X)
+	underlying := iterType.Underlying()
+
+	// Handle map types
+	if _, ok := underlying.(*gtypes.Map); ok {
+		// Generate a for-in loop to iterate over map keys and check own-property
+		c.tsw.WriteLiterally("for (const k in ")
+		c.WriteValueExpr(exp.X)
+		c.tsw.WriteLiterally(") {")
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+		c.tsw.WriteLiterally("if (Object.prototype.hasOwnProperty.call(")
+		c.WriteValueExpr(exp.X)
+		c.tsw.WriteLiterally(", k)) {")
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+		// If a key variable is provided and is not blank, declare it as a constant
+		if exp.Key != nil {
+			if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
+				c.tsw.WriteLiterally("const ")
+				c.WriteIdentValue(ident)
+				c.tsw.WriteLiterally(" = k")
+				c.tsw.WriteLine("")
+			}
+		}
+		// If a value variable is provided and is not blank, declare it from the map lookup
+		if exp.Value != nil {
+			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+				c.tsw.WriteLiterally("const ")
+				c.WriteIdentValue(ident)
+				c.tsw.WriteLiterally(" = ")
+				c.WriteValueExpr(exp.X)
+				c.tsw.WriteLiterally("[k]")
+				c.tsw.WriteLine("")
+			}
+		}
+		// Write the loop body
+		c.WriteStmtBlock(exp.Body, false)
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("}")
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("}")
+		return nil
+	}
+
+	// Handle string type by converting the string to a rune array
+	if basic, ok := underlying.(*gtypes.Basic); ok && (basic.Info()&gtypes.IsString != 0) {
+		// Convert the string to runes using goscript.stringToRunes
+		c.tsw.WriteLiterally("const _runes = goscript.stringToRunes(")
+		c.WriteValueExpr(exp.X)
+		c.tsw.WriteLiterally(")")
+		c.tsw.WriteLine("")
+		// Standard index loop over the runes array
+		c.tsw.WriteLiterally("for (let i = 0; i < _runes.length; i++) {")
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+		// Key (index) is already declared by the 'for (let i = ...)' loop
+		// No need to redeclare 'const i = i'
+		// Declare value if provided and not blank
+		if exp.Value != nil {
+			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+				c.tsw.WriteLiterally("const ")
+				c.WriteIdentValue(ident)
+				c.tsw.WriteLiterally(" = _runes[i]")
+				c.tsw.WriteLine("")
+			}
+		}
+		c.WriteStmtBlock(exp.Body, false)
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("}")
+		return nil
+	}
+
+	// Handle array and slice types
+	if _, isArray := underlying.(*gtypes.Array); isArray || isSlice(underlying) {
+		// If both key and value are provided, use an index loop and assign both
+		if exp.Key != nil && exp.Value != nil {
+			c.tsw.WriteLiterally("for (let i = 0; i < ")
+			c.WriteValueExpr(exp.X)
+			c.tsw.WriteLiterally(".length; i++) {")
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+			// Key (index) 'i' is already declared by the 'for (let i = ...)' loop
+			// No need to redeclare 'const i = i'
+			// Declare value if not blank
+			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+				c.tsw.WriteLiterally("const ")
+				c.WriteIdentValue(ident)
+				c.tsw.WriteLiterally(" = ")
+				c.WriteValueExpr(exp.X)
+				c.tsw.WriteLiterally("[i]")
+				c.tsw.WriteLine("")
+			}
+			c.WriteStmtBlock(exp.Body, false)
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+			return nil
+		} else if exp.Key != nil && exp.Value == nil { // Only key provided
+			c.tsw.WriteLiterally("for (let i = 0; i < ")
+			c.WriteValueExpr(exp.X)
+			c.tsw.WriteLiterally(".length; i++) {")
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+			// Key (index) 'i' is already declared by the 'for (let i = ...)' loop
+			// No need to redeclare 'const i = i'
+			c.WriteStmtBlock(exp.Body, false)
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+			return nil
+		} else if exp.Key == nil && exp.Value != nil { // Only value provided; use for-of loop
+			c.tsw.WriteLiterally("for (const v of ")
+			c.WriteValueExpr(exp.X)
+			c.tsw.WriteLiterally(") {")
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+				c.tsw.WriteLiterally("const ")
+				c.WriteIdentValue(ident)
+				c.tsw.WriteLiterally(" = v")
+				c.tsw.WriteLine("")
+			}
+			c.WriteStmtBlock(exp.Body, false)
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+			return nil
+		} else {
+			// Fallback: simple index loop without declaring range variables
+			c.tsw.WriteLiterally("for (let i = 0; i < ")
+			c.WriteValueExpr(exp.X)
+			c.tsw.WriteLiterally(".length; i++) {")
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+			c.WriteStmtBlock(exp.Body, false)
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+			return nil
+		}
+	}
+
+	// Fallback case if the ranged type is not supported.
+	c.tsw.WriteCommentLine("unsupported range loop")
+	return nil
+}
+
 func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 	switch t := expr.(type) {
 	case *ast.Ident:
@@ -715,4 +864,10 @@ func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 		// everything else defaults to null in TS
 		c.tsw.WriteLiterally("null")
 	}
+}
+
+// isSlice returns true if the underlying type is a slice.
+func isSlice(typ gtypes.Type) bool {
+	_, ok := typ.(*gtypes.Slice)
+	return ok
 }

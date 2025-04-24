@@ -13,7 +13,7 @@ class MyStruct {
 	
 	public Method1(): number {
 		const m = this
-		return m.Value;
+		return m.Value
 	}
 	
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
@@ -22,11 +22,11 @@ class MyStruct {
 
 export function main(): void {
 	let i: MyInterface;
-	let s = new MyStruct({ Value: 10 }).clone();
-	i = s.clone();
+	let s = new MyStruct({ Value: 10 }).clone()
+	i = s.clone()
 	
-	let ok: boolean = i instanceof MyStruct;
-	let assertedValue: MyStruct | null = ok ? (i as MyStruct) : null;
+	let ok: boolean = (i as any) satisfies MyStruct
+	let assertedValue: MyStruct | null = ok ? (i as MyStruct) : null
 	if (ok) {
 		console.log("Type assertion successful")
 	} else {

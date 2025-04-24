@@ -1,13 +1,5 @@
 vendor
-.aider*
-!.aider-prompt
-.roo*
-go.sum
-go.mod
-LICENSE
-example
-vendor
-.aider*
+.aider.*
 .roo*
 go.sum
 go.mod

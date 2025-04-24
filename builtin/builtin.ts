@@ -28,3 +28,12 @@ export const len = <T>(slice: Array<T>): number => {
 export const cap = <T>(slice: Array<T> & { __capacity?: number }): number => {
     return slice.__capacity !== undefined ? slice.__capacity : slice.length;
 };
+
+/**
+ * Converts a string to an array of Unicode code points (runes).
+ * @param str The input string.
+ * @returns An array of numbers representing the Unicode code points.
+ */
+export const stringToRunes = (str: string): number[] => {
+    return Array.from(str).map(c => c.codePointAt(0) || 0);
+};

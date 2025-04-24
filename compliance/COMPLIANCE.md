@@ -41,7 +41,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   **Control Flow:**
     *   `if`/`else` statements.
     *   `switch` statements.
-    *   `for` loops (condition-only).
+    *   `for` loops (condition-only, basic counter-based, `range` over arrays/slices/strings).
 *   **Data Structures:**
     *   Arrays (`[N]T`) - Including array literals and indexing.
     *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`.
@@ -73,7 +73,7 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
 
 *   Interfaces (`interface{}`) - Definition tested, and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions.
 *   **Control Flow:**
-    *   `for` loops (basic counter-based covered; `range`, condition-only, infinite still uncovered)
+    *   `for` loops (condition-only, infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)
     *   `select` statement (for channel operations)
     *   `defer` statement
