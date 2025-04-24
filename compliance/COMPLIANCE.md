@@ -28,7 +28,6 @@ The following tests are currently implemented in the `/compliance/tests` directo
 Based on the existing tests, GoScript aims to support the following Go features:
 
 *   **Basic Types:** `int`, `string`, `bool`, `float64` (implicitly tested).
-    *   Constants (`const`) - Note: Handling of large integer constants (exceeding standard JavaScript number limits) is currently not fully compliant.
 *   **Operators:**
     *   Arithmetic: `+`, `-`, `*`, `/`, `%`
     *   Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
@@ -36,6 +35,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   **Control Flow:**
     *   `if`/`else` statements.
     *   `switch` statements.
+    *   `for` loops (condition-only).
 *   **Data Structures:**
     *   Arrays (`[N]T`) - Including array literals and indexing.
     *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`.
@@ -48,6 +48,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Function calls.
     *   Method calls (on values and pointers).
     *   `println` built-in (mapped to `console.log`).
+    *   Multiple return values (including assignment and usage with blank identifier).
 *   **Variables & Assignment:**
     *   Variable declaration (`var`, implicitly via `:=`).
     *   Short variable declaration (`:=`).
@@ -64,23 +65,24 @@ Based on the existing tests, GoScript aims to support the following Go features:
 
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
-*   **Data Structures:**
-    *   Maps (`map[K]V`, `make`, `delete`)
-    *   Struct Embedding
-*   **Functions:**
-    *   Multiple return values (including assignment and usage with blank identifier).
-    *   Variadic functions (`...T`)
-    *   Closures
-    *   Recursion
-*   **Basic Types & Values:**
-   *   `rune` (and string/rune conversions)
-   *   `iota` consts
+*   Interfaces (`interface{}`) - Definition tested, but usage (assignment, type assertions `v.(T)`) is not
+    *   type assertion: add a function `export function isMyInterface<T=unknown>(obj T): obj is MyInterface` which checks each of the function signatures on obj to verify they are all present and match the interface. try to make the best possible type assertion approach for this.
 *   **Control Flow:**
     *   `for` loops (basic counter-based covered; `range`, condition-only, infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)
     *   `select` statement (for channel operations)
     *   `defer` statement
     *   `panic` / `recover`
+*   **Data Structures:**
+    *   Maps (`map[K]V`, `make`, `delete`)
+    *   Struct Embedding
+*   **Functions:**
+    *   Variadic functions (`...T`)
+    *   Closures
+    *   Recursion
+*   **Basic Types & Values:**
+   *   `rune` (and string/rune conversions)
+   *   `iota` consts
 *   **Concurrency:**
     *   Goroutines (`go func()`)
     *   Channels (`chan T`, `make`, send `<-`, receive `<-`, buffered/unbuffered, closing)
@@ -100,7 +102,6 @@ These are the not-planned features that we should NOT waste time adding yet:
 *   **Reflection:** (`reflect` package) - Likely out of scope for direct translation.
 *   **Testing:** (`testing` package) - Test files themselves are usually not translated.
 *   Constants (`const`) - handling of large integer constants (exceeding standard JavaScript number limits) is currently not fully compliant.
-*   Interfaces (`interface{}`) - Definition tested, but usage (assignment, type assertions `v.(T)`) is not
 *   Generics (Type parameters, constraints)
 *   `goto` (less common, but part of the language)
 *   **Directives:**

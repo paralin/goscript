@@ -44,6 +44,18 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 		c.WriteStmtFor(exp)
 	case *ast.SwitchStmt:
 		c.WriteStmtSwitch(exp)
+	case *ast.IncDecStmt:
+		// Handle increment/decrement (e.g., i++ or i--)
+		if err := c.WriteValueExpr(exp.X); err != nil { // The expression (e.g., i)
+			// Handle error
+		}
+		tokStr, ok := gstypes.TokenToTs(exp.Tok)
+		if !ok {
+			c.tsw.WriteCommentLine(fmt.Sprintf("unknown incdec token: %s", exp.Tok.String()))
+		} else {
+			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++ or --)
+		}
+		c.tsw.WriteLine(";") // Add semicolon
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
