@@ -49,7 +49,8 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 			c.WriteField(field, false)
 		}
 
-		// Find and write methods for this struct
+		// Methods for this struct are discovered by scanning all package declarations.
+		// Future improvement: use pkg.TypesInfo.MethodSet (go/types) for direct method lookup.
 		for _, fileSyntax := range c.pkg.Syntax {
 			for _, decl := range fileSyntax.Decls {
 				funcDecl, isFunc := decl.(*ast.FuncDecl)

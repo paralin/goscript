@@ -43,7 +43,10 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 	case *ast.ForStmt:
 		c.WriteStmtFor(exp)
 	case *ast.RangeStmt:
-		_ = c.WriteStmtRange(exp) // Generate TS for for…range loops
+		// Generate TS for for…range loops, log if something goes wrong
+		if err := c.WriteStmtRange(exp); err != nil {
+			c.tsw.WriteCommentLine(fmt.Sprintf("error writing range loop: %v", err))
+		}
 	case *ast.SwitchStmt:
 		c.WriteStmtSwitch(exp)
 	case *ast.IncDecStmt:
@@ -492,21 +495,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	return nil
 }
 
-// filterBlankIdentifiers is no longer needed with the new WriteStmtAssign logic.
-// Keeping it commented out for now in case it's referenced elsewhere or for future use.
-/*
-func filterBlankIdentifiers(lhs, rhs []ast.Expr) ([]ast.Expr, []ast.Expr) {
-	filteredLhs := []ast.Expr{}
-	filteredRhs := []ast.Expr{}
-	for i := range lhs {
-		if ident, ok := lhs[i].(*ast.Ident); !ok || ident.Name != "_" {
-			filteredLhs = append(filteredLhs, lhs[i])
-			filteredRhs = append(filteredRhs, rhs[i])
-		}
-	}
-	return filteredLhs, filteredRhs
-}
-*/
+// Note: delegates to WriteZeroValueForType for unified zero‐value mapping.
 
 // shouldApplyClone determines if .clone() should be applied to the RHS of an assignment
 // to emulate Go's value semantics for structs.

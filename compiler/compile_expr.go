@@ -29,9 +29,18 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 		// Translate [N]T to T[]
 		c.WriteTypeExpr(exp.Elt)
 		c.tsw.WriteLiterally("[]")
-	// Add cases for MapType, ChanType etc.
+	case *ast.MapType:
+		// Map<K,V> → TS object type { [key: K]: V }
+		c.tsw.WriteLiterally("{ [key: ")
+		c.WriteTypeExpr(exp.Key)
+		c.tsw.WriteLiterally("]: ")
+		c.WriteTypeExpr(exp.Value)
+		c.tsw.WriteLiterally(" }")
+	case *ast.ChanType:
+		// channel types are not yet supported in TS output
+		c.tsw.WriteCommentInline("channel type")
 	default:
-		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled type expr: %T", exp))
+		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled type expr: %T (map/chan support pending)", exp))
 	}
 }
 
@@ -554,6 +563,7 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ interface{}) {
 		c.tsw.WriteLiterally("null")
 	}
 }
+// Note: this implements zero‐value logic; for AST‐based cases see WriteZeroValue in compile_stmt.go
 
 // WriteKeyValueExprValue writes a key-value pair.
 func (c *GoToTSCompiler) WriteKeyValueExprValue(exp *ast.KeyValueExpr) {
