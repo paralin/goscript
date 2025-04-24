@@ -42,9 +42,75 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 		}
 	case *ast.ForStmt:
 		c.WriteStmtFor(exp)
+	case *ast.SwitchStmt:
+		c.WriteStmtSwitch(exp)
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
+}
+
+// WriteStmtSwitch writes a switch statement.
+func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) {
+	// Handle optional initialization statement
+	if exp.Init != nil {
+		c.tsw.WriteLiterally("{")
+		c.tsw.Indent(1)
+		c.WriteStmt(exp.Init)
+		defer func() {
+			c.tsw.Indent(-1)
+			c.tsw.WriteLiterally("}")
+		}()
+	}
+
+	c.tsw.WriteLiterally("switch (")
+	// Handle the switch tag (the expression being switched on)
+	if exp.Tag != nil {
+		c.WriteValueExpr(exp.Tag)
+	}
+	c.tsw.WriteLiterally(") {")
+	c.tsw.WriteLine("")
+	c.tsw.Indent(1)
+
+	// Handle case clauses
+	for _, stmt := range exp.Body.List {
+		if caseClause, ok := stmt.(*ast.CaseClause); ok {
+			c.WriteCaseClause(caseClause)
+		} else {
+			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled statement in switch body: %T", stmt))
+		}
+	}
+
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+}
+
+// WriteCaseClause writes a case clause within a switch statement.
+func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) {
+	if exp.List == nil {
+		// Default case
+		c.tsw.WriteLiterally("default:")
+		c.tsw.WriteLine("")
+	} else {
+		// Case with expressions
+		c.tsw.WriteLiterally("case ")
+		for i, expr := range exp.List {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ") // Although Go doesn't support multiple expressions per case like this,
+			} // TypeScript does, so we'll write it this way for now.
+			c.WriteValueExpr(expr)
+		}
+		c.tsw.WriteLiterally(":")
+		c.tsw.WriteLine("")
+	}
+
+	c.tsw.Indent(1)
+	// Write the body of the case clause
+	for _, stmt := range exp.Body {
+		c.WriteStmt(stmt)
+	}
+	// Add break statement (Go's switch has implicit breaks)
+	c.tsw.WriteLine("break;")
+	c.tsw.Indent(-1)
 }
 
 // Overload for backward compatibility

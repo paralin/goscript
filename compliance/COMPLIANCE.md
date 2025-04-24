@@ -12,6 +12,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`copy_independence/`**: Verifies that copies of struct values are independent and modifications to one do not affect others.
 *   **`function_call_result_assignment/`**: Tests assigning the result of a function returning a struct, ensuring proper value semantics (copying).
 *   **`if_statement/`**: Covers basic `if`/`else` conditional statements, including correct `} else {` formatting.
+*   **`switch_statement/`**: Verifies basic `switch` statements with integer and string tags and default cases.
 *   **`for_loop_basic/`**: Verifies basic counter-based `for` loops (`for init; cond; post {}`).
 *   **`method_call_on_pointer_receiver/`**: Verifies calling methods with pointer receivers (`*T`) on pointer variables.
 *   **`method_call_on_value_receiver/`**: Verifies calling methods with value receivers (`T`) on value variables. (Note: Go often implicitly takes the address for pointer receivers, this tests the explicit value receiver case).
@@ -34,6 +35,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Logical: `&&`, `||`, `!`
 *   **Control Flow:**
     *   `if`/`else` statements.
+    *   `switch` statements.
 *   **Data Structures:**
     *   Arrays (`[N]T`) - Including array literals and indexing.
     *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`.
