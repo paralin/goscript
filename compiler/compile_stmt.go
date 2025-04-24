@@ -39,6 +39,8 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) {
 		} else {
 			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled declaration type in DeclStmt: %T", exp.Decl))
 		}
+	case *ast.ForStmt:
+		c.WriteStmtFor(exp)
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
@@ -218,6 +220,38 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 	}
 }
 
+// writeAssignmentCore writes the core LHS, operator, and RHS of an assignment.
+// It does NOT handle blank identifiers, 'let' keyword, or trailing semicolons/comments/newlines.
+func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token) {
+	for i, l := range lhs {
+		if i != 0 {
+			c.tsw.WriteLiterally(", ")
+		}
+		c.WriteValueExpr(l) // LHS is a value
+	}
+	c.tsw.WriteLiterally(" ")
+	tokStr, ok := gstypes.TokenToTs(tok) // Use explicit gstypes alias
+	if !ok {
+		c.tsw.WriteLiterally("?= ")
+		c.tsw.WriteCommentLine("Unknown token " + tok.String())
+	} else {
+		c.tsw.WriteLiterally(tokStr)
+	}
+	c.tsw.WriteLiterally(" ")
+	for i, r := range rhs {
+		if i != 0 {
+			c.tsw.WriteLiterally(", ")
+		}
+		// Check if we should apply clone for value-type semantics
+		if shouldApplyClone(c.pkg, r) {
+			c.WriteValueExpr(r) // RHS is a value
+			c.tsw.WriteLiterally(".clone()")
+		} else {
+			c.WriteValueExpr(r) // RHS is a value
+		}
+	}
+}
+
 // WriteStmtAssign writes an assign statement.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 	// skip blank-identifier assignments: ignore single `_ = ...` assignments
@@ -232,68 +266,13 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) {
 		return
 	}
 
-	// Write the core assignment statement (LHS, operator, RHS)
 	// special-case define assignments (`:=`):
 	if exp.Tok == token.DEFINE {
 		c.tsw.WriteLiterally("let ")
-		for i, l := range lhs {
-			if i != 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-
-			c.WriteValueExpr(l) // LHS is a value
-			c.tsw.WriteLiterally(" = ")
-
-			// Check if we should apply clone for value-type semantics
-			if shouldApplyClone(c.pkg, rhs[i]) {
-				c.WriteValueExpr(rhs[i]) // RHS is a value
-				c.tsw.WriteLiterally(".clone()")
-			} else {
-				c.WriteValueExpr(rhs[i]) // RHS is a value
-			}
-		}
-
-		// Handle trailing inline comment AFTER writing the statement but BEFORE the newline
-		if c.pkg != nil && c.pkg.Fset != nil && exp.End().IsValid() {
-			if file := c.pkg.Fset.File(exp.End()); file != nil {
-				endLine := file.Line(exp.End())
-				for _, cg := range c.cmap[exp] {
-					if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > exp.End() {
-						commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
-						c.tsw.WriteLiterally(" // " + commentText)
-						break
-					}
-				}
-			}
-		}
-
-		// Write the newline to finish the statement line
-		c.tsw.WriteLine("")
-		return
 	}
 
-	// fallback for other assignment tokens (`=`, `+=`, etc):
-	for i, l := range lhs {
-		if i != 0 {
-			c.tsw.WriteLiterally(", ")
-		}
-		c.WriteValueExpr(l) // LHS is a value
-	}
-	c.tsw.WriteLiterally(" ")
-	tokStr, ok := gstypes.TokenToTs(exp.Tok) // Use explicit gstypes alias
-	if !ok {
-		c.tsw.WriteLiterally("?= ")
-		c.tsw.WriteCommentLine("Unknown token " + exp.Tok.String())
-	} else {
-		c.tsw.WriteLiterally(tokStr)
-	}
-	c.tsw.WriteLiterally(" ")
-	for i, r := range rhs {
-		if i != 0 {
-			c.tsw.WriteLiterally(", ")
-		}
-		c.WriteValueExpr(r) // RHS is a value
-	}
+	// Write the core assignment
+	c.writeAssignmentCore(lhs, rhs, exp.Tok)
 
 	// Handle trailing inline comment AFTER writing the statement but BEFORE the newline
 	if c.pkg != nil && c.pkg.Fset != nil && exp.End().IsValid() {
@@ -348,6 +327,70 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) {
 
 	// Add semicolon according to design doc (omit semicolons) - REMOVED semicolon
 	c.tsw.WriteLine("") // Finish with a newline
+}
+
+// WriteStmtFor writes a for statement.
+func (c *GoToTSCompiler) WriteStmtFor(exp *ast.ForStmt) {
+	c.tsw.WriteLiterally("for (")
+	if exp.Init != nil {
+		c.WriteForInit(exp.Init) // Use WriteForInit
+	}
+	c.tsw.WriteLiterally("; ")
+	if exp.Cond != nil {
+		c.WriteValueExpr(exp.Cond)
+	}
+	c.tsw.WriteLiterally("; ")
+	if exp.Post != nil {
+		c.WriteForPost(exp.Post) // Use WriteForPost
+	}
+	c.tsw.WriteLiterally(") ")
+	c.WriteStmtBlock(exp.Body, false)
+}
+
+// WriteForInit writes the initialization part of a for loop header.
+func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) {
+	switch s := stmt.(type) {
+	case *ast.AssignStmt:
+		// Handle assignment in init (e.g., i := 0 or i = 0)
+		// Need to handle 'let' for :=
+		if s.Tok == token.DEFINE {
+			c.tsw.WriteLiterally("let ")
+		}
+		// Write the core assignment without trailing syntax
+		// Blank identifiers should already be handled by filterBlankIdentifiers if needed,
+		// but for init statements they are less common. Let's assume simple assignments for now.
+		c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok)
+	case *ast.ExprStmt:
+		// Handle expression statement in init (less common, but possible)
+		c.WriteValueExpr(s.X)
+	default:
+		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled for loop init statement: %T", stmt))
+	}
+}
+
+// WriteForPost writes the post part of a for loop header.
+func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) {
+	switch s := stmt.(type) {
+	case *ast.IncDecStmt:
+		// Handle increment/decrement (e.g., i++)
+		c.WriteValueExpr(s.X) // The expression (e.g., i)
+		tokStr, ok := gstypes.TokenToTs(s.Tok)
+		if !ok {
+			c.tsw.WriteLiterally("/* unknown incdec token */")
+		} else {
+			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++)
+		}
+	case *ast.AssignStmt:
+		// Handle assignment in post (e.g., i = i + 1)
+		// No 'let' keyword here
+		// Blank identifiers should already be handled by filterBlankIdentifiers if needed.
+		c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok)
+	case *ast.ExprStmt:
+		// Handle expression statement in post (less common)
+		c.WriteValueExpr(s.X)
+	default:
+		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled for loop post statement: %T", stmt))
+	}
 }
 
 // WriteZeroValue writes the TypeScript zero‐value for a Go type.
