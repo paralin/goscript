@@ -227,7 +227,7 @@ func copyFile(src, dst string) error {
 }
 
 // RunGoScriptTestDir compiles all .go files in testDir, runs the generated TypeScript, and compares output to expected.log.
-func RunGoScriptTestDir(t *testing.T, testDir string) {
+func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) { // Added workspaceDir parameter
 	t.Helper()
 
 	log := logrus.New()
@@ -238,14 +238,17 @@ func RunGoScriptTestDir(t *testing.T, testDir string) {
 	defer os.RemoveAll(tempDir)
 
 	// Create tsconfig.json in the temporary directory for path aliases
-	tsconfigContent := `{
+	builtinTsPath := filepath.Join(workspaceDir, "builtin", "builtin.ts") // Use passed workspaceDir
+	// Ensure the path uses forward slashes for JSON compatibility, even on Windows
+	builtinTsPathForJSON := filepath.ToSlash(builtinTsPath)
+	tsconfigContent := fmt.Sprintf(`{
 	 "compilerOptions": {
 	   "baseUrl": ".",
 	   "paths": {
-	     "@go/builtin": ["/Users/cjs/repos/goscript/builtin/builtin.ts"]
+	     "@go/builtin": ["%s"]
 	   }
 	 }
-}`
+}`, builtinTsPathForJSON) // Use dynamic path
 	tsconfigPath := filepath.Join(tempDir, "tsconfig.json")
 	if err := os.WriteFile(tsconfigPath, []byte(tsconfigContent), 0o644); err != nil {
 		t.Fatalf("failed to write tsconfig.json to temp dir: %v", err)
@@ -256,9 +259,8 @@ func RunGoScriptTestDir(t *testing.T, testDir string) {
 
 	// Copy the goscript runtime file to the temp directory
 	// Use absolute path to avoid issues with changing working directories
-	workspaceDir := "/Users/cjs/repos/goscript" // Get this from environment details
-	runtimeSrc := filepath.Join(workspaceDir, "builtin/builtin.ts")
-	runtimeDst := filepath.Join(tempDir, "builtin.ts") // Rename to builtin.ts in temp dir
+	runtimeSrc := filepath.Join(workspaceDir, "builtin", "builtin.ts") // Use passed workspaceDir
+	runtimeDst := filepath.Join(tempDir, "builtin.ts")                 // Rename to builtin.ts in temp dir
 	if err := copyFile(runtimeSrc, runtimeDst); err != nil {
 		t.Fatalf("failed to copy goscript runtime file: %v", err)
 	}

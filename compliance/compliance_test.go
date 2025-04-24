@@ -14,6 +14,13 @@ func TestCompliance(t *testing.T) {
 		t.Fatalf("failed to read tests dir: %v", err)
 	}
 
+	// Get workspace directory (project root)
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	workspaceDir = filepath.Join(workspaceDir, "..")
+
 	// First collect all test paths
 	var testPaths []string
 	for _, dir := range dirs {
@@ -40,7 +47,7 @@ func TestCompliance(t *testing.T) {
 		go func(path string) {
 			defer wg.Done()
 			t.Run(filepath.Base(path), func(t *testing.T) {
-				RunGoScriptTestDir(t, path)
+				RunGoScriptTestDir(t, workspaceDir, path) // Pass workspaceDir
 			})
 		}(testPath)
 	}

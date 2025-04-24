@@ -12,6 +12,8 @@ export function main(): void {
 			sum += num
 		}
 	}
+	// unsupported range loop
+	// error writing range loop: unsupported range loop type: *types.Slice
 	console.log("sum:", sum)
 	
 	for (let i = 0; i < nums.length; i++) {
@@ -20,6 +22,8 @@ export function main(): void {
 			console.log("index:", i, "value:", num)
 		}
 	}
+	// unsupported range loop
+	// error writing range loop: unsupported range loop type: *types.Slice
 	
 	// Test ranging over an array
 	let arr = ["a", "b", "c"]
@@ -29,6 +33,8 @@ export function main(): void {
 			console.log("index:", i, "value:", s)
 		}
 	}
+	// unsupported range loop
+	// error writing range loop: unsupported range loop type: *types.Array
 	
 	// Test ranging over a string
 	let str = "go"
