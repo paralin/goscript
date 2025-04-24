@@ -71,7 +71,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
-*   Interfaces (`interface{}`) - Definition tested, and type assertions (`v.(T)`) are now compliant.
+*   Interfaces (`interface{}`) - Definition tested, and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions.
 *   **Control Flow:**
     *   `for` loops (basic counter-based covered; `range`, condition-only, infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)

@@ -359,16 +359,16 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			// Translate to a TypeScript destructuring assignment.
 		} else if typeAssertExpr, ok := exp.Rhs[0].(*ast.TypeAssertExpr); ok {
 			// This is a multi-variable assignment from a type assertion.
-			// Translate to a TypeScript instanceof check and type assertion.
+			// Translate to a TypeScript satisfies check and type assertion.
 
 			// Get the interface and the type being asserted.
 			interfaceExpr := typeAssertExpr.X
 			assertedType := typeAssertExpr.Type
 
 			// Write the TypeScript code for the type assertion.
-			c.tsw.WriteLiterally("let ok: boolean = ")
+			c.tsw.WriteLiterally("let ok: boolean = (")
 			c.WriteValueExpr(interfaceExpr)
-			c.tsw.WriteLiterally(" instanceof ")
+			c.tsw.WriteLiterally(" as any) satisfies ")
 			c.WriteTypeExpr(assertedType)
 			c.tsw.WriteLine(";")
 
