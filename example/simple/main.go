@@ -25,14 +25,83 @@ func (m *MyStruct) GetMyBool() bool {
 func NewMyStruct(s string) MyStruct {
 	return MyStruct{MyString: s}
 }
+func vals() (int, int) {
+	return 1, 2
+}
 
 func main() {
 	println("Hello from GoScript example!")
 
-	// Create and use a struct instance
-	myInstance := NewMyStruct("example data")
-	println("MyInstance string:", myInstance.GetMyString())
-	myInstance.MyInt = 123
-	println("MyInstance int:", myInstance.MyInt)
-	println("MyInstance bool:", myInstance.GetMyBool()) // Call the new method
+	// Basic arithmetic
+	a, b := 10, 3
+	println("Addition:", a+b, "Subtraction:", a-b, "Multiplication:", a*b, "Division:", a/b, "Modulo:", a%b)
+
+	// Boolean logic and comparisons
+	println("Logic &&:", true && false, "||:", true || false, "!:!", !true)
+	println("Comparisons:", a == b, a != b, a < b, a > b, a <= b, a >= b)
+
+	// Arrays
+	arr := [3]int{1, 2, 3}
+	println("Array elements:", arr[0], arr[1], arr[2])
+
+	// Slices and range loop
+	slice := []int{4, 5, 6}
+	println("Slice elements:", slice[0], slice[1], slice[2])
+	sum := 0
+	for idx, val := range slice {
+		sum += val
+		println("Range idx:", idx, "val:", val)
+	}
+	println("Range sum:", sum)
+
+	// Basic for loop
+	prod := 1
+	for i := 1; i <= 3; i++ {
+		prod *= i
+	}
+	println("Product via for:", prod)
+
+	// Struct, pointers, copy independence
+	instance := NewMyStruct("go-script")
+	println("instance.MyString:", instance.GetMyString())
+	instance.MyInt = 42
+	copyInst := instance
+	copyInst.MyInt = 7
+	println("instance.MyInt:", instance.MyInt, "copyInst.MyInt:", copyInst.MyInt)
+
+	// Pointer initialization and dereference assignment
+	ptr := new(MyStruct)
+	ptr.MyInt = 9
+	println("ptr.MyInt:", ptr.MyInt)
+	deref := *ptr
+	deref.MyInt = 8
+	println("After deref assign, ptr.MyInt:", ptr.MyInt, "deref.MyInt:", deref.MyInt)
+
+	// Method calls on pointer receiver
+	ptr.myBool = true
+	println("ptr.GetMyBool():", ptr.GetMyBool())
+
+	// Composite literal assignment
+	comp := MyStruct{MyInt: 100, MyString: "composite", myBool: false}
+	println("comp fields:", comp.MyInt, comp.GetMyString(), comp.GetMyBool())
+
+	// Multiple return values and blank identifier
+	x, _ := vals()
+	_, y := vals()
+	println("vals x:", x, "y:", y)
+
+	// If/else
+	if a > b {
+		println("If branch: a>b")
+	} else {
+		println("Else branch: a<=b")
+	}
+
+	// Switch statement
+	switch a {
+	case 10:
+		println("Switch case 10")
+	default:
+		println("Switch default")
+	}
 }

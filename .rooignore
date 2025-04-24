@@ -4,6 +4,5 @@ vendor
 go.sum
 go.mod
 LICENSE
-example
 .vscode
 .github
