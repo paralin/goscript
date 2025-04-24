@@ -99,8 +99,9 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 	if err != nil {
 		t.Fatalf("failed to create compiler: %v", err)
 	}
-	if err := comp.CompilePackages(context.Background(), "."); err != nil {
-		t.Fatalf("compilation failed: %v", err)
+	cmpErr := comp.CompilePackages(context.Background(), ".")
+	if cmpErr != nil {
+		t.Errorf("compilation failed: %v", err)
 	}
 
 	// Log generated TypeScript files and copy them back to testDir
@@ -141,18 +142,20 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 			// Prepend the comment to the generated content
 			finalContent := append([]byte(comment), generatedContent...)
 
-			t.Logf("Writing generated file with comment to %s", destPath)
 			if err := os.WriteFile(destPath, finalContent, 0o644); err != nil {
 				t.Logf("failed to write file %s: %v", destPath, err)
 				return err
 			}
 
-			// Log the final content written
-			t.Logf("Final content written to %s:\n%s", destPath, string(finalContent))
+			t.Logf("generated content written to %s:\n%s", destPath, string(finalContent))
 		}
 		return nil
 	}); err != nil {
 		t.Fatalf("error while walking: %v", err.Error())
+	}
+
+	if cmpErr != nil {
+		t.Fatalf("compilation failed: %v", cmpErr)
 	}
 }
 

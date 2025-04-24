@@ -841,6 +841,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
+			return nil
 		} else if exp.Key != nil && exp.Value == nil { // Only key provided
 			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
 			// Write the expression for the iterable
@@ -855,6 +856,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
+			return nil
 		} else if exp.Key == nil && exp.Value != nil { // Only value provided; use for-of loop
 			c.tsw.WriteLiterally("for (const v of ")
 			if err := c.WriteValueExpr(exp.X); err != nil {
@@ -875,6 +877,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
+			return nil
 		} else {
 			// Fallback: simple index loop without declaring range variables, use _i
 			indexVarName := "_i"

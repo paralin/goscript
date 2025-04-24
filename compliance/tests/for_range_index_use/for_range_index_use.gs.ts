@@ -13,8 +13,6 @@ export function main(): void {
 			console.log("Range idx:", idx, "val:", val)
 		}
 	}
-	// unsupported range loop
-	// error writing range loop: unsupported range loop type: *types.Slice
 	console.log("Sum:", sum)
 }
 
