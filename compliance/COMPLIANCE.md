@@ -23,6 +23,12 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`struct_field_access/`**: Verifies accessing fields of struct values and struct pointers.
 *   **`value_type_copy_behavior/`**: Focuses specifically on demonstrating that assigning struct values creates independent copies (value semantics).
 
+Each test should have only three files:
+
+1. test_name.go - the Go code to convert to TypeScript
+2. test_name.gs.ts - the generated TypeScript code, created automatically on test run
+3. expected.log - the expected output from running the .gs.ts
+
 ## Covered Go Language Constructs
 
 Based on the existing tests, GoScript aims to support the following Go features:
@@ -65,8 +71,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
-*   Interfaces (`interface{}`) - Definition tested, but usage (assignment, type assertions `v.(T)`) is not
-    *   type assertion: add a function `export function isMyInterface<T=unknown>(obj T): obj is MyInterface` which checks each of the function signatures on obj to verify they are all present and match the interface. try to make the best possible type assertion approach for this.
+*   Interfaces (`interface{}`) - Definition tested, and type assertions (`v.(T)`) are now compliant.
 *   **Control Flow:**
     *   `for` loops (basic counter-based covered; `range`, condition-only, infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)

@@ -357,6 +357,31 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		if callExpr, ok := exp.Rhs[0].(*ast.CallExpr); ok {
 			// This is a multi-variable assignment from a function call.
 			// Translate to a TypeScript destructuring assignment.
+		} else if typeAssertExpr, ok := exp.Rhs[0].(*ast.TypeAssertExpr); ok {
+			// This is a multi-variable assignment from a type assertion.
+			// Translate to a TypeScript instanceof check and type assertion.
+
+			// Get the interface and the type being asserted.
+			interfaceExpr := typeAssertExpr.X
+			assertedType := typeAssertExpr.Type
+
+			// Write the TypeScript code for the type assertion.
+			c.tsw.WriteLiterally("let ok: boolean = ")
+			c.WriteValueExpr(interfaceExpr)
+			c.tsw.WriteLiterally(" instanceof ")
+			c.WriteTypeExpr(assertedType)
+			c.tsw.WriteLine(";")
+
+			c.tsw.WriteLiterally("let assertedValue: ")
+			c.WriteTypeExpr(assertedType)
+			c.tsw.WriteLiterally(" | null = ok ? (")
+			c.WriteValueExpr(interfaceExpr)
+			c.tsw.WriteLiterally(" as ")
+			c.WriteTypeExpr(assertedType)
+			c.tsw.WriteLiterally(") : null;")
+			c.tsw.WriteLine("")
+
+			return nil
 
 			// Determine if 'let' or 'const' is needed for :=
 			if exp.Tok == token.DEFINE {

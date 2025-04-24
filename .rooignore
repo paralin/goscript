@@ -1,0 +1,16 @@
+vendor
+.aider*
+.roo*
+go.sum
+go.mod
+LICENSE
+example
+vendor
+.aider*
+.roo*
+go.sum
+go.mod
+LICENSE
+example
+.vscode
+.github

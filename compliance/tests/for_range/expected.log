@@ -1,0 +1,9 @@
+sum: 9
+index: 0 value: 2
+index: 1 value: 3
+index: 2 value: 4
+index: 0 value: a
+index: 1 value: b
+index: 2 value: c
+index: 0 value: 103
+index: 1 value: 111
