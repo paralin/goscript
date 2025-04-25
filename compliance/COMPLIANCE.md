@@ -22,6 +22,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`simple/`**: A basic test covering simple struct definition, field access, method calls, and `println`. (Likely overlaps with others, could be a general integration test).
 *   **`simple_deref_assignment/`**: Tests simple assignment involving pointer dereferencing (`*ptr`), ensuring value copying.
 *   **`struct_field_access/`**: Verifies accessing fields of struct values and struct pointers.
+*   **`struct_value_init_clone/`**: Checks struct initialization via composite literal (`T{...}`) and subsequent assignment, ensuring `.clone()` is used for value semantics.
 *   **`value_type_copy_behavior/`**: Focuses specifically on demonstrating that assigning struct values creates independent copies (value semantics).
 
 Each test should have only three files:
