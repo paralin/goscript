@@ -1,4 +1,4 @@
-// Generated file based on test_for_range.go
+// Generated file based on for_range.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as goscript from "@go/builtin";

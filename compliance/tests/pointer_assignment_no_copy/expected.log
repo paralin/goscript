@@ -1,0 +1,2 @@
+Pointer copy value: Expected: modified original, Actual: modified original
+Original value after pointer copy modification: Expected: 20, Actual: 20

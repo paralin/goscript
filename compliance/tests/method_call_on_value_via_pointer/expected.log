@@ -1,0 +1,2 @@
+Value via pointer call: Expected: 100, Actual: 100
+Value via pointer call after modification: Expected: 200, Actual: 200

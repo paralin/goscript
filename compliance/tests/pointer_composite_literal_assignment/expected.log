@@ -1,0 +1,3 @@
+MyInt via pointer: Expected: 42, Actual: 42
+MyString via pointer: Expected: composite literal pointer, Actual: composite literal pointer
+MyInt after modification: Expected: 99, Actual: 99
