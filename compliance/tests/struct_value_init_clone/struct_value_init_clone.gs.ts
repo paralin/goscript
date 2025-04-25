@@ -13,7 +13,7 @@ class Point {
 
 export function main(): void {
 	// Initialize directly
-	let p1 = new Point({ X: 1, Y: 2 }).clone()
+	let p1 = new Point({ X: 1, Y: 2 })
 	console.log("p1:", p1.X, p1.Y)
 	
 	// Assign to another variable (should trigger clone)
@@ -25,7 +25,7 @@ export function main(): void {
 	console.log("p2:", p2.X, p2.Y)
 	
 	// Initialize via variable assignment
-	let v = new Point({ X: 3, Y: 4 }).clone()
+	let v = new Point({ X: 3, Y: 4 })
 	let p3 = v.clone() // Should trigger clone
 	p3.Y = 40 // Modify the copy
 	

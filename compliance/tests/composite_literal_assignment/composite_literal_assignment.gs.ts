@@ -15,7 +15,7 @@ class MyStruct {
 export function main(): void {
 	// === Composite Literal Assignment (Value Copy) ===
 	// Creating a struct directly using a composite literal.
-	let structLiteral = new MyStruct({ MyString: "composite literal" }).clone()
+	let structLiteral = new MyStruct({ MyString: "composite literal" })
 	// Assigning it creates another independent copy.
 	let structLiteralCopy = structLiteral.clone()
 	structLiteralCopy.MyString = "modified composite literal copy"

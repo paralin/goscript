@@ -61,9 +61,9 @@ This is the typical package structure of the output TypeScript import path:
             becomes:
             ```typescript
             class Point { /* ... constructor, fields, clone ... */ }
-            let v = new Point({ X: 1, Y: 2 }).clone() // v is Point
+            let v = new Point({ X: 1, Y: 2 }) // v is Point
             ```
-            *Note: As per the "Value Semantics" section, assigning from a composite literal value (`T{...}`) immediately invokes `.clone()` to ensure the assigned variable holds an independent copy.*
+            *Note: Assigning from a composite literal value (`T{...}`) directly to a variable (`v := T{...}` or `var v = T{...}`) translates to `new Type(...)` without an immediate `.clone()`. For assignments from *other* struct values, `.clone()` is invoked to ensure the assigned variable holds an independent copy, as per the "Value Semantics" section.*
         -   **Pointer Initialization (`&T{...}`):** Initializing a pointer to a struct using a composite literal with the address-of operator (`&`) also translates directly to creating a new class instance. The resulting TypeScript object represents the non-null pointer value.
             ```go
             p := &Point{X: 1, Y: 2} // p is *Point

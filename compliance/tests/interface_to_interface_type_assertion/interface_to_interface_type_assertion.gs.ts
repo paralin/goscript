@@ -27,7 +27,7 @@ interface MyOtherInterface
 
 export function main(): void {
 	let i: MyInterface;
-	let s = new MyStruct({ Value: 10 }).clone()
+	let s = new MyStruct({ Value: 10 })
 	i = s.clone()
 	
 	let ok: boolean = (i as any) satisfies MyOtherInterface

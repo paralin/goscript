@@ -24,7 +24,7 @@ class MyStruct {
 
 export function main(): void {
 	// Create a struct value
-	let msValue = new MyStruct({ MyInt: 100 }).clone()
+	let msValue = new MyStruct({ MyInt: 100 })
 	
 	// === Method Call on Pointer Receiver via Value ===
 	// Call the pointer-receiver method using the value variable.

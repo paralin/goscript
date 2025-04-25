@@ -18,7 +18,7 @@ class MyStruct {
 
 export function main(): void {
 	// Create a struct value
-	let msValue = new MyStruct({ MyInt: 100 }).clone()
+	let msValue = new MyStruct({ MyInt: 100 })
 	// Create a pointer to the struct value
 	let msPointer = msValue
 	

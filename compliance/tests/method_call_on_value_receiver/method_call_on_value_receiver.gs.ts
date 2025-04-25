@@ -18,7 +18,7 @@ class MyStruct {
 }
 
 export function main(): void {
-	let ms = new MyStruct({ MyInt: 1, MyString: "bar" }).clone()
+	let ms = new MyStruct({ MyInt: 1, MyString: "bar" })
 	console.log("Method call on value: Expected: bar, Actual:", ms.GetMyString())
 }
 

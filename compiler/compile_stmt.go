@@ -739,7 +739,19 @@ func shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool {
 		return false
 	}
 
-	// Check if the underlying type is a struct
+	// Optimization: If the RHS is a composite literal itself, we don't need to clone immediately.
+	if _, isCompositeLit := rhs.(*ast.CompositeLit); isCompositeLit {
+		// Check if it's a struct *value* literal (not a pointer like &T{})
+		// We rely on the type check below to confirm it's a struct.
+		// If it IS a struct composite literal, don't clone.
+		// If it's something else (like a slice literal), the type check below will handle it.
+		if _, isStruct := tv.Type.Underlying().(*gtypes.Struct); isStruct {
+			return false // Don't clone direct composite literal initialization
+		}
+		// If it's a composite literal but not for a struct (e.g., slice), proceed with normal type check.
+	}
+
+	// Check if the underlying type is a struct (for non-composite-literal RHS)
 	// Also check if it's a named type whose underlying type is a struct
 	switch t := tv.Type.Underlying().(type) {
 	case *gtypes.Struct:

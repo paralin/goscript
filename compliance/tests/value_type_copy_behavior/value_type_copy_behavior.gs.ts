@@ -13,7 +13,7 @@ class MyStruct {
 }
 
 export function main(): void {
-	let dereferencedStructCopy = new MyStruct({ MyString: "original" }).clone()
+	let dereferencedStructCopy = new MyStruct({ MyString: "original" })
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.
 	let valueCopy1 = dereferencedStructCopy.clone()
