@@ -33,5 +33,11 @@ jobs:
           node-version: ${{ matrix.node }}
           cache: 'yarn'
 
+      - name: Yarn install
+        run: yarn install
+
+      - name: Install tsx
+        run: npm i -g tsx
+
       - name: Test Go
         run: go test -v ./...
