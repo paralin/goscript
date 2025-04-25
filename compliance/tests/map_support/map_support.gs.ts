@@ -45,7 +45,7 @@ export function main(): void {
 	// Iterate over a map with range
 	console.log("Iterating over scores map:")
 	// Note: Map iteration is not ordered in Go, so we will collect the results and sort them for consistent test output.
-	let scoreResults: string[];
+	let scoreResults: string[] = [];
 	
 	// Using string concatenation to build the output string
 	for (const [k, v] of scores.entries()) {
@@ -54,7 +54,7 @@ export function main(): void {
 		{
 			// Using string concatenation to build the output string
 			let result = "  - Name: " + name + " Score: " + itoa(score)
-			scoreResults = append(scoreResults, result)
+			scoreResults = goscript.append(scoreResults, result)
 		}
 	}
 	
@@ -91,8 +91,8 @@ function itoa(i: number): string {
 		i = -i
 	}
 	for (; i > 0; ) {
-		s = string(rune(i % 10 + '0')) + s
-		i /= 10
+		s = String.fromCharCode(i % 10 + 48) + s
+		i = Math.floor(i / 10)
 	}
 	if (isNegative) {
 		s = "-" + s

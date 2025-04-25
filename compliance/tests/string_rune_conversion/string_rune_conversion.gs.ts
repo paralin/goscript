@@ -5,7 +5,7 @@ import * as goscript from "@go/builtin";
 
 export function main(): void {
 	// === string(rune) Conversion ===
-	let r: number = 'A';
+	let r: number = 65;
 	let s = String.fromCharCode(r)
 	console.log(s)
 	

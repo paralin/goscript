@@ -186,13 +186,20 @@ func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
 }
 
 // RunTypeScriptRunner runs the runner.ts file using tsx and returns its stdout.
-func RunTypeScriptRunner(t *testing.T, tempDir, tsRunner string) string {
+func RunTypeScriptRunner(t *testing.T, workspaceDir, tempDir, tsRunner string) string {
 	t.Helper()
 	cmd := exec.Command("tsx", tsRunner)
 	cmd.Dir = tempDir
+
+	// Prepend node_modules/.bin to PATH
+	nodeBinDir := filepath.Join(workspaceDir, "node_modules", ".bin")
+	currentPath := os.Getenv("PATH")
+	newPath := fmt.Sprintf("%s%c%s", nodeBinDir, os.PathListSeparator, currentPath)
+	cmd.Env = append(os.Environ(), "PATH="+newPath) // Set the modified PATH
+
 	var outBuf, errBuf bytes.Buffer
 	cmd.Stdout = io.MultiWriter(&outBuf, os.Stderr)
-	cmd.Stderr = os.Stderr
+	cmd.Stderr = os.Stderr // Keep stderr going to the test output for debugging
 	if err := cmd.Run(); err != nil {
 		t.Fatalf("run failed: %v\nstderr: %s", err, errBuf.String())
 	}
@@ -271,7 +278,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	}
 
 	tsRunner := WriteTypeScriptRunner(t, tempDir)
-	actual := strings.TrimSpace(RunTypeScriptRunner(t, tempDir, tsRunner))
+	actual := strings.TrimSpace(RunTypeScriptRunner(t, workspaceDir, tempDir, tsRunner)) // Pass workspaceDir
 
 	expectedLogPath := filepath.Join(testDir, "expected.log")
 	expected, err := os.ReadFile(expectedLogPath)

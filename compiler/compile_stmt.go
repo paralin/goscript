@@ -370,16 +370,49 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 // writeAssignmentCore writes the core LHS, operator, and RHS of an assignment.
 // It does NOT handle blank identifiers, 'let' keyword, or trailing semicolons/comments/newlines.
 func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token) error {
+	// Special handling for integer division assignment (/=)
+	if tok == token.QUO_ASSIGN && len(lhs) == 1 && len(rhs) == 1 {
+		lhsType := c.pkg.TypesInfo.TypeOf(lhs[0])
+		rhsType := c.pkg.TypesInfo.TypeOf(rhs[0])
+
+		if lhsType != nil && rhsType != nil {
+			lhsBasic, lhsIsBasic := lhsType.Underlying().(*gtypes.Basic)
+			rhsBasic, rhsIsBasic := rhsType.Underlying().(*gtypes.Basic)
+
+			if lhsIsBasic && rhsIsBasic && (lhsBasic.Info()&gtypes.IsInteger != 0) && (rhsBasic.Info()&gtypes.IsInteger != 0) {
+				// Integer division assignment: lhs = Math.floor(lhs / rhs)
+				if err := c.WriteValueExpr(lhs[0]); err != nil {
+					return err
+				}
+				c.tsw.WriteLiterally(" = Math.floor(")
+				if err := c.WriteValueExpr(lhs[0]); err != nil { // Write LHS again for the division
+					return err
+				}
+				c.tsw.WriteLiterally(" / ")
+				if err := c.WriteValueExpr(rhs[0]); err != nil {
+					return err
+				}
+				c.tsw.WriteLiterally(")")
+				return nil // Handled integer division assignment
+			}
+		}
+	}
+
+	// --- Original logic for other assignments ---
+	isMapIndexLHS := false // Track if the first LHS is a map index
 	for i, l := range lhs {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
 		// Handle map indexing assignment specially
-		isMapIndexLHS := false
+		currentIsMapIndex := false
 		if indexExpr, ok := l.(*ast.IndexExpr); ok {
 			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
 				if _, isMap := tv.Type.Underlying().(*gtypes.Map); isMap {
-					isMapIndexLHS = true
+					currentIsMapIndex = true
+					if i == 0 {
+						isMapIndexLHS = true
+					}
 					// Use mapSet helper
 					c.tsw.WriteLiterally("goscript.mapSet(")
 					if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
@@ -395,14 +428,15 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			}
 		}
 
-		if !isMapIndexLHS {
+		if !currentIsMapIndex {
 			if err := c.WriteValueExpr(l); err != nil { // LHS is a value
 				return err
 			}
 		}
 	}
-	// Only write the assignment operator for regular variables, not for map assignments
-	if len(lhs) == 1 && isLHSMapIndex(lhs[0], c.pkg) {
+
+	// Only write the assignment operator for regular variables, not for map assignments handled by mapSet
+	if isMapIndexLHS && len(lhs) == 1 { // Only skip operator if it's a single map assignment
 		// Continue, we've already written part of the mapSet() function call
 	} else {
 		c.tsw.WriteLiterally(" ")
@@ -415,6 +449,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		}
 		c.tsw.WriteLiterally(" ")
 	}
+
 	for i, r := range rhs {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
@@ -432,12 +467,11 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		}
 	}
 	// If the LHS was a single map index, close the mapSet call
-	if len(lhs) == 1 && isLHSMapIndex(lhs[0], c.pkg) {
+	if isMapIndexLHS && len(lhs) == 1 {
 		c.tsw.WriteLiterally(")")
 	}
 	return nil
 }
-
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// writeTypeAssertion handles multi-variable assignment from a type assertion.
 	writeTypeAssertion := func(typeAssertExpr *ast.TypeAssertExpr) error {

@@ -92,3 +92,15 @@ export const deleteMapEntry = <K, V>(map: Map<K, V>, key: K): void => {
 export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
     return map.has(key);
 };
+/**
+ * Appends elements to a slice (TypeScript array).
+ * Note: In Go, append can return a new slice if the underlying array is reallocated.
+ * This helper emulates that by returning the modified array.
+ * @param slice The slice (TypeScript array) to append to.
+ * @param elements The elements to append.
+ * @returns The modified slice (TypeScript array).
+ */
+export const append = <T>(slice: Array<T>, ...elements: T[]): Array<T> => {
+    slice.push(...elements);
+    return slice;
+};

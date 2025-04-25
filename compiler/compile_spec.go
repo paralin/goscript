@@ -190,6 +190,11 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		if a.Type != nil {
 			c.tsw.WriteLiterally(": ")
 			c.WriteTypeExpr(a.Type) // Variable type annotation
+
+			// Check if it's an array type declaration without an initial value
+			if _, isArrayType := a.Type.(*ast.ArrayType); isArrayType && len(a.Values) == 0 {
+				c.tsw.WriteLiterally(" = []")
+			}
 		}
 		if len(a.Values) > 0 {
 			c.tsw.WriteLiterally(" = ")

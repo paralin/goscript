@@ -6,6 +6,7 @@ import (
 	"go/ast"
 	"go/token"
 	gtypes "go/types"
+	"strconv"
 
 	gstypes "github.com/paralin/goscript/types"
 )
@@ -383,21 +384,62 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		case "string":
 			// Handle string() conversion, specifically for rune to string
 			if len(exp.Args) == 1 {
-				// Check if the argument is a rune (int32)
-				if tv, ok := c.pkg.TypesInfo.Types[exp.Args[0]]; ok {
+				// Check if the argument is a rune (int32) or a call to rune()
+				arg := exp.Args[0]
+				innerCall, isCallExpr := arg.(*ast.CallExpr)
+
+				if isCallExpr {
+					// Check if it's a call to rune()
+					if innerFunIdent, innerFunIsIdent := innerCall.Fun.(*ast.Ident); innerFunIsIdent && innerFunIdent.String() == "rune" {
+						// Translate string(rune(val)) to String.fromCharCode(val)
+						if len(innerCall.Args) == 1 {
+							c.tsw.WriteLiterally("String.fromCharCode(")
+							if err := c.WriteValueExpr(innerCall.Args[0]); err != nil {
+								return fmt.Errorf("failed to write argument for string(rune) conversion: %w", err)
+							}
+							c.tsw.WriteLiterally(")")
+							return nil // Handled string(rune)
+						}
+					}
+				}
+
+				// Handle direct string(int32) conversion
+				// This assumes 'rune' is int32
+				if tv, ok := c.pkg.TypesInfo.Types[arg]; ok {
 					if basic, isBasic := tv.Type.Underlying().(*gtypes.Basic); isBasic && basic.Kind() == gtypes.Int32 {
 						// Translate string(rune_val) to String.fromCharCode(rune_val)
 						c.tsw.WriteLiterally("String.fromCharCode(")
-						if err := c.WriteValueExpr(exp.Args[0]); err != nil {
-							return fmt.Errorf("failed to write argument for string(rune) conversion: %w", err)
+						if err := c.WriteValueExpr(arg); err != nil {
+							return fmt.Errorf("failed to write argument for string(int32) conversion: %w", err)
 						}
 						c.tsw.WriteLiterally(")")
-						return nil // Handled string(rune)
+						return nil // Handled string(int32)
 					}
 				}
 			}
 			// Return error for other unhandled string conversions
 			return fmt.Errorf("unhandled string conversion: %s", exp.Fun)
+		case "append":
+			// Translate append(slice, elements...) to goscript.append(slice, elements...)
+			if len(exp.Args) >= 1 {
+				c.tsw.WriteLiterally("goscript.append(")
+				// The first argument is the slice
+				if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+					return fmt.Errorf("failed to write slice in append call: %w", err)
+				}
+				// The remaining arguments are the elements to append
+				for i, arg := range exp.Args[1:] {
+					if i > 0 || len(exp.Args) > 1 { // Add comma before elements if there are any
+						c.tsw.WriteLiterally(", ")
+					}
+					if err := c.WriteValueExpr(arg); err != nil {
+						return fmt.Errorf("failed to write argument %d in append call: %w", i+1, err)
+					}
+				}
+				c.tsw.WriteLiterally(")")
+				return nil // Handled append
+			}
+			return errors.New("unhandled append call with incorrect number of arguments")
 		default:
 			// Not a special built-in, treat as a regular function call
 			if err := c.WriteValueExpr(expFun); err != nil {
@@ -480,7 +522,20 @@ func (c *GoToTSCompiler) WriteBinaryExprValue(exp *ast.BinaryExpr) error {
 
 // WriteBasicLitValue writes a basic literal value.
 func (c *GoToTSCompiler) WriteBasicLitValue(exp *ast.BasicLit) {
-	c.tsw.WriteLiterally(exp.Value)
+	if exp.Kind == token.CHAR {
+		// Go char literal 'x' is a rune (int32). Translate to its numeric code point.
+		// Use strconv.UnquoteChar to handle escape sequences correctly.
+		val, _, _, err := strconv.UnquoteChar(exp.Value[1:len(exp.Value)-1], '\'')
+		if err != nil {
+			c.tsw.WriteCommentInline(fmt.Sprintf("error parsing char literal %s: %v", exp.Value, err))
+			c.tsw.WriteLiterally("0") // Default to 0 on error
+		} else {
+			c.tsw.WriteLiterally(fmt.Sprintf("%d", val))
+		}
+	} else {
+		// Other literals (INT, FLOAT, STRING, IMAG)
+		c.tsw.WriteLiterally(exp.Value)
+	}
 }
 
 /*
