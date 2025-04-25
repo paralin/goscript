@@ -1,6 +1,7 @@
 {
   "compilerOptions": {
     "baseUrl": ".",
+    "lib": ["ES2020"],
     "paths": {
       "@go/builtin": ["./builtin/builtin.ts"]
     }

@@ -34,6 +34,7 @@ Each test should have only three files:
 Based on the existing tests, GoScript aims to support the following Go features:
 
 *   **Basic Types:** `int`, `string`, `bool`, `float64` (implicitly tested).
+*   **Type Conversions:** `string(rune)`
 *   **Operators:**
     *   Arithmetic: `+`, `-`, `*`, `/`, `%`
     *   Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
@@ -86,7 +87,6 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
     *   Closures
     *   Recursion
 *   **Basic Types & Values:**
-   *   `rune` (and string/rune conversions)
    *   `iota` consts
 *   **Concurrency:**
     *   Goroutines (`go func()`)

@@ -1,0 +1,13 @@
+Empty map created: Expected: true, Actual: true
+Map size after adding 3 items: Expected: 3, Actual: 3
+Alice's score: Expected: 90, Actual: 90
+Bob's score: Expected: 85, Actual: 85
+Bob's updated score: Expected: 88, Actual: 88
+Does David exist in map? Expected: false, Actual: false
+Value for non-existent key: Expected: 0, Actual: 0
+After delete, does Charlie exist? Expected: false, Actual: false
+Map literal size: Expected: 3, Actual: 3
+Color code for red: Expected: #ff0000, Actual: #ff0000
+Iterating over scores map:
+  - Name: Alice Score: 90
+  - Name: Bob Score: 88

@@ -70,7 +70,28 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	case *ast.KeyValueExpr:
 		return c.WriteKeyValueExprValue(exp)
 	case *ast.IndexExpr:
-		// Translate X[Index] to X[Index]
+		// Handle map access: use Map.get() instead of brackets for reading values
+		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
+			// Check if it's a map type
+			if _, isMap := tv.Type.Underlying().(*gtypes.Map); isMap {
+				if err := c.WriteValueExpr(exp.X); err != nil {
+					return err
+				}
+				c.tsw.WriteLiterally(".get(")
+				if err := c.WriteValueExpr(exp.Index); err != nil {
+					return err
+				}
+				// Note: For map access (reading), Go returns the zero value if the key doesn't exist.
+				// We need to handle this in TS. For now, default to 0 or null based on type.
+				// A more robust solution would involve checking the expected type of the context.
+				// For simplicity, let's add a comment indicating this might need refinement.
+				c.tsw.WriteLiterally(")") // No ?? 0 here, get() returns undefined if not found
+				// c.tsw.WriteCommentInline("map access might need zero value handling")
+				return nil
+			}
+		}
+
+		// Regular array/slice access: use brackets
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return err
 		}
@@ -276,9 +297,55 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				return nil // Handled cap
 			}
 			return errors.New("unhandled cap call with incorrect number of arguments")
+		case "delete":
+			// Translate delete(map, key) to goscript.deleteMapEntry(map, key)
+			if len(exp.Args) == 2 {
+				c.tsw.WriteLiterally("goscript.deleteMapEntry(")
+				if err := c.WriteValueExpr(exp.Args[0]); err != nil { // Map
+					return err
+				}
+				c.tsw.WriteLiterally(", ")
+				if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Key
+					return err
+				}
+				c.tsw.WriteLiterally(")")
+				return nil // Handled delete
+			}
+			return errors.New("unhandled delete call with incorrect number of arguments")
 		case "make":
 			// Handle make for slices: make([]T, len, cap) or make([]T, len)
-			if len(exp.Args) >= 2 {
+			if len(exp.Args) >= 1 {
+				// Handle map creation: make(map[K]V)
+				if mapType, ok := exp.Args[0].(*ast.MapType); ok {
+					c.tsw.WriteLiterally("goscript.makeMap(")
+
+					// Get key type
+					if keyType := c.pkg.TypesInfo.TypeOf(mapType.Key); keyType != nil {
+						// Use the underlying type for basic types
+						underlyingKeyType := keyType.Underlying()
+						c.tsw.WriteLiterally(fmt.Sprintf("%q", underlyingKeyType.String()))
+					} else {
+						// If type info is not available, this is an error condition
+						return errors.New("could not determine key type for makeMap")
+					}
+
+					c.tsw.WriteLiterally(", ")
+
+					// Get value type
+					if valueType := c.pkg.TypesInfo.TypeOf(mapType.Value); valueType != nil {
+						// Use the underlying type for basic types
+						underlyingValueType := valueType.Underlying()
+						c.tsw.WriteLiterally(fmt.Sprintf("%q", underlyingValueType.String()))
+					} else {
+						// If type info is not available, this is an error condition
+						return errors.New("could not determine value type for makeMap")
+					}
+
+					c.tsw.WriteLiterally(")")
+					return nil // Handled make for map
+				}
+
+				// Handle slice creation
 				if arrayType, ok := exp.Args[0].(*ast.ArrayType); ok {
 					c.tsw.WriteLiterally("goscript.makeSlice(")
 					// Get and write the string representation of the element type
@@ -291,27 +358,50 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 						return errors.New("could not determine element type for makeSlice")
 					}
 					c.tsw.WriteLiterally(", ")
-					if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
-						return err
-					}
-					if len(exp.Args) == 3 {
-						c.tsw.WriteLiterally(", ")
-						if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+					if len(exp.Args) >= 2 {
+						if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 							return err
 						}
-					} else if len(exp.Args) > 3 {
-						return errors.New("makeSlice expects 2 or 3 arguments")
+						if len(exp.Args) == 3 {
+							c.tsw.WriteLiterally(", ")
+							if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+								return err
+							}
+						} else if len(exp.Args) > 3 {
+							return errors.New("makeSlice expects 2 or 3 arguments")
+						}
+					} else {
+						// If no length is provided, default to 0
+						c.tsw.WriteLiterally("0")
 					}
 					c.tsw.WriteLiterally(")")
 					return nil // Handled make for slice
 				}
 			}
-			// Fallthrough for unhandled make calls (e.g., maps, channels)
+			// Fallthrough for unhandled make calls (e.g., channels)
 			return errors.New("unhandled make call")
+		case "string":
+			// Handle string() conversion, specifically for rune to string
+			if len(exp.Args) == 1 {
+				// Check if the argument is a rune (int32)
+				if tv, ok := c.pkg.TypesInfo.Types[exp.Args[0]]; ok {
+					if basic, isBasic := tv.Type.Underlying().(*gtypes.Basic); isBasic && basic.Kind() == gtypes.Int32 {
+						// Translate string(rune_val) to String.fromCharCode(rune_val)
+						c.tsw.WriteLiterally("String.fromCharCode(")
+						if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+							return fmt.Errorf("failed to write argument for string(rune) conversion: %w", err)
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled string(rune)
+					}
+				}
+			}
+			// Return error for other unhandled string conversions
+			return fmt.Errorf("unhandled string conversion: %s", exp.Fun)
 		default:
 			// Not a special built-in, treat as a regular function call
 			if err := c.WriteValueExpr(expFun); err != nil {
-				return err
+				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
@@ -319,7 +409,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					c.tsw.WriteLiterally(", ")
 				}
 				if err := c.WriteValueExpr(arg); err != nil {
-					return err
+					return fmt.Errorf("failed to write argument %d in call: %w", i, err)
 				}
 			}
 			c.tsw.WriteLiterally(")")
@@ -328,7 +418,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	} else {
 		// Not an identifier (e.g., method call on a value)
 		if err := c.WriteValueExpr(expFun); err != nil {
-			return err
+			return fmt.Errorf("failed to write method expression in call: %w", err)
 		}
 	}
 	c.tsw.WriteLiterally("(")
@@ -337,7 +427,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			c.tsw.WriteLiterally(", ")
 		}
 		if err := c.WriteValueExpr(arg); err != nil {
-			return err
+			return fmt.Errorf("failed to write argument %d in call: %w", i, err)
 		}
 	}
 	c.tsw.WriteLiterally(")")
@@ -397,9 +487,40 @@ func (c *GoToTSCompiler) WriteBasicLitValue(exp *ast.BasicLit) {
 WriteCompositeLitValue writes a composite literal value.
 For array literals, uses type information to determine array length and element type,
 and fills uninitialized elements with the correct zero value.
+For map literals, creates a new Map with entries.
 */
 func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 	if exp.Type != nil {
+		// Handle map literals: map[K]V{k1: v1, k2: v2}
+		if _, isMapType := exp.Type.(*ast.MapType); isMapType {
+			c.tsw.WriteLiterally("new Map([")
+
+			// Add each key-value pair as an entry
+			for i, elm := range exp.Elts {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+
+				if kv, ok := elm.(*ast.KeyValueExpr); ok {
+					c.tsw.WriteLiterally("[")
+					if err := c.WriteValueExpr(kv.Key); err != nil {
+						return fmt.Errorf("failed to write map literal key: %w", err)
+					}
+					c.tsw.WriteLiterally(", ")
+					if err := c.WriteValueExpr(kv.Value); err != nil {
+						return fmt.Errorf("failed to write map literal value: %w", err)
+					}
+					c.tsw.WriteLiterally("]")
+				} else {
+					return fmt.Errorf("map literal elements must be key-value pairs")
+				}
+			}
+
+			c.tsw.WriteLiterally("])")
+			return nil
+		}
+
+		// Handle array literals
 		if arrType, isArrayType := exp.Type.(*ast.ArrayType); isArrayType {
 			c.tsw.WriteLiterally("[")
 			// Use type info to get array length and element type

@@ -374,19 +374,47 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		if err := c.WriteValueExpr(l); err != nil { // LHS is a value
-			return err
+		// Handle map indexing assignment specially
+		isMapIndexLHS := false
+		if indexExpr, ok := l.(*ast.IndexExpr); ok {
+			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
+				if _, isMap := tv.Type.Underlying().(*gtypes.Map); isMap {
+					isMapIndexLHS = true
+					// Use mapSet helper
+					c.tsw.WriteLiterally("goscript.mapSet(")
+					if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
+						return err
+					}
+					c.tsw.WriteLiterally(", ")
+					if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
+						return err
+					}
+					c.tsw.WriteLiterally(", ")
+					// Value will be added after operator and RHS
+				}
+			}
+		}
+
+		if !isMapIndexLHS {
+			if err := c.WriteValueExpr(l); err != nil { // LHS is a value
+				return err
+			}
 		}
 	}
-	c.tsw.WriteLiterally(" ")
-	tokStr, ok := gstypes.TokenToTs(tok) // Use explicit gstypes alias
-	if !ok {
-		c.tsw.WriteLiterally("?= ")
-		c.tsw.WriteCommentLine("Unknown token " + tok.String())
+	// Only write the assignment operator for regular variables, not for map assignments
+	if len(lhs) == 1 && isLHSMapIndex(lhs[0], c.pkg) {
+		// Continue, we've already written part of the mapSet() function call
 	} else {
-		c.tsw.WriteLiterally(tokStr)
+		c.tsw.WriteLiterally(" ")
+		tokStr, ok := gstypes.TokenToTs(tok) // Use explicit gstypes alias
+		if !ok {
+			c.tsw.WriteLiterally("?= ")
+			c.tsw.WriteCommentLine("Unknown token " + tok.String())
+		} else {
+			c.tsw.WriteLiterally(tokStr)
+		}
+		c.tsw.WriteLiterally(" ")
 	}
-	c.tsw.WriteLiterally(" ")
 	for i, r := range rhs {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
@@ -402,6 +430,10 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				return err
 			}
 		}
+	}
+	// If the LHS was a single map index, close the mapSet call
+	if len(lhs) == 1 && isLHSMapIndex(lhs[0], c.pkg) {
+		c.tsw.WriteLiterally(")")
 	}
 	return nil
 }
@@ -524,12 +556,117 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		return nil
 	}
 
+	// writeMapLookupWithExists handles the map comma-ok idiom: value, exists := myMap[key]
+	writeMapLookupWithExists := func(lhs []ast.Expr, indexExpr *ast.IndexExpr, tok token.Token) error {
+		// First check that we have exactly two LHS expressions (value and exists)
+		if len(lhs) != 2 {
+			return fmt.Errorf("map comma-ok idiom requires exactly 2 variables on LHS, got %d", len(lhs))
+		}
+
+		// Check for blank identifiers and get variable names
+		valueIsBlank := false
+		existsIsBlank := false
+		var valueName string
+		var existsName string
+
+		if valIdent, ok := lhs[0].(*ast.Ident); ok {
+			if valIdent.Name == "_" {
+				valueIsBlank = true
+			} else {
+				valueName = valIdent.Name
+			}
+		} else {
+			return fmt.Errorf("unhandled LHS expression type for value in map comma-ok: %T", lhs[0])
+		}
+
+		if existsIdent, ok := lhs[1].(*ast.Ident); ok {
+			if existsIdent.Name == "_" {
+				existsIsBlank = true
+			} else {
+				existsName = existsIdent.Name
+			}
+		} else {
+			return fmt.Errorf("unhandled LHS expression type for exists in map comma-ok: %T", lhs[1])
+		}
+
+		// Declare variables if using := and not blank
+		if tok == token.DEFINE {
+			if !valueIsBlank {
+				c.tsw.WriteLiterally("let ")
+				c.tsw.WriteLiterally(valueName)
+				c.tsw.WriteLine("")
+			}
+			if !existsIsBlank {
+				c.tsw.WriteLiterally("let ")
+				c.tsw.WriteLiterally(existsName)
+				c.tsw.WriteLine("")
+			}
+		}
+
+		// Assign 'exists'
+		if !existsIsBlank {
+			c.tsw.WriteLiterally(existsName)
+			c.tsw.WriteLiterally(" = ")
+			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
+				return err
+			}
+			c.tsw.WriteLiterally(".has(")
+			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
+				return err
+			}
+			c.tsw.WriteLiterally(")")
+			c.tsw.WriteLine("")
+		}
+
+		// Assign 'value'
+		if !valueIsBlank {
+			c.tsw.WriteLiterally(valueName)
+			c.tsw.WriteLiterally(" = ")
+			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
+				return err
+			}
+			c.tsw.WriteLiterally(".get(")
+			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
+				return err
+			}
+			c.tsw.WriteLiterally(") ?? ")
+			// Write the zero value for the map's value type
+			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
+				if mapType, isMap := tv.Type.Underlying().(*gtypes.Map); isMap {
+					c.WriteZeroValueForType(mapType.Elem())
+				} else {
+					// Fallback zero value if type info is missing or not a map
+					c.tsw.WriteLiterally("null")
+				}
+			} else {
+				c.tsw.WriteLiterally("null")
+			}
+			c.tsw.WriteLine("")
+		}
+
+		return nil
+	}
+
 	// Handle multi-variable assignment from a single function call returning multiple values.
 	if len(exp.Lhs) > 1 && len(exp.Rhs) == 1 {
 		if callExpr, ok := exp.Rhs[0].(*ast.CallExpr); ok {
 			return writeMultiVarAssignFromCall(exp.Lhs, callExpr, exp.Tok)
 		} else if typeAssertExpr, ok := exp.Rhs[0].(*ast.TypeAssertExpr); ok {
 			return writeTypeAssertion(typeAssertExpr)
+		} else if indexExpr, ok := exp.Rhs[0].(*ast.IndexExpr); ok {
+			// Check if this is a map lookup (comma-ok idiom)
+			if len(exp.Lhs) == 2 {
+				// Get the type of the indexed expression
+				if c.pkg != nil && c.pkg.TypesInfo != nil {
+					tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]
+					if ok {
+						// Check if it's a map type
+						if _, isMap := tv.Type.Underlying().(*gtypes.Map); isMap {
+							return writeMapLookupWithExists(exp.Lhs, indexExpr, exp.Tok)
+						}
+					}
+				}
+			}
 		}
 	}
 
@@ -719,19 +856,12 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 
 	// Handle map types
 	if _, ok := underlying.(*gtypes.Map); ok {
-		// Generate a for-in loop to iterate over map keys and check own-property
-		c.tsw.WriteLiterally("for (const k in ")
+		// Use for-of with entries() for proper Map iteration
+		c.tsw.WriteLiterally("for (const [k, v] of ")
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write range loop map expression: %w", err)
 		}
-		c.tsw.WriteLiterally(") {")
-		c.tsw.Indent(1)
-		c.tsw.WriteLine("")
-		c.tsw.WriteLiterally("if (Object.prototype.hasOwnProperty.call(")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write range loop map hasOwnProperty expression: %w", err)
-		}
-		c.tsw.WriteLiterally(", k)) {")
+		c.tsw.WriteLiterally(".entries()) {")
 		c.tsw.Indent(1)
 		c.tsw.WriteLine("")
 		// If a key variable is provided and is not blank, declare it as a constant
@@ -744,17 +874,13 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				c.tsw.WriteLine("")
 			}
 		}
-		// If a value variable is provided and is not blank, declare it from the map lookup
+		// If a value variable is provided and is not blank, use the value from entries()
 		if exp.Value != nil {
 			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
 				c.tsw.WriteLiterally("const ")
 				// WriteIdentValue does not currently return an error, assuming it's safe for now.
 				c.WriteIdentValue(ident)
-				c.tsw.WriteLiterally(" = ")
-				if err := c.WriteValueExpr(exp.X); err != nil {
-					return fmt.Errorf("failed to write range loop map value expression: %w", err)
-				}
-				c.tsw.WriteLiterally("[k]")
+				c.tsw.WriteLiterally(" = v")
 				c.tsw.WriteLine("")
 			}
 		}
@@ -762,8 +888,6 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		if err := c.WriteStmtBlock(exp.Body, false); err != nil {
 			return fmt.Errorf("failed to write range loop map body: %w", err)
 		}
-		c.tsw.Indent(-1)
-		c.tsw.WriteLine("}")
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("}")
 		return nil
@@ -960,4 +1084,21 @@ func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 func isSlice(typ gtypes.Type) bool {
 	_, ok := typ.(*gtypes.Slice)
 	return ok
+}
+
+// isLHSMapIndex returns true if the expression is an index expression on a map type.
+func isLHSMapIndex(expr ast.Expr, pkg *packages.Package) bool {
+	if pkg == nil || pkg.TypesInfo == nil {
+		return false
+	}
+	indexExpr, ok := expr.(*ast.IndexExpr)
+	if !ok {
+		return false
+	}
+	tv, ok := pkg.TypesInfo.Types[indexExpr.X]
+	if !ok || tv.Type == nil {
+		return false
+	}
+	_, isMap := tv.Type.Underlying().(*gtypes.Map)
+	return isMap
 }
