@@ -22,12 +22,9 @@ from Go to TypeScript, so not all programs will work correctly:
 - Numbers (ints) use the "number" type in JavaScript is different than Go int32.
 - Pointer arithmetic (uintptr) and unsafe are not supported
 - Reflection is not supported
+- Complex numbers are not supported
 
-If you want to guarantee your program runs exactly the same in the browser as
-natively, you should instead use wasm or gopherjs.
-
-It's currently an experimental project, and not ready for production.
-
+If you are OK with these limitations, GoScript is for you!
 
 ## Usage
 
