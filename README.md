@@ -26,53 +26,6 @@ natively, you should instead use wasm or gopherjs.
 
 It's currently an experimental project, and not ready for production.
 
-## Generated Code
-
-Below is a simple example of how code is generated:
-
-```go
-package main
-
-// MyStruct is converted into a class.
-type MyStruct struct {
-	// MyInt is a public integer field, initialized to zero.
-	MyInt int
-	// myBool is a private boolean field, intialized to false.
-	myBool bool
-}
-
-func main() {
-	println("Hello world")
-}
-```
-
-Generated with `goscript compile .`:
-
-```typescript
-// MyStruct is converted into a class.
-class MyStruct {
-	// MyInt is a public integer field, initialized to zero.
-	public myInt: number = 0;
-	// myBool is a private boolean field, intialized to false.
-	private myBool: boolean = false;
-}
-
-export function main() {
-	console.log("Hello world");
-}
-```
-
-Code is compiled with `GOARCH=js` and uses a 32-bit environment similar to wasm.
-
-All Go import paths are prefixed with `@go/` and can be imported in TypeScript:
-
-```typescript
-import { MyFunction, MyStruct } from '@go/github.com/myorg/mypackage';
-
-MyFunction();
-let myThing = new MyStruct();
-myThing.DoSometing();
-```
 
 ## Usage
 
@@ -141,7 +94,10 @@ This example initializes the compiler with basic configuration, creates a compil
 
 ## Roadmap
 
+Check [the compliance tests](./compliance/COMPLIANCE.md) for implementation progress.
+
  - [X] Simple programs compile & run
+ - [ ] Compliance for basic language features complete
  - [ ] Function coloring and async logic
  - [ ] Work our way up to more complex programs
  - [ ] Generate init() function to recursively initialize packages
@@ -151,3 +107,284 @@ This example initializes the compiler with basic configuration, creates a compil
  - [ ] performance testing
  - [ ] examples of calling Go code from TypeScript
 
+
+## Generated Code
+
+Below is a simple example of how code is generated:
+
+```go
+package main
+
+// MyStruct demonstrates a simple struct with public and private fields.
+// It will be converted into a TypeScript class by goscript.
+type MyStruct struct {
+  // MyInt is a public integer field, initialized to zero.
+  MyInt int
+  // MyString is a public string field, initialized to empty string.
+  MyString string
+  // myBool is a private boolean field, initialized to false.
+  myBool bool
+}
+
+// GetMyString returns the MyString field.
+func (m *MyStruct) GetMyString() string {
+  return m.MyString
+}
+
+// GetMyBool returns the myBool field.
+func (m *MyStruct) GetMyBool() bool {
+  return m.myBool
+}
+
+// NewMyStruct creates a new MyStruct instance.
+func NewMyStruct(s string) MyStruct {
+  return MyStruct{MyString: s}
+}
+
+func vals() (int, int) {
+  return 1, 2
+}
+
+func main() {
+  println("Hello from GoScript example!")
+
+  // Basic arithmetic
+  a, b := 10, 3
+  println("Addition:", a+b, "Subtraction:", a-b, "Multiplication:", a*b, "Division:", a/b, "Modulo:", a%b)
+
+  // Boolean logic and comparisons
+  println("Logic &&:", true && false, "||:", true || false, "!:!", !true)
+  println("Comparisons:", a == b, a != b, a < b, a > b, a <= b, a >= b)
+
+  // string(rune) conversion
+  var r rune = 'X'
+  s := string(r)
+  println("string('X'):", s)
+
+  var r2 rune = 121 // 'y'
+  s2 := string(r2)
+  println("string(121):", s2)
+
+  var r3 rune = 0x221A // '√'
+  s3 := string(r3)
+  println("string(0x221A):", s3)
+
+  // Arrays
+  arr := [3]int{1, 2, 3}
+  println("Array elements:", arr[0], arr[1], arr[2])
+
+  // Slices and range loop
+  slice := []int{4, 5, 6}
+  println("Slice elements:", slice[0], slice[1], slice[2])
+  sum := 0
+  for idx, val := range slice {
+    sum += val
+    println("Range idx:", idx, "val:", val)
+  }
+  println("Range sum:", sum)
+
+  // Basic for loop
+  prod := 1
+  for i := 1; i <= 3; i++ {
+    prod *= i
+  }
+  println("Product via for:", prod)
+
+  // Struct, pointers, copy independence
+  instance := NewMyStruct("go-script")
+  println("instance.MyString:", instance.GetMyString())
+  instance.MyInt = 42
+  copyInst := instance
+  copyInst.MyInt = 7
+  println("instance.MyInt:", instance.MyInt, "copyInst.MyInt:", copyInst.MyInt)
+
+  // Pointer initialization and dereference assignment
+  ptr := new(MyStruct)
+  ptr.MyInt = 9
+  println("ptr.MyInt:", ptr.MyInt)
+  deref := *ptr
+  deref.MyInt = 8
+  println("After deref assign, ptr.MyInt:", ptr.MyInt, "deref.MyInt:", deref.MyInt)
+
+  // Method calls on pointer receiver
+  ptr.myBool = true
+  println("ptr.GetMyBool():", ptr.GetMyBool())
+
+  // Composite literal assignment
+  comp := MyStruct{MyInt: 100, MyString: "composite", myBool: false}
+  println("comp fields:", comp.MyInt, comp.GetMyString(), comp.GetMyBool())
+
+  // Multiple return values and blank identifier
+  x, _ := vals()
+  _, y := vals()
+  println("vals x:", x, "y:", y)
+
+  // If/else
+  if a > b {
+    println("If branch: a>b")
+  } else {
+    println("Else branch: a<=b")
+  }
+
+  // Switch statement
+  switch a {
+  case 10:
+    println("Switch case 10")
+  default:
+    println("Switch default")
+  }
+}
+```
+
+Generated with `goscript compile .`:
+
+```typescript
+import * as goscript from "@go/builtin";
+
+class MyStruct {
+  // MyInt is a public integer field, initialized to zero.
+  public MyInt: number = 0;
+  // MyString is a public string field, initialized to empty string.
+  public MyString: string = "";
+  // myBool is a private boolean field, initialized to false.
+  private myBool: boolean = false;
+
+  // GetMyString returns the MyString field.
+  public GetMyString(): string {
+    const m = this
+    return m.MyString
+  }
+
+  // GetMyBool returns the myBool field.
+  public GetMyBool(): boolean {
+    const m = this
+    return m.myBool
+  }
+
+  constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
+  public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
+}
+
+// NewMyStruct creates a new MyStruct instance.
+export function NewMyStruct(s: string): MyStruct {
+  return new MyStruct({ MyString: s })
+}
+
+function vals(): [number, number] {
+  return [1, 2]
+}
+
+export function main(): void {
+  console.log("Hello from GoScript example!")
+
+  // Basic arithmetic
+  let a = 10
+  let b = 3
+  console.log("Addition:", a + b, "Subtraction:", a - b, "Multiplication:", a * b, "Division:", a / b, "Modulo:", a % b)
+
+  // Boolean logic and comparisons
+  console.log("Logic &&:", true && false, "||:", true || false, "!:!", !true)
+  console.log("Comparisons:", a == b, a != b, a < b, a > b, a <= b, a >= b)
+
+  // string(rune) conversion
+  let r: number = 'X';
+  let s = String.fromCharCode(r)
+  console.log("string('X'):", s)
+
+  // 'y'
+  let r2: number = 121;
+  let s2 = String.fromCharCode(r2)
+  console.log("string(121):", s2)
+
+  // '√'
+  let r3: number = 0x221A;
+  let s3 = String.fromCharCode(r3)
+  console.log("string(0x221A):", s3)
+
+  // Arrays
+  let arr = [1, 2, 3]
+  console.log("Array elements:", arr[0], arr[1], arr[2])
+
+  // Slices and range loop
+  let slice = [4, 5, 6]
+  console.log("Slice elements:", slice[0], slice[1], slice[2])
+  let sum = 0
+  for (let idx = 0; idx < slice.length; idx++) {
+    const val = slice[idx]
+    {
+      sum += val
+      console.log("Range idx:", idx, "val:", val)
+    }
+  }
+  console.log("Range sum:", sum)
+
+  // Basic for loop
+  let prod = 1
+  for (let i = 1; i <= 3; i++) {
+    prod *= i
+  }
+  console.log("Product via for:", prod)
+
+  // Struct, pointers, copy independence
+  let instance = NewMyStruct("go-script").clone()
+  console.log("instance.MyString:", instance.GetMyString())
+  instance.MyInt = 42
+  let copyInst = instance.clone()
+  copyInst.MyInt = 7
+  console.log("instance.MyInt:", instance.MyInt, "copyInst.MyInt:", copyInst.MyInt)
+
+  // Pointer initialization and dereference assignment
+  let ptr = new(MyStruct)
+  ptr.MyInt = 9
+  console.log("ptr.MyInt:", ptr.MyInt)
+  let deref = ptr.clone()
+  deref.MyInt = 8
+  console.log("After deref assign, ptr.MyInt:", ptr.MyInt, "deref.MyInt:", deref.MyInt)
+
+  // Method calls on pointer receiver
+  ptr.myBool = true
+  console.log("ptr.GetMyBool():", ptr.GetMyBool())
+
+  // Composite literal assignment
+  let comp = new MyStruct({ MyInt: 100, MyString: "composite", myBool: false }).clone()
+  console.log("comp fields:", comp.MyInt, comp.GetMyString(), comp.GetMyBool())
+
+  // Multiple return values and blank identifier
+  let [x, ] = vals()
+  let [, y] = vals()
+  console.log("vals x:", x, "y:", y)
+
+  // If/else
+  if (a > b) {
+    console.log("If branch: a>b")
+  } else {
+    console.log("Else branch: a<=b")
+  }
+
+  // Switch statement
+  switch (a) {
+    case 10:
+      console.log("Switch case 10")
+      break
+    default:
+      console.log("Switch default")
+      break
+  }
+}
+```
+
+Code is compiled with `GOARCH=js` and uses a 32-bit environment similar to wasm.
+
+All Go import paths are prefixed with `@go/` and can be imported in TypeScript:
+
+```typescript
+import { MyFunction, MyStruct } from '@go/github.com/myorg/mypackage';
+
+MyFunction();
+let myThing = new MyStruct();
+myThing.DoSometing();
+```
+
+## License
+
+MIT

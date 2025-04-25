@@ -41,6 +41,19 @@ func main() {
 	println("Logic &&:", true && false, "||:", true || false, "!:!", !true)
 	println("Comparisons:", a == b, a != b, a < b, a > b, a <= b, a >= b)
 
+	// string(rune) conversion
+	var r rune = 'X'
+	s := string(r)
+	println("string('X'):", s)
+
+	var r2 rune = 121 // 'y'
+	s2 := string(r2)
+	println("string(121):", s2)
+
+	var r3 rune = 0x221A // '√'
+	s3 := string(r3)
+	println("string(0x221A):", s3)
+
 	// Arrays
 	arr := [3]int{1, 2, 3}
 	println("Array elements:", arr[0], arr[1], arr[2])

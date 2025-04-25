@@ -41,6 +41,13 @@ func TestBuildRunExampleSimple(t *testing.T) {
 		t.Fatalf("compilation failed: %v", err)
 	}
 
+	// Log the compiled file
+	outFile, err := os.ReadFile(filepath.Join(outputDir, "@go/example/main.gs.ts"))
+	if err != nil {
+		t.Fatalf("failed to read output file: %v", err)
+	}
+	t.Log(string(outFile))
+
 	// Run the compiled TypeScript file
 	cmd := exec.Command("tsx", "--tsconfig", "./tsconfig.json", "./main.ts")
 	cmd.Dir = projectDir
