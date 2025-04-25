@@ -3,3 +3,12 @@ two
 
 String switch:
 hello
+
+Switch without expression:
+negative
+
+Switch without expression (zero):
+zero
+
+Switch without expression (positive):
+positive

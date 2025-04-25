@@ -24,4 +24,36 @@ func main() {
 	default:
 		println("other string")
 	}
+	x := -5
+	println("\nSwitch without expression:")
+	switch {
+	case x < 0:
+		println("negative")
+	case x == 0:
+		println("zero")
+	default: // x > 0
+		println("positive")
+	}
+
+	x = 0
+	println("\nSwitch without expression (zero):")
+	switch {
+	case x < 0:
+		println("negative")
+	case x == 0:
+		println("zero")
+	default: // x > 0
+		println("positive")
+	}
+
+	x = 10
+	println("\nSwitch without expression (positive):")
+	switch {
+	case x < 0:
+		println("negative")
+	case x == 0:
+		println("zero")
+	default: // x > 0
+		println("positive")
+	}
 }

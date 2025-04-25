@@ -147,6 +147,8 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error {
 		if err := c.WriteValueExpr(exp.Tag); err != nil {
 			return fmt.Errorf("failed to write switch tag expression: %w", err)
 		}
+	} else {
+		c.tsw.WriteLiterally("true") // Write 'true' for switch without expression
 	}
 	c.tsw.WriteLiterally(") {")
 	c.tsw.WriteLine("")
