@@ -234,21 +234,39 @@ func main() {
   default:
     println("Switch default")
   }
+
+  // Goroutines and Channels
+  println("\nGoroutines and Channels:")
+  ch := make(chan string)
+  go func() {
+    println("Goroutine: Sending message")
+    ch <- "Hello from goroutine!"
+  }()
+  msg := <-ch
+  println("Main goroutine: Received message:", msg)
+
+  // Function Literals
+  println("\nFunction Literals:")
+  add := func(x, y int) int {
+    return x + y
+  }
+  sum = add(5, 7)
+  println("Function literal result:", sum)
 }
 ```
 
 Generated with `goscript compile .`:
 
 ```typescript
-import * as goscript from "@go/builtin";
+import * as goscript from "@go/builtin"
 
 class MyStruct {
   // MyInt is a public integer field, initialized to zero.
-  public MyInt: number = 0;
+  public MyInt: number = 0
   // MyString is a public string field, initialized to empty string.
-  public MyString: string = "";
+  public MyString: string = ""
   // myBool is a private boolean field, initialized to false.
-  private myBool: boolean = false;
+  private myBool: boolean = false
 
   // GetMyString returns the MyString field.
   public GetMyString(): string {
@@ -262,8 +280,8 @@ class MyStruct {
     return m.myBool
   }
 
-  constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
-  public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
+  constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any) }
+  public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this) }
 }
 
 // NewMyStruct creates a new MyStruct instance.
@@ -275,7 +293,7 @@ function vals(): [number, number] {
   return [1, 2]
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
   console.log("Hello from GoScript example!")
 
   // Basic arithmetic
@@ -288,17 +306,17 @@ export function main(): void {
   console.log("Comparisons:", a == b, a != b, a < b, a > b, a <= b, a >= b)
 
   // string(rune) conversion
-  let r: number = 'X';
+  let r: number = 'X'
   let s = String.fromCharCode(r)
   console.log("string('X'):", s)
 
   // 'y'
-  let r2: number = 121;
+  let r2: number = 121
   let s2 = String.fromCharCode(r2)
   console.log("string(121):", s2)
 
   // '√'
-  let r3: number = 0x221A;
+  let r3: number = 0x221A
   let s3 = String.fromCharCode(r3)
   console.log("string(0x221A):", s3)
 
@@ -371,6 +389,24 @@ export function main(): void {
       console.log("Switch default")
       break
   }
+
+  // Goroutines and Channels
+  console.log("\nGoroutines and Channels:")
+  let ch = goscript.makeChannel<string>(0)
+  queueMicrotask(async () => {
+    console.log("Goroutine: Sending message")
+    await ch.send("Hello from goroutine!")
+  })
+  let msg = await ch.receive()
+  console.log("Main goroutine: Received message:", msg)
+
+  // Function Literals
+  console.log("\nFunction Literals:")
+  let add = (x: number, y: number): number => {
+    return x + y
+  }
+  sum = add(5, 7)
+  console.log("Function literal result:", sum)
 }
 ```
 
