@@ -1,0 +1,14 @@
+# General ignores (from .gitignore and common patterns)
+.DS_Store
+*.swp
+.#*
+node_modules
+vendor/
+
+# Project specific ignores
+.gitignore
+.npmignore
+.roo*
+.aider.*
+.vscode/
+.github/
