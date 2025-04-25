@@ -59,6 +59,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Method calls (on values and pointers).
     *   `println` built-in (mapped to `console.log`).
     *   Multiple return values (including assignment and usage with blank identifier).
+    *   Asynchronous Functions (`async`/`await` based on channel operations)
 *   **Variables & Assignment:**
     *   Variable declaration (`var`, implicitly via `:=`).
     *   Short variable declaration (`:=`).
@@ -70,6 +71,8 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Address-of operator (`&`).
     *   Dereference operator (`*`).
 *   **Value Semantics:** Emulation of Go's struct copy-on-assignment behavior.
+*   **Concurrency:**
+    *   Channels (`chan T`, `make`, send `<-`, receive `<-`, buffered/unbuffered, closing)
 
 ## Uncovered Go Language Constructs (Based on Go By Example)
 

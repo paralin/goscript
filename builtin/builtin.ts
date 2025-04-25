@@ -104,3 +104,125 @@ export const append = <T>(slice: Array<T>, ...elements: T[]): Array<T> => {
     slice.push(...elements);
     return slice;
 };
+/**
+ * Represents a Go channel in TypeScript.
+ * Supports asynchronous sending and receiving of values.
+ */
+export interface Channel<T> {
+    /**
+     * Sends a value to the channel.
+     * Returns a promise that resolves when the value is accepted by the channel.
+     * @param value The value to send.
+     */
+    send(value: T): Promise<void>;
+
+    /**
+     * Receives a value from the channel.
+     * Returns a promise that resolves with the received value.
+     */
+    receive(): Promise<T>;
+
+    /**
+     * Closes the channel.
+     * No more values can be sent to a closed channel.
+     */
+    close(): void;
+}
+
+// A simple implementation of buffered channels
+class BufferedChannel<T> implements Channel<T> {
+    private buffer: T[] = [];
+    private closed: boolean = false;
+    private capacity: number;
+    private senders: Array<(value: boolean) => void> = []; // Resolvers for blocked senders
+    private receivers: Array<(value: T) => void> = []; // Resolvers for blocked receivers
+
+    constructor(capacity: number) {
+        this.capacity = capacity;
+    }
+
+    async send(value: T): Promise<void> {
+        if (this.closed) {
+            throw new Error("send on closed channel");
+        }
+
+        // If there are waiting receivers, directly pass the value
+        if (this.receivers.length > 0) {
+            const receiver = this.receivers.shift()!;
+            receiver(value);
+            return;
+        }
+
+        // If buffer is not full, add to buffer
+        if (this.buffer.length < this.capacity) {
+            this.buffer.push(value);
+            return;
+        }
+
+        // Buffer is full, block the sender
+        return new Promise<void>((resolve, reject) => {
+            this.senders.push((success: boolean) => {
+                if (success) {
+                    this.buffer.push(value);
+                    resolve();
+                } else {
+                    reject(new Error("send on closed channel"));
+                }
+            });
+        });
+    }
+
+    async receive(): Promise<T> {
+        // If buffer has values, return from buffer
+        if (this.buffer.length > 0) {
+            const value = this.buffer.shift()!;
+
+            // If there are waiting senders, unblock one
+            if (this.senders.length > 0) {
+                const sender = this.senders.shift()!;
+                sender(true); // Unblock with success
+            }
+
+            return value;
+        }
+
+        // If channel is closed and buffer is empty, throw error
+        if (this.closed) {
+            throw new Error("receive on closed channel");
+        }
+
+        // Buffer is empty, block the receiver
+        return new Promise<T>((resolve) => {
+            this.receivers.push(resolve);
+        });
+    }
+
+    close(): void {
+        if (this.closed) {
+            throw new Error("close of closed channel");
+        }
+
+        this.closed = true;
+
+        // Unblock all waiting senders with failure
+        for (const sender of this.senders) {
+            sender(false);
+        }
+        this.senders = [];
+
+        // Unblock all waiting receivers with undefined
+        for (const receiver of this.receivers) {
+            receiver(undefined as any);
+        }
+        this.receivers = [];
+    }
+}
+
+/**
+ * Creates a new channel with the specified buffer size.
+ * @param bufferSize The size of the channel buffer. If 0, creates an unbuffered channel.
+ * @returns A new channel instance.
+ */
+export const makeChannel = <T>(bufferSize: number): Channel<T> => {
+    return new BufferedChannel<T>(bufferSize);
+};

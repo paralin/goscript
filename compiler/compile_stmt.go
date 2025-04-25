@@ -81,6 +81,10 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++ or --)
 		}
 		c.tsw.WriteLine("")
+	case *ast.SendStmt:
+		if err := c.WriteStmtSend(exp); err != nil {
+			return fmt.Errorf("failed to write send statement: %w", err)
+		}
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
@@ -1147,4 +1151,20 @@ func isLHSMapIndex(expr ast.Expr, pkg *packages.Package) bool {
 	}
 	_, isMap := tv.Type.Underlying().(*gtypes.Map)
 	return isMap
+}
+
+// WriteStmtSend writes a channel send statement (ch <- value).
+func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
+	// Translate ch <- value to await ch.send(value)
+	c.tsw.WriteLiterally("await ")
+	if err := c.WriteValueExpr(exp.Chan); err != nil { // The channel expression
+		return fmt.Errorf("failed to write channel expression in send statement: %w", err)
+	}
+	c.tsw.WriteLiterally(".send(")
+	if err := c.WriteValueExpr(exp.Value); err != nil { // The value expression
+		return fmt.Errorf("failed to write value expression in send statement: %w", err)
+	}
+	c.tsw.WriteLiterally(")")
+	c.tsw.WriteLine("") // Add newline after the statement
+	return nil
 }

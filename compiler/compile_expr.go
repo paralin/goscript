@@ -27,7 +27,7 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	case *ast.InterfaceType:
 		c.WriteInterfaceType(exp)
 	case *ast.FuncType:
-		c.WriteFuncType(exp)
+		c.WriteFuncType(exp, false) // Function types are not async
 	case *ast.ArrayType:
 		// Translate [N]T to T[]
 		c.WriteTypeExpr(exp.Elt)
@@ -40,8 +40,10 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 		c.WriteTypeExpr(exp.Value)
 		c.tsw.WriteLiterally(" }")
 	case *ast.ChanType:
-		// channel types are not yet supported in TS output
-		c.tsw.WriteCommentInline("channel type")
+		// Translate channel types to goscript.Channel<T>
+		c.tsw.WriteLiterally("goscript.Channel<")
+		c.WriteTypeExpr(exp.Value) // Write the element type
+		c.tsw.WriteLiterally(">")
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled type expr: %T (map/chan support pending)", exp))
 	}
@@ -215,7 +217,7 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 
 			// Method signature is a FuncType
 			if funcType, ok := method.Type.(*ast.FuncType); ok {
-				c.WriteFuncType(funcType)
+				c.WriteFuncType(funcType, false) // Interface method signatures are not async
 			} else {
 				// Should not happen for valid interfaces, but handle defensively
 				c.tsw.WriteCommentInline("unexpected method type")
@@ -232,13 +234,16 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 }
 
 // WriteFuncType writes a function type signature.
-func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType) {
+func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 	c.tsw.WriteLiterally("(")
 	c.WriteFieldList(exp.Params, true) // true = arguments
 	c.tsw.WriteLiterally(")")
 	if exp.Results != nil && len(exp.Results.List) > 0 {
 		// Use colon for return type annotation
 		c.tsw.WriteLiterally(": ")
+		if isAsync {
+			c.tsw.WriteLiterally("Promise<")
+		}
 		if len(exp.Results.List) == 1 && len(exp.Results.List[0].Names) == 0 {
 			// Single unnamed return type
 			c.WriteTypeExpr(exp.Results.List[0].Type)
@@ -253,15 +258,23 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType) {
 			}
 			c.tsw.WriteLiterally("]")
 		}
+		if isAsync {
+			c.tsw.WriteLiterally(">")
+		}
 	} else {
 		// No return value -> void
-		c.tsw.WriteLiterally(": void")
+		if isAsync {
+			c.tsw.WriteLiterally(": Promise<void>")
+		} else {
+			c.tsw.WriteLiterally(": void")
+		}
 	}
 }
 
 // WriteCallExpr writes a function call.
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
+
 	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
 		switch funIdent.String() {
 		case "println":
@@ -314,6 +327,28 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled delete call with incorrect number of arguments")
 		case "make":
+			// First check if we have a channel type
+			if typ := c.pkg.TypesInfo.TypeOf(exp.Args[0]); typ != nil {
+				if chanType, ok := typ.Underlying().(*gtypes.Chan); ok {
+					// Handle channel creation: make(chan T, bufferSize) or make(chan T)
+					c.tsw.WriteLiterally("goscript.makeChannel<")
+					c.WriteGoType(chanType.Elem())
+					c.tsw.WriteLiterally(">(")
+
+					// If buffer size is provided, add it
+					if len(exp.Args) >= 2 {
+						if err := c.WriteValueExpr(exp.Args[1]); err != nil {
+							return fmt.Errorf("failed to write buffer size in makeChannel: %w", err)
+						}
+					} else {
+						// Default to 0 (unbuffered channel)
+						c.tsw.WriteLiterally("0")
+					}
+
+					c.tsw.WriteLiterally(")")
+					return nil // Handled make for channel
+				}
+			}
 			// Handle make for slices: make([]T, len, cap) or make([]T, len)
 			if len(exp.Args) >= 1 {
 				// Handle map creation: make(map[K]V)
@@ -419,6 +454,16 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			// Return error for other unhandled string conversions
 			return fmt.Errorf("unhandled string conversion: %s", exp.Fun)
+		case "close":
+			// Translate close(ch) to ch.close()
+			if len(exp.Args) == 1 {
+				if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+					return fmt.Errorf("failed to write channel in close call: %w", err)
+				}
+				c.tsw.WriteLiterally(".close()")
+				return nil // Handled close
+			}
+			return errors.New("unhandled close call with incorrect number of arguments")
 		case "append":
 			// Translate append(slice, elements...) to goscript.append(slice, elements...)
 			if len(exp.Args) >= 1 {
@@ -441,6 +486,11 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled append call with incorrect number of arguments")
 		default:
+			// Check if this is an async function call
+			if funIdent != nil && c.isAsyncFunc(funIdent.Name) {
+				c.tsw.WriteLiterally("await ")
+			}
+
 			// Not a special built-in, treat as a regular function call
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
@@ -478,6 +528,16 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 // WriteUnaryExprValue writes a unary operation on a value.
 func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) error {
+	if exp.Op == token.ARROW {
+		// Channel receive: <-ch becomes await ch.receive()
+		c.tsw.WriteLiterally("await ")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write channel receive operand: %w", err)
+		}
+		c.tsw.WriteLiterally(".receive()")
+		return nil
+	}
+
 	if exp.Op == token.AND {
 		// Address-of operator (&) might translate to just the value in TS,
 		// or potentially involve reference objects if complex pointer logic is needed.
@@ -502,6 +562,21 @@ func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) error {
 
 // WriteBinaryExprValue writes a binary operation on values.
 func (c *GoToTSCompiler) WriteBinaryExprValue(exp *ast.BinaryExpr) error {
+	// Handle special cases like channel send
+	if exp.Op == token.ARROW {
+		// Channel send: ch <- val becomes await ch.send(val)
+		c.tsw.WriteLiterally("await ")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write channel send target: %w", err)
+		}
+		c.tsw.WriteLiterally(".send(")
+		if err := c.WriteValueExpr(exp.Y); err != nil {
+			return fmt.Errorf("failed to write channel send value: %w", err)
+		}
+		c.tsw.WriteLiterally(")")
+		return nil
+	}
+
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write binary expression left operand: %w", err)
 	}
