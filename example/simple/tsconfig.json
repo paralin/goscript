@@ -6,7 +6,8 @@
     "jsx": "react",
     "baseUrl": "./",
     "paths": {
-      "@go/*": ["output/@go/*"]
+      "@go/*": ["output/@go/*"],
+      "@go/builtin": ["../../builtin/builtin.ts"]
     },
     "allowSyntheticDefaultImports": true,
     "declaration": true,

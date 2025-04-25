@@ -118,4 +118,21 @@ func main() {
 	default:
 		println("Switch default")
 	}
+	// Goroutines and Channels
+	println("\nGoroutines and Channels:")
+	ch := make(chan string)
+	go func() {
+		println("Goroutine: Sending message")
+		ch <- "Hello from goroutine!"
+	}()
+	msg := <-ch
+	println("Main goroutine: Received message:", msg)
+
+	// Function Literals
+	println("\nFunction Literals:")
+	add := func(x, y int) int {
+		return x + y
+	}
+	sum = add(5, 7)
+	println("Function literal result:", sum)
 }
