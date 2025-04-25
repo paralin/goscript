@@ -3,7 +3,7 @@
 
 import * as goscript from "@go/builtin";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Create map using make
 	let scores = goscript.makeMap("string", "int")
 	console.log("Empty map created: Expected: true, Actual:", goscript.len(scores) == 0)

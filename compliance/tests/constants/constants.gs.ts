@@ -12,7 +12,7 @@ let Truth = false;
 // Small    = Big >> 59 // Commented out as it depends on Big
 let Greeting = "Hello, Constants!";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	console.log(Pi)
 	console.log(Truth)
 	// println(Big) // Commented out until large integer handling is implemented

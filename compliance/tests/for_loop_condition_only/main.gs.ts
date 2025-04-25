@@ -3,7 +3,7 @@
 
 import * as goscript from "@go/builtin";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i = 0
 	for (; i < 5; ) {
 		console.log(i)

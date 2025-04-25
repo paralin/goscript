@@ -112,6 +112,8 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		}
 		c.tsw.WriteLiterally(")")
 		return nil
+	case *ast.FuncLit:
+		return c.WriteFuncLitValue(exp)
 	// Add cases for SliceExpr etc.
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled value expr: %T", exp))
@@ -856,4 +858,55 @@ func (c *GoToTSCompiler) WriteKeyValueExprValue(exp *ast.KeyValueExpr) error {
 		return fmt.Errorf("failed to write key-value expression value: %w", err)
 	}
 	return nil
+}
+
+// WriteFuncLitValue writes a function literal as a TypeScript arrow function.
+func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
+	// Determine if the function literal should be async
+	isAsync := c.containsAsyncOperations(exp.Body)
+
+	if isAsync {
+		c.tsw.WriteLiterally("async ")
+	}
+
+	// Write arrow function: (params) => { body }
+	c.tsw.WriteLiterally("(")
+	c.WriteFieldList(exp.Type.Params, true) // true = arguments
+	c.tsw.WriteLiterally(") => ")
+
+	// Write function body
+	if err := c.WriteStmt(exp.Body); err != nil {
+		return fmt.Errorf("failed to write function literal body: %w", err)
+	}
+
+	return nil
+}
+
+// containsAsyncOperations recursively checks an AST node for asynchronous operations.
+func (c *GoToTSCompiler) containsAsyncOperations(node ast.Node) bool {
+	var hasAsync bool
+	ast.Inspect(node, func(n ast.Node) bool {
+		if n == nil {
+			return false
+		}
+		switch s := n.(type) {
+		case *ast.SendStmt:
+			hasAsync = true
+			return false // Stop inspecting this branch
+		case *ast.UnaryExpr:
+			if s.Op == token.ARROW { // Channel receive <-
+				hasAsync = true
+				return false // Stop inspecting this branch
+			}
+		case *ast.CallExpr:
+			// Check if the called function is known to be async
+			if funIdent, ok := s.Fun.(*ast.Ident); ok && c.isAsyncFunc(funIdent.Name) {
+				hasAsync = true
+				return false // Stop inspecting this branch
+			}
+			// TODO: More sophisticated check for method calls on async types
+		}
+		return true // Continue inspecting
+	})
+	return hasAsync
 }

@@ -25,7 +25,7 @@ interface MyOtherInterface
 	Method1(): number;
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i: MyInterface;
 	let s = new MyStruct({ Value: 10 })
 	i = s.clone()

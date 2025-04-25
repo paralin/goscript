@@ -12,7 +12,7 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// === Pointer Initialization ===
 	// Create a pointer to a MyStruct instance using a composite literal.
 	let structPointer = new MyStruct({ MyInt: 4, MyString: "hello world" })

@@ -85,6 +85,41 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		if err := c.WriteStmtSend(exp); err != nil {
 			return fmt.Errorf("failed to write send statement: %w", err)
 		}
+	case *ast.GoStmt:
+		// Handle goroutine statement
+		// Translate 'go func() { ... }()' to 'queueMicrotask(() => { ... compiled body ... })'
+
+		// The call expression's function is the function literal
+		callExpr := exp.Call
+		if funcLit, ok := callExpr.Fun.(*ast.FuncLit); ok {
+			// Check if the function literal body contains async operations
+			isAsync := c.containsAsyncOperations(funcLit.Body)
+
+			if isAsync {
+				c.tsw.WriteLiterally("queueMicrotask(async () => {")
+			} else {
+				c.tsw.WriteLiterally("queueMicrotask(() => {")
+			}
+
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+
+			// Compile the function literal's body directly
+			if err := c.WriteStmt(funcLit.Body); err != nil {
+				return fmt.Errorf("failed to write goroutine function literal body: %w", err)
+			}
+
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("})") // Close the queueMicrotask callback and the statement
+
+		} else {
+			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled goroutine function type: %T", callExpr.Fun))
+			// Fallback: try to compile the call expression directly, though it might not work
+			if err := c.WriteValueExpr(exp.Call); err != nil {
+				return fmt.Errorf("failed to write fallback goroutine call expression: %w", err)
+			}
+			c.tsw.WriteLine("") // Ensure a newline even on fallback
+		}
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}

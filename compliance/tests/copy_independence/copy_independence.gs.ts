@@ -12,7 +12,7 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Setup from previous steps (simplified for this test)
 	let structPointer = new MyStruct({ MyInt: 4, MyString: "hello world" })
 	let dereferencedStructCopy = structPointer.clone()

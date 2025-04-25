@@ -3,7 +3,7 @@
 
 import * as goscript from "@go/builtin";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Test basic array literal
 	let a: number[] = [1, 2, 3];
 	console.log(a[0], a[1], a[2])

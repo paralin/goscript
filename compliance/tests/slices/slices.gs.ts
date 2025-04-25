@@ -3,7 +3,7 @@
 
 import * as goscript from "@go/builtin";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Create a slice of integers with length 5 and capacity 10
 	let s = goscript.makeSlice("int", 5, 10)
 	console.log(goscript.len(s))

@@ -20,7 +20,7 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i: MyInterface;
 	let s = new MyStruct({ Value: 10 })
 	i = s.clone()

@@ -3,7 +3,7 @@
 
 import * as goscript from "@go/builtin";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let slice = [10, 20, 30, 40, 50]
 	let sum = 0
 	for (let idx = 0; idx < slice.length; idx++) {

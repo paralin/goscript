@@ -53,6 +53,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Composite Literals for structs (`MyStruct{...}`).
 *   **Functions & Methods:**
     *   Function definition (`func`).
+    *   Function Literals (`func() { ... }`)
     *   Method definition with value receivers (`func (v T) Method()`).
     *   Method definition with pointer receivers (`func (p *T) Method()`).
     *   Function calls.
@@ -72,6 +73,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Dereference operator (`*`).
 *   **Value Semantics:** Emulation of Go's struct copy-on-assignment behavior.
 *   **Concurrency:**
+    *   Goroutines (`go func()`)
     *   Channels (`chan T`, `make`, send `<-`, receive `<-`, buffered/unbuffered, closing)
 
 ## Uncovered Go Language Constructs (Based on Go By Example)
@@ -94,8 +96,6 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
 *   **Basic Types & Values:**
    *   `iota` consts
 *   **Concurrency:**
-    *   Goroutines (`go func()`)
-    *   Channels (`chan T`, `make`, send `<-`, receive `<-`, buffered/unbuffered, closing)
     *   Mutexes (`sync.Mutex`)
 *   **Error Handling:**
     *   `error` interface usage

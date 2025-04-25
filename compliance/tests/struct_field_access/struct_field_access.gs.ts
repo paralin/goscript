@@ -11,7 +11,7 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// === Struct Field Access ===
 	let ms = new MyStruct({ MyInt: 42, MyString: "foo" })
 	console.log("MyInt: Expected: 42, Actual:", ms.MyInt)

@@ -12,7 +12,7 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let dereferencedStructCopy = new MyStruct({ MyString: "original" })
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.
