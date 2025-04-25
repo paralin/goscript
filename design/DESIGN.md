@@ -487,11 +487,72 @@ To determine which functions need to be marked `async` in TypeScript, the compil
 
 ### TypeScript Generation
 
+## Functions
+
 -   **Async Functions:** Go functions colored as **Asynchronous** are generated as TypeScript `async function`s. Their return type `T` is wrapped in a `Promise<T>`. If the function has no return value, the TypeScript return type is `Promise<void>`.
 -   **Sync Functions:** Go functions colored as **Synchronous** are generated as regular TypeScript `function`s with their corresponding return types.
 -   **Function Calls:** When a Go function call targets an **Asynchronous** function, the generated TypeScript call expression is prefixed with the `await` keyword. Calls to **Synchronous** functions are generated directly without `await`.
 
 This coloring approach ensures that asynchronous operations propagate correctly through the call stack in the generated TypeScript code.
+
+### Async Example
+
+Consider the following Go code using a channel:
+
+```go
+package main
+
+// This function receives from a channel, making it async.
+func receiveFromChan(ch chan int) int {
+	val := <-ch // This operation makes the function async
+	return val
+}
+
+// This function calls an async function, making it async too.
+func caller(ch chan int) int {
+	// We expect this call to be awaited in TypeScript
+	result := receiveFromChan(ch)
+	return result + 1
+}
+
+func main() {
+	myChan := make(chan int, 1)
+	myChan <- 10
+	finalResult := caller(myChan)
+	println(finalResult) // Expected output: 11
+	close(myChan)
+}
+
+```
+
+This translates to the following TypeScript:
+
+```typescript
+import * as goscript from "@go/builtin";
+
+// Marked async because it contains 'await ch.receive()'
+async function receiveFromChan(ch: goscript.Channel<number>): Promise<number> {
+	let val = await ch.receive()
+	return val
+}
+
+// Marked async because it calls the async 'receiveFromChan'
+async function caller(ch: goscript.Channel<number>): Promise<number> {
+	let result = await receiveFromChan(ch) // Call is awaited
+	return result + 1
+}
+
+// Marked async because it calls the async 'caller' and uses 'await myChan.send()'
+export async function main(): Promise<void> {
+	let myChan = goscript.makeChannel<number>(1)
+	await myChan.send(10) // Send is awaited
+	let finalResult = await caller(myChan) // Call is awaited
+	console.log(finalResult)
+	myChan.close()
+}
+```
+
+*Note on Microtasks:* While Go's concurrency model involves goroutines and a scheduler, the TypeScript translation primarily uses `async`/`await` and Promises for channel operations. Starting a new Goroutine with the `go` keyword is translated to a call to `queueMicrotask` with the target function, effectively scheduling it to run asynchronously similar to how Promises resolve.
 
 ## Constants
 
