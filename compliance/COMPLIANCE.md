@@ -44,6 +44,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   **Control Flow:**
     *   `if`/`else` statements.
     *   `switch` statements.
+    *   `select` statement.
     *   `for` loops (condition-only, basic counter-based, `range` over arrays/slices/strings).
 *   **Data Structures:**
     *   Arrays (`[N]T`) - Including array literals and indexing.

@@ -347,6 +347,11 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 						c.tsw.WriteLiterally("0")
 					}
 
+					c.tsw.WriteLiterally(", ") // Add comma for zero value argument
+
+					// Write the zero value for the channel's element type
+					c.WriteZeroValueForType(chanType.Elem())
+
 					c.tsw.WriteLiterally(")")
 					return nil // Handled make for channel
 				}
@@ -789,63 +794,6 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 	return nil
 }
 
-// WriteZeroValueForType writes the zero value for a given type.
-// Handles array types recursively.
-func (c *GoToTSCompiler) WriteZeroValueForType(typ interface{}) {
-	switch t := typ.(type) {
-	case *gtypes.Array:
-		c.tsw.WriteLiterally("[")
-		for i := 0; i < int(t.Len()); i++ {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-			c.WriteZeroValueForType(t.Elem())
-		}
-		c.tsw.WriteLiterally("]")
-	case *ast.ArrayType:
-		// Try to get length from AST
-		length := 0
-		if bl, ok := t.Len.(*ast.BasicLit); ok && bl.Kind == token.INT {
-			if _, err := fmt.Sscan(bl.Value, &length); err != nil {
-				c.tsw.WriteCommentInline(fmt.Sprintf("error parsing array length for zero value: %v", err))
-			}
-		}
-		c.tsw.WriteLiterally("[")
-		for i := 0; i < length; i++ {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-			c.WriteZeroValueForType(t.Elt)
-		}
-		c.tsw.WriteLiterally("]")
-	case *gtypes.Basic:
-		switch t.Kind() {
-		case gtypes.Bool:
-			c.tsw.WriteLiterally("false")
-		case gtypes.String:
-			c.tsw.WriteLiterally(`""`)
-		default:
-			c.tsw.WriteLiterally("0")
-		}
-	case *ast.Ident:
-		// Try to map Go builtins
-		if tsname, ok := gstypes.GoBuiltinToTypescript(t.Name); ok {
-			switch tsname {
-			case "boolean":
-				c.tsw.WriteLiterally("false")
-			case "string":
-				c.tsw.WriteLiterally(`""`)
-			default:
-				c.tsw.WriteLiterally("0")
-			}
-		} else {
-			c.tsw.WriteLiterally("null")
-		}
-	default:
-		c.tsw.WriteLiterally("null")
-	}
-}
-
 // WriteKeyValueExprValue writes a key-value pair.
 // Returns an error if writing the key or value fails.
 func (c *GoToTSCompiler) WriteKeyValueExprValue(exp *ast.KeyValueExpr) error {
@@ -880,33 +828,4 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	}
 
 	return nil
-}
-
-// containsAsyncOperations recursively checks an AST node for asynchronous operations.
-func (c *GoToTSCompiler) containsAsyncOperations(node ast.Node) bool {
-	var hasAsync bool
-	ast.Inspect(node, func(n ast.Node) bool {
-		if n == nil {
-			return false
-		}
-		switch s := n.(type) {
-		case *ast.SendStmt:
-			hasAsync = true
-			return false // Stop inspecting this branch
-		case *ast.UnaryExpr:
-			if s.Op == token.ARROW { // Channel receive <-
-				hasAsync = true
-				return false // Stop inspecting this branch
-			}
-		case *ast.CallExpr:
-			// Check if the called function is known to be async
-			if funIdent, ok := s.Fun.(*ast.Ident); ok && c.isAsyncFunc(funIdent.Name) {
-				hasAsync = true
-				return false // Stop inspecting this branch
-			}
-			// TODO: More sophisticated check for method calls on async types
-		}
-		return true // Continue inspecting
-	})
-	return hasAsync
 }

@@ -78,7 +78,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		if !ok {
 			c.tsw.WriteCommentLine(fmt.Sprintf("unknown incdec token: %s", exp.Tok.String()))
 		} else {
-			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++ or --)
+			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++)
 		}
 		c.tsw.WriteLine("")
 	case *ast.SendStmt:
@@ -120,9 +120,201 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			}
 			c.tsw.WriteLine("") // Ensure a newline even on fallback
 		}
+	case *ast.SelectStmt:
+		// Handle select statement
+		if err := c.WriteStmtSelect(exp); err != nil {
+			return fmt.Errorf("failed to write select statement: %w", err)
+		}
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
+	return nil
+}
+
+// WriteStmtSelect writes a select statement.
+func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
+	// This is our implementation of the select statement, which will use Promise.race
+	// to achieve the same semantics as Go's select statement.
+
+	// Create an array to hold all the select cases
+	tempArrayName := c.newTempVar()
+	c.tsw.WriteLiterally("const ")
+	c.tsw.WriteLiterally(tempArrayName)
+	c.tsw.WriteLiterally(": goscript.SelectCase<any>[] = []") // Array of SelectCase objects
+	c.tsw.WriteLine("")
+
+	// Variable to track whether we have a default case
+	hasDefault := false
+
+	// For each case clause, generate a SelectCase object and add it to the array
+	for i, stmt := range exp.Body.List {
+		if commClause, ok := stmt.(*ast.CommClause); ok {
+			if commClause.Comm == nil {
+				// This is a default case
+				hasDefault = true
+				// Add a SelectCase object for the default case with a special ID
+				c.tsw.WriteLiterally(tempArrayName)
+				c.tsw.WriteLiterally(".push({")
+				c.tsw.Indent(1)
+				c.tsw.WriteLine("")
+				c.tsw.WriteLiterally("id: -1,") // Special ID for default case
+				c.tsw.WriteLine("")
+				c.tsw.WriteLiterally("isSend: false,") // Default case is neither send nor receive, but needs a value
+				c.tsw.WriteLine("")
+				c.tsw.WriteLiterally("channel: null,") // No channel for default case
+				c.tsw.WriteLine("")
+				c.tsw.WriteLiterally("onSelected: async (result) => {") // Mark as async because case body might contain await
+				c.tsw.Indent(1)
+				c.tsw.WriteLine("")
+				// Write the case body
+				for _, bodyStmt := range commClause.Body {
+					if err := c.WriteStmt(bodyStmt); err != nil {
+						return fmt.Errorf("failed to write statement in select default case body (onSelected): %w", err)
+					}
+				}
+				c.tsw.Indent(-1)
+				c.tsw.WriteLine("}") // Close onSelected handler
+				c.tsw.Indent(-1)
+				c.tsw.WriteLine("}),") // Close SelectCase object and add comma
+				c.tsw.WriteLine("")
+
+				continue
+			}
+
+			// Generate a unique ID for this case
+			caseID := i
+
+			// Start writing the SelectCase object
+			c.tsw.WriteLiterally(tempArrayName)
+			c.tsw.WriteLiterally(".push({")
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+			c.tsw.WriteLiterally(fmt.Sprintf("id: %d,", caseID))
+			c.tsw.WriteLine("")
+
+			// Handle different types of comm statements
+			switch comm := commClause.Comm.(type) {
+			case *ast.AssignStmt:
+				// This is a receive operation with assignment: case v := <-ch: or case v, ok := <-ch:
+				if len(comm.Rhs) == 1 {
+					if unaryExpr, ok := comm.Rhs[0].(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
+						// It's a receive operation
+						c.tsw.WriteLiterally("isSend: false,")
+						c.tsw.WriteLine("")
+						c.tsw.WriteLiterally("channel: ")
+						if err := c.WriteValueExpr(unaryExpr.X); err != nil { // The channel expression
+							return fmt.Errorf("failed to write channel expression in select receive case: %w", err)
+						}
+						c.tsw.WriteLiterally(",")
+						c.tsw.WriteLine("")
+					} else {
+						c.tsw.WriteCommentLine(fmt.Sprintf("unhandled RHS in select assignment case: %T", comm.Rhs[0]))
+					}
+				} else {
+					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled RHS count in select assignment case: %d", len(comm.Rhs)))
+				}
+			case *ast.ExprStmt:
+				// This is a simple receive: case <-ch:
+				if unaryExpr, ok := comm.X.(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
+					c.tsw.WriteLiterally("isSend: false,")
+					c.tsw.WriteLine("")
+					c.tsw.WriteLiterally("channel: ")
+					if err := c.WriteValueExpr(unaryExpr.X); err != nil { // The channel expression
+						return fmt.Errorf("failed to write channel expression in select receive case: %w", err)
+					}
+					c.tsw.WriteLiterally(",")
+					c.tsw.WriteLine("")
+				} else {
+					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled expression in select case: %T", comm.X))
+				}
+			case *ast.SendStmt:
+				// This is a send operation: case ch <- v:
+				c.tsw.WriteLiterally("isSend: true,")
+				c.tsw.WriteLine("")
+				c.tsw.WriteLiterally("channel: ")
+				if err := c.WriteValueExpr(comm.Chan); err != nil { // The channel expression
+					return fmt.Errorf("failed to write channel expression in select send case: %w", err)
+				}
+				c.tsw.WriteLiterally(",")
+				c.tsw.WriteLine("")
+				c.tsw.WriteLiterally("value: ")
+				if err := c.WriteValueExpr(comm.Value); err != nil { // The value expression
+					return fmt.Errorf("failed to write value expression in select send case: %w", err)
+				}
+				c.tsw.WriteLiterally(",")
+				c.tsw.WriteLine("")
+			default:
+				c.tsw.WriteCommentLine(fmt.Sprintf("unhandled comm statement in select case: %T", comm))
+			}
+
+			// Add the onSelected handler to execute the case body after the select resolves
+			c.tsw.WriteLiterally("onSelected: async (result) => {") // Mark as async because case body might contain await
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+
+			// Handle assignment for channel receives if needed (inside the onSelected handler)
+			if assignStmt, ok := commClause.Comm.(*ast.AssignStmt); ok {
+				// This is a receive operation with assignment
+				if len(assignStmt.Lhs) == 1 {
+					// Simple receive: case v := <-ch:
+					valIdent, ok := assignStmt.Lhs[0].(*ast.Ident)
+					if ok && valIdent.Name != "_" { // Check for blank identifier
+						c.tsw.WriteLiterally("const ")
+						c.WriteIdentValue(valIdent)
+						c.tsw.WriteLiterally(" = result.value")
+						c.tsw.WriteLine("")
+					}
+				} else if len(assignStmt.Lhs) == 2 {
+					// Receive with ok: case v, ok := <-ch:
+					valIdent, valOk := assignStmt.Lhs[0].(*ast.Ident)
+					okIdent, okOk := assignStmt.Lhs[1].(*ast.Ident)
+
+					if valOk && valIdent.Name != "_" {
+						c.tsw.WriteLiterally("const ")
+						c.WriteIdentValue(valIdent)
+						c.tsw.WriteLiterally(" = result.value")
+						c.tsw.WriteLine("")
+					}
+
+					if okOk && okIdent.Name != "_" {
+						c.tsw.WriteLiterally("const ")
+						c.WriteIdentValue(okIdent)
+						c.tsw.WriteLiterally(" = result.ok")
+						c.tsw.WriteLine("")
+					}
+				}
+			}
+			// Note: Simple receive (case <-ch:) and send (case ch <- v:) don't require assignment here,
+			// as the operation was already performed by selectReceive/selectSend and the result is in 'result'.
+
+			// Write the case body
+			for _, bodyStmt := range commClause.Body {
+				if err := c.WriteStmt(bodyStmt); err != nil {
+					return fmt.Errorf("failed to write statement in select case body (onSelected): %w", err)
+				}
+			}
+
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}") // Close onSelected handler
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}),") // Close SelectCase object and add comma
+			c.tsw.WriteLine("")
+
+		} else {
+			c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement in select body: %T", stmt))
+		}
+	}
+
+	// Call the selectStatement helper with the array of SelectCase objects and the hasDefault flag
+	// The result of selectStatement is the result of the selected case, but we handle assignments
+	// within the onSelected handlers, so we don't need to assign the result here.
+	c.tsw.WriteLiterally("await goscript.selectStatement(")
+	c.tsw.WriteLiterally(tempArrayName)
+	c.tsw.WriteLiterally(", ")
+	c.tsw.WriteLiterally(fmt.Sprintf("%t", hasDefault))
+	c.tsw.WriteLiterally(")")
+	c.tsw.WriteLine("")
+
 	return nil
 }
 
@@ -513,6 +705,81 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 	}
 	return nil
 }
+
+// writeChannelReceiveWithOk handles the val, ok := <-channel assignment pattern.
+func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *ast.UnaryExpr, tok token.Token) error {
+	// Ensure LHS has exactly two expressions
+	if len(lhs) != 2 {
+		return fmt.Errorf("internal error: writeChannelReceiveWithOk called with %d LHS expressions", len(lhs))
+	}
+
+	// Get variable names, handling blank identifiers
+	valueIsBlank := false
+	okIsBlank := false
+	var valueName string
+	var okName string
+
+	if valIdent, ok := lhs[0].(*ast.Ident); ok {
+		if valIdent.Name == "_" {
+			valueIsBlank = true
+		} else {
+			valueName = valIdent.Name
+		}
+	} else {
+		return fmt.Errorf("unhandled LHS expression type for value in channel receive: %T", lhs[0])
+	}
+
+	if okIdent, ok := lhs[1].(*ast.Ident); ok {
+		if okIdent.Name == "_" {
+			okIsBlank = true
+		} else {
+			okName = okIdent.Name
+		}
+	} else {
+		return fmt.Errorf("unhandled LHS expression type for ok in channel receive: %T", lhs[1])
+	}
+
+	// Generate temporary variable for the result
+	resultVar := c.newTempVar()
+	c.tsw.WriteLiterally("const ")
+	c.tsw.WriteLiterally(resultVar)
+	c.tsw.WriteLiterally(" = await ")
+	if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
+		return fmt.Errorf("failed to write channel expression in receive: %w", err)
+	}
+	c.tsw.WriteLiterally(".receiveWithOk()")
+	c.tsw.WriteLine("")
+
+	// Assign to variables, declaring if needed (tok == token.DEFINE)
+	assignOrDeclare := func(varName string, isBlank bool, valueSource string) error {
+		if !isBlank {
+			if tok == token.DEFINE {
+				// Check if the variable is already declared in the current scope to avoid redeclaration error
+				// This requires scope tracking, which is complex. For now, assume := might redeclare.
+				// A safer approach might be to always assign, assuming prior declaration or handling scope elsewhere.
+				// Let's stick with 'let' for := for now, acknowledging potential issues.
+				c.tsw.WriteLiterally("let ")
+			}
+			c.tsw.WriteLiterally(varName)
+			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally(resultVar)
+			c.tsw.WriteLiterally(".")
+			c.tsw.WriteLiterally(valueSource)
+			c.tsw.WriteLine("")
+		}
+		return nil
+	}
+
+	if err := assignOrDeclare(valueName, valueIsBlank, "value"); err != nil {
+		return err
+	}
+	if err := assignOrDeclare(okName, okIsBlank, "ok"); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// writeTypeAssertion handles multi-variable assignment from a type assertion.
 	writeTypeAssertion := func(typeAssertExpr *ast.TypeAssertExpr) error {
@@ -722,13 +989,12 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		return nil
 	}
 
-	// Handle multi-variable assignment from a single function call returning multiple values.
+	// Handle multi-variable assignment from a single expression.
 	if len(exp.Lhs) > 1 && len(exp.Rhs) == 1 {
-		if callExpr, ok := exp.Rhs[0].(*ast.CallExpr); ok {
-			return writeMultiVarAssignFromCall(exp.Lhs, callExpr, exp.Tok)
-		} else if typeAssertExpr, ok := exp.Rhs[0].(*ast.TypeAssertExpr); ok {
+		rhsExpr := exp.Rhs[0]
+		if typeAssertExpr, ok := rhsExpr.(*ast.TypeAssertExpr); ok {
 			return writeTypeAssertion(typeAssertExpr)
-		} else if indexExpr, ok := exp.Rhs[0].(*ast.IndexExpr); ok {
+		} else if indexExpr, ok := rhsExpr.(*ast.IndexExpr); ok {
 			// Check if this is a map lookup (comma-ok idiom)
 			if len(exp.Lhs) == 2 {
 				// Get the type of the indexed expression
@@ -742,12 +1008,35 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 					}
 				}
 			}
+		} else if unaryExpr, ok := rhsExpr.(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
+			// Handle val, ok := <-channel
+			if len(exp.Lhs) == 2 {
+				return c.writeChannelReceiveWithOk(exp.Lhs, unaryExpr, exp.Tok)
+			}
+			// If LHS count is not 2, fall through to error or other handling
+		} else if callExpr, ok := rhsExpr.(*ast.CallExpr); ok {
+			return writeMultiVarAssignFromCall(exp.Lhs, callExpr, exp.Tok)
 		}
+		// If none of the specific multi-assign patterns match, fall through to the error check below
 	}
 
 	// Handle all other assignment cases (one-to-one, multiple RHS expressions, etc.)
 	// Ensure LHS and RHS have the same length for valid Go code in these cases
 	if len(exp.Lhs) != len(exp.Rhs) {
+		// Allow single RHS channel receive to be discarded (case <-ch:)
+		if len(exp.Lhs) == 0 && len(exp.Rhs) == 1 {
+			if unaryExpr, ok := exp.Rhs[0].(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
+				// Translate <-ch to await ch.receive() and discard result
+				c.tsw.WriteLiterally("await ")
+				if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
+					return fmt.Errorf("failed to write channel expression in discarded receive: %w", err)
+				}
+				c.tsw.WriteLiterally(".receive()") // Use receive() as receiveWithOk() result isn't needed
+				c.tsw.WriteLine("")
+				return nil
+			}
+		}
+
 		c.tsw.WriteCommentLine(fmt.Sprintf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs)))
 		return fmt.Errorf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs))
 	}
@@ -811,6 +1100,19 @@ func shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool {
 
 // WriteStmtExpr writes an expr statement.
 func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
+	// Handle simple channel receive used as a statement (<-ch)
+	if unaryExpr, ok := exp.X.(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
+		// Translate <-ch to await ch.receive()
+		c.tsw.WriteLiterally("await ")
+		if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
+			return fmt.Errorf("failed to write channel expression in receive statement: %w", err)
+		}
+		c.tsw.WriteLiterally(".receive()") // Use receive() as the value is discarded
+		c.tsw.WriteLine("")
+		return nil
+	}
+
+	// Handle other expression statements
 	if err := c.WriteValueExpr(exp.X); err != nil { // Expression statement evaluates a value
 		return err
 	}
@@ -935,6 +1237,60 @@ func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 }
 
 // WriteZeroValue writes the TypeScript zero‐value for a Go type.
+func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		// Try to resolve identifier type
+		if tv, found := c.pkg.TypesInfo.Types[t]; found {
+			underlying := tv.Type.Underlying()
+			switch u := underlying.(type) {
+			case *gtypes.Basic: // Use gotypes alias
+				if u.Info()&gtypes.IsNumeric != 0 { // Use gotypes alias
+					c.tsw.WriteLiterally("0")
+				} else if u.Info()&gtypes.IsString != 0 { // Use gotypes alias
+					c.tsw.WriteLiterally(`""`)
+				} else if u.Info()&gtypes.IsBoolean != 0 { // Use gotypes alias
+					c.tsw.WriteLiterally("false")
+				} else {
+					c.tsw.WriteLiterally("null // unknown basic type")
+				}
+			case *gtypes.Struct: // Use gotypes alias
+				// Zero value for struct is new instance
+				c.tsw.WriteLiterally("new ")
+				c.WriteTypeExpr(t) // Write the type name
+				c.tsw.WriteLiterally("()")
+			case *gtypes.Pointer, *gtypes.Interface, *gtypes.Slice, *gtypes.Map, *gtypes.Chan, *gtypes.Signature: // Use gotypes alias
+				// Pointers, interfaces, slices, maps, channels, functions zero value is null/undefined
+				c.tsw.WriteLiterally("null")
+			default:
+				c.tsw.WriteLiterally("null // unknown underlying type")
+			}
+		} else {
+			// Fallback for unresolved identifiers (basic types)
+			switch t.Name {
+			case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "uintptr", "float32", "float64", "complex64", "complex128":
+				c.tsw.WriteLiterally("0")
+			case "string":
+				c.tsw.WriteLiterally(`""`)
+			case "bool":
+				c.tsw.WriteLiterally("false")
+			default:
+				// Assume custom type, might be struct or interface -> null
+				c.tsw.WriteLiterally("null // unresolved identifier")
+			}
+		}
+	case *ast.StarExpr, *ast.InterfaceType, *ast.ArrayType, *ast.MapType, *ast.ChanType, *ast.FuncType:
+		// Pointers, interfaces, arrays, maps, channels, functions zero value is null/undefined
+		c.tsw.WriteLiterally("null")
+	case *ast.StructType:
+		// Anonymous struct zero value is complex, default to null for now
+		c.tsw.WriteLiterally("null")
+	default:
+		// everything else defaults to null in TS
+		c.tsw.WriteLiterally("null")
+	}
+}
+
 // WriteStmtRange writes a for…range loop by generating equivalent TypeScript code.
 func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	// Get the type of the iterable expression
@@ -1111,60 +1467,6 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	// Fallback case if the ranged type is not supported.
 	c.tsw.WriteCommentLine("unsupported range loop")
 	return fmt.Errorf("unsupported range loop type: %T", underlying)
-}
-
-func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Try to resolve identifier type
-		if tv, found := c.pkg.TypesInfo.Types[t]; found {
-			underlying := tv.Type.Underlying()
-			switch u := underlying.(type) {
-			case *gtypes.Basic: // Use gotypes alias
-				if u.Info()&gtypes.IsNumeric != 0 { // Use gotypes alias
-					c.tsw.WriteLiterally("0")
-				} else if u.Info()&gtypes.IsString != 0 { // Use gotypes alias
-					c.tsw.WriteLiterally(`""`)
-				} else if u.Info()&gtypes.IsBoolean != 0 { // Use gotypes alias
-					c.tsw.WriteLiterally("false")
-				} else {
-					c.tsw.WriteLiterally("null // unknown basic type")
-				}
-			case *gtypes.Struct: // Use gotypes alias
-				// Zero value for struct is new instance
-				c.tsw.WriteLiterally("new ")
-				c.WriteTypeExpr(t) // Write the type name
-				c.tsw.WriteLiterally("()")
-			case *gtypes.Pointer, *gtypes.Interface, *gtypes.Slice, *gtypes.Map, *gtypes.Chan, *gtypes.Signature: // Use gotypes alias
-				// Pointers, interfaces, slices, maps, channels, functions zero value is null/undefined
-				c.tsw.WriteLiterally("null")
-			default:
-				c.tsw.WriteLiterally("null // unknown underlying type")
-			}
-		} else {
-			// Fallback for unresolved identifiers (basic types)
-			switch t.Name {
-			case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "uintptr", "float32", "float64", "complex64", "complex128":
-				c.tsw.WriteLiterally("0")
-			case "string":
-				c.tsw.WriteLiterally(`""`)
-			case "bool":
-				c.tsw.WriteLiterally("false")
-			default:
-				// Assume custom type, might be struct or interface -> null
-				c.tsw.WriteLiterally("null // unresolved identifier")
-			}
-		}
-	case *ast.StarExpr, *ast.InterfaceType, *ast.ArrayType, *ast.MapType, *ast.ChanType, *ast.FuncType:
-		// Pointers, interfaces, arrays, maps, channels, functions zero value is null/undefined
-		c.tsw.WriteLiterally("null")
-	case *ast.StructType:
-		// Anonymous struct zero value is complex, default to null for now
-		c.tsw.WriteLiterally("null")
-	default:
-		// everything else defaults to null in TS
-		c.tsw.WriteLiterally("null")
-	}
 }
 
 // isSlice returns true if the underlying type is a slice.

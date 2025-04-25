@@ -1,0 +1,9 @@
+TEST1: Default case hit correctly
+TEST2: Received expected value: hello
+TEST3: Received buffered value with ok==true: 42
+TEST4: Received zero value with ok==false: 0
+TEST5: Sent value successfully
+TEST6: Default hit correctly (channel full)
+TEST7: Selected ch4 correctly: from ch4
+TEST8: Selected ch5 correctly: from ch5
+TEST9: Channel is closed, ok is false, val: false
