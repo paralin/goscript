@@ -90,7 +90,7 @@ This is the typical package structure of the output TypeScript import path:
 
         let i: MyInterface = new MyStruct({ Value: 10 }).clone()
         // goscript.typeAssert returns [value, ok] tuple
-        let [s, ok] = goscript.typeAssert&lt;MyStruct&gt;(i, MyStruct) // Runtime helper needed
+        let [s, ok] = goscript.typeAssert<MyStruct>(i, MyStruct) // Runtime helper needed
         if (ok) {
             // use s (type MyStruct | null, non-null if ok is true)
         }
@@ -218,6 +218,20 @@ This is the typical package structure of the output TypeScript import path:
         ```
     *Note: The reliance on runtime helpers (`@go/builtin`) is crucial for correctly emulating Go's map semantics, especially regarding zero values and potentially type information for `makeMap`.*
 - **Functions:** Converted to TypeScript `function`s. Exported functions are prefixed with `export`.
+- **Function Literals:** Go function literals (anonymous functions) are translated into TypeScript arrow functions (`=>`).
+    ```go
+    greet := func(name string) string {
+        return "Hello, " + name
+    }
+    message := greet("world")
+    ```
+    becomes:
+    ```typescript
+    let greet = (name: string): string => { // Arrow function
+        return "Hello, " + name
+    }
+    let message = greet("world")
+    ```
 - **Methods:** Go functions with receivers are generated as methods within the corresponding TypeScript `class`. They retain their original Go casing.
     -   **Receiver Type (Value vs. Pointer):** Both value receivers (`func (m MyStruct) Method()`) and pointer receivers (`func (m *MyStruct) Method()`) are translated into regular methods on the TypeScript class.
         ```go
@@ -473,7 +487,7 @@ To determine which functions need to be marked `async` in TypeScript, the compil
 
 ### TypeScript Generation
 
--   **Async Functions:** Go functions colored as **Asynchronous** are generated as TypeScript `async function`s. Their return type `T` is wrapped in a `Promise&lt;T&gt;`. If the function has no return value, the TypeScript return type is `Promise&lt;void&gt;`.
+-   **Async Functions:** Go functions colored as **Asynchronous** are generated as TypeScript `async function`s. Their return type `T` is wrapped in a `Promise<T>`. If the function has no return value, the TypeScript return type is `Promise<void>`.
 -   **Sync Functions:** Go functions colored as **Synchronous** are generated as regular TypeScript `function`s with their corresponding return types.
 -   **Function Calls:** When a Go function call targets an **Asynchronous** function, the generated TypeScript call expression is prefixed with the `await` keyword. Calls to **Synchronous** functions are generated directly without `await`.
 
