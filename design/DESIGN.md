@@ -13,25 +13,427 @@ This is the typical package structure of the output TypeScript import path:
 
 - **Exported Identifiers:** Go identifiers (functions, types, variables, struct fields, interface methods) that are exported (start with an uppercase letter) retain their original PascalCase naming in the generated TypeScript code. For example, `MyFunction` in Go becomes `export function MyFunction(...)` in TypeScript, and `MyStruct.MyField` becomes `MyStruct.MyField`.
 - **Unexported Identifiers:** Go identifiers that are unexported (start with a lowercase letter) retain their original camelCase naming but are typically not directly accessible in the generated TypeScript unless they are part of an exported struct's definition (where they might become private fields).
-- **Built-in Types:** Go built-in types are mapped to corresponding TypeScript types (e.g., `string` -> `string`, `int` -> `number`, `bool` -> `boolean`).
 - **Keywords:** Go keywords are generally not an issue, but care must be taken if a Go identifier clashes with a TypeScript keyword.
 
 ## Type Mapping
+- **Built-in Types:** Go built-in types are mapped to corresponding TypeScript types (e.g., `string` -> `string`, `int` -> `number`, `bool` -> `boolean`).
+- **String and Rune Conversions:** Go's `rune` type (an alias for `int32` representing a Unicode code point) and its interaction with `string` are handled as follows:
+    -   **`rune` Type:** Translated to TypeScript `number`.
+    -   **`string(rune)` Conversion:** The Go conversion from a `rune` to a `string` containing that single character is translated using `String.fromCharCode()`:
+        ```go
+        var r rune = 'A' // Unicode point 65
+        s := string(r)
+        ```
+        becomes:
+        ```typescript
+        let r: number = 65
+        let s = String.fromCharCode(r) // s becomes "A"
+        ```
+    -   **`[]rune(string)` Conversion:** Converting a `string` to a slice of `rune`s requires a runtime helper to correctly handle multi-byte Unicode characters:
+        ```go
+        runes := []rune("Go€")
+        ```
+        becomes (conceptual translation using a runtime helper):
+        ```typescript
+        import * as goscript from "@go/builtin"
+        let runes = goscript.stringToRunes("Go€") // runes becomes [71, 111, 8364]
+        ```
+        *(This helper was also seen in the `for range` over strings translation).*
+    -   **`string([]rune)` Conversion:** Converting a slice of `rune`s back to a `string` also requires a runtime helper:
+        ```go
+        s := string([]rune{71, 111, 8364})
+        ```
+        becomes (conceptual translation using a runtime helper):
+        ```typescript
+        import * as goscript from "@go/builtin"
+        let s = goscript.runesToString([71, 111, 8364]) // s becomes "Go€"
+        ```
+    *Note: Direct conversion between `string` and `[]byte` would involve different runtime helpers focusing on byte representations.*
 
 - **Structs:** Converted to TypeScript `class`es. Exported fields become `public` members, unexported fields become `private` members. A `clone()` method is added to support Go's value semantics on assignment.
+-   **Field Access:** Accessing exported struct fields uses standard TypeScript dot notation (`instance.FieldName`). Go's automatic dereferencing for pointer field access (`ptr.Field`) translates to using optional chaining (`ptr?.FieldName`) in TypeScript due to the `T | null` pointer mapping. Unexported fields become `private` class members and are generally not accessible from outside the class.
+-   **Struct Composite Literals:**
+        -   **Value Initialization (`T{...}`):** Initializing a struct value translates directly to creating a new instance of the corresponding TypeScript class using its constructor.
+            ```go
+            type Point struct{ X, Y int }
+            v := Point{X: 1, Y: 2} // v is Point
+            ```
+            becomes:
+            ```typescript
+            class Point { /* ... constructor, fields, clone ... */ }
+            let v = new Point({ X: 1, Y: 2 }).clone() // v is Point
+            ```
+            *Note: As per the "Value Semantics" section, assigning from a composite literal value (`T{...}`) immediately invokes `.clone()` to ensure the assigned variable holds an independent copy.*
+        -   **Pointer Initialization (`&T{...}`):** Initializing a pointer to a struct using a composite literal with the address-of operator (`&`) also translates directly to creating a new class instance. The resulting TypeScript object represents the non-null pointer value.
+            ```go
+            p := &Point{X: 1, Y: 2} // p is *Point
+            ```
+            becomes:
+            ```typescript
+            let p = new Point({ X: 1, Y: 2 }) // p is Point (representing the non-null pointer case)
+            ```
+        *Note: The distinction between pointer and value initialization in Go is primarily relevant for assignment semantics (cloning for values) and method receiver types, rather than the initial object creation in TypeScript.*
 - **Pointers (`*T`):** Mapped to TypeScript union types (`T | null`).
 - **Interfaces:** Mapped to TypeScript `interface` types. Methods retain their original Go casing.
-- **Slices/Arrays:** Mapped to TypeScript arrays (`T[]`).
-- **Maps:** Mapped to TypeScript `Map<K, V>` or plain objects `{ [key: K]: V }` depending on context (requires type info).
+- **Type Assertions:** Go's type assertion allows checking the underlying concrete type of an interface variable and extracting it. This requires runtime type information.
+    -   **Comma-Ok Assertion (`v, ok := i.(T)`):** This form checks if interface `i` holds a value of concrete type `T`. If it does, `ok` is `true` and `v` gets the value of type `T`. Otherwise, `ok` is `false` and `v` gets the zero value for type `T`. This requires a runtime check, likely via a helper function.
+        ```go
+        var i MyInterface = MyStruct{Value: 10}
+        s, ok := i.(MyStruct)
+        if ok {
+            // use s (type MyStruct)
+        }
+        ```
+        becomes (conceptual translation using a runtime helper):
+        ```typescript
+        import * as goscript from "@go/builtin"
+
+        let i: MyInterface = new MyStruct({ Value: 10 }).clone()
+        // goscript.typeAssert returns [value, ok] tuple
+        let [s, ok] = goscript.typeAssert&lt;MyStruct&gt;(i, MyStruct) // Runtime helper needed
+        if (ok) {
+            // use s (type MyStruct | null, non-null if ok is true)
+        }
+        ```
+        *Note: A runtime helper (e.g., `goscript.typeAssert`) is necessary because TypeScript interfaces are structural and erased at runtime. Simple casting (`as T`) or operators like `instanceof` (only for classes) or `satisfies` (compile-time only) are insufficient to fully replicate Go's runtime behavior.*
+
+    -   **Panic Assertion (`v := i.(T)`):** This form asserts that `i` holds type `T`. If the assertion fails, it panics. This would also translate using a runtime helper that throws an error or mimics Go's panic on failure.
+- **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`). However, Go's slice semantics, particularly regarding length, capacity, and creation with `make`, require runtime support.
+    -   **Creation (`make`):** `make([]T, len)` and `make([]T, len, cap)` are translated using a runtime helper `makeSlice`:
+        ```go
+        s1 := make([]int, 5)
+        s2 := make([]int, 5, 10)
+        ```
+        becomes:
+        ```typescript
+        import * as goscript from "@go/builtin"
+        let s1 = goscript.makeSlice("int", 5)       // Creates array of length 5, capacity 5
+        let s2 = goscript.makeSlice("int", 5, 10)  // Creates array of length 5, capacity 10 (runtime handles capacity)
+        ```
+        *Note: The runtime (`@go/builtin`) likely manages the capacity concept internally, as standard TypeScript arrays don't have explicit capacity.*
+    -   **Literals:** Slice literals are translated directly to TypeScript array literals:
+        ```go
+        s := []int{1, 2, 3}
+        ```
+        becomes:
+        ```typescript
+        let s = [1, 2, 3]
+        ```
+    -   **Length (`len(s)`):** Uses a runtime helper `len`:
+        ```go
+        l := len(s)
+        ```
+        becomes:
+        ```typescript
+        let l = goscript.len(s) // Not s.length directly, to potentially handle nil slices correctly
+        ```
+    -   **Capacity (`cap(s)`):** Uses a runtime helper `cap`:
+        ```go
+        c := cap(s)
+        ```
+        becomes:
+        ```typescript
+        let c = goscript.cap(s) // Runtime provides capacity info
+        ```
+    -   **Access/Assignment (`s[i]`):** Translated directly using standard TypeScript array indexing.
+    -   **Append (`append(s, ...)`):** Requires a runtime helper `append` to handle potential resizing and capacity changes according to Go rules. (This is assumed based on Go semantics, though not explicitly in this specific test).
+    -   **Slicing (`s[low:high]`):** Requires runtime support to correctly handle Go's slicing behavior, which creates a new slice header sharing the underlying array. (Assumed, not in this test).
+- **Arrays:** Go arrays (e.g., `[5]int`) have a fixed size known at compile time. They are also mapped to TypeScript arrays (`T[]`), but their fixed-size nature is enforced during compilation (e.g., preventing `append`).
+
+*Note: The distinction between slices and arrays in Go is important. While both map to TypeScript arrays, runtime helpers are essential for emulating slice-specific behaviors like `make`, `len`, `cap`, `append`, and sub-slicing.*
+- **Maps:** Go maps (`map[K]V`) are translated to TypeScript's standard `Map<K, V>` objects. Various Go map operations are mapped as follows:
+    -   **Creation (`make`):** `make(map[K]V)` is translated using a runtime helper:
+        ```go
+        m := make(map[string]int)
+        ```
+        becomes:
+        ```typescript
+        import * as goscript from "@go/builtin"
+        let m = goscript.makeMap("string", "int") // Type info passed as strings
+        ```
+    -   **Literals:** Map literals are translated to `new Map(...)`:
+        ```go
+        m := map[string]int{"one": 1, "two": 2}
+        ```
+        becomes:
+        ```typescript
+        let m = new Map([["one", 1], ["two", 2]])
+        ```
+    -   **Assignment (`m[k] = v`):** Uses a runtime helper `mapSet`:
+        ```go
+        m["three"] = 3
+        ```
+        becomes:
+        ```typescript
+        goscript.mapSet(m, "three", 3)
+        ```
+    -   **Access (`m[k]`):** Uses the standard `Map.get()` method. Accessing a non-existent key in Go yields the zero value for the value type. In TypeScript, `Map.get()` returns `undefined` for non-existent keys, so the translation must ensure the correct zero value is returned (this might involve runtime checks or type information).
+        ```go
+        val := m["one"] // Assuming m["one"] exists
+        zero := m["nonexistent"] // Assuming m["nonexistent"] doesn't exist
+        ```
+        becomes (simplified conceptual translation):
+        ```typescript
+        let val = m.get("one")
+        let zero = m.get("nonexistent") ?? 0 // Provide zero value (0 for int) if undefined
+        ```
+    -   **Comma-Ok Idiom (`v, ok := m[k]`):** Translated using `Map.has()` and `Map.get()` with zero-value handling:
+        ```go
+        v, ok := m["three"]
+        ```
+        becomes:
+        ```typescript
+        let v: number
+        let ok: boolean
+        ok = m.has("three")
+        v = m.get("three") ?? 0 // Provide zero value if key doesn't exist
+        ```
+    -   **Length (`len(m)`):** Uses a runtime helper `len`:
+        ```go
+        size := len(m)
+        ```
+        becomes:
+        ```typescript
+        let size = goscript.len(m) // Uses runtime helper, not Map.size directly
+        ```
+    -   **Deletion (`delete(m, k)`):** Uses a runtime helper `deleteMapEntry`:
+        ```go
+        delete(m, "two")
+        ```
+        becomes:
+        ```typescript
+        goscript.deleteMapEntry(m, "two")
+        ```
+    -   **Iteration (`for k, v := range m`):** Uses standard `Map.entries()` and `for...of`:
+        ```go
+        for key, value := range m {
+            // ...
+        }
+        ```
+        becomes:
+        ```typescript
+        for (const [key, value] of m.entries()) {
+            // ...
+        }
+        ```
+    *Note: The reliance on runtime helpers (`@go/builtin`) is crucial for correctly emulating Go's map semantics, especially regarding zero values and potentially type information for `makeMap`.*
 - **Functions:** Converted to TypeScript `function`s. Exported functions are prefixed with `export`.
-- **Methods:** Functions with receivers are generated as methods within the corresponding TypeScript `class`. They retain their original Go casing.
+- **Methods:** Go functions with receivers are generated as methods within the corresponding TypeScript `class`. They retain their original Go casing.
+    -   **Receiver Type (Value vs. Pointer):** Both value receivers (`func (m MyStruct) Method()`) and pointer receivers (`func (m *MyStruct) Method()`) are translated into regular methods on the TypeScript class.
+        ```go
+        type Counter struct{ count int }
+        func (c Counter) Value() int { return c.count } // Value receiver
+        func (c *Counter) Inc()    { c.count++ }       // Pointer receiver
+        ```
+        becomes:
+        ```typescript
+        class Counter {
+            private count: number = 0;
+            public Value(): number { const c = this; return c.count; }
+            public Inc(): void    { const c = this; c.count++; }
+            // ... constructor, clone ...
+        }
+        ```
+    -   **Method Calls:** Go allows calling pointer-receiver methods on values (`value.PtrMethod()`) and value-receiver methods on pointers (`ptr.ValueMethod()`) via automatic referencing/dereferencing. In TypeScript, method calls are made directly on the class instance (which represents either the Go value or the non-null Go pointer).
+        ```go
+        var c Counter
+        var p *Counter = &c
+        _ = c.Value() // OK
+        _ = p.Value() // OK (Go implicitly dereferences p)
+        c.Inc()       // OK (Go implicitly takes address of c)
+        p.Inc()       // OK
+        ```
+        becomes:
+        ```typescript
+        let c = new Counter().clone()
+        let p: Counter | null = c // p references the same object as c initially
+        c.Value() // OK
+        p?.Value() // OK (requires null check for pointer types)
+        c.Inc()    // OK
+        p?.Inc()   // OK (requires null check for pointer types)
+        ```
+        *Note: The optional chaining (`?.`) is generally required when calling methods on variables representing Go pointers (mapped to `T | null`). However, if the compiler can determine that a pointer variable is definitely not `null` at the point of call (e.g., immediately after initialization via `p := &T{...}`), the `?.` may be omitted for optimization.*
+    -   **Receiver Binding:** As per Code Generation Conventions, the Go receiver identifier (e.g., `c`) is bound to `this` within the method body (`const c = this`).
+    -   **Semantic Note on Value Receivers:** In Go, a method with a value receiver operates on a *copy* of the struct. The current TypeScript translation defines the method directly on the class. If a value-receiver method modifies the receiver's fields, the TypeScript version will modify the *original* object referenced by `this`, differing from Go's copy semantics. This is an area for potential future refinement if strict copy-on-call semantics for value receivers are required. (The `clone()` method handles copy-on-assignment, not copy-on-method-call).
 
 ## Value Semantics
 
 Go's value semantics (where assigning a struct copies it) are emulated in TypeScript by:
 1. Adding a `clone()` method to generated classes.
-2. Automatically calling `.clone()` during assignment statements (`=`, `:=`) when the right-hand side is a variable holding a struct type (requires type information during compilation).
+2. Automatically calling `.clone()` during assignment statements (`=`, `:=`) whenever the right-hand side evaluates to a struct *value* (e.g., assigning from a variable, a composite literal `T{...}`, or a dereferenced pointer `*p`). This requires type information during compilation.
 
+## Control Flow: `for range` Loops
+
+Go's `for range` construct is translated differently depending on the type being iterated over:
+
+-   **Slices and Arrays:** `for range` over slices (`[]T`) or arrays (`[N]T`) is translated into a standard TypeScript C-style `for` loop:
+    ```go
+    items := []string{"a", "b", "c"}
+    for i, item := range items {
+        // ... use i and item
+    }
+    for _, item := range items {
+        // ... use item only
+    }
+    ```
+    becomes:
+    ```typescript
+    let items = ["a", "b", "c"]
+    for (let i = 0; i < items.length; i++) {
+        const item = items[i]
+        { // New scope for loop body variables
+            // ... use i and item
+        }
+    }
+    for (let i = 0; i < items.length; i++) { // Index 'i' still generated
+        const item = items[i]
+        { // New scope for loop body variables
+            // ... use item only
+        }
+    }
+    ```
+    *Note: A new block scope `{}` is introduced for the loop body to correctly emulate Go's per-iteration variable scoping for `item` (and `i` if captured).*
+
+-   **Maps:** `for range` over maps (`map[K]V`) uses the `Map.entries()` iterator (as shown previously in the Maps section):
+    ```go
+    m := map[string]int{"one": 1}
+    for k, v := range m {
+        // ...
+    }
+    ```
+    becomes:
+    ```typescript
+    let m = new Map([["one", 1]])
+    for (const [k, v] of m.entries()) {
+        // ...
+    }
+    ```
+
+-   **Strings:** `for range` over strings iterates over Unicode code points (runes). This is translated using a runtime helper `stringToRunes` and a C-style `for` loop:
+    ```go
+    str := "go"
+    for i, r := range str {
+        // i is byte index, r is rune (int32)
+    }
+    ```
+    becomes:
+    ```typescript
+    import * as goscript from "@go/builtin"
+    let str = "go"
+    const _runes = goscript.stringToRunes(str) // Convert to array of runes (numbers)
+    for (let i = 0; i < _runes.length; i++) { // i is rune index here
+        const r = _runes[i] // r is rune (number)
+        {
+            // ... use i and r
+        }
+    }
+    ```
+    *Note: The index `i` in the generated TypeScript loop corresponds to the *rune index*, not the byte index as in Go's `for range` over strings.*
+## Control Flow: `switch` Statements
+
+Go's `switch` statement is translated into a standard TypeScript `switch` statement.
+
+-   **Basic Switch:**
+    ```go
+    switch value {
+    case 1:
+        // do something
+    case 2, 3: // Multiple values per case
+        // do something else
+    default:
+        // default action
+    }
+    ```
+    becomes:
+    ```typescript
+    switch (value) {
+        case 1:
+            // do something
+            break // Automatically added
+        case 2: // Multiple Go cases become separate TS cases
+        case 3:
+            // do something else
+            break // Automatically added
+        default:
+            // default action
+            break // Automatically added
+    }
+    ```
+    *Note: `break` statements are automatically inserted at the end of each translated `case` block to replicate Go's default behavior of not falling through.*
+
+-   **Switch without Expression:** A Go `switch` without an expression (`switch { ... }`) is equivalent to `switch true { ... }` and is useful for cleaner if/else-if chains. This translates similarly, comparing `true` against the case conditions.
+    ```go
+    switch {
+    case x < 0:
+        // negative
+    case x == 0:
+        // zero
+    default: // x > 0
+        // positive
+    }
+    ```
+    becomes:
+    ```typescript
+    switch (true) {
+        case x < 0:
+            // negative
+            break
+        case x == 0:
+            // zero
+            break
+        default:
+            // positive
+            break
+    }
+    ```
+-   **Fallthrough:** Go's explicit `fallthrough` keyword is *not* currently supported and would require specific handling if implemented.
+## Control Flow: `if` Statements
+
+Go's `if` statements are translated into standard TypeScript `if` statements.
+
+-   **Basic `if`/`else if`/`else`:**
+    ```go
+    if condition1 {
+        // block 1
+    } else if condition2 {
+        // block 2
+    } else {
+        // block 3
+    }
+    ```
+    becomes:
+    ```typescript
+    if (condition1) {
+        // block 1
+    } else if (condition2) {
+        // block 2
+    } else {
+        // block 3
+    }
+    ```
+
+-   **`if` with Short Statement:** Go allows an optional short statement (typically variable initialization) before the condition. The scope of variables declared in the short statement is limited to the `if` (and any `else if`/`else`) blocks. This is translated by declaring the variable before the `if` statement in TypeScript, often within an immediately-invoked function expression (IIFE) or a simple block to mimic the limited scope if necessary, although simpler translations might place the variable in the outer scope if no name conflicts arise.
+    ```go
+    if v := computeValue(); v > 10 {
+        // use v
+    } else {
+        // use v
+    }
+    // v is not accessible here
+    ```
+    becomes (conceptual translation, potentially simplified):
+    ```typescript
+    { // Optional block to limit scope
+        const v = computeValue()
+        if (v > 10) {
+            // use v
+        } else {
+            // use v
+        }
+    }
+    // v is not accessible here (if block scope is used)
+    ```
+    *Note: Precise scoping might require careful handling, especially if the initialized variable shadows an outer variable.*
 ## Zero Values
 
 Go's zero values are mapped as follows:
@@ -50,5 +452,73 @@ Go's zero values are mapped as follows:
 ## Code Generation Conventions
 
 - **No Trailing Semicolons:** Generated TypeScript code omits semicolons at end of statements. Statements are line-separated without `;`.
-- **Receiver Binding in Methods:** For each Go method with a receiver `r`, the generated TypeScript method body starts with `const r = this` to bind the receiver name to `this`.
 
+## Asynchronous Operations (Async/Await)
+
+GoScript handles Go's concurrency primitives (like channels and potentially goroutines in the future) by mapping them to TypeScript's `async`/`await` mechanism where appropriate.
+
+### Function Coloring
+
+To determine which functions need to be marked `async` in TypeScript, the compiler performs a "function coloring" analysis during compilation:
+
+1.  **Base Cases (Async Roots):**
+    *   A function is inherently **Asynchronous** if its body contains:
+        *   A channel receive operation (`&lt;-ch`).
+        *   A `select` statement.
+        *   (Potentially in the future: `go` statement).
+2.  **Propagation:**
+    *   A function is marked **Asynchronous** if it directly calls another function that is already marked **Asynchronous**.
+3.  **Default:**
+    *   If a function does not meet any of the asynchronous criteria above, it is considered **Synchronous**.
+
+### TypeScript Generation
+
+-   **Async Functions:** Go functions colored as **Asynchronous** are generated as TypeScript `async function`s. Their return type `T` is wrapped in a `Promise&lt;T&gt;`. If the function has no return value, the TypeScript return type is `Promise&lt;void&gt;`.
+-   **Sync Functions:** Go functions colored as **Synchronous** are generated as regular TypeScript `function`s with their corresponding return types.
+-   **Function Calls:** When a Go function call targets an **Asynchronous** function, the generated TypeScript call expression is prefixed with the `await` keyword. Calls to **Synchronous** functions are generated directly without `await`.
+
+This coloring approach ensures that asynchronous operations propagate correctly through the call stack in the generated TypeScript code.
+
+## Constants
+
+Go `const` declarations are translated into TypeScript `let` declarations at the module scope.
+
+```go
+const Pi = 3.14
+const Greeting = "Hello"
+```
+
+becomes:
+
+```typescript
+let Pi = 3.14
+let Greeting = "Hello"
+```
+
+*Note: Handling of untyped constants and potential precision issues with large numbers or complex constant expressions is an area for future refinement.*
+
+## Multiple Return Values
+
+Go functions that return multiple values are translated into TypeScript functions that return a tuple (an array with fixed element types).
+
+```go
+func swap(x, y string) (string, string) {
+    return y, x
+}
+
+a, b := swap("hello", "world")
+first, _ := swap("one", "two") // Ignore second value
+```
+
+becomes:
+
+```typescript
+function swap(x: string, y: string): [string, string] {
+    return [y, x]
+}
+
+let [a, b] = swap("hello", "world")
+let [first, ] = swap("one", "two") // Ignore second value via destructuring hole
+```
+
+Assignment from function calls returning multiple values uses TypeScript's array destructuring syntax. The blank identifier `_` in Go corresponds to omitting the variable name in the TypeScript destructuring pattern.
