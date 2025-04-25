@@ -36,7 +36,9 @@ It's currently an experimental project, and not ready for production.
 Compile a package using the CLI tool:
 
 ```bash
-goscript compile --package <go_package_path> --gopath <path_to_gopath> --output <output_directory>
+goscript compile \
+  --package "my/package" \
+  --output ./output
 ```
 
 For example, to compile the simple example:
@@ -92,7 +94,7 @@ func main() {
 
 ```
 
-This example initializes the compiler with basic configuration, creates a compiler instance, and then calls `CompilePackages` to translate the specified Go package into TypeScript files within the designated output directory.
+This example initializes the compiler, creates a compiler instance, and then calls `CompilePackages` to translate the specified Go package into TypeScript files in the output directory.
 
 ## Roadmap
 
