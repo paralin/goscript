@@ -353,7 +353,7 @@ export async function main(): Promise<void> {
   console.log("instance.MyInt:", instance.MyInt, "copyInst.MyInt:", copyInst.MyInt)
 
   // Pointer initialization and dereference assignment
-  let ptr = new(MyStruct)
+  let ptr = new MyStruct()
   ptr.MyInt = 9
   console.log("ptr.MyInt:", ptr.MyInt)
   let deref = ptr.clone()
