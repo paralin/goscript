@@ -153,7 +153,6 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 	}); err != nil {
 		t.Fatalf("error while walking: %v", err.Error())
 	}
-	//
 
 	if cmpErr != nil {
 		t.Fatalf("compilation failed: %v", cmpErr)
