@@ -408,7 +408,7 @@ export interface SelectCase<T> {
     channel: Channel<any>;
     value?: any; // Value to send for send cases
     // Optional handlers for when this case is selected
-    onSelected?: (result: SelectResult<T>) => void | Promise<void>;
+    onSelected?: (result: SelectResult<T>) => Promise<void>;
 }
 
 
@@ -423,7 +423,7 @@ export interface SelectCase<T> {
 export async function selectStatement<T>(
     cases: SelectCase<T>[],
     hasDefault: boolean = false
-): Promise<void> { // Changed return type to void as onSelected handles the case body
+): Promise<void> {
     if (cases.length === 0 && !hasDefault) {
          // Go spec: If there are no cases, the select statement blocks forever.
          // Emulate blocking forever with a promise that never resolves.
