@@ -93,6 +93,47 @@ func main() {
 
 This example initializes the compiler, creates a compiler instance, and then calls `CompilePackages` to translate the specified Go package into TypeScript files in the output directory.
 
+### TypeScript API
+
+You can also use GoScript programmatically within your Node.js projects.
+
+**Installation:**
+
+```bash
+npm install goscript
+# or
+yarn add goscript
+```
+
+**Usage:**
+
+```typescript
+import { compile } from 'goscript';
+import * as path from 'path';
+
+async function runCompilation() {
+  const exampleDir = path.resolve(__dirname, 'path/to/your/go/project'); // Adjust path accordingly
+  const outputDir = path.join(exampleDir, 'ts_output');
+
+  try {
+    await compile({
+      pkg: '.', // Compile the package in the exampleDir
+      dir: exampleDir,
+      output: outputDir,
+      // Optional: specify path to goscript CLI if not in PATH or using go run
+      // goscriptPath: '/path/to/goscript/executable'
+    });
+    console.log(`Compilation successful! Output in ${outputDir}`);
+  } catch (error) {
+    console.error('Compilation failed:', error);
+  }
+}
+
+runCompilation();
+```
+
+This example imports the `compile` function, configures it to compile a Go package located in `exampleDir`, and outputs the TypeScript files to `outputDir`.
+
 ## Roadmap
 
 Check [the compliance tests](./compliance/COMPLIANCE.md) for implementation progress.

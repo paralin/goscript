@@ -1,10 +1,17 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "target": "ES2022",
-    "lib": ["ES2020", "dom"],
-    "paths": {
-      "@go/builtin": ["./builtin/builtin.ts"]
-    }
-  }
+    "target": "ES2022", // Target modern ECMAScript features
+    "module": "ESNext", // Use modern ES modules
+    "moduleResolution": "bundler", // Use the 'bundler' resolution strategy
+    "outDir": "./dist",
+    "rootDir": "./",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "declaration": true, // Generate .d.ts files
+    "sourceMap": true // Generate source maps for debugging
+  },
+  "include": ["compiler", "builtin"],
+  "exclude": ["node_modules", "dist", "**/*.test.ts"] // Exclude tests from build output
 }

@@ -4,7 +4,7 @@
 import * as goscript from "@go/builtin";
 
 export async function main(): Promise<void> {
-	let messages = goscript.makeChannel<string>(0)
+	let messages = goscript.makeChannel<string>(0, "")
 	
 	queueMicrotask(async () => {
 		{

@@ -2,13 +2,50 @@
   "name": "goscript",
   "version": "0.0.2",
   "description": "Go to TypeScript compiler",
-  "scripts": {
-    "example": "cd ./example/simple && bash run.bash",
-    "test": "go test -v ./..."
+  "type": "module",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/compiler/index.d.ts",
+        "default": "./dist/compiler/index.js"
+      }
+    },
+    "./compiler": {
+      "import": {
+        "types": "./dist/compiler/index.d.ts",
+        "default": "./dist/compiler/index.js"
+      }
+    },
+    "./builtin": {
+      "import": {
+        "types": "./dist/builtin/builtin.d.ts",
+        "default": "./dist/builtin/builtin.js"
+      }
+    }
   },
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build",
+    "example": "cd ./example/simple && bash run.bash",
+    "test": "vitest run",
+    "format": "prettier --write './{src,builtin,example}/**/(*.ts|*.tsx|*.html|*.css|*.scss)'"
+  },
+  "files": [
+    "dist",
+    "src",
+    "cmd",
+    "compiler",
+    "builtin",
+    "go.mod",
+    "go.sum",
+    "LICENSE",
+    "README.md"
+  ],
   "devDependencies": {
+    "@types/node": "^22.15.2",
     "prettier": "^3.5.3",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "vitest": "^3.1.2"
   }
 }
