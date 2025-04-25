@@ -1,0 +1,13 @@
+{
+  "name": "goscript",
+  "version": "1.0.0",
+  "description": "Go to TypeScript compiler",
+  "scripts": {
+    "example": "cd ./example/simple && bash run.bash",
+    "test": "go test -v ./..."
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "tsx": "^4.0.0"
+  }
+}
