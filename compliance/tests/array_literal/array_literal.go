@@ -2,7 +2,7 @@ package main
 
 func main() {
 	// Test basic array literal
-	var a [3]int = [3]int{1, 2, 3}
+	var a [3]int = [3]int{1, 2, 3} //nolint:staticcheck
 	println(a[0], a[1], a[2])
 
 	// Test array literal with inferred length

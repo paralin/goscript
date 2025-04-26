@@ -4,6 +4,7 @@
 import * as goscript from "@go/builtin";
 
 export async function main(): Promise<void> {
+	//nolint:staticcheck
 	let a: number = 1.23;
 	let b = 4.56
 	let c: number;

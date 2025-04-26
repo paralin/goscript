@@ -5,7 +5,7 @@ import * as goscript from "@go/builtin";
 
 export async function main(): Promise<void> {
 	// === string(rune) Conversion ===
-	let r: number = 65;
+	let r = 65
 	let s = String.fromCharCode(r)
 	console.log(s)
 	

@@ -3,7 +3,7 @@ package main
 type MyStruct struct {
 	MyInt    int
 	MyString string
-	myBool   bool
+	myBool   bool //nolint:unused
 }
 
 func main() {

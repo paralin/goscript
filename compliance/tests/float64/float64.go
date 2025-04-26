@@ -1,7 +1,7 @@
 package main
 
 func main() {
-	var a float64 = 1.23
+	var a float64 = 1.23 //nolint:staticcheck
 	b := 4.56
 	var c float64
 

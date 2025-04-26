@@ -7,6 +7,8 @@ export async function main(): Promise<void> {
 	let ch = goscript.makeChannel<number>(0, 0) // Unbuffered
 	ch.close()
 	
+	//nolint:staticcheck
+	
 	// Should not be reached
 	
 	// Should be reached

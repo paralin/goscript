@@ -78,7 +78,7 @@ func (w *TSCodeWriter) WriteLiterally(literal string) {
 	if w.lineWritten {
 		w.WriteLinePreamble()
 	}
-	w.w.Write([]byte(literal))
+	w.w.Write([]byte(literal)) //nolint:errcheck
 }
 
 // WriteSectionTail writes the end of a section.

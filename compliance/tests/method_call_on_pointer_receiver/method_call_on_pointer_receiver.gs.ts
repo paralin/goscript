@@ -6,7 +6,6 @@ import * as goscript from "@go/builtin";
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
-	private myBool: boolean = false;
 	
 	// GetMyString returns the MyString field.
 	public GetMyString(): string {

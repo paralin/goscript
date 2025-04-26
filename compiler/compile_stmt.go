@@ -1458,29 +1458,6 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	return fmt.Errorf("unsupported range loop type: %T", underlying)
 }
 
-// isSlice returns true if the underlying type is a slice.
-func isSlice(typ gtypes.Type) bool {
-	_, ok := typ.(*gtypes.Slice)
-	return ok
-}
-
-// isLHSMapIndex returns true if the expression is an index expression on a map type.
-func isLHSMapIndex(expr ast.Expr, pkg *packages.Package) bool {
-	if pkg == nil || pkg.TypesInfo == nil {
-		return false
-	}
-	indexExpr, ok := expr.(*ast.IndexExpr)
-	if !ok {
-		return false
-	}
-	tv, ok := pkg.TypesInfo.Types[indexExpr.X]
-	if !ok || tv.Type == nil {
-		return false
-	}
-	_, isMap := tv.Type.Underlying().(*gtypes.Map)
-	return isMap
-}
-
 // WriteStmtSend writes a channel send statement (ch <- value).
 func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 	// Translate ch <- value to await ch.send(value)
@@ -1495,4 +1472,10 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 	c.tsw.WriteLiterally(")")
 	c.tsw.WriteLine("") // Add newline after the statement
 	return nil
+}
+
+// isSlice returns true if the underlying type is a slice.
+func isSlice(typ gtypes.Type) bool {
+	_, ok := typ.(*gtypes.Slice)
+	return ok
 }

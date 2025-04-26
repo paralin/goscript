@@ -6,7 +6,6 @@ import * as goscript from "@go/builtin";
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
-	private myBool: boolean = false;
 	
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }

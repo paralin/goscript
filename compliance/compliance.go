@@ -257,7 +257,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	le := logrus.NewEntry(log)
 
 	tempDir := PrepareTempTestDir(t, testDir)
-	defer os.RemoveAll(tempDir)
+	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	// Create tsconfig.json in the temporary directory for path aliases
 	builtinTsPath := filepath.Join(workspaceDir, "builtin", "builtin.ts") // Use passed workspaceDir

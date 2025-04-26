@@ -3,7 +3,6 @@ package main
 type MyStruct struct {
 	MyInt    int
 	MyString string
-	myBool   bool
 }
 
 // GetMyString returns the MyString field.

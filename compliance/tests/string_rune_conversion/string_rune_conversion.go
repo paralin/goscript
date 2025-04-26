@@ -2,7 +2,7 @@ package main
 
 func main() {
 	// === string(rune) Conversion ===
-	var r rune = 'A'
+	r := 'A'
 	s := string(r)
 	println(s)
 
