@@ -1,3 +1,4 @@
+--- Original Tests ---
 5
 10
 3
@@ -5,3 +6,83 @@
 10
 20
 hello
+--- New Tests ---
+5
+5
+1
+5
+4
+4
+a
+d
+2
+3
+b
+c
+--- Zero len/cap append ---
+0
+0
+1
+1
+100
+2
+2
+200
+--- Modify slice, check array ---
+20
+25
+--- Modify array, check slice ---
+15
+10
+--- Append sub-slice w/in capacity ---
+2
+5
+3
+5
+99
+3
+--- Append sub-slice exceed capacity ---
+2
+2
+3
+3
+4
+5
+101
+1
+2
+3
+4
+5
+--- Slicing a slice ---
+3
+5
+10
+2
+4
+20
+30
+20
+20
+--- Three-index slicing ---
+2
+3
+1
+2
+3
+3
+99
+3
+4
+4
+101
+4
+--- Additional Tests ---
+Slice literal len: 3
+Slice literal cap: 3
+Slice literal[1]: 20
+Nil slice len: 0
+Nil slice cap: 0
+Append to nil slice len: 1
+Append to nil slice cap: 1
+Append to nil slice[0]: 5

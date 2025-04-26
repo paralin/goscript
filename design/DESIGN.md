@@ -167,50 +167,68 @@ This is the typical package structure of the output TypeScript import path:
             3.  Object destructuring is used to extract the `value` and `ok` properties into the corresponding variables from the Go code (e.g., `let { value: v, ok } = ...`). If a variable is the blank identifier (`_`), it's assigned using `value: _` in the destructuring pattern.
 
     -   **Panic Assertion (`v := i.(T)`):** This form asserts that `i` holds type `T` and panics if it doesn't. The translation uses the same `goscript.typeAssert` helper. After the call, the generated code uses destructuring to get `value` and `ok`. It then checks the `ok` flag. If `ok` is false, the code triggers a runtime panic (e.g., by throwing an error) to mimic Go's behavior. The asserted `value` is assigned to `v` only if `ok` is true.
-- **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`). However, Go's slice semantics, particularly regarding length, capacity, and creation with `make`, require runtime support.
-    -   **Creation (`make`):** `make([]T, len)` and `make([]T, len, cap)` are translated using a runtime helper `makeSlice`:
+- **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`) augmented with a hidden `__capacity` property to emulate Go's slice semantics. Runtime helpers from `@go/builtin` are crucial for correct behavior.
+    -   **Representation:** A Go slice is represented in TypeScript as `Array<T> & { __capacity?: number }`. The `__capacity` property stores the slice's capacity.
+    -   **Creation (`make`):** `make([]T, len)` and `make([]T, len, cap)` are translated using the generic runtime helper `goscript.makeSlice<T>(len, cap?)`.
         ```go
-        s1 := make([]int, 5)
-        s2 := make([]int, 5, 10)
+        s1 := make([]int, 5)       // len 5, cap 5
+        s2 := make([]int, 5, 10)  // len 5, cap 10
+        var s3 []string           // nil slice
         ```
         becomes:
         ```typescript
         import * as goscript from "@go/builtin"
-        let s1 = goscript.makeSlice("int", 5)       // Creates array of length 5, capacity 5
-        let s2 = goscript.makeSlice("int", 5, 10)  // Creates array of length 5, capacity 10 (runtime handles capacity)
+        let s1 = goscript.makeSlice<number>(5)      // Creates array len 5, sets __capacity = 5
+        let s2 = goscript.makeSlice<number>(5, 10) // Creates array len 5, sets __capacity = 10
+        let s3: string[] = []                     // Represents nil slice as empty array
         ```
-        *Note: The runtime (`@go/builtin`) likely manages the capacity concept internally, as standard TypeScript arrays don't have explicit capacity.*
-    -   **Literals:** Slice literals are translated directly to TypeScript array literals:
+    -   **Literals:** Slice literals are translated directly to TypeScript array literals. The capacity of a slice created from a literal is equal to its length.
         ```go
-        s := []int{1, 2, 3}
+        s := []int{1, 2, 3} // len 3, cap 3
         ```
         becomes:
         ```typescript
-        let s = [1, 2, 3]
+        let s = [1, 2, 3] // Runtime helpers treat this as having __capacity = 3
         ```
-    -   **Length (`len(s)`):** Uses a runtime helper `len`:
+    -   **Length (`len(s)`):** Uses the runtime helper `goscript.len(s)`. Returns `0` for nil (empty array) slices.
+    -   **Capacity (`cap(s)`):** Uses the runtime helper `goscript.cap(s)`. This helper reads the `__capacity` property or defaults to the array's `length` if `__capacity` is not set (e.g., for plain array literals). Returns `0` for nil (empty array) slices.
+    -   **Access/Assignment (`s[i]`):** Translated directly using standard TypeScript array indexing (`s[i]`). Out-of-bounds access will likely throw a runtime error in TypeScript, similar to Go's panic.
+    -   **Slicing (`a[low:high]`, `a[low:high:max]`):** Slicing operations create a *new* slice header (a new TypeScript array object with its own `__capacity`) that shares the *same underlying data* as the original array or slice. This is done using the `goscript.slice` runtime helper.
+        -   `a[low:high]` translates to `goscript.slice(a, low, high)`. The new slice has length `high - low` and capacity `original_capacity - low`.
+        -   `a[:high]` translates to `goscript.slice(a, undefined, high)`.
+        -   `a[low:]` translates to `goscript.slice(a, low, undefined)`.
+        -   `a[:]` translates to `goscript.slice(a, undefined, undefined)`.
+        -   `a[low:high:max]` translates to `goscript.slice(a, low, high, max)`. The new slice has length `high - low` and capacity `max - low`.
         ```go
-        l := len(s)
+        arr := [5]int{0, 1, 2, 3, 4} // Array (len 5, cap 5)
+        s1 := arr[1:4]      // [1, 2, 3], len 3, cap 4 (5-1)
+        s2 := s1[1:2]       // [2], len 1, cap 3 (cap of s1 - 1)
+        s3 := arr[0:2:3]    // [0, 1], len 2, cap 3 (3-0)
         ```
         becomes:
         ```typescript
-        let l = goscript.len(s) // Not s.length directly, to potentially handle nil slices correctly
+        let arr = [0, 1, 2, 3, 4]
+        let s1 = goscript.slice(arr, 1, 4)      // len 3, __capacity 4
+        let s2 = goscript.slice(s1, 1, 2)       // len 1, __capacity 3
+        let s3 = goscript.slice(arr, 0, 2, 3)   // len 2, __capacity 3
         ```
-    -   **Capacity (`cap(s)`):** Uses a runtime helper `cap`:
+        *Important:* Modifications made through a slice affect the underlying data, and thus are visible through other slices sharing that data.
+    -   **Append (`append(s, ...)`):** Translated using the `goscript.append` runtime helper. Crucially, the result of `goscript.append` *must* be assigned back to the slice variable, as `append` may return a new slice instance if reallocation occurs.
         ```go
-        c := cap(s)
+        s = append(s, elem1, elem2)
         ```
         becomes:
         ```typescript
-        let c = goscript.cap(s) // Runtime provides capacity info
+        s = goscript.append(s, elem1, elem2)
         ```
-    -   **Access/Assignment (`s[i]`):** Translated directly using standard TypeScript array indexing.
-    -   **Append (`append(s, ...)`):** Requires a runtime helper `append` to handle potential resizing and capacity changes according to Go rules. (This is assumed based on Go semantics, though not explicitly in this specific test).
-    -   **Slicing (`s[low:high]`):** Requires runtime support to correctly handle Go's slicing behavior, which creates a new slice header sharing the underlying array. (Assumed, not in this test).
-- **Arrays:** Go arrays (e.g., `[5]int`) have a fixed size known at compile time. They are also mapped to TypeScript arrays (`T[]`), but their fixed-size nature is enforced during compilation (e.g., preventing `append`).
+        -   **Behavior:**
+            -   If appending fits within the existing capacity (`len(s) + num_elements <= cap(s)`), elements are added to the underlying array, and the original slice header's length is updated (potentially modifying the same object `s` refers to). The underlying array is modified.
+            -   If appending exceeds the capacity, a *new*, larger underlying array is allocated, the existing elements plus the new elements are copied to it, and `append` returns a *new* slice header referencing this new array. The original underlying array is *not* modified beyond its bounds.
+            -   Appending to a nil slice allocates a new underlying array.
+- **Arrays:** Go arrays (e.g., `[5]int`) have a fixed size known at compile time. They are also mapped to TypeScript arrays (`T[]`), but their fixed-size nature is enforced during compilation (e.g., preventing `append`). Slicing an array (`arr[:]`, `arr[low:high]`, etc.) uses the `goscript.slice` helper, resulting in a Go-style slice backed by the original array data.
     -   **Sparse Array Literals:** For Go array literals with specific indices (e.g., `[5]int{1: 10, 3: 30}`), unspecified indices are filled with the zero value of the element type in the generated TypeScript. For example, `[5]int{1: 10, 3: 30}` becomes `[0, 10, 0, 30, 0]`.
 
-*Note: The distinction between slices and arrays in Go is important. While both map to TypeScript arrays, runtime helpers are essential for emulating slice-specific behaviors like `make`, `len`, `cap`, `append`, and sub-slicing.*
+*Note: The distinction between slices and arrays in Go is important. While both often map to TypeScript arrays, runtime helpers (`makeSlice`, `slice`, `len`, `cap`, `append`) and the `__capacity` property are essential for emulating Go's slice semantics accurately.*
 - **Maps:** Go maps (`map[K]V`) are translated to TypeScript's standard `Map<K, V>` objects. Various Go map operations are mapped as follows:
     -   **Creation (`make`):** `make(map[K]V)` is translated using a runtime helper:
         ```go

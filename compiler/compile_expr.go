@@ -108,6 +108,43 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		}
 		c.tsw.WriteLiterally("]")
 		return nil
+	case *ast.SliceExpr:
+		// Translate Go slice expression to goscript.slice(x, low, high, max)
+		c.tsw.WriteLiterally("goscript.slice(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return err
+		}
+		// low argument
+		c.tsw.WriteLiterally(", ")
+		if exp.Low != nil {
+			if err := c.WriteValueExpr(exp.Low); err != nil {
+				return err
+			}
+		} else {
+			c.tsw.WriteLiterally("undefined")
+		}
+		// high argument
+		c.tsw.WriteLiterally(", ")
+		if exp.High != nil {
+			if err := c.WriteValueExpr(exp.High); err != nil {
+				return err
+			}
+		} else {
+			c.tsw.WriteLiterally("undefined")
+		}
+		// max argument (only for full slice expressions)
+		if exp.Slice3 {
+			c.tsw.WriteLiterally(", ")
+			if exp.Max != nil {
+				if err := c.WriteValueExpr(exp.Max); err != nil {
+					return err
+				}
+			} else {
+				c.tsw.WriteLiterally("undefined")
+			}
+		}
+		c.tsw.WriteLiterally(")")
+		return nil
 	case *ast.ParenExpr:
 		// Translate (X) to (X)
 		c.tsw.WriteLiterally("(")

@@ -14,6 +14,34 @@ export const makeSlice = <T>(
 }
 
 /**
+ * Creates a new slice header that shares the backing array.
+ * Arguments mirror Go semantics; omitted indices are undefined.
+ *
+ * @param arr  The original slice/array produced by makeSlice or another slice
+ * @param low  Starting index (defaults to 0)
+ * @param high Ending index (defaults to arr.length)
+ * @param max  Capacity limit (defaults to original capacity)
+ */
+export const slice = <T>(
+  arr: Array<T> & { __capacity?: number },
+  low?: number,
+  high?: number,
+  max?: number,
+): Array<T> & { __capacity?: number } => {
+  const start = low ?? 0
+  const origLen = arr.length
+  const origCap = arr.__capacity !== undefined ? arr.__capacity : origLen
+  const end = high !== undefined ? high : origLen
+  const newCap = max !== undefined ? max - start : origCap - start
+
+  const newArr = arr.slice(start, end) as Array<T> & {
+    __capacity?: number
+  }
+  newArr.__capacity = newCap
+  return newArr
+}
+
+/**
  * Creates a new map (TypeScript Map).
  * @returns A new TypeScript Map.
  */
@@ -50,8 +78,8 @@ export const cap = <T>(slice: Array<T> & { __capacity?: number }): number => {
  * Represents the Go error type (interface).
  */
 export type Error = {
-  Error(): string;
-} | null;
+  Error(): string
+} | null
 
 /**
  * Converts a string to an array of Unicode code points (runes).
@@ -113,8 +141,14 @@ export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
  * @param elements The elements to append.
  * @returns The modified slice (TypeScript array).
  */
-export const append = <T>(slice: Array<T>, ...elements: T[]): Array<T> => {
+export const append = <T>(
+  slice: Array<T> & { __capacity?: number },
+  ...elements: T[]
+): Array<T> & { __capacity?: number } => {
   slice.push(...elements)
+  if (slice.__capacity !== undefined && slice.length > slice.__capacity) {
+    slice.__capacity = slice.length
+  }
   return slice
 }
 
@@ -122,35 +156,35 @@ export const append = <T>(slice: Array<T>, ...elements: T[]): Array<T> => {
  * Represents the kinds of Go types that can be registered at runtime.
  */
 export enum TypeKind {
-  Struct = "struct",
-  Interface = "interface",
-  Basic = "basic",
-  Pointer = "pointer",
-  Slice = "slice",
-  Map = "map",
-  Channel = "channel",
-  Function = "function",
+  Struct = 'struct',
+  Interface = 'interface',
+  Basic = 'basic',
+  Pointer = 'pointer',
+  Slice = 'slice',
+  Map = 'map',
+  Channel = 'channel',
+  Function = 'function',
 }
 
 /**
  * Represents type information for a Go type in the runtime.
  */
 export interface TypeInfo {
-  name: string;
-  kind: TypeKind;
-  zeroValue: any;
+  name: string
+  kind: TypeKind
+  zeroValue: any
   // For interfaces, the set of methods
-  methods?: Set<string>;
+  methods?: Set<string>
   // For structs, the constructor
-  constructor?: new (...args: any[]) => any;
+  constructor?: new (...args: any[]) => any
 }
 
 // Registry to store runtime type information
-const typeRegistry = new Map<string, TypeInfo>();
+const typeRegistry = new Map<string, TypeInfo>()
 
 /**
  * Registers a type with the runtime type system.
- * 
+ *
  * @param name The name of the type.
  * @param kind The kind of the type.
  * @param zeroValue The zero value for the type.
@@ -163,7 +197,7 @@ export const registerType = (
   kind: TypeKind,
   zeroValue: any,
   methods?: Set<string>,
-  constructor?: new (...args: any[]) => any
+  constructor?: new (...args: any[]) => any,
 ): TypeInfo => {
   const typeInfo: TypeInfo = {
     name,
@@ -171,37 +205,40 @@ export const registerType = (
     zeroValue,
     methods,
     constructor,
-  };
-  typeRegistry.set(name, typeInfo);
-  return typeInfo;
-};
+  }
+  typeRegistry.set(name, typeInfo)
+  return typeInfo
+}
 
 /**
  * Represents the result of a type assertion.
  */
 export interface TypeAssertResult<T> {
-  value: T;
-  ok: boolean;
+  value: T
+  ok: boolean
 }
 
 /**
  * Performs a type assertion at runtime.
- * 
+ *
  * @param value The value to assert.
  * @param typeName The name of the target type.
  * @returns An object with the asserted value and whether the assertion succeeded.
  */
-export function typeAssert<T>(value: any, typeName: string): TypeAssertResult<T> {
+export function typeAssert<T>(
+  value: any,
+  typeName: string,
+): TypeAssertResult<T> {
   // Get the type information from the registry
-  const typeInfo = typeRegistry.get(typeName);
+  const typeInfo = typeRegistry.get(typeName)
   if (!typeInfo) {
-    console.warn(`Type information for '${typeName}' not found in registry.`);
-    return { value: null as unknown as T, ok: false };
+    console.warn(`Type information for '${typeName}' not found in registry.`)
+    return { value: null as unknown as T, ok: false }
   }
 
   // If value is null or undefined, assertion fails
   if (value === null || value === undefined) {
-    return { value: typeInfo.zeroValue as T, ok: false };
+    return { value: typeInfo.zeroValue as T, ok: false }
   }
 
   // Check based on the kind of the target type
@@ -209,86 +246,88 @@ export function typeAssert<T>(value: any, typeName: string): TypeAssertResult<T>
     case TypeKind.Struct:
       // For structs, use instanceof with the constructor
       if (typeInfo.constructor && value instanceof typeInfo.constructor) {
-        return { value: value as T, ok: true };
+        return { value: value as T, ok: true }
       }
-      break;
-      
+      break
+
     case TypeKind.Interface:
       // For interfaces, check if the value has all the required methods
       if (typeInfo.methods && typeof value === 'object') {
         const allMethodsPresent = Array.from(typeInfo.methods).every(
-          (method) => typeof (value as any)[method] === 'function'
-        );
+          (method) => typeof (value as any)[method] === 'function',
+        )
         if (allMethodsPresent) {
-          return { value: value as T, ok: true };
+          return { value: value as T, ok: true }
         }
       }
-      break;
-      
+      break
+
     case TypeKind.Basic:
       // For basic types, check if the value matches the expected JavaScript type
       // This is a simple check for common basic types
-      const basicType = typeof value;
+      const basicType = typeof value
       if (
-        basicType === 'string' || 
-        basicType === 'number' || 
+        basicType === 'string' ||
+        basicType === 'number' ||
         basicType === 'boolean'
       ) {
-        return { value: value as T, ok: true };
+        return { value: value as T, ok: true }
       }
-      break;
-      
+      break
+
     case TypeKind.Pointer:
       // For pointers, check if value is not null or undefined
       // In Go, pointers can be nil which we represent as null/undefined in TS
       if (value !== null && value !== undefined) {
-        return { value: value as T, ok: true };
+        return { value: value as T, ok: true }
       }
-      break;
-      
+      break
+
     case TypeKind.Slice:
       // For slices, check if the value is an array
       if (Array.isArray(value)) {
-        return { value: value as T, ok: true };
+        return { value: value as T, ok: true }
       }
-      break;
-      
+      break
+
     case TypeKind.Map:
       // For maps, check if the value is a Map
       if (value instanceof Map) {
-        return { value: value as T, ok: true };
+        return { value: value as T, ok: true }
       }
-      break;
-      
+      break
+
     case TypeKind.Channel:
       // For channels, check if the value has the required Channel interface methods
       if (
-        typeof value === 'object' && 
+        typeof value === 'object' &&
         value !== null &&
-        'send' in value && 
-        'receive' in value && 
+        'send' in value &&
+        'receive' in value &&
         'close' in value &&
         typeof value.send === 'function' &&
         typeof value.receive === 'function' &&
         typeof value.close === 'function'
       ) {
-        return { value: value as T, ok: true };
+        return { value: value as T, ok: true }
       }
-      break;
-      
+      break
+
     case TypeKind.Function:
       // For functions, check if the value is a function
       if (typeof value === 'function') {
-        return { value: value as T, ok: true };
+        return { value: value as T, ok: true }
       }
-      break;
-      
+      break
+
     default:
-      console.warn(`Type assertion for kind '${typeInfo.kind}' not implemented.`);
+      console.warn(
+        `Type assertion for kind '${typeInfo.kind}' not implemented.`,
+      )
   }
 
   // Assertion failed
-  return { value: typeInfo.zeroValue as T, ok: false };
+  return { value: typeInfo.zeroValue as T, ok: false }
 }
 
 /**
