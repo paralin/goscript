@@ -28,11 +28,25 @@
     "prepublishOnly": "npm run build",
     "example": "cd ./example/simple && bash run.bash",
     "test": "vitest run",
-    "format": "prettier --write './{src,builtin,example}/**/(*.ts|*.tsx|*.html|*.css|*.scss)'"
+    "format": "npm run format:go && npm run format:js && npm run format:config",
+    "format:config": "prettier --write tsconfig.json package.json",
+    "format:go": "gofumpt -w .",
+    "format:js": "prettier --write './{src,builtin,example}/**/(*.ts|*.tsx|*.html|*.css|*.scss)'",
+    "release": "npm run release:version && npm run release:commit",
+    "release:minor": "npm run release:version:minor && npm run release:commit",
+    "release:version": "npm version patch -m \"release: v%s\" --no-git-tag-version",
+    "release:version:minor": "npm version minor -m \"release: v%s\" --no-git-tag-version",
+    "release:commit": "git reset && git add package.json && git commit -s -m \"release: v$npm_package_version\" && git tag v$npm_package_version",
+    "release:publish": "git push && git push --tags && npm run build && npm publish",
+    "lint": "npm run lint:go && npm run lint:js",
+    "lint:go": "make lint",
+    "lint:js": "eslint -c eslint.config.mjs ./",
+    "prepare": "husky",
+    "precommit": "lint-staged"
   },
   "files": [
+    "!**/*.tsbuildinfo",
     "dist",
-    "src",
     "cmd",
     "compiler",
     "builtin",
@@ -41,11 +55,23 @@
     "LICENSE",
     "README.md"
   ],
+  "lint-staged": {
+    "package.json": "prettier --config .prettierrc.yaml --write",
+    "./{src,builtin,example}/**/(*.ts|*.tsx|*.html|*.css|*.scss)": "prettier --config .prettierrc.yaml --write"
+  },
   "devDependencies": {
+    "@eslint/js": "^9.25.1",
     "@types/node": "^22.15.2",
+    "@typescript-eslint/eslint-plugin": "^8.31.0",
+    "@typescript-eslint/parser": "^8.31.0",
+    "eslint": "^9.25.1",
+    "eslint-config-prettier": "^10.0.2",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.4.3",
     "prettier": "^3.5.3",
     "tsx": "^4.0.0",
-    "typescript": "^5.0.0",
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.31.0",
     "vitest": "^3.1.2"
   }
 }

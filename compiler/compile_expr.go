@@ -359,48 +359,14 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			// Handle make for slices: make([]T, len, cap) or make([]T, len)
 			if len(exp.Args) >= 1 {
 				// Handle map creation: make(map[K]V)
-				if mapType, ok := exp.Args[0].(*ast.MapType); ok {
-					c.tsw.WriteLiterally("goscript.makeMap(")
-
-					// Get key type
-					if keyType := c.pkg.TypesInfo.TypeOf(mapType.Key); keyType != nil {
-						// Use the underlying type for basic types
-						underlyingKeyType := keyType.Underlying()
-						c.tsw.WriteLiterally(fmt.Sprintf("%q", underlyingKeyType.String()))
-					} else {
-						// If type info is not available, this is an error condition
-						return errors.New("could not determine key type for makeMap")
-					}
-
-					c.tsw.WriteLiterally(", ")
-
-					// Get value type
-					if valueType := c.pkg.TypesInfo.TypeOf(mapType.Value); valueType != nil {
-						// Use the underlying type for basic types
-						underlyingValueType := valueType.Underlying()
-						c.tsw.WriteLiterally(fmt.Sprintf("%q", underlyingValueType.String()))
-					} else {
-						// If type info is not available, this is an error condition
-						return errors.New("could not determine value type for makeMap")
-					}
-
-					c.tsw.WriteLiterally(")")
+				if _, ok := exp.Args[0].(*ast.MapType); ok {
+					c.tsw.WriteLiterally("goscript.makeMap()")
 					return nil // Handled make for map
 				}
 
 				// Handle slice creation
-				if arrayType, ok := exp.Args[0].(*ast.ArrayType); ok {
+				if _, ok := exp.Args[0].(*ast.ArrayType); ok {
 					c.tsw.WriteLiterally("goscript.makeSlice(")
-					// Get and write the string representation of the element type
-					if typ := c.pkg.TypesInfo.TypeOf(arrayType.Elt); typ != nil {
-						// Use the underlying type for basic types like int, string, etc.
-						underlyingType := typ.Underlying()
-						c.tsw.WriteLiterally(fmt.Sprintf("%q", underlyingType.String()))
-					} else {
-						// If type info is not available, this is an error condition for makeSlice
-						return errors.New("could not determine element type for makeSlice")
-					}
-					c.tsw.WriteLiterally(", ")
 					if len(exp.Args) >= 2 {
 						if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 							return err

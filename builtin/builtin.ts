@@ -1,29 +1,25 @@
 /**
  * Creates a new slice (TypeScript array) with the specified length and capacity.
- * @param elementType The element type of the slice (for type hinting).
  * @param len The length of the slice.
  * @param cap The capacity of the slice (optional).
  * @returns A new TypeScript array representing the slice.
  */
 export const makeSlice = <T>(
-  elementType: any,
   len: number,
   cap?: number,
 ): Array<T> & { __capacity?: number } => {
-  const slice = new Array<T>(len) as Array<T> & { __capacity?: number };
-  slice.__capacity = cap !== undefined ? cap : len;
-  return slice;
-};
+  const slice = new Array<T>(len) as Array<T> & { __capacity?: number }
+  slice.__capacity = cap !== undefined ? cap : len
+  return slice
+}
 
 /**
  * Creates a new map (TypeScript Map).
- * @param keyType The key type of the map (for type hinting).
- * @param valueType The value type of the map (for type hinting).
  * @returns A new TypeScript Map.
  */
-export const makeMap = <K, V>(keyType: any, valueType: any): Map<K, V> => {
-  return new Map<K, V>();
-};
+export const makeMap = <K, V>(): Map<K, V> => {
+  return new Map<K, V>()
+}
 
 /**
  * Returns the length of a collection (string, array, or map).
@@ -31,15 +27,15 @@ export const makeMap = <K, V>(keyType: any, valueType: any): Map<K, V> => {
  * @returns The length of the collection.
  */
 export const len = <T>(
-  collection: string | Array<T> | Map<any, any>,
+  collection: string | Array<T> | Map<unknown, unknown>,
 ): number => {
-  if (typeof collection === "string" || Array.isArray(collection)) {
-    return collection.length;
+  if (typeof collection === 'string' || Array.isArray(collection)) {
+    return collection.length
   } else if (collection instanceof Map) {
-    return collection.size;
+    return collection.size
   }
-  return 0; // Default fallback
-};
+  return 0 // Default fallback
+}
 
 /**
  * Returns the capacity of a slice (TypeScript array).
@@ -47,8 +43,8 @@ export const len = <T>(
  * @returns The capacity of the slice.
  */
 export const cap = <T>(slice: Array<T> & { __capacity?: number }): number => {
-  return slice.__capacity !== undefined ? slice.__capacity : slice.length;
-};
+  return slice.__capacity !== undefined ? slice.__capacity : slice.length
+}
 
 /**
  * Converts a string to an array of Unicode code points (runes).
@@ -56,8 +52,8 @@ export const cap = <T>(slice: Array<T> & { __capacity?: number }): number => {
  * @returns An array of numbers representing the Unicode code points.
  */
 export const stringToRunes = (str: string): number[] => {
-  return Array.from(str).map((c) => c.codePointAt(0) || 0);
-};
+  return Array.from(str).map((c) => c.codePointAt(0) || 0)
+}
 
 /**
  * Gets a value from a map, with a default value if the key doesn't exist.
@@ -71,8 +67,8 @@ export const mapGet = <K, V>(
   key: K,
   defaultValue: V | null = null,
 ): V | null => {
-  return map.has(key) ? map.get(key)! : defaultValue;
-};
+  return map.has(key) ? map.get(key)! : defaultValue
+}
 
 /**
  * Sets a value in a map.
@@ -81,8 +77,8 @@ export const mapGet = <K, V>(
  * @param value The value to set.
  */
 export const mapSet = <K, V>(map: Map<K, V>, key: K, value: V): void => {
-  map.set(key, value);
-};
+  map.set(key, value)
+}
 
 /**
  * Deletes a key from a map.
@@ -90,8 +86,8 @@ export const mapSet = <K, V>(map: Map<K, V>, key: K, value: V): void => {
  * @param key The key to delete.
  */
 export const deleteMapEntry = <K, V>(map: Map<K, V>, key: K): void => {
-  map.delete(key);
-};
+  map.delete(key)
+}
 
 /**
  * Checks if a key exists in a map.
@@ -100,8 +96,8 @@ export const deleteMapEntry = <K, V>(map: Map<K, V>, key: K): void => {
  * @returns True if the key exists, false otherwise.
  */
 export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
-  return map.has(key);
-};
+  return map.has(key)
+}
 /**
  * Appends elements to a slice (TypeScript array).
  * Note: In Go, append can return a new slice if the underlying array is reallocated.
@@ -111,25 +107,25 @@ export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
  * @returns The modified slice (TypeScript array).
  */
 export const append = <T>(slice: Array<T>, ...elements: T[]): Array<T> => {
-  slice.push(...elements);
-  return slice;
-};
+  slice.push(...elements)
+  return slice
+}
 
 /**
  * Represents the result of a channel receive operation with 'ok' value
  */
 export interface ChannelReceiveResult<T> {
-  value: T; // Should be T | ZeroValue<T>
-  ok: boolean;
+  value: T // Should be T | ZeroValue<T>
+  ok: boolean
 }
 
 /**
  * Represents a result from a select operation
  */
 export interface SelectResult<T> {
-  value: T; // Should be T | ZeroValue<T>
-  ok: boolean;
-  id: number;
+  value: T // Should be T | ZeroValue<T>
+  ok: boolean
+  id: number
 }
 
 /**
@@ -142,14 +138,14 @@ export interface Channel<T> {
    * Returns a promise that resolves when the value is accepted by the channel.
    * @param value The value to send.
    */
-  send(value: T): Promise<void>;
+  send(value: T): Promise<void>
 
   /**
    * Receives a value from the channel.
    * Returns a promise that resolves with the received value.
    * If the channel is closed, it throws an error.
    */
-  receive(): Promise<T>;
+  receive(): Promise<T>
 
   /**
    * Receives a value from the channel along with a boolean indicating
@@ -159,21 +155,21 @@ export interface Channel<T> {
    * - If channel is closed and empty: {value: <zero value>, ok: false}
    * - If channel is closed but has remaining buffered data: {value: <data>, ok: true}
    */
-  receiveWithOk(): Promise<ChannelReceiveResult<T>>;
+  receiveWithOk(): Promise<ChannelReceiveResult<T>>
 
   /**
    * Closes the channel.
    * No more values can be sent to a closed channel.
    * Receive operations on a closed channel return the zero value and ok=false.
    */
-  close(): void;
+  close(): void
 
   /**
    * Used in select statements to create a receive operation promise.
    * @param id An identifier for this case in the select statement
    * @returns Promise that resolves when this case is selected
    */
-  selectReceive(id: number): Promise<SelectResult<T>>;
+  selectReceive(id: number): Promise<SelectResult<T>>
 
   /**
    * Used in select statements to create a send operation promise.
@@ -181,216 +177,215 @@ export interface Channel<T> {
    * @param id An identifier for this case in the select statement
    * @returns Promise that resolves when this case is selected
    */
-  selectSend(value: T, id: number): Promise<SelectResult<boolean>>;
+  selectSend(value: T, id: number): Promise<SelectResult<boolean>>
 
   /**
    * Checks if the channel has data ready to be received without blocking.
    * Used for non-blocking select operations.
    */
-  canReceiveNonBlocking(): boolean;
+  canReceiveNonBlocking(): boolean
 
   /**
    * Checks if the channel can accept a send operation without blocking.
    * Used for non-blocking select operations.
    */
-  canSendNonBlocking(): boolean;
+  canSendNonBlocking(): boolean
 }
 
 // A simple implementation of buffered channels
 class BufferedChannel<T> implements Channel<T> {
-  private buffer: T[] = [];
-  private closed: boolean = false;
-  private capacity: number;
-  private senders: Array<(value: boolean) => void> = []; // Resolvers for blocked senders
-  private receivers: Array<(value: T) => void> = []; // Resolvers for blocked receivers
-  private receiversWithOk: Array<(result: ChannelReceiveResult<T>) => void> =
-    []; // For receive with ok
-  private zeroValue: T; // Store the zero value for the element type
+  private buffer: T[] = []
+  private closed: boolean = false
+  private capacity: number
+  private senders: Array<(value: boolean) => void> = [] // Resolvers for blocked senders
+  private receivers: Array<(value: T) => void> = [] // Resolvers for blocked receivers
+  private receiversWithOk: Array<(result: ChannelReceiveResult<T>) => void> = [] // For receive with ok
+  private zeroValue: T // Store the zero value for the element type
 
   constructor(capacity: number, zeroValue: T) {
-    this.capacity = capacity;
-    this.zeroValue = zeroValue;
+    this.capacity = capacity
+    this.zeroValue = zeroValue
   }
 
   async send(value: T): Promise<void> {
     if (this.closed) {
-      throw new Error("send on closed channel");
+      throw new Error('send on closed channel')
     }
 
     // If there are waiting receivers, directly pass the value
     if (this.receivers.length > 0) {
-      const receiver = this.receivers.shift()!;
-      receiver(value);
-      return;
+      const receiver = this.receivers.shift()!
+      receiver(value)
+      return
     }
 
     // If there are waiting receivers with ok, directly pass the value and ok=true
     if (this.receiversWithOk.length > 0) {
-      const receiver = this.receiversWithOk.shift()!;
-      receiver({ value, ok: true });
-      return;
+      const receiver = this.receiversWithOk.shift()!
+      receiver({ value, ok: true })
+      return
     }
 
     // If buffer is not full, add to buffer
     if (this.buffer.length < this.capacity) {
-      this.buffer.push(value);
-      return;
+      this.buffer.push(value)
+      return
     }
 
     // Buffer is full, block the sender
     return new Promise<void>((resolve, reject) => {
       this.senders.push((success: boolean) => {
         if (success) {
-          this.buffer.push(value);
-          resolve();
+          this.buffer.push(value)
+          resolve()
         } else {
-          reject(new Error("send on closed channel"));
+          reject(new Error('send on closed channel'))
         }
-      });
-    });
+      })
+    })
   }
 
   async receive(): Promise<T> {
     // If buffer has values, return from buffer
     if (this.buffer.length > 0) {
-      const value = this.buffer.shift()!;
+      const value = this.buffer.shift()!
 
       // If there are waiting senders, unblock one
       if (this.senders.length > 0) {
-        const sender = this.senders.shift()!;
-        sender(true); // Unblock with success
+        const sender = this.senders.shift()!
+        sender(true) // Unblock with success
       }
 
-      return value;
+      return value
     }
 
     // If channel is closed and buffer is empty, throw error (receive without ok)
     if (this.closed) {
-      throw new Error("receive on closed channel");
+      throw new Error('receive on closed channel')
     }
 
     // Buffer is empty, block the receiver
     return new Promise<T>((resolve) => {
-      this.receivers.push(resolve);
-    });
+      this.receivers.push(resolve)
+    })
   }
 
   async receiveWithOk(): Promise<ChannelReceiveResult<T>> {
     // If buffer has values, return from buffer with ok=true
     if (this.buffer.length > 0) {
-      const value = this.buffer.shift()!;
+      const value = this.buffer.shift()!
 
       // If there are waiting senders, unblock one
       if (this.senders.length > 0) {
-        const sender = this.senders.shift()!;
-        sender(true); // Unblock with success
+        const sender = this.senders.shift()!
+        sender(true) // Unblock with success
       }
 
-      return { value, ok: true };
+      return { value, ok: true }
     }
 
     // If channel is closed and buffer is empty, return zero value with ok=false
     if (this.closed) {
-      return { value: this.zeroValue, ok: false }; // Return zeroValue
+      return { value: this.zeroValue, ok: false } // Return zeroValue
     }
 
     // Buffer is empty, block the receiver with ok
     return new Promise<ChannelReceiveResult<T>>((resolve) => {
-      this.receiversWithOk.push(resolve);
-    });
+      this.receiversWithOk.push(resolve)
+    })
   }
 
   async selectReceive(id: number): Promise<SelectResult<T>> {
     // If buffer has values, return from buffer with ok=true
     if (this.buffer.length > 0) {
-      const value = this.buffer.shift()!;
+      const value = this.buffer.shift()!
 
       // If there are waiting senders, unblock one
       if (this.senders.length > 0) {
-        const sender = this.senders.shift()!;
-        sender(true); // Unblock with success
+        const sender = this.senders.shift()!
+        sender(true) // Unblock with success
       }
 
-      return { value, ok: true, id };
+      return { value, ok: true, id }
     }
 
     // If channel is closed and buffer is empty, return zero value with ok=false
     if (this.closed) {
-      return { value: this.zeroValue, ok: false, id }; // Return zeroValue
+      return { value: this.zeroValue, ok: false, id } // Return zeroValue
     }
 
     // Buffer is empty, return a promise that will be resolved when a value is available
     return new Promise<SelectResult<T>>((resolve) => {
       this.receiversWithOk.push((result) => {
-        resolve({ ...result, id });
-      });
-    });
+        resolve({ ...result, id })
+      })
+    })
   }
 
   async selectSend(value: T, id: number): Promise<SelectResult<boolean>> {
     if (this.closed) {
-      return { value: false, ok: false, id };
+      return { value: false, ok: false, id }
     }
 
     // If there are waiting receivers, directly pass the value
     if (this.receivers.length > 0) {
-      const receiver = this.receivers.shift()!;
-      receiver(value);
-      return { value: true, ok: true, id };
+      const receiver = this.receivers.shift()!
+      receiver(value)
+      return { value: true, ok: true, id }
     }
 
     // If there are waiting receivers with ok, directly pass the value and ok=true
     if (this.receiversWithOk.length > 0) {
-      const receiver = this.receiversWithOk.shift()!;
-      receiver({ value, ok: true });
-      return { value: true, ok: true, id };
+      const receiver = this.receiversWithOk.shift()!
+      receiver({ value, ok: true })
+      return { value: true, ok: true, id }
     }
 
     // If buffer is not full, add to buffer
     if (this.buffer.length < this.capacity) {
-      this.buffer.push(value);
-      return { value: true, ok: true, id };
+      this.buffer.push(value)
+      return { value: true, ok: true, id }
     }
 
     // Buffer is full, return a promise that will be resolved when buffer space is available
-    return new Promise<SelectResult<boolean>>((resolve, reject) => {
+    return new Promise<SelectResult<boolean>>((resolve) => {
       this.senders.push((success: boolean) => {
         if (success) {
-          this.buffer.push(value);
-          resolve({ value: true, ok: true, id });
+          this.buffer.push(value)
+          resolve({ value: true, ok: true, id })
         } else {
-          resolve({ value: false, ok: false, id });
+          resolve({ value: false, ok: false, id })
         }
-      });
-    });
+      })
+    })
   }
 
   close(): void {
     if (this.closed) {
-      throw new Error("close of closed channel");
+      throw new Error('close of closed channel')
     }
 
-    this.closed = true;
+    this.closed = true
 
     // Unblock all waiting senders with failure
     for (const sender of this.senders) {
-      sender(false);
+      sender(false)
     }
-    this.senders = [];
+    this.senders = []
 
     // Unblock all waiting receivers with the zero value
     for (const receiver of this.receivers) {
       // Note: receive() without ok throws on closed channel, this unblocking should not happen in correct Go logic
       // but for safety, we'll resolve with zero value if it somehow does.
-      receiver(this.zeroValue);
+      receiver(this.zeroValue)
     }
-    this.receivers = [];
+    this.receivers = []
 
     // Unblock all waiting receivers with ok=false and zero value
     for (const receiver of this.receiversWithOk) {
-      receiver({ value: this.zeroValue, ok: false });
+      receiver({ value: this.zeroValue, ok: false })
     }
-    this.receiversWithOk = [];
+    this.receiversWithOk = []
   }
 
   /**
@@ -398,7 +393,7 @@ class BufferedChannel<T> implements Channel<T> {
    * Used for non-blocking select operations.
    */
   canReceiveNonBlocking(): boolean {
-    return this.buffer.length > 0 || this.closed;
+    return this.buffer.length > 0 || this.closed
   }
 
   /**
@@ -406,7 +401,7 @@ class BufferedChannel<T> implements Channel<T> {
    * Used for non-blocking select operations.
    */
   canSendNonBlocking(): boolean {
-    return !this.closed && this.buffer.length < this.capacity;
+    return !this.closed && this.buffer.length < this.capacity
   }
 }
 
@@ -414,12 +409,12 @@ class BufferedChannel<T> implements Channel<T> {
  * Represents a case in a select statement.
  */
 export interface SelectCase<T> {
-  id: number;
-  isSend: boolean; // true for send, false for receive
-  channel: Channel<any>;
-  value?: any; // Value to send for send cases
+  id: number
+  isSend: boolean // true for send, false for receive
+  channel: Channel<any>
+  value?: any // Value to send for send cases
   // Optional handlers for when this case is selected
-  onSelected?: (result: SelectResult<T>) => Promise<void>;
+  onSelected?: (result: SelectResult<T>) => Promise<void>
 }
 
 /**
@@ -437,23 +432,23 @@ export async function selectStatement<T>(
   if (cases.length === 0 && !hasDefault) {
     // Go spec: If there are no cases, the select statement blocks forever.
     // Emulate blocking forever with a promise that never resolves.
-    return new Promise<void>(() => {}); // Promise never resolves
+    return new Promise<void>(() => {}) // Promise never resolves
   }
 
   // 1. Check for ready (non-blocking) operations
-  const readyCases: SelectCase<T>[] = [];
+  const readyCases: SelectCase<T>[] = []
   for (const caseObj of cases) {
     if (caseObj.id === -1) {
       // Skip default case in this check
-      continue;
+      continue
     }
     if (caseObj.isSend) {
       if (caseObj.channel.canSendNonBlocking()) {
-        readyCases.push(caseObj);
+        readyCases.push(caseObj)
       }
     } else {
       if (caseObj.channel.canReceiveNonBlocking()) {
-        readyCases.push(caseObj);
+        readyCases.push(caseObj)
       }
     }
   }
@@ -461,39 +456,39 @@ export async function selectStatement<T>(
   if (readyCases.length > 0) {
     // If one or more cases are ready, choose one pseudo-randomly
     const selectedCase =
-      readyCases[Math.floor(Math.random() * readyCases.length)];
+      readyCases[Math.floor(Math.random() * readyCases.length)]
 
     // Execute the selected operation and its onSelected handler
     if (selectedCase.isSend) {
       const result = await selectedCase.channel.selectSend(
         selectedCase.value,
         selectedCase.id,
-      );
+      )
       if (selectedCase.onSelected) {
-        await selectedCase.onSelected(result as SelectResult<T>); // Await the handler
+        await selectedCase.onSelected(result as SelectResult<T>) // Await the handler
       }
     } else {
-      const result = await selectedCase.channel.selectReceive(selectedCase.id);
+      const result = await selectedCase.channel.selectReceive(selectedCase.id)
       if (selectedCase.onSelected) {
-        await selectedCase.onSelected(result); // Await the handler
+        await selectedCase.onSelected(result) // Await the handler
       }
     }
-    return; // Return after executing a ready case
+    return // Return after executing a ready case
   }
 
   // 2. If no operations are ready and there's a default case, select default
   if (hasDefault) {
     // Find the default case (it will have id -1)
-    const defaultCase = cases.find((c) => c.id === -1);
+    const defaultCase = cases.find((c) => c.id === -1)
     if (defaultCase && defaultCase.onSelected) {
       // Execute the onSelected handler for the default case
       await defaultCase.onSelected({
         value: undefined,
         ok: false,
         id: -1,
-      } as SelectResult<T>); // Await the handler
+      } as SelectResult<T>) // Await the handler
     }
-    return; // Return after executing the default case
+    return // Return after executing the default case
   }
 
   // 3. If no operations are ready and no default case, block until one is ready
@@ -503,17 +498,17 @@ export async function selectStatement<T>(
     .map((caseObj) => {
       // Exclude default case
       if (caseObj.isSend) {
-        return caseObj.channel.selectSend(caseObj.value, caseObj.id);
+        return caseObj.channel.selectSend(caseObj.value, caseObj.id)
       } else {
-        return caseObj.channel.selectReceive(caseObj.id);
+        return caseObj.channel.selectReceive(caseObj.id)
       }
-    });
+    })
 
-  const result = await Promise.race(blockingPromises);
+  const result = await Promise.race(blockingPromises)
   // Execute onSelected handler for the selected case
-  const selectedCase = cases.find((c) => c.id === result.id);
+  const selectedCase = cases.find((c) => c.id === result.id)
   if (selectedCase && selectedCase.onSelected) {
-    await selectedCase.onSelected(result); // Await the handler
+    await selectedCase.onSelected(result) // Await the handler
   }
   // No explicit return needed here, as the function will implicitly return after the await
 }
@@ -528,5 +523,5 @@ export const makeChannel = <T>(
   bufferSize: number,
   zeroValue: T,
 ): Channel<T> => {
-  return new BufferedChannel<T>(bufferSize, zeroValue);
-};
+  return new BufferedChannel<T>(bufferSize, zeroValue)
+}

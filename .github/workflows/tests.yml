@@ -41,3 +41,9 @@ jobs:
 
       - name: Test Go
         run: go test -v ./...
+
+      - name: Test Js
+        run: yarn test:js
+
+      - name: Lint Js
+        run: yarn lint:js

@@ -1,3 +1,3 @@
-import { main } from "@go/example/main.gs.js";
+import { main } from '@go/example/main.gs.js'
 
-main();
+main()
