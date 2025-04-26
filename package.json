@@ -30,7 +30,7 @@
     "build": "tsc",
     "prepublishOnly": "npm run build",
     "example": "cd ./example/simple && bash run.bash",
-    "test": "npm run test:js && npm run test:go",
+    "test": "npm run test:go && npm run test:js",
     "test:go": "go test -v ./...",
     "test:js": "tsc --noEmit && vitest run",
     "format": "npm run format:go && npm run format:js && npm run format:config",

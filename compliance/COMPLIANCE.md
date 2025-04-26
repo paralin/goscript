@@ -72,7 +72,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   `for` loops (condition-only, basic counter-based, infinite, `range` over arrays/slices/strings/maps).
 *   **Data Structures:**
 *   Arrays (`[N]T`) - Including array literals, indexing, and `range`.
-*   Slices (`[]T`) - Including slices of slices, creation using `make([]T, len)` and `make([]T, len, cap)`, `len`, `cap`, `append`, and slicing expressions (`[low:high]`, `[low:high:max]`).
+*   Slices (`[]T`) - Including slices of slices, compliant creation using `make([]T, len)` and `make([]T, len, cap)`, `len`, `cap`, `append`, and slicing expressions (`[low:high]`, `[low:high:max]`).
 *   Maps (`map[K]V`) - Creation using `make(map[K]V)` (generates `makeMap<TS_K, TS_V>()`), access, assignment, `delete`, `len`, `range`.
 *   `struct` definitions (including exported/unexported fields).
     *   Composite Literals for structs (`MyStruct{...}`).

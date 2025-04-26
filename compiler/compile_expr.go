@@ -470,7 +470,20 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 				// Handle slice creation
 				if _, ok := exp.Args[0].(*ast.ArrayType); ok {
-					c.tsw.WriteLiterally("goscript.makeSlice(")
+					// Get the slice type information
+					sliceType := c.pkg.TypesInfo.TypeOf(exp.Args[0])
+					if sliceType == nil {
+						return errors.New("could not get type information for slice in make call")
+					}
+					goElemType, ok := sliceType.Underlying().(*gtypes.Slice)
+					if !ok {
+						return errors.New("expected slice type for make call")
+					}
+
+					c.tsw.WriteLiterally("goscript.makeSlice<")
+					c.WriteGoType(goElemType.Elem()) // Write the element type
+					c.tsw.WriteLiterally(">(")
+
 					if len(exp.Args) >= 2 {
 						if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 							return err

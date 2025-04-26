@@ -7,12 +7,12 @@ export async function main(): Promise<void> {
 	// --- Original Tests ---
 	console.log("--- Original Tests ---")
 	// Create a slice of integers with length 5 and capacity 10
-	let s = goscript.makeSlice(5, 10)
+	let s = goscript.makeSlice<number>(5, 10)
 	console.log(goscript.len(s)) // 5
 	console.log(goscript.cap(s)) // 10
 	
 	// Create a slice of strings with length 3
-	let s2 = goscript.makeSlice(3)
+	let s2 = goscript.makeSlice<string>(3)
 	console.log(goscript.len(s2)) // 3
 	console.log(goscript.cap(s2)) // 3
 	
@@ -53,7 +53,7 @@ export async function main(): Promise<void> {
 	
 	// Create slice with 0 len/cap and append
 	console.log("--- Zero len/cap append ---")
-	let zeroSlice = goscript.makeSlice(0, 0)
+	let zeroSlice = goscript.makeSlice<number>(0, 0)
 	console.log(goscript.len(zeroSlice)) // 0
 	console.log(goscript.cap(zeroSlice)) // 0
 	zeroSlice = goscript.append(zeroSlice, 100)
@@ -211,7 +211,7 @@ export async function main(): Promise<void> {
 	// Create a slice of slices where inner slice has capacity for append
 	
 	// {0, 0}, len 2, cap 5
-	let sliceOfSlicesWithCap = [[ 1, 2, 3 ], goscript.makeSlice(2, 5), [ 6, 7, 8, 9 ]]
+	let sliceOfSlicesWithCap = [[ 1, 2, 3 ], goscript.makeSlice<number>(2, 5), [ 6, 7, 8, 9 ]]
 	sliceOfSlicesWithCap[1][0] = 40
 	sliceOfSlicesWithCap[1][1] = 50
 	
@@ -289,13 +289,13 @@ export async function main(): Promise<void> {
 	
 	// Create a slice of slices using make
 	console.log("--- Make slice of slices ---")
-	let makeSliceOfSlices = goscript.makeSlice(2, 4) // len 2, cap 4
+	let makeSliceOfSlices = goscript.makeSlice<number[]>(2, 4) // len 2, cap 4
 	console.log("Length of makeSliceOfSlices:", goscript.len(makeSliceOfSlices)) // 2
 	console.log("Capacity of makeSliceOfSlices:", goscript.cap(makeSliceOfSlices)) // 4
 	
 	// Initialize inner slices
 	makeSliceOfSlices[0] = [1000, 2000]
-	makeSliceOfSlices[1] = goscript.makeSlice(1, 3)
+	makeSliceOfSlices[1] = goscript.makeSlice<number>(1, 3)
 	makeSliceOfSlices[1][0] = 3000
 	
 	console.log("makeSliceOfSlices[0][1]:", makeSliceOfSlices[0][1]) // 2000
@@ -333,7 +333,7 @@ export async function main(): Promise<void> {
 	
 	// Empty slice of slices (not nil)
 	console.log("--- Empty slice of slices ---")
-	let emptySliceOfSlices = goscript.makeSlice(0)
+	let emptySliceOfSlices = goscript.makeSlice<number[]>(0)
 	console.log("Empty slice of slices len:", goscript.len(emptySliceOfSlices)) // 0
 	console.log("Empty slice of slices cap:", goscript.cap(emptySliceOfSlices)) // 0 (or more, implementation dependent)
 	
