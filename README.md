@@ -463,11 +463,21 @@ Code is compiled with `GOARCH=js` and uses a 32-bit environment similar to wasm.
 All Go import paths are prefixed with `@go/` and can be imported in TypeScript:
 
 ```typescript
-import { MyFunction, MyStruct } from '@go/github.com/myorg/mypackage';
+import { MyAsyncFunction, MyStruct } from '@go/github.com/myorg/mypackage';
 
-MyFunction();
-let myThing = new MyStruct();
-myThing.DoSometing();
+// Example of importing and using a compiled Go async function
+async function runGoCode() {
+  // Call an async function compiled from Go
+  const result = await MyAsyncFunction("input data");
+  console.log("Result from Go async function:", result);
+
+  // You can still use synchronous types and functions
+  let myThing = new MyStruct();
+  myThing.GetMyString();
+  }
+  ```
+
+runGoCode();
 ```
 
 ## License
