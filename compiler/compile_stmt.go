@@ -136,25 +136,22 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 	// This is our implementation of the select statement, which will use Promise.race
 	// to achieve the same semantics as Go's select statement.
 
-	// Create an array to hold all the select cases
-	tempArrayName := c.newTempVar()
-	c.tsw.WriteLiterally("const ")
-	c.tsw.WriteLiterally(tempArrayName)
-	c.tsw.WriteLiterally(": goscript.SelectCase<any>[] = []") // Array of SelectCase objects
-	c.tsw.WriteLine("")
-
 	// Variable to track whether we have a default case
 	hasDefault := false
 
-	// For each case clause, generate a SelectCase object and add it to the array
+	// Start the selectStatement call and the array literal
+	c.tsw.WriteLiterally("await goscript.selectStatement(")
+	c.tsw.WriteLine("[") // Put bracket on new line
+	c.tsw.Indent(1)
+
+	// For each case clause, generate a SelectCase object directly into the array literal
 	for i, stmt := range exp.Body.List {
 		if commClause, ok := stmt.(*ast.CommClause); ok {
 			if commClause.Comm == nil {
 				// This is a default case
 				hasDefault = true
 				// Add a SelectCase object for the default case with a special ID
-				c.tsw.WriteLiterally(tempArrayName)
-				c.tsw.WriteLiterally(".push({")
+				c.tsw.WriteLiterally("{") // Start object literal
 				c.tsw.Indent(1)
 				c.tsw.WriteLine("")
 				c.tsw.WriteLiterally("id: -1,") // Special ID for default case
@@ -175,7 +172,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 				c.tsw.Indent(-1)
 				c.tsw.WriteLine("}") // Close onSelected handler
 				c.tsw.Indent(-1)
-				c.tsw.WriteLine("}),") // Close SelectCase object and add comma
+				c.tsw.WriteLiterally("},") // Close SelectCase object and add comma
 				c.tsw.WriteLine("")
 
 				continue
@@ -185,8 +182,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 			caseID := i
 
 			// Start writing the SelectCase object
-			c.tsw.WriteLiterally(tempArrayName)
-			c.tsw.WriteLiterally(".push({")
+			c.tsw.WriteLiterally("{") // Start object literal
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			c.tsw.WriteLiterally(fmt.Sprintf("id: %d,", caseID))
@@ -297,7 +293,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}") // Close onSelected handler
 			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}),") // Close SelectCase object and add comma
+			c.tsw.WriteLiterally("},") // Close SelectCase object and add comma
 			c.tsw.WriteLine("")
 
 		} else {
@@ -305,12 +301,9 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 		}
 	}
 
-	// Call the selectStatement helper with the array of SelectCase objects and the hasDefault flag
-	// The result of selectStatement is the result of the selected case, but we handle assignments
-	// within the onSelected handlers, so we don't need to assign the result here.
-	c.tsw.WriteLiterally("await goscript.selectStatement(")
-	c.tsw.WriteLiterally(tempArrayName)
-	c.tsw.WriteLiterally(", ")
+	// Close the array literal and the selectStatement call
+	c.tsw.Indent(-1)
+	c.tsw.WriteLiterally("], ")
 	c.tsw.WriteLiterally(fmt.Sprintf("%t", hasDefault))
 	c.tsw.WriteLiterally(")")
 	c.tsw.WriteLine("")

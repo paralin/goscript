@@ -10,26 +10,26 @@ export async function main(): Promise<void> {
 	// Should not be reached
 	
 	// Should be reached
-	const _tempVar1: goscript.SelectCase<any>[] = []
-	_tempVar1.push({
-		id: 0,
-		isSend: true,
-		channel: ch,
-		value: 2,
-		onSelected: async (result) => {
-			console.log("Sent value")
-		}
-	}),
-	
-	_tempVar1.push({
-		id: -1,
-		isSend: false,
-		channel: null,
-		onSelected: async (result) => {
-			console.log("Default case hit")
-		}
-	}),
-	
-	await goscript.selectStatement(_tempVar1, true)
+	await goscript.selectStatement([
+		{
+			id: 0,
+			isSend: true,
+			channel: ch,
+			value: 2,
+			onSelected: async (result) => {
+				console.log("Sent value")
+			}
+		},
+		
+		{
+			id: -1,
+			isSend: false,
+			channel: null,
+			onSelected: async (result) => {
+				console.log("Default case hit")
+			}
+		},
+		
+	], true)
 }
 
