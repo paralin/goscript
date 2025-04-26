@@ -20,6 +20,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`for_range/`**: Tests `for range` loops over slices and maps (key-value).
 *   **`for_range_index_use/`**: Tests `for range` loops over slices where the index is explicitly used.
 *   **`func_literal/`**: Verifies the translation of function literals (closures).
+*   **`for_loop_infinite/`**: Verifies infinite `for {}` loops and the `break` statement.
 *   **`function_call_result_assignment/`**: Tests assigning the result of a function returning a struct, ensuring proper value semantics (copying).
 *   **`if_statement/`**: Covers basic `if`/`else` conditional statements, including correct `} else {` formatting.
 *   **`interface_to_interface_type_assertion/`**: Tests type assertions from one interface type to another.
@@ -67,11 +68,11 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   **Control Flow:**
     *   `if`/`else` statements.
     *   `switch` statements.
-    *   `select` statement.
-    *   `for` loops (condition-only, basic counter-based, `range` over arrays/slices/strings).
+    *   `select` statements (basic channel communication).
+    *   `for` loops (condition-only, basic counter-based, infinite, `range` over arrays/slices/strings/maps).
 *   **Data Structures:**
-    *   Arrays (`[N]T`) - Including array literals and indexing.
-    *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`.
+    *   Arrays (`[N]T`) - Including array literals, indexing, and `range`.
+    *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`, `len`, `cap`, `append`.
     *   Maps (`map[K]V`) - Creation using `make(map[K]V)` (generates `makeMap<TS_K, TS_V>()`), access, assignment, `delete`, `len`, `range`.
     *   `struct` definitions (including exported/unexported fields).
     *   Composite Literals for structs (`MyStruct{...}`).
@@ -106,9 +107,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
 *   **Control Flow:**
-    *   `for` loops (infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)
-    *   `select` statement (for channel operations)
     *   `defer` statement
     *   `panic` / `recover`
 *   **Data Structures:**

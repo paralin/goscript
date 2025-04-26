@@ -125,6 +125,16 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		if err := c.WriteStmtSelect(exp); err != nil {
 			return fmt.Errorf("failed to write select statement: %w", err)
 		}
+	case *ast.BranchStmt:
+		// Handle break and continue statements
+		switch exp.Tok {
+		case token.BREAK:
+			c.tsw.WriteLine("break") // No semicolon needed
+		case token.CONTINUE:
+			c.tsw.WriteLine("continue") // No semicolon needed
+		default:
+			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled branch statement token: %s", exp.Tok.String()))
+		}
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
