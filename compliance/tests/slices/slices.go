@@ -171,4 +171,178 @@ func main() {
 	// println(smallSlice[1]) // Index out of bounds (len 1, cap 1) - should panic
 	// smallSlice[1] = 10     // Index out of bounds - should panic
 	// println(smallSlice[-1]) // Negative index - should panic
+
+	// --- Slices of Slices Tests ---
+	println("--- Slices of Slices Tests ---")
+
+	// Create a slice of slices of integers
+	sliceOfSlices := [][]int{
+		{1, 2, 3},
+		{4, 5},
+		{6, 7, 8, 9},
+	}
+
+	println("Length of sliceOfSlices:", len(sliceOfSlices))   // 3
+	println("Capacity of sliceOfSlices:", cap(sliceOfSlices)) // 3
+
+	// Access elements
+	println("sliceOfSlices[0][1]:", sliceOfSlices[0][1]) // 2
+	println("sliceOfSlices[1][0]:", sliceOfSlices[1][0]) // 4
+	println("sliceOfSlices[2][3]:", sliceOfSlices[2][3]) // 9
+
+	// Append to inner slice (should modify the inner slice)
+	println("--- Append to inner slice ---")
+	innerSlice := sliceOfSlices[1]                      // {4, 5}, len 2, cap 2
+	println("Length of innerSlice:", len(innerSlice))   // 2
+	println("Capacity of innerSlice:", cap(innerSlice)) // 2
+
+	innerSlice = append(innerSlice, 50)                              // {4, 5, 50}
+	println("Length of innerSlice after append:", len(innerSlice))   // 3
+	println("Capacity of innerSlice after append:", cap(innerSlice)) // 4 (or more)
+	println("innerSlice[2]:", innerSlice[2])                         // 50
+
+	// Check if the original slice of slices reflects the change (it should, as innerSlice is a view)
+	// Note: Appending to innerSlice might reallocate its underlying array if capacity is exceeded.
+	// If reallocated, the original sliceOfSlices will *not* see the change at that index.
+	// This test case specifically checks the scenario where the append happens within the original capacity
+	// or if the reallocation behavior is correctly handled by GoScript.
+	// For this simple case, appending 50 to {4, 5} will likely cause reallocation.
+	// Let's test appending within capacity first.
+
+	// Create a slice of slices where inner slice has capacity for append
+	sliceOfSlicesWithCap := [][]int{
+		{1, 2, 3},
+		make([]int, 2, 5), // {0, 0}, len 2, cap 5
+		{6, 7, 8, 9},
+	}
+	sliceOfSlicesWithCap[1][0] = 40
+	sliceOfSlicesWithCap[1][1] = 50
+
+	println("--- Append to inner slice with capacity ---")
+	innerSliceWithCap := sliceOfSlicesWithCap[1]                      // {40, 50}, len 2, cap 5
+	println("Length of innerSliceWithCap:", len(innerSliceWithCap))   // 2
+	println("Capacity of innerSliceWithCap:", cap(innerSliceWithCap)) // 5
+
+	innerSliceWithCap = append(innerSliceWithCap, 60)                              // {40, 50, 60}
+	println("Length of innerSliceWithCap after append:", len(innerSliceWithCap))   // 3
+	println("Capacity of innerSliceWithCap after append:", cap(innerSliceWithCap)) // 5
+	println("innerSliceWithCap[2]:", innerSliceWithCap[2])                         // 60
+
+	// Check if the original slice of slices reflects the change (it should, as append was within capacity)
+	println("sliceOfSlicesWithCap[1][2]:", sliceOfSlicesWithCap[1][2]) // 60
+
+	// Append to inner slice exceeding capacity
+	println("--- Append to inner slice exceeding capacity ---")
+	innerSliceExceedCap := sliceOfSlices[0]                               // {1, 2, 3}, len 3, cap 3
+	println("Length of innerSliceExceedCap:", len(innerSliceExceedCap))   // 3
+	println("Capacity of innerSliceExceedCap:", cap(innerSliceExceedCap)) // 3
+
+	innerSliceExceedCap = append(innerSliceExceedCap, 10, 20)                          // {1, 2, 3, 10, 20} - will reallocate
+	println("Length of innerSliceExceedCap after append:", len(innerSliceExceedCap))   // 5
+	println("Capacity of innerSliceExceedCap after append:", cap(innerSliceExceedCap)) // 6 (or more)
+	println("innerSliceExceedCap[3]:", innerSliceExceedCap[3])                         // 10
+	println("innerSliceExceedCap[4]:", innerSliceExceedCap[4])                         // 20
+
+	// Check if the original slice of slices reflects the change (it should NOT, due to reallocation)
+	// The original sliceOfSlices[0] should still be {1, 2, 3}
+	println("Original sliceOfSlices[0] after inner append:", sliceOfSlices[0][0], sliceOfSlices[0][1], sliceOfSlices[0][2]) // 1 2 3
+
+	// Slicing a slice of slices
+	println("--- Slicing a slice of slices ---")
+	subSliceOfSlices := sliceOfSlices[1:3]                          // {{4, 5}, {6, 7, 8, 9}}, len 2, cap 2
+	println("Length of subSliceOfSlices:", len(subSliceOfSlices))   // 2
+	println("Capacity of subSliceOfSlices:", cap(subSliceOfSlices)) // 2
+	println("subSliceOfSlices[0][0]:", subSliceOfSlices[0][0])      // 4
+	println("subSliceOfSlices[1][2]:", subSliceOfSlices[1][2])      // 8
+
+	// Modify element in sub-slice of slices (should affect original)
+	println("--- Modify element in sub-slice of slices ---")
+	subSliceOfSlices[0][1] = 55
+	println("sliceOfSlices[1][1] after sub-slice modification:", sliceOfSlices[1][1]) // 55
+
+	// Append a new slice to the slice of slices
+	println("--- Append a new slice to slice of slices ---")
+	sliceOfSlices = append(sliceOfSlices, []int{100, 110})
+	println("Length of sliceOfSlices after append:", len(sliceOfSlices))   // 4
+	println("Capacity of sliceOfSlices after append:", cap(sliceOfSlices)) // 6 (or more)
+	println("sliceOfSlices[3][0]:", sliceOfSlices[3][0])                   // 100
+
+	// Append an existing slice to the slice of slices
+	println("--- Append an existing slice to slice of slices ---")
+	existingSlice := []int{200, 210}
+	sliceOfSlices = append(sliceOfSlices, existingSlice)
+	println("Length of sliceOfSlices after appending existing:", len(sliceOfSlices))   // 5
+	println("Capacity of sliceOfSlices after appending existing:", cap(sliceOfSlices)) // 6 (or more)
+	println("sliceOfSlices[4][1]:", sliceOfSlices[4][1])                               // 210
+
+	// Modify the appended existing slice (should NOT affect the slice in sliceOfSlices if it was copied)
+	// Go's append copies the slice header, but the underlying array is shared unless reallocation occurs.
+	// Modifying existingSlice *after* appending it should not affect the copy in sliceOfSlices
+	// unless they still share the underlying array and the modification is within the shared capacity.
+	// Let's test this carefully.
+	println("--- Modify appended existing slice ---")
+	existingSlice[0] = 205
+	println("sliceOfSlices[4][0] after modifying existingSlice:", sliceOfSlices[4][0]) // Should still be 200 if copied or shared but not modified at index 0
+
+	// If we modify an element in the slice within sliceOfSlices, it *should* affect the original existingSlice
+	// if they share the underlying array.
+	println("--- Modify slice within sliceOfSlices ---")
+	sliceOfSlices[4][1] = 215
+	println("existingSlice[1] after modifying slice within sliceOfSlices:", existingSlice[1]) // Should be 215
+
+	// Create a slice of slices using make
+	println("--- Make slice of slices ---")
+	makeSliceOfSlices := make([][]int, 2, 4)                          // len 2, cap 4
+	println("Length of makeSliceOfSlices:", len(makeSliceOfSlices))   // 2
+	println("Capacity of makeSliceOfSlices:", cap(makeSliceOfSlices)) // 4
+
+	// Initialize inner slices
+	makeSliceOfSlices[0] = []int{1000, 2000}
+	makeSliceOfSlices[1] = make([]int, 1, 3)
+	makeSliceOfSlices[1][0] = 3000
+
+	println("makeSliceOfSlices[0][1]:", makeSliceOfSlices[0][1]) // 2000
+	println("makeSliceOfSlices[1][0]:", makeSliceOfSlices[1][0]) // 3000
+
+	// Append a new inner slice
+	makeSliceOfSlices = append(makeSliceOfSlices, []int{4000, 5000})
+	println("Length of makeSliceOfSlices after append:", len(makeSliceOfSlices))   // 3
+	println("Capacity of makeSliceOfSlices after append:", cap(makeSliceOfSlices)) // 4
+	println("makeSliceOfSlices[2][1]:", makeSliceOfSlices[2][1])                   // 5000
+
+	// Append another new inner slice (should exceed capacity and reallocate outer slice)
+	makeSliceOfSlices = append(makeSliceOfSlices, []int{6000})
+	println("Length of makeSliceOfSlices after second append:", len(makeSliceOfSlices))   // 4
+	println("Capacity of makeSliceOfSlices after second append:", cap(makeSliceOfSlices)) // 8 (or more)
+	println("makeSliceOfSlices[3][0]:", makeSliceOfSlices[3][0])                          // 6000
+
+	// Nil slice of slices
+	println("--- Nil slice of slices ---")
+	var nilSliceOfSlices [][]int
+	println("Nil slice of slices len:", len(nilSliceOfSlices)) // 0
+	println("Nil slice of slices cap:", cap(nilSliceOfSlices)) // 0
+
+	// Append to nil slice of slices
+	nilSliceOfSlices = append(nilSliceOfSlices, []int{10000})
+	println("Length of nilSliceOfSlices after append:", len(nilSliceOfSlices))   // 1
+	println("Capacity of nilSliceOfSlices after append:", cap(nilSliceOfSlices)) // 1 (or more)
+	println("nilSliceOfSlices[0][0]:", nilSliceOfSlices[0][0])                   // 10000
+
+	// Append another slice to the nil slice of slices
+	nilSliceOfSlices = append(nilSliceOfSlices, []int{20000, 30000})
+	println("Length of nilSliceOfSlices after second append:", len(nilSliceOfSlices))   // 2
+	println("Capacity of nilSliceOfSlices after second append:", cap(nilSliceOfSlices)) // 2 (or more)
+	println("nilSliceOfSlices[1][1]:", nilSliceOfSlices[1][1])                          // 30000
+
+	// Empty slice of slices (not nil)
+	println("--- Empty slice of slices ---")
+	emptySliceOfSlices := make([][]int, 0)
+	println("Empty slice of slices len:", len(emptySliceOfSlices)) // 0
+	println("Empty slice of slices cap:", cap(emptySliceOfSlices)) // 0 (or more, implementation dependent)
+
+	// Append to empty slice of slices
+	emptySliceOfSlices = append(emptySliceOfSlices, []int{40000})
+	println("Length of emptySliceOfSlices after append:", len(emptySliceOfSlices))   // 1
+	println("Capacity of emptySliceOfSlices after append:", cap(emptySliceOfSlices)) // 1 (or more)
+	println("emptySliceOfSlices[0][0]:", emptySliceOfSlices[0][0])                   // 40000
 }

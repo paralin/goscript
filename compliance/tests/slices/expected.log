@@ -86,3 +86,75 @@ Nil slice cap: 0
 Append to nil slice len: 1
 Append to nil slice cap: 1
 Append to nil slice[0]: 5
+--- Slices of Slices Tests ---
+Length of sliceOfSlices: 3
+Capacity of sliceOfSlices: 3
+sliceOfSlices[0][1]: 2
+sliceOfSlices[1][0]: 4
+sliceOfSlices[2][3]: 9
+--- Append to inner slice ---
+Length of innerSlice: 2
+Capacity of innerSlice: 2
+Length of innerSlice after append: 3
+Capacity of innerSlice after append: 3
+innerSlice[2]: 50
+--- Append to inner slice with capacity ---
+Length of innerSliceWithCap: 2
+Capacity of innerSliceWithCap: 5
+Length of innerSliceWithCap after append: 3
+Capacity of innerSliceWithCap after append: 5
+innerSliceWithCap[2]: 60
+sliceOfSlicesWithCap[1][2]: 60
+--- Append to inner slice exceeding capacity ---
+Length of innerSliceExceedCap: 3
+Capacity of innerSliceExceedCap: 3
+Length of innerSliceExceedCap after append: 5
+Capacity of innerSliceExceedCap after append: 5
+innerSliceExceedCap[3]: 10
+innerSliceExceedCap[4]: 20
+Original sliceOfSlices[0] after inner append: 1 2 3
+--- Slicing a slice of slices ---
+Length of subSliceOfSlices: 2
+Capacity of subSliceOfSlices: 2
+subSliceOfSlices[0][0]: 4
+subSliceOfSlices[1][2]: 8
+--- Modify element in sub-slice of slices ---
+sliceOfSlices[1][1] after sub-slice modification: 55
+--- Append a new slice to slice of slices ---
+Length of sliceOfSlices after append: 4
+Capacity of sliceOfSlices after append: 4
+sliceOfSlices[3][0]: 100
+--- Append an existing slice to slice of slices ---
+Length of sliceOfSlices after appending existing: 5
+Capacity of sliceOfSlices after appending existing: 5
+sliceOfSlices[4][1]: 210
+--- Modify appended existing slice ---
+sliceOfSlices[4][0] after modifying existingSlice: 205
+--- Modify slice within sliceOfSlices ---
+existingSlice[1] after modifying slice within sliceOfSlices: 215
+--- Make slice of slices ---
+Length of makeSliceOfSlices: 2
+Capacity of makeSliceOfSlices: 4
+makeSliceOfSlices[0][1]: 2000
+makeSliceOfSlices[1][0]: 3000
+Length of makeSliceOfSlices after append: 3
+Capacity of makeSliceOfSlices after append: 4
+makeSliceOfSlices[2][1]: 5000
+Length of makeSliceOfSlices after second append: 4
+Capacity of makeSliceOfSlices after second append: 4
+makeSliceOfSlices[3][0]: 6000
+--- Nil slice of slices ---
+Nil slice of slices len: 0
+Nil slice of slices cap: 0
+Length of nilSliceOfSlices after append: 1
+Capacity of nilSliceOfSlices after append: 1
+nilSliceOfSlices[0][0]: 10000
+Length of nilSliceOfSlices after second append: 2
+Capacity of nilSliceOfSlices after second append: 2
+nilSliceOfSlices[1][1]: 30000
+--- Empty slice of slices ---
+Empty slice of slices len: 0
+Empty slice of slices cap: 0
+Length of emptySliceOfSlices after append: 1
+Capacity of emptySliceOfSlices after append: 1
+emptySliceOfSlices[0][0]: 40000
