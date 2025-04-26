@@ -186,9 +186,13 @@ func (c *GoToTSCompiler) WriteIdentType(exp *ast.Ident) {
 	c.tsw.WriteLiterally(name)
 }
 
-// WriteIdentValue writes an identifier used as a value (variable, function name).
+// WriteIdentValue writes an identifier used as a value (variable, function name, nil).
 func (c *GoToTSCompiler) WriteIdentValue(exp *ast.Ident) {
-	c.tsw.WriteLiterally(exp.Name)
+	if exp.Name == "nil" {
+		c.tsw.WriteLiterally("null")
+	} else {
+		c.tsw.WriteLiterally(exp.Name)
+	}
 }
 
 // WriteSelectorExprType writes a selector expression used as a type (e.g., pkg.Type).

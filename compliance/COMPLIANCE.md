@@ -25,6 +25,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`interface_to_interface_type_assertion/`**: Tests type assertions from one interface type to another.
 *   **`interface_type_assertion/`**: Tests type assertions from an interface type to a concrete type (`v.(T)`).
 *   **`embedded_interface_assertion/`**: Tests type assertions involving embedded interfaces.
+*   **`interface_multi_param_return/`**: Tests interface method signatures with multiple parameters (named/unnamed) and multiple return values, including `nil` translation.
 *   **`map_support/`**: Covers map creation (`make`, literal), access, assignment, deletion, length, and iteration (`range`).
 *   **`method_call_on_pointer_receiver/`**: Verifies calling methods with pointer receivers (`*T`) on pointer variables.
 *   **`method_call_on_pointer_via_value/`**: Verifies calling methods with pointer receivers (`*T`) on value variables (Go implicitly takes the address).
