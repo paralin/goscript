@@ -72,9 +72,10 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   **Data Structures:**
     *   Arrays (`[N]T`) - Including array literals and indexing.
     *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`.
-    *   Maps (`map[K]V`) - Creation using `make(map[K]V)` (generates `makeMap<TS_K, TS_V>()`), literals, access, assignment, `delete`, `len`, `range`.
+    *   Maps (`map[K]V`) - Creation using `make(map[K]V)` (generates `makeMap<TS_K, TS_V>()`), access, assignment, `delete`, `len`, `range`.
     *   `struct` definitions (including exported/unexported fields).
     *   Composite Literals for structs (`MyStruct{...}`).
+    *   Interfaces (`interface{}`) - Definition and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions and embedded interfaces using the `extends` keyword.
 *   **Functions & Methods:**
     *   Function definition (`func`).
     *   Function Literals (`func() { ... }`)
@@ -104,7 +105,6 @@ Based on the existing tests, GoScript aims to support the following Go features:
 
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
-*   Interfaces (`interface{}`) - Definition and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions.
 *   **Control Flow:**
     *   `for` loops (infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)

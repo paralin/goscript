@@ -4,8 +4,8 @@
 import * as goscript from "@go/builtin";
 
 interface Reader 
-{
-	Read(_p0: number[]): [number, error];
+ {
+	Read(_p0: number[]): [number, goscript.Error];
 }
 
 // Register this interface with the runtime type system
@@ -18,8 +18,8 @@ const Reader__typeInfo = goscript.registerType(
 );
 
 interface Closer 
-{
-	Close(): error;
+ {
+	Close(): goscript.Error;
 }
 
 // Register this interface with the runtime type system
@@ -32,9 +32,7 @@ const Closer__typeInfo = goscript.registerType(
 );
 
 interface ReadCloser 
-{
-	Reader; // Embedded interface - requires manual merging or mixin in TS
-	Closer; // Embedded interface - requires manual merging or mixin in TS
+ extends Reader, Closer {
 }
 
 // Register this interface with the runtime type system
@@ -48,14 +46,14 @@ const ReadCloser__typeInfo = goscript.registerType(
 
 class MyStruct {
 	
-	public Read(p: number[]): [number, error] {
+	public Read(p: number[]): [number, goscript.Error] {
 		const m = this
-		return [0, nil]
+		return [0, null]
 	}
 	
-	public Close(): error {
+	public Close(): goscript.Error {
 		const m = this
-		return nil
+		return null
 	}
 	
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
@@ -76,8 +74,7 @@ export async function main(): Promise<void> {
 	let s = new MyStruct({  })
 	rwc = s.clone()
 	
-	const _tempVar1 = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
-	let ok = _tempVar1.ok
+	let { value: _, ok: ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
 	if (ok) {
 		console.log("Embedded interface assertion successful")
 	} else {

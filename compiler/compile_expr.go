@@ -7,6 +7,7 @@ import (
 	"go/token"
 	gtypes "go/types"
 	"strconv"
+	"strings"
 
 	gstypes "github.com/paralin/goscript/compiler/types"
 )
@@ -162,6 +163,13 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 // WriteIdentType writes an identifier used as a type.
 func (c *GoToTSCompiler) WriteIdentType(exp *ast.Ident) {
 	name := exp.Name
+
+	// Special case for the built-in error interface
+	if name == "error" {
+		c.tsw.WriteLiterally("goscript.Error")
+		return
+	}
+
 	if tsname, ok := gstypes.GoBuiltinToTypescript(name); ok {
 		name = tsname
 	} else {
@@ -245,24 +253,46 @@ func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
 
 // WriteInterfaceType writes an interface type definition.
 func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
-	if exp.Methods == nil || exp.Methods.NumFields() == 0 {
-		c.tsw.WriteLiterally("{}")
-		return
-	}
-	c.tsw.WriteLine("{")
-	c.tsw.Indent(1)
-	for _, method := range exp.Methods.List {
-		if len(method.Names) > 0 {
-			// Named method - use WriteInterfaceMethodSignature
-			if err := c.WriteInterfaceMethodSignature(method); err != nil {
-				c.tsw.WriteCommentInline(fmt.Sprintf("error writing interface method signature: %v", err))
+	var embeddedInterfaces []string
+	var methods []*ast.Field
+
+	if exp.Methods != nil {
+		for _, method := range exp.Methods.List {
+			if len(method.Names) > 0 {
+				// Named method
+				methods = append(methods, method)
+			} else {
+				// Embedded interface - collect the type name using type info
+				if tv, ok := c.pkg.TypesInfo.Types[method.Type]; ok && tv.Type != nil {
+					if namedType, ok := tv.Type.(*gtypes.Named); ok {
+						embeddedInterfaces = append(embeddedInterfaces, namedType.Obj().Name())
+					} else {
+						c.tsw.WriteCommentLine(fmt.Sprintf("// Unhandled embedded interface type: %T", tv.Type))
+					}
+				} else {
+					c.tsw.WriteCommentLine("// Could not resolve embedded interface type")
+				}
 			}
-		} else {
-			// Embedded interface - write the type name
-			c.WriteTypeExpr(method.Type)
-			c.tsw.WriteLine("; // Embedded interface - requires manual merging or mixin in TS")
 		}
 	}
+
+	// If there are embedded interfaces, write the extends clause
+	if len(embeddedInterfaces) > 0 {
+		c.tsw.WriteLiterally(" extends ")
+		c.tsw.WriteLiterally(strings.Join(embeddedInterfaces, ", "))
+	}
+
+	// Write the interface body
+	c.tsw.WriteLine(" {")
+	c.tsw.Indent(1)
+
+	// Write named methods
+	for _, method := range methods {
+		if err := c.WriteInterfaceMethodSignature(method); err != nil {
+			c.tsw.WriteCommentInline(fmt.Sprintf("error writing interface method signature: %v", err))
+		}
+	}
+
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
 }
@@ -822,7 +852,38 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	// Write arrow function: (params) => { body }
 	c.tsw.WriteLiterally("(")
 	c.WriteFieldList(exp.Type.Params, true) // true = arguments
-	c.tsw.WriteLiterally(") => ")
+	c.tsw.WriteLiterally(")")
+
+	// Handle return type for function literals
+	if exp.Type.Results != nil && len(exp.Type.Results.List) > 0 {
+		c.tsw.WriteLiterally(": ")
+		if isAsync {
+			c.tsw.WriteLiterally("Promise<")
+		}
+		if len(exp.Type.Results.List) == 1 && len(exp.Type.Results.List[0].Names) == 0 {
+			c.WriteTypeExpr(exp.Type.Results.List[0].Type)
+		} else {
+			c.tsw.WriteLiterally("[")
+			for i, field := range exp.Type.Results.List {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteTypeExpr(field.Type)
+			}
+			c.tsw.WriteLiterally("]")
+		}
+		if isAsync {
+			c.tsw.WriteLiterally(">")
+		}
+	} else {
+		if isAsync {
+			c.tsw.WriteLiterally(": Promise<void>")
+		} else {
+			c.tsw.WriteLiterally(": void")
+		}
+	}
+
+	c.tsw.WriteLiterally(" => ")
 
 	// Write function body
 	if err := c.WriteStmt(exp.Body); err != nil {

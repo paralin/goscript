@@ -5,7 +5,7 @@ import * as goscript from "@go/builtin";
 
 interface MultiParamReturner 
 {
-	Process(data: number[], count: number, _p2: string): [boolean, error];
+	Process(data: number[], count: number, _p2: string): [boolean, goscript.Error];
 }
 
 // Register this interface with the runtime type system
@@ -19,7 +19,7 @@ const MultiParamReturner__typeInfo = goscript.registerType(
 
 class MyProcessor {
 	
-	public Process(data: number[], count: number, _: string): [boolean, error] {
+	public Process(data: number[], count: number, _: string): [boolean, goscript.Error] {
 		const p = this
 		if (count > 0 && goscript.len(data) > 0) {
 			console.log("Processing successful")

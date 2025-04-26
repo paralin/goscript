@@ -47,6 +47,13 @@ export const cap = <T>(slice: Array<T> & { __capacity?: number }): number => {
 }
 
 /**
+ * Represents the Go error type (interface).
+ */
+export type Error = {
+  Error(): string;
+} | null;
+
+/**
  * Converts a string to an array of Unicode code points (runes).
  * @param str The input string.
  * @returns An array of numbers representing the Unicode code points.
