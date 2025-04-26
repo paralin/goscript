@@ -14,6 +14,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`if_statement/`**: Covers basic `if`/`else` conditional statements, including correct `} else {` formatting.
 *   **`switch_statement/`**: Verifies basic `switch` statements with integer and string tags and default cases.
 *   **`for_loop_basic/`**: Verifies basic counter-based `for` loops (`for init; cond; post {}`).
+*   **`for_loop_condition_only/`**: Verifies `for` loops with only a condition (`for cond {}`).
 *   **`map_support/`**: Covers map creation (`make`, literal), access, assignment, deletion, length, and iteration (`range`).
 *   **`method_call_on_pointer_receiver/`**: Verifies calling methods with pointer receivers (`*T`) on pointer variables.
 *   **`method_call_on_value_receiver/`**: Verifies calling methods with value receivers (`T`) on value variables. (Note: Go often implicitly takes the address for pointer receivers, this tests the explicit value receiver case).
@@ -83,7 +84,7 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
 
 *   Interfaces (`interface{}`) - Definition tested, and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions.
 *   **Control Flow:**
-    *   `for` loops (condition-only, infinite still uncovered)
+    *   `for` loops (infinite still uncovered)
     *   `switch` statements (with/without expression, type switches)
     *   `select` statement (for channel operations)
     *   `defer` statement
