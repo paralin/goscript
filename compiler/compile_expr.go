@@ -276,13 +276,6 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 		}
 	}
 
-	// Write the interface name
-	// Assumes the interface name is handled by WriteTypeSpec
-	// c.tsw.WriteLiterally("interface ")
-	// if err := c.WriteValueExpr(a.Name); err != nil { // Interface name is a value identifier
-	// 	return err
-	// }
-
 	// If there are embedded interfaces, write the extends clause
 	if len(embeddedInterfaces) > 0 {
 		c.tsw.WriteLiterally(" extends ")
@@ -290,8 +283,8 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 	}
 
 	// Write the interface body on the same line
-	c.tsw.WriteLiterally(" {")
-	c.tsw.WriteLine("") // Newline after opening brace
+	c.tsw.WriteLiterally("{") // Removed leading space
+	c.tsw.WriteLine("")       // Newline after opening brace
 	c.tsw.Indent(1)
 
 	// Write named methods

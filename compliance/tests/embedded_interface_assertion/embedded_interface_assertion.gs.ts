@@ -3,7 +3,7 @@
 
 import * as goscript from "@go/builtin";
 
-interface Reader  {
+interface Reader {
 	Read(_p0: number[]): [number, goscript.Error];
 }
 
@@ -16,7 +16,7 @@ const Reader__typeInfo = goscript.registerType(
   undefined
 );
 
-interface Closer  {
+interface Closer {
 	Close(): goscript.Error;
 }
 
@@ -29,7 +29,7 @@ const Closer__typeInfo = goscript.registerType(
   undefined
 );
 
-interface ReadCloser  extends Reader, Closer {
+interface ReadCloser  extends Reader, Closer{
 }
 
 // Register this interface with the runtime type system

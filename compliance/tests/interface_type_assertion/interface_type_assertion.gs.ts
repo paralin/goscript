@@ -3,8 +3,7 @@
 
 import * as goscript from "@go/builtin";
 
-interface MyInterface 
- {
+interface MyInterface {
 	Method1(): number;
 }
 
