@@ -6,24 +6,44 @@ This document outlines the compliance tests for the GoScript compiler, verifying
 
 The following tests are currently implemented in the `/compliance/tests` directory:
 
+*   **`array_literal/`**: Tests array literal creation and indexing.
+*   **`async_basic/`**: Verifies basic goroutine (`go func()`) translation using `async`/`await`.
 *   **`basic_arithmetic/`**: Verifies basic arithmetic operations (`+`, `-`, `*`, `/`, `%`).
 *   **`boolean_logic/`**: Tests boolean logic operators (`&&`, `||`, `!`) and comparisons (`==`, `!=`, `<`, `>`, `<=`, `>=`).
+*   **`channel_basic/`**: Covers basic channel operations (make, send, receive, close) for unbuffered channels.
 *   **`composite_literal_assignment/`**: Checks the assignment of struct values created using composite literals, ensuring correct value copying.
+*   **`constants/`**: Tests basic constant declarations and usage.
 *   **`copy_independence/`**: Verifies that copies of struct values are independent and modifications to one do not affect others.
-*   **`function_call_result_assignment/`**: Tests assigning the result of a function returning a struct, ensuring proper value semantics (copying).
-*   **`if_statement/`**: Covers basic `if`/`else` conditional statements, including correct `} else {` formatting.
-*   **`switch_statement/`**: Verifies basic `switch` statements with integer and string tags and default cases.
+*   **`float64/`**: Tests basic operations with `float64` types.
 *   **`for_loop_basic/`**: Verifies basic counter-based `for` loops (`for init; cond; post {}`).
 *   **`for_loop_condition_only/`**: Verifies `for` loops with only a condition (`for cond {}`).
+*   **`for_range/`**: Tests `for range` loops over slices and maps (key-value).
+*   **`for_range_index_use/`**: Tests `for range` loops over slices where the index is explicitly used.
+*   **`func_literal/`**: Verifies the translation of function literals (closures).
+*   **`function_call_result_assignment/`**: Tests assigning the result of a function returning a struct, ensuring proper value semantics (copying).
+*   **`if_statement/`**: Covers basic `if`/`else` conditional statements, including correct `} else {` formatting.
+*   **`interface_to_interface_type_assertion/`**: Tests type assertions from one interface type to another.
+*   **`interface_type_assertion/`**: Tests type assertions from an interface type to a concrete type (`v.(T)`).
 *   **`map_support/`**: Covers map creation (`make`, literal), access, assignment, deletion, length, and iteration (`range`).
 *   **`method_call_on_pointer_receiver/`**: Verifies calling methods with pointer receivers (`*T`) on pointer variables.
-*   **`method_call_on_value_receiver/`**: Verifies calling methods with value receivers (`T`) on value variables. (Note: Go often implicitly takes the address for pointer receivers, this tests the explicit value receiver case).
+*   **`method_call_on_pointer_via_value/`**: Verifies calling methods with pointer receivers (`*T`) on value variables (Go implicitly takes the address).
+*   **`method_call_on_value_receiver/`**: Verifies calling methods with value receivers (`T`) on value variables.
+*   **`method_call_on_value_via_pointer/`**: Verifies calling methods with value receivers (`T`) on pointer variables (Go implicitly dereferences).
+*   **`multiple_return_values/`**: Tests functions returning multiple values and their assignment.
+*   **`pointer_assignment_no_copy/`**: Verifies that assigning pointers copies the pointer (address), not the underlying value.
+*   **`pointer_composite_literal_assignment/`**: Checks assignment involving pointers to struct composite literals.
 *   **`pointer_deref_multiassign/`**: Tests dereferencing a pointer during a multi-variable assignment (`:=` or `=`), including the use of the blank identifier (`_`).
 *   **`pointer_initialization/`**: Checks the initialization of pointer variables using the address-of operator (`&`) or `new()`.
-*   **`simple/`**: A basic test covering simple struct definition, field access, method calls, and `println`. (Likely overlaps with others, could be a general integration test).
+*   **`select_receive_on_closed_channel_no_default/`**: Tests `select` behavior when receiving from a closed channel without a default case.
+*   **`select_send_on_full_buffered_channel_with_default/`**: Tests `select` behavior when sending to a full buffered channel with a default case.
+*   **`select_statement/`**: Verifies basic `select` statements for channel communication.
+*   **`simple/`**: A basic test covering simple struct definition, field access, method calls, and `println`.
 *   **`simple_deref_assignment/`**: Tests simple assignment involving pointer dereferencing (`*ptr`), ensuring value copying.
+*   **`slices/`**: Covers slice creation (`make`), length (`len`), capacity (`cap`), and appending (`append`).
+*   **`string_rune_conversion/`**: Tests the conversion between `string` and `rune`.
 *   **`struct_field_access/`**: Verifies accessing fields of struct values and struct pointers.
-*   **`struct_value_init_clone/`**: Checks struct initialization via composite literal (`T{...}`) (omitting `.clone()` for direct assignment) and subsequent assignment from variables (ensuring `.clone()` is used for value semantics).
+*   **`struct_value_init_clone/`**: Checks struct initialization via composite literal (`T{...}`) and subsequent assignment (ensuring `.clone()` is used).
+*   **`switch_statement/`**: Verifies basic `switch` statements with integer and string tags and default cases.
 *   **`value_type_copy_behavior/`**: Focuses specifically on demonstrating that assigning struct values creates independent copies (value semantics).
 
 Each test should have only three files:
