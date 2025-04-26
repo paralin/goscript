@@ -112,6 +112,179 @@ export const append = <T>(slice: Array<T>, ...elements: T[]): Array<T> => {
 }
 
 /**
+ * Represents the kinds of Go types that can be registered at runtime.
+ */
+export enum TypeKind {
+  Struct = "struct",
+  Interface = "interface",
+  Basic = "basic",
+  Pointer = "pointer",
+  Slice = "slice",
+  Map = "map",
+  Channel = "channel",
+  Function = "function",
+}
+
+/**
+ * Represents type information for a Go type in the runtime.
+ */
+export interface TypeInfo {
+  name: string;
+  kind: TypeKind;
+  zeroValue: any;
+  // For interfaces, the set of methods
+  methods?: Set<string>;
+  // For structs, the constructor
+  constructor?: new (...args: any[]) => any;
+}
+
+// Registry to store runtime type information
+const typeRegistry = new Map<string, TypeInfo>();
+
+/**
+ * Registers a type with the runtime type system.
+ * 
+ * @param name The name of the type.
+ * @param kind The kind of the type.
+ * @param zeroValue The zero value for the type.
+ * @param methods Optional set of method names for interfaces.
+ * @param constructor Optional constructor for structs.
+ * @returns The type information object for chaining.
+ */
+export const registerType = (
+  name: string,
+  kind: TypeKind,
+  zeroValue: any,
+  methods?: Set<string>,
+  constructor?: new (...args: any[]) => any
+): TypeInfo => {
+  const typeInfo: TypeInfo = {
+    name,
+    kind,
+    zeroValue,
+    methods,
+    constructor,
+  };
+  typeRegistry.set(name, typeInfo);
+  return typeInfo;
+};
+
+/**
+ * Represents the result of a type assertion.
+ */
+export interface TypeAssertResult<T> {
+  value: T;
+  ok: boolean;
+}
+
+/**
+ * Performs a type assertion at runtime.
+ * 
+ * @param value The value to assert.
+ * @param typeName The name of the target type.
+ * @returns An object with the asserted value and whether the assertion succeeded.
+ */
+export function typeAssert<T>(value: any, typeName: string): TypeAssertResult<T> {
+  // Get the type information from the registry
+  const typeInfo = typeRegistry.get(typeName);
+  if (!typeInfo) {
+    console.warn(`Type information for '${typeName}' not found in registry.`);
+    return { value: null as unknown as T, ok: false };
+  }
+
+  // If value is null or undefined, assertion fails
+  if (value === null || value === undefined) {
+    return { value: typeInfo.zeroValue as T, ok: false };
+  }
+
+  // Check based on the kind of the target type
+  switch (typeInfo.kind) {
+    case TypeKind.Struct:
+      // For structs, use instanceof with the constructor
+      if (typeInfo.constructor && value instanceof typeInfo.constructor) {
+        return { value: value as T, ok: true };
+      }
+      break;
+      
+    case TypeKind.Interface:
+      // For interfaces, check if the value has all the required methods
+      if (typeInfo.methods && typeof value === 'object') {
+        const allMethodsPresent = Array.from(typeInfo.methods).every(
+          (method) => typeof (value as any)[method] === 'function'
+        );
+        if (allMethodsPresent) {
+          return { value: value as T, ok: true };
+        }
+      }
+      break;
+      
+    case TypeKind.Basic:
+      // For basic types, check if the value matches the expected JavaScript type
+      // This is a simple check for common basic types
+      const basicType = typeof value;
+      if (
+        basicType === 'string' || 
+        basicType === 'number' || 
+        basicType === 'boolean'
+      ) {
+        return { value: value as T, ok: true };
+      }
+      break;
+      
+    case TypeKind.Pointer:
+      // For pointers, check if value is not null or undefined
+      // In Go, pointers can be nil which we represent as null/undefined in TS
+      if (value !== null && value !== undefined) {
+        return { value: value as T, ok: true };
+      }
+      break;
+      
+    case TypeKind.Slice:
+      // For slices, check if the value is an array
+      if (Array.isArray(value)) {
+        return { value: value as T, ok: true };
+      }
+      break;
+      
+    case TypeKind.Map:
+      // For maps, check if the value is a Map
+      if (value instanceof Map) {
+        return { value: value as T, ok: true };
+      }
+      break;
+      
+    case TypeKind.Channel:
+      // For channels, check if the value has the required Channel interface methods
+      if (
+        typeof value === 'object' && 
+        value !== null &&
+        'send' in value && 
+        'receive' in value && 
+        'close' in value &&
+        typeof value.send === 'function' &&
+        typeof value.receive === 'function' &&
+        typeof value.close === 'function'
+      ) {
+        return { value: value as T, ok: true };
+      }
+      break;
+      
+    case TypeKind.Function:
+      // For functions, check if the value is a function
+      if (typeof value === 'function') {
+        return { value: value as T, ok: true };
+      }
+      break;
+      
+    default:
+      console.warn(`Type assertion for kind '${typeInfo.kind}' not implemented.`);
+  }
+
+  // Assertion failed
+  return { value: typeInfo.zeroValue as T, ok: false };
+}
+
+/**
  * Represents the result of a channel receive operation with 'ok' value
  */
 export interface ChannelReceiveResult<T> {

@@ -72,6 +72,9 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		return c.WriteCompositeLitValue(exp)
 	case *ast.KeyValueExpr:
 		return c.WriteKeyValueExprValue(exp)
+	case *ast.TypeAssertExpr:
+		// Handle type assertion in an expression context
+		return c.WriteTypeAssertExpr(exp)
 	case *ast.IndexExpr:
 		// Handle map access: use Map.get() instead of brackets for reading values
 		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
@@ -119,6 +122,39 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled value expr: %T", exp))
 		return nil
 	}
+}
+
+// WriteTypeAssertExpr writes a type assertion expression.
+func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
+	// Get the type name string for the asserted type
+	typeName := c.getTypeNameString(exp.Type)
+	
+	// Generate a call to goscript.typeAssert
+	c.tsw.WriteLiterally("goscript.typeAssert<")
+	c.WriteTypeExpr(exp.Type) // Write the asserted type for the generic
+	c.tsw.WriteLiterally(">(")
+	if err := c.WriteValueExpr(exp.X); err != nil { // The interface expression
+		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
+	}
+	c.tsw.WriteLiterally(", ")
+	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+	c.tsw.WriteLiterally(").value") // Access the value field directly in expression context
+	return nil
+}
+
+// getTypeNameString returns the string representation of a type name
+func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
+	switch t := typeExpr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		// For imported types like pkg.Type
+		if ident, ok := t.X.(*ast.Ident); ok {
+			return fmt.Sprintf("%s.%s", ident.Name, t.Sel.Name)
+		}
+	}
+	// Default case, use a placeholder for complex types
+	return "unknown"
 }
 
 // --- Exported Node-Specific Writers ---

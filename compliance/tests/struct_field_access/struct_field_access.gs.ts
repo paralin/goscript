@@ -9,6 +9,15 @@ class MyStruct {
 	
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
+	
+	// Register this type with the runtime type system
+	static __typeInfo = goscript.registerType(
+	  'MyStruct',
+	  goscript.TypeKind.Struct,
+	  new MyStruct(),
+	  new Set([]),
+	  MyStruct
+	);
 }
 
 export async function main(): Promise<void> {

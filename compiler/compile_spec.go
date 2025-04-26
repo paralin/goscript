@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	"strings"
 )
 
 // WriteSpec writes a specification to the output.
@@ -22,6 +23,56 @@ func (c *GoToTSCompiler) WriteSpec(a ast.Spec) error {
 		return fmt.Errorf("unknown spec type: %T", a)
 	}
 	return nil
+}
+
+// collectMethodNames returns a comma-separated string of method names for a struct
+func (c *GoToTSCompiler) collectMethodNames(structName string) string {
+	var methodNames []string
+
+	for _, fileSyntax := range c.pkg.Syntax {
+		for _, decl := range fileSyntax.Decls {
+			funcDecl, isFunc := decl.(*ast.FuncDecl)
+			if !isFunc || funcDecl.Recv == nil || len(funcDecl.Recv.List) == 0 {
+				continue // Skip non-functions or functions without receivers
+			}
+
+			// Check if the receiver type matches the struct name
+			recvField := funcDecl.Recv.List[0]
+			recvType := recvField.Type
+			// Handle pointer receivers (*MyStruct) and value receivers (MyStruct)
+			if starExpr, ok := recvType.(*ast.StarExpr); ok {
+				recvType = starExpr.X // Get the type being pointed to
+			}
+
+			// Check if the receiver identifier name matches the struct name
+			if ident, ok := recvType.(*ast.Ident); ok && ident.Name == structName {
+				// Found a method for this struct
+				methodNames = append(methodNames, fmt.Sprintf("'%s'", funcDecl.Name.Name))
+			}
+		}
+	}
+
+	return strings.Join(methodNames, ", ")
+}
+
+// collectInterfaceMethods returns a comma-separated string of method names for an interface
+func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceType) string {
+	var methodNames []string
+
+	if interfaceType.Methods != nil {
+		for _, method := range interfaceType.Methods.List {
+			if len(method.Names) > 0 {
+				// Named method
+				methodNames = append(methodNames, fmt.Sprintf("'%s'", method.Names[0].Name))
+			} else {
+				// Embedded interface - should collect its methods too
+				// This is a simplification, as we'd need to resolve the embedded interface
+				c.tsw.WriteCommentLine("// Note: Methods from embedded interfaces are not automatically included")
+			}
+		}
+	}
+
+	return strings.Join(methodNames, ", ")
 }
 
 // WriteTypeSpec writes the type specification to the output.
@@ -81,6 +132,18 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.WriteLine("")
 		c.tsw.WriteLinef("constructor(init?: Partial<%s>) { if (init) Object.assign(this, init as any); }", className)
 		c.tsw.WriteLinef("public clone(): %s { return Object.assign(Object.create(%s.prototype) as %s, this); }", className, className, className)
+
+		// Add code to register the type with the runtime system
+		c.tsw.WriteLine("")
+		c.tsw.WriteLinef("// Register this type with the runtime type system")
+		c.tsw.WriteLinef("static __typeInfo = goscript.registerType(")
+		c.tsw.WriteLinef("  '%s',", className)
+		c.tsw.WriteLinef("  goscript.TypeKind.Struct,")
+		c.tsw.WriteLinef("  new %s(),", className)
+		c.tsw.WriteLinef("  new Set([%s]),", c.collectMethodNames(className))
+		c.tsw.WriteLinef("  %s", className)
+		c.tsw.WriteLinef(");")
+
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("}")
 	case *ast.InterfaceType:
@@ -90,6 +153,18 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		}
 		c.tsw.WriteLine(" ")
 		c.WriteTypeExpr(a.Type) // The interface definition itself is a type
+
+		// Add code to register the interface with the runtime system
+		interfaceName := a.Name.Name
+		c.tsw.WriteLine("")
+		c.tsw.WriteLinef("// Register this interface with the runtime type system")
+		c.tsw.WriteLinef("const %s__typeInfo = goscript.registerType(", interfaceName)
+		c.tsw.WriteLinef("  '%s',", interfaceName)
+		c.tsw.WriteLinef("  goscript.TypeKind.Interface,")
+		c.tsw.WriteLinef("  null,") // Zero value for interface is null
+		c.tsw.WriteLinef("  new Set([%s]),", c.collectInterfaceMethods(t))
+		c.tsw.WriteLinef("  undefined")
+		c.tsw.WriteLinef(");")
 	default:
 		// type alias
 		c.tsw.WriteLiterally("type ")

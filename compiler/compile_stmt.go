@@ -775,32 +775,6 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// writeTypeAssertion handles multi-variable assignment from a type assertion.
-	writeTypeAssertion := func(typeAssertExpr *ast.TypeAssertExpr) error {
-		interfaceExpr := typeAssertExpr.X
-		assertedType := typeAssertExpr.Type
-
-		// Write the TypeScript code for the type assertion.
-		c.tsw.WriteLiterally("let ok: boolean = (")
-		if err := c.WriteValueExpr(interfaceExpr); err != nil {
-			return fmt.Errorf("failed to write interface expression in type assertion (ok check): %w", err)
-		}
-		c.tsw.WriteLiterally(" as any) satisfies ")
-		c.WriteTypeExpr(assertedType)
-		c.tsw.WriteLine("")
-
-		c.tsw.WriteLiterally("let assertedValue: ")
-		c.WriteTypeExpr(assertedType)
-		c.tsw.WriteLiterally(" | null = ok ? (")
-		if err := c.WriteValueExpr(interfaceExpr); err != nil {
-			return fmt.Errorf("failed to write interface expression in type assertion (value assignment): %w", err)
-		}
-		c.tsw.WriteLiterally(" as ")
-		c.WriteTypeExpr(assertedType)
-		c.tsw.WriteLiterally(") : null")
-		c.tsw.WriteLine("")
-
-		return nil
-	}
 
 	// writeMultiVarAssignFromCall handles multi-variable assignment from a single function call.
 	writeMultiVarAssignFromCall := func(lhs []ast.Expr, callExpr *ast.CallExpr, tok token.Token) error {
@@ -982,7 +956,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	if len(exp.Lhs) > 1 && len(exp.Rhs) == 1 {
 		rhsExpr := exp.Rhs[0]
 		if typeAssertExpr, ok := rhsExpr.(*ast.TypeAssertExpr); ok {
-			return writeTypeAssertion(typeAssertExpr)
+			return c.writeTypeAssertion(exp.Lhs, typeAssertExpr, exp.Tok)
 		} else if indexExpr, ok := rhsExpr.(*ast.IndexExpr); ok {
 			// Check if this is a map lookup (comma-ok idiom)
 			if len(exp.Lhs) == 2 {
@@ -1478,4 +1452,85 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 func isSlice(typ gtypes.Type) bool {
 	_, ok := typ.(*gtypes.Slice)
 	return ok
+}
+
+// writeTypeAssertion handles multi-variable assignment from a type assertion.
+func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.TypeAssertExpr, tok token.Token) error {
+	interfaceExpr := typeAssertExpr.X
+	assertedType := typeAssertExpr.Type
+
+	// Ensure LHS has exactly two expressions (value and ok)
+	if len(lhs) != 2 {
+		return fmt.Errorf("type assertion assignment requires exactly 2 variables on LHS, got %d", len(lhs))
+	}
+
+	// Get variable names, handling blank identifiers
+	valueIsBlank := false
+	okIsBlank := false
+	var valueName string
+	var okName string
+
+	if valIdent, ok := lhs[0].(*ast.Ident); ok {
+		if valIdent.Name == "_" {
+			valueIsBlank = true
+		} else {
+			valueName = valIdent.Name
+		}
+	} else {
+		return fmt.Errorf("unhandled LHS expression type for value in type assertion: %T", lhs[0])
+	}
+
+	if okIdent, ok := lhs[1].(*ast.Ident); ok {
+		if okIdent.Name == "_" {
+			okIsBlank = true
+		} else {
+			okName = okIdent.Name
+		}
+	} else {
+		return fmt.Errorf("unhandled LHS expression type for ok in type assertion: %T", lhs[1])
+	}
+
+	// Get the type name string for the asserted type
+	typeName := c.getTypeNameString(assertedType)
+
+	// Generate temporary variable for the result of goscript.typeAssert
+	resultVar := c.newTempVar()
+	c.tsw.WriteLiterally("const ")
+	c.tsw.WriteLiterally(resultVar)
+	c.tsw.WriteLiterally(" = goscript.typeAssert<")
+	c.WriteTypeExpr(assertedType) // Write the asserted type for the generic
+	c.tsw.WriteLiterally(">(")
+	if err := c.WriteValueExpr(interfaceExpr); err != nil { // The interface expression
+		return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
+	}
+	c.tsw.WriteLiterally(", ")
+	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+	c.tsw.WriteLiterally(")")
+	c.tsw.WriteLine("")
+
+	// Assign to variables, declaring if needed (tok == token.DEFINE)
+	assignOrDeclare := func(varName string, isBlank bool, valueSource string) error {
+		if !isBlank {
+			if tok == token.DEFINE {
+				// Use 'let' for :=
+				c.tsw.WriteLiterally("let ")
+			}
+			c.tsw.WriteLiterally(varName)
+			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally(resultVar)
+			c.tsw.WriteLiterally(".")
+			c.tsw.WriteLiterally(valueSource)
+			c.tsw.WriteLine("")
+		}
+		return nil
+	}
+
+	if err := assignOrDeclare(valueName, valueIsBlank, "value"); err != nil {
+		return err
+	}
+	if err := assignOrDeclare(okName, okIsBlank, "ok"); err != nil {
+		return err
+	}
+
+	return nil
 }
