@@ -185,8 +185,8 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		if err := c.WriteValueExpr(a.Name); err != nil { // Interface name is a value identifier
 			return err
 		}
-		c.tsw.WriteLine(" ")
-		c.WriteTypeExpr(a.Type) // The interface definition itself is a type
+		c.tsw.WriteLiterally(" ") // Changed from WriteLine to WriteLiterally
+		c.WriteTypeExpr(a.Type)   // The interface definition itself is a type
 
 		// Add code to register the interface with the runtime system
 		interfaceName := a.Name.Name

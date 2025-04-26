@@ -4,7 +4,7 @@
 import * as goscript from "@go/builtin";
 
 interface MultiParamReturner 
-{
+ {
 	Process(data: number[], count: number, _p2: string): [boolean, goscript.Error];
 }
 

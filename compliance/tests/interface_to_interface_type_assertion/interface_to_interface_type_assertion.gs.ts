@@ -4,7 +4,7 @@
 import * as goscript from "@go/builtin";
 
 interface MyInterface 
-{
+ {
 	Method1(): number;
 }
 
@@ -39,7 +39,7 @@ class MyStruct {
 }
 
 interface MyOtherInterface 
-{
+ {
 	Method1(): number;
 }
 

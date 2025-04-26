@@ -4,7 +4,7 @@
 import * as goscript from "@go/builtin";
 
 export async function main(): Promise<void> {
-	let greet = (name: string) => {
+	let greet = (name: string): string => {
 		return "Hello, " + name
 	}
 	
