@@ -20,7 +20,6 @@ export async function main(): Promise<void> {
 				console.log("Sent value")
 			}
 		},
-		
 		{
 			id: -1,
 			isSend: false,
@@ -29,7 +28,6 @@ export async function main(): Promise<void> {
 				console.log("Default case hit")
 			}
 		},
-		
 	], true)
 }
 

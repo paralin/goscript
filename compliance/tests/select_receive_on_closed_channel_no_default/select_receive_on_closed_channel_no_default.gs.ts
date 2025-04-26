@@ -10,22 +10,21 @@ export async function main(): Promise<void> {
 	// Should not be reached
 	
 	// Should be reached
-	const _tempVar1: goscript.SelectCase<any>[] = []
-	_tempVar1.push({
-		id: 0,
-		isSend: false,
-		channel: ch,
-		onSelected: async (result) => {
-			const val = result.value
-			const ok = result.ok
-			if (ok) {
-				console.log("Received value with ok==true:", val) // Should not be reached
-			} else {
-				console.log("Received zero value with ok==false:", val) // Should be reached
+	await goscript.selectStatement([
+		{
+			id: 0,
+			isSend: false,
+			channel: ch,
+			onSelected: async (result) => {
+				const val = result.value
+				const ok = result.ok
+				if (ok) {
+					console.log("Received value with ok==true:", val) // Should not be reached
+				} else {
+					console.log("Received zero value with ok==false:", val) // Should be reached
+				}
 			}
-		}
-	}),
-	
-	await goscript.selectStatement(_tempVar1, false)
+		},
+	], false)
 }
 
