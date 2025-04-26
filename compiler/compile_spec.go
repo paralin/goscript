@@ -70,7 +70,7 @@ func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceTyp
 			} else {
 				// Embedded interface - resolve it and collect its methods
 				embeddedType := method.Type
-				
+
 				// Resolve the embedded interface using type information
 				if tv, ok := c.pkg.TypesInfo.Types[embeddedType]; ok && tv.Type != nil {
 					// Get the underlying interface type
@@ -82,7 +82,7 @@ func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceTyp
 					} else if underlying, ok := tv.Type.(*types.Interface); ok {
 						ifaceType = underlying
 					}
-					
+
 					// Collect methods from the interface
 					if ifaceType != nil {
 						for i := 0; i < ifaceType.NumMethods(); i++ {
@@ -102,7 +102,7 @@ func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceTyp
 	for name := range methodNamesMap {
 		methodNames = append(methodNames, fmt.Sprintf("'%s'", name))
 	}
-	
+
 	// Sort for deterministic output
 	sort.Strings(methodNames)
 
@@ -362,4 +362,68 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 	}
 
 	c.tsw.WriteImport(impName, importPath)
+}
+
+// WriteInterfaceMethodSignature writes a TypeScript interface method signature from a Go ast.Field.
+func (c *GoToTSCompiler) WriteInterfaceMethodSignature(field *ast.Field) error {
+	if len(field.Names) == 0 {
+		// Should not happen for named methods in an interface, but handle defensively
+		return fmt.Errorf("interface method field has no name")
+	}
+
+	methodName := field.Names[0]
+	funcType, ok := field.Type.(*ast.FuncType)
+	if !ok {
+		// Should not happen for valid interface methods, but handle defensively
+		c.tsw.WriteCommentInline("unexpected interface method type")
+		return fmt.Errorf("interface method type is not a FuncType")
+	}
+
+	// Write method name
+	c.WriteIdentValue(methodName)
+
+	// Write parameter list (name: type)
+	c.tsw.WriteLiterally("(")
+	if funcType.Params != nil {
+		for i, param := range funcType.Params.List {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			// Determine parameter name
+			paramName := fmt.Sprintf("_p%d", i) // Default placeholder
+			if len(param.Names) > 0 && param.Names[0].Name != "" && param.Names[0].Name != "_" {
+				paramName = param.Names[0].Name
+			}
+			c.tsw.WriteLiterally(paramName)
+			c.tsw.WriteLiterally(": ")
+			c.WriteTypeExpr(param.Type)
+		}
+	}
+	c.tsw.WriteLiterally(")")
+
+	// Write return type
+	// Use WriteFuncType's logic for return types, but without the async handling
+	if funcType.Results != nil && len(funcType.Results.List) > 0 {
+		c.tsw.WriteLiterally(": ")
+		if len(funcType.Results.List) == 1 && len(funcType.Results.List[0].Names) == 0 {
+			// Single unnamed return type
+			c.WriteTypeExpr(funcType.Results.List[0].Type)
+		} else {
+			// Multiple or named return types -> tuple
+			c.tsw.WriteLiterally("[")
+			for i, result := range funcType.Results.List {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteTypeExpr(result.Type)
+			}
+			c.tsw.WriteLiterally("]")
+		}
+	} else {
+		// No return value -> void
+		c.tsw.WriteLiterally(": void")
+	}
+
+	c.tsw.WriteLine(";") // Semicolon at the end of the method signature
+	return nil
 }

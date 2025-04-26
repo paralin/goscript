@@ -128,7 +128,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	// Get the type name string for the asserted type
 	typeName := c.getTypeNameString(exp.Type)
-	
+
 	// Generate a call to goscript.typeAssert
 	c.tsw.WriteLiterally("goscript.typeAssert<")
 	c.WriteTypeExpr(exp.Type) // Write the asserted type for the generic
@@ -249,18 +249,10 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 	c.tsw.Indent(1)
 	for _, method := range exp.Methods.List {
 		if len(method.Names) > 0 {
-			// Keep original Go casing for method names
-			methodName := method.Names[0]
-			c.WriteIdentValue(methodName)
-
-			// Method signature is a FuncType
-			if funcType, ok := method.Type.(*ast.FuncType); ok {
-				c.WriteFuncType(funcType, false) // Interface method signatures are not async
-			} else {
-				// Should not happen for valid interfaces, but handle defensively
-				c.tsw.WriteCommentInline("unexpected method type")
+			// Named method - use WriteInterfaceMethodSignature
+			if err := c.WriteInterfaceMethodSignature(method); err != nil {
+				c.tsw.WriteCommentInline(fmt.Sprintf("error writing interface method signature: %v", err))
 			}
-			c.tsw.WriteLine(";")
 		} else {
 			// Embedded interface - write the type name
 			c.WriteTypeExpr(method.Type)
