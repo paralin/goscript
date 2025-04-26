@@ -29,6 +29,5 @@ export async function main(): Promise<void> {
 	console.log("dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: " + dereferencedStructCopy.MyString)
 	// Expected: "value copy 2"
 	console.log("valueCopy2: Expected: value copy 2, Actual: " + valueCopy2.MyString)
-	pointerCopy/* discarded value */
 }
 

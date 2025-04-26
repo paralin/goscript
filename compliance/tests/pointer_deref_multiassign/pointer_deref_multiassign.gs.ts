@@ -18,10 +18,6 @@ export async function main(): Promise<void> {
 	// Dereference structPointer to get a copy of the struct.
 	// Also demonstrates multi-variable assignment and the use of the blank identifier '_'.
 	let dereferencedStructCopy = structPointer.clone()
-	structPointer.myBool/* discarded value */
-	structPointer.MyInt/* discarded value */
 	let unusedString = "hello" // testing _ set
-	unusedString/* discarded value */
-	dereferencedStructCopy/* discarded value */
 }
 

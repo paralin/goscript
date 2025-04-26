@@ -847,12 +847,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	writeSingleAssign := func(lhsExpr, rhsExpr ast.Expr, tok token.Token, isLast bool) error {
 		// Check for blank identifier on the left-hand side
 		if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name == "_" {
-			// Blank identifier: evaluate the RHS for side effects, but discard the value.
-			if err := c.WriteValueExpr(rhsExpr); err != nil {
-				return fmt.Errorf("failed to write RHS for blank identifier assignment: %w", err)
-			}
-			c.tsw.WriteCommentInline("discarded value")
-			c.tsw.WriteLine("") // Remove semicolon, each assignment gets its own line
+			// Blank identifier: Skip generating output for this assignment.
+			// Note: This assumes RHS side effects are not required in the generated TS.
 			return nil
 		}
 
