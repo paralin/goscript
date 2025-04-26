@@ -474,10 +474,8 @@ async function runGoCode() {
   // You can still use synchronous types and functions
   let myThing = new MyStruct();
   myThing.GetMyString();
-  }
-  ```
-
-runGoCode();
+  runGoCode();
+}
 ```
 
 ## License
