@@ -212,7 +212,7 @@ This is the typical package structure of the output TypeScript import path:
         let s2 = goscript.slice(s1, 1, 2)       // len 1, __capacity 3
         let s3 = goscript.slice(arr, 0, 2, 3)   // len 2, __capacity 3
         ```
-        *Important:* Modifications made through a slice affect the underlying data, and thus are visible through other slices sharing that data.
+        *Important:* Modifications made through a slice affect the underlying data. As demonstrated in the compliance tests (e.g., "Slicing a slice"), changes made via one slice variable (like `subSlice2` modifying index 0) are visible through other slice variables (`subSlice1`, `baseSlice`) that share the same underlying memory region.
     -   **Append (`append(s, ...)`):** Translated using the `goscript.append` runtime helper. Crucially, the result of `goscript.append` *must* be assigned back to the slice variable, as `append` may return a new slice instance if reallocation occurs.
         ```go
         s = append(s, elem1, elem2)
