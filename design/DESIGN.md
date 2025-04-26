@@ -16,7 +16,7 @@ This is the typical package structure of the output TypeScript import path:
 - **Keywords:** Go keywords are generally not an issue, but care must be taken if a Go identifier clashes with a TypeScript keyword.
 
 ## Type Mapping
-- **Built-in Types:** Go built-in types are mapped to corresponding TypeScript types (e.g., `string` -> `string`, `int` -> `number`, `bool` -> `boolean`).
+- **Built-in Types:** Go built-in types are mapped to corresponding TypeScript types (e.g., `string` -> `string`, `int` -> `number`, `bool` -> `boolean`, `float64` -> `number`).
 - **String and Rune Conversions:** Go's `rune` type (an alias for `int32` representing a Unicode code point) and its interaction with `string` are handled as follows:
     -   **`rune` Type:** Translated to TypeScript `number`.
     -   **`string(rune)` Conversion:** The Go conversion from a `rune` to a `string` containing that single character is translated using `String.fromCharCode()`:
@@ -139,6 +139,7 @@ This is the typical package structure of the output TypeScript import path:
     -   **Append (`append(s, ...)`):** Requires a runtime helper `append` to handle potential resizing and capacity changes according to Go rules. (This is assumed based on Go semantics, though not explicitly in this specific test).
     -   **Slicing (`s[low:high]`):** Requires runtime support to correctly handle Go's slicing behavior, which creates a new slice header sharing the underlying array. (Assumed, not in this test).
 - **Arrays:** Go arrays (e.g., `[5]int`) have a fixed size known at compile time. They are also mapped to TypeScript arrays (`T[]`), but their fixed-size nature is enforced during compilation (e.g., preventing `append`).
+    -   **Sparse Array Literals:** For Go array literals with specific indices (e.g., `[5]int{1: 10, 3: 30}`), unspecified indices are filled with the zero value of the element type in the generated TypeScript. For example, `[5]int{1: 10, 3: 30}` becomes `[0, 10, 0, 30, 0]`.
 
 *Note: The distinction between slices and arrays in Go is important. While both map to TypeScript arrays, runtime helpers are essential for emulating slice-specific behaviors like `make`, `len`, `cap`, `append`, and sub-slicing.*
 - **Maps:** Go maps (`map[K]V`) are translated to TypeScript's standard `Map<K, V>` objects. Various Go map operations are mapped as follows:
@@ -149,7 +150,7 @@ This is the typical package structure of the output TypeScript import path:
         becomes:
         ```typescript
         import * as goscript from "@go/builtin"
-        let m = goscript.makeMap("string", "int") // Type info passed as strings
+        let m = goscript.makeMap<string, number>() // Using generics for type information
         ```
     -   **Literals:** Map literals are translated to `new Map(...)`:
         ```go
@@ -266,7 +267,7 @@ This is the typical package structure of the output TypeScript import path:
         c.Inc()    // OK
         p?.Inc()   // OK (requires null check for pointer types)
         ```
-        *Note: The optional chaining (`?.`) is generally required when calling methods on variables representing Go pointers (mapped to `T | null`). However, if the compiler can determine that a pointer variable is definitely not `null` at the point of call (e.g., immediately after initialization via `p := &T{...}`), the `?.` may be omitted for optimization.*
+        *Note: The optional chaining (`?.`) is generally required when calling methods on variables representing Go pointers (mapped to `T | null`). However, if the compiler can determine that a pointer variable is definitely not `null` at the point of call (e.g., immediately after initialization via `p := &T{...}` or immediately after a pointer assignment where the source is known to be non-null), the `?.` may be omitted for optimization.*
     -   **Receiver Binding:** As per Code Generation Conventions, the Go receiver identifier (e.g., `c`) is bound to `this` within the method body (`const c = this`).
     -   **Semantic Note on Value Receivers:** In Go, a method with a value receiver operates on a *copy* of the struct. The current TypeScript translation defines the method directly on the class. If a value-receiver method modifies the receiver's fields, the TypeScript version will modify the *original* object referenced by `this`, differing from Go's copy semantics. This is an area for potential future refinement if strict copy-on-call semantics for value receivers are required. (The `clone()` method handles copy-on-assignment, not copy-on-method-call).
 
@@ -274,7 +275,89 @@ This is the typical package structure of the output TypeScript import path:
 
 Go's value semantics (where assigning a struct copies it) are emulated in TypeScript by:
 1. Adding a `clone()` method to generated classes.
-2. Automatically calling `.clone()` during assignment statements (`=`, `:=`) whenever the right-hand side evaluates to a struct *value* (e.g., assigning from a variable, a composite literal `T{...}`, or a dereferenced pointer `*p`). This requires type information during compilation.
+2. Automatically calling `.clone()` during assignment statements (`=`, `:=`) whenever the right-hand side evaluates to a struct *value* (e.g., assigning from a variable, a composite literal `T{...}`, a dereferenced pointer `*p`, or the result of a function call returning a struct value). This requires type information during compilation.
+3. *Note:* Assigning a pointer variable to another pointer variable (e.g., `p2 := p1`) does *not* trigger `.clone()` as this maintains Go's reference semantics for pointers.
+
+## Multi-Assignment Statements
+
+Go's multi-assignment statements (where multiple variables are assigned in a single statement) are translated into separate TypeScript assignments:
+
+```go
+a, b, c := val1, val2, val3
+```
+
+becomes:
+
+```typescript
+let a = val1
+let b = val2
+let c = val3
+```
+
+The blank identifier (`_`) in Go results in the omission of the corresponding assignment in TypeScript:
+
+```go
+x, _, z := val1, val2, val3
+```
+
+becomes:
+
+```typescript
+let x = val1
+let z = val3
+```
+
+## Operators
+
+Go operators are generally mapped directly to their TypeScript equivalents:
+
+- **Arithmetic Operators:** `+`, `-`, `*`, `/`, `%` map directly to the same operators in TypeScript.
+- **Comparison Operators:** `==`, `!=`, `<`, `<=`, `>`, `>=` map directly to the same operators in TypeScript.
+- **Logical Operators:** `&&`, `||`, `!` map directly to the same operators in TypeScript.
+
+## Control Flow: Basic `for` Loops
+
+Go's C-style `for` loops translate directly to their TypeScript equivalents:
+
+-   **Three-Part Loop:**
+    ```go
+    for i := 0; i < 10; i++ {
+        // body
+    }
+    ```
+    becomes:
+    ```typescript
+    for (let i = 0; i < 10; i++) {
+        // body
+    }
+    ```
+
+-   **Condition-Only Loop (while):**
+    ```go
+    for condition {
+        // body
+    }
+    ```
+    becomes:
+    ```typescript
+    for (; condition; ) {
+        // body
+    }
+    ```
+    *Note: This is semantically equivalent to a `while` loop in other languages.*
+
+-   **Infinite Loop:**
+    ```go
+    for {
+        // body
+    }
+    ```
+    becomes:
+    ```typescript
+    for (;;) {
+        // body
+    }
+    ```
 
 ## Control Flow: `for range` Loops
 
@@ -343,6 +426,7 @@ Go's `for range` construct is translated differently depending on the type being
     }
     ```
     *Note: The index `i` in the generated TypeScript loop corresponds to the *rune index*, not the byte index as in Go's `for range` over strings.*
+
 ## Control Flow: `switch` Statements
 
 Go's `switch` statement is translated into a standard TypeScript `switch` statement.
@@ -401,6 +485,59 @@ Go's `switch` statement is translated into a standard TypeScript `switch` statem
     }
     ```
 -   **Fallthrough:** Go's explicit `fallthrough` keyword is *not* currently supported and would require specific handling if implemented.
+
+## Control Flow: `select` Statements
+
+Go's `select` statement, used for channel communication, is translated using a runtime helper:
+
+```go
+select {
+case val, ok := <-ch1:
+    // Process received value
+case ch2 <- value:
+    // Process after sending
+default:
+    // Default case
+}
+```
+
+becomes:
+
+```typescript
+import * as goscript from "@go/builtin"
+
+await goscript.selectStatement([
+    {
+        id: 0,  // Unique identifier for this case
+        isSend: false,  // This is a receive operation
+        channel: ch1,
+        onSelected: async (result) => {
+            const val = result.value
+            const ok = result.ok
+            // Process received value
+        }
+    },
+    {
+        id: 1,  // Unique identifier for this case
+        isSend: true,  // This is a send operation
+        channel: ch2,
+        value: value,
+        onSelected: async () => {
+            // Process after sending
+        }
+    }
+], true)  // true indicates there's a default case
+```
+
+The `selectStatement` helper takes an array of case objects, each containing:
+- `id`: A unique identifier for the case
+- `isSend`: Boolean indicating whether this is a send (`true`) or receive (`false`) operation
+- `channel`: The channel to operate on
+- `value`: (For send operations) The value to send
+- `onSelected`: Callback function that runs when this case is selected
+
+For receive operations, the callback receives a `result` object with `value` and `ok` properties, similar to Go's comma-ok syntax. The second parameter to `selectStatement` indicates whether the `select` has a default case.
+
 ## Control Flow: `if` Statements
 
 Go's `if` statements are translated into standard TypeScript `if` statements.
@@ -448,6 +585,7 @@ Go's `if` statements are translated into standard TypeScript `if` statements.
     // v is not accessible here (if block scope is used)
     ```
     *Note: Precise scoping might require careful handling, especially if the initialized variable shadows an outer variable.*
+
 ## Zero Values
 
 Go's zero values are mapped as follows:
@@ -477,13 +615,43 @@ To determine which functions need to be marked `async` in TypeScript, the compil
 
 1.  **Base Cases (Async Roots):**
     *   A function is inherently **Asynchronous** if its body contains:
-        *   A channel receive operation (`&lt;-ch`).
+        *   A channel receive operation (`<-ch`).
+        *   A channel send operation (`ch <- val`).
         *   A `select` statement.
-        *   (Potentially in the future: `go` statement).
+        *   A goroutine creation (`go` statement).
 2.  **Propagation:**
     *   A function is marked **Asynchronous** if it directly calls another function that is already marked **Asynchronous**.
 3.  **Default:**
     *   If a function does not meet any of the asynchronous criteria above, it is considered **Synchronous**.
+
+### Channel Operations
+
+Channel operations are translated as follows:
+
+-   **Creation:** `make(chan T, capacity)` is translated to `goscript.makeChannel<T>(capacity, zeroValueOfTypeT)`. For unbuffered channels (`make(chan T)`), the capacity is `0`.
+-   **Receive:** `val := <-ch` is translated to `val = await ch.receive()`.
+-   **Send:** `ch <- val` is translated to `await ch.send(val)`.
+-   **Close:** `close(ch)` is translated to `ch.close()`.
+
+### Goroutines
+
+Go's goroutine creation (`go func() { ... }()`) is translated to a call to `queueMicrotask` with the target function wrapped in an async arrow function:
+
+```go
+go func() {
+    // Goroutine body
+}()
+```
+
+becomes:
+
+```typescript
+queueMicrotask(async () => {
+    {
+        // Goroutine body
+    }
+})
+```
 
 ### TypeScript Generation
 
@@ -544,7 +712,7 @@ async function caller(ch: goscript.Channel<number>): Promise<number> {
 
 // Marked async because it calls the async 'caller' and uses 'await myChan.send()'
 export async function main(): Promise<void> {
-	let myChan = goscript.makeChannel<number>(1)
+	let myChan = goscript.makeChannel<number>(1, 0)
 	await myChan.send(10) // Send is awaited
 	let finalResult = await caller(myChan) // Call is awaited
 	console.log(finalResult)

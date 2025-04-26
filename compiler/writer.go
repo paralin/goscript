@@ -54,7 +54,7 @@ func (w *TSCodeWriter) Indent(count int) {
 
 // WriteImport writes a TypeScript import.
 func (w *TSCodeWriter) WriteImport(symbolName, importPath string) {
-	w.WriteLinef("import * as %s from %q;", symbolName, importPath)
+	w.WriteLinef("import * as %s from %q", symbolName, importPath)
 }
 
 // WriteCommentLine writes a comment as a // line.

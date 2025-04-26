@@ -1,0 +1,3 @@
+*   **Type Assertions (Lines 78-98):**
+    *   **Issue:** The design mandates a runtime helper (`goscript.typeAssert`) for type assertions (especially interface-to-concrete-type) because compile-time checks like `satisfies` are insufficient (Line 98). However, the generated code for both `interface_to_interface_type_assertion` and `interface_type_assertion` uses `(i as any) satisfies TargetType`.
+    *   **Action:** The implementation needs to be changed to use the intended runtime helper mechanism.
