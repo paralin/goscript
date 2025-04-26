@@ -75,6 +75,40 @@ This is the typical package structure of the output TypeScript import path:
         *Note: The distinction between pointer and value initialization in Go is primarily relevant for assignment semantics (cloning for values) and method receiver types, rather than the initial object creation in TypeScript.*
 - **Pointers (`*T`):** Mapped to TypeScript union types (`T | null`).
 - **Interfaces:** Mapped to TypeScript `interface` types. Methods retain their original Go casing.
+- **Embedded Interfaces:** Go interfaces can embed other interfaces. This is translated using TypeScript's `extends` keyword. The generated TypeScript interface extends all the interfaces embedded in the original Go interface.
+        ```go
+        // Go code
+        type Reader interface { Read(p []byte) (n int, err error) }
+        type Closer interface { Close() error }
+        type ReadCloser interface {
+            Reader // Embeds Reader
+            Closer // Embeds Closer
+        }
+        ```
+        becomes:
+        ```typescript
+        // TypeScript translation
+        interface Reader {
+            Read(_p0: number[]): [number, goscript.Error];
+        }
+        interface Closer {
+            Close(): goscript.Error;
+        }
+        // ReadCloser extends both Reader and Closer
+        interface ReadCloser extends Reader, Closer {
+        }
+        ```
+    - **Runtime Registration:** When registering an interface type with the runtime (`goscript.registerType`), the set of method names includes all methods from the interface itself *and* all methods from any embedded interfaces.
+        ```typescript
+        // Example registration for ReadCloser
+        const ReadCloser__typeInfo = goscript.registerType(
+          'ReadCloser',
+          goscript.TypeKind.Interface,
+          null,
+          new Set(['Close', 'Read']), // Includes methods from Reader and Closer
+          undefined
+        );
+        ```
 - **Type Assertions:** Go's type assertion syntax (`i.(T)`) allows checking if an interface variable `i` holds a value of a specific concrete type `T` or implements another interface `T`. This is translated using the `goscript.typeAssert` runtime helper function.
     -   **Comma-Ok Assertion (`v, ok := i.(T)`):** This form checks if the assertion holds and returns the asserted value (or zero value) and a boolean status.
         -   **Interface-to-Concrete Example:**
