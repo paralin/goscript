@@ -30,6 +30,8 @@ If you are OK with these limitations, GoScript is for you!
 
 ### Command Line
 
+After installing the `goscript` npm package, the `goscript` command line tool is available. You can run it directly or within your `package.json` scripts.
+
 Compile a package using the CLI tool:
 
 ```bash
@@ -38,11 +40,16 @@ goscript compile \
   --output ./output
 ```
 
-For example, to compile the simple example:
+For example, to compile the simple example from the project root:
+
+```bash
+goscript compile --package ./example/simple --output ./output
+```
+Or within the `example/simple` directory:
 
 ```bash
 cd example/simple
-go run ../../cmd/goscript compile --package . --output ./output
+goscript compile --package . --output ./output
 ```
 
 ### As a Library
