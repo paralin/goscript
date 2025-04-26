@@ -411,7 +411,7 @@ class BufferedChannel<T> implements Channel<T> {
 export interface SelectCase<T> {
   id: number
   isSend: boolean // true for send, false for receive
-  channel: Channel<any>
+  channel: Channel<any> | null // Allow null
   value?: any // Value to send for send cases
   // Optional handlers for when this case is selected
   onSelected?: (result: SelectResult<T>) => Promise<void>
@@ -442,12 +442,11 @@ export async function selectStatement<T>(
       // Skip default case in this check
       continue
     }
-    if (caseObj.isSend) {
-      if (caseObj.channel.canSendNonBlocking()) {
+    // Add check for channel existence
+    if (caseObj.channel) {
+      if (caseObj.isSend && caseObj.channel.canSendNonBlocking()) {
         readyCases.push(caseObj)
-      }
-    } else {
-      if (caseObj.channel.canReceiveNonBlocking()) {
+      } else if (!caseObj.isSend && caseObj.channel.canReceiveNonBlocking()) {
         readyCases.push(caseObj)
       }
     }
@@ -459,19 +458,25 @@ export async function selectStatement<T>(
       readyCases[Math.floor(Math.random() * readyCases.length)]
 
     // Execute the selected operation and its onSelected handler
-    if (selectedCase.isSend) {
-      const result = await selectedCase.channel.selectSend(
-        selectedCase.value,
-        selectedCase.id,
-      )
-      if (selectedCase.onSelected) {
-        await selectedCase.onSelected(result as SelectResult<T>) // Await the handler
+    // Add check for channel existence
+    if (selectedCase.channel) {
+      if (selectedCase.isSend) {
+        const result = await selectedCase.channel.selectSend(
+          selectedCase.value,
+          selectedCase.id,
+        )
+        if (selectedCase.onSelected) {
+          await selectedCase.onSelected(result as SelectResult<T>) // Await the handler
+        }
+      } else {
+        const result = await selectedCase.channel.selectReceive(selectedCase.id)
+        if (selectedCase.onSelected) {
+          await selectedCase.onSelected(result) // Await the handler
+        }
       }
     } else {
-      const result = await selectedCase.channel.selectReceive(selectedCase.id)
-      if (selectedCase.onSelected) {
-        await selectedCase.onSelected(result) // Await the handler
-      }
+      // This case should ideally not happen if channel is required for non-default cases
+      console.error('Selected case without a channel:', selectedCase)
     }
     return // Return after executing a ready case
   }
@@ -497,11 +502,16 @@ export async function selectStatement<T>(
     .filter((c) => c.id !== -1)
     .map((caseObj) => {
       // Exclude default case
-      if (caseObj.isSend) {
-        return caseObj.channel.selectSend(caseObj.value, caseObj.id)
-      } else {
-        return caseObj.channel.selectReceive(caseObj.id)
+      // Add check for channel existence (though it should always exist here)
+      if (caseObj.channel) {
+        if (caseObj.isSend) {
+          return caseObj.channel.selectSend(caseObj.value, caseObj.id)
+        } else {
+          return caseObj.channel.selectReceive(caseObj.id)
+        }
       }
+      // Return a promise that never resolves if channel is somehow missing
+      return new Promise<SelectResult<any>>(() => {})
     })
 
   const result = await Promise.race(blockingPromises)

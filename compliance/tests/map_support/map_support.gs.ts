@@ -5,7 +5,7 @@ import * as goscript from "@go/builtin";
 
 export async function main(): Promise<void> {
 	// Create map using make
-	let scores = goscript.makeMap()
+	let scores = goscript.makeMap<string, number>()
 	console.log("Empty map created: Expected: true, Actual:", goscript.len(scores) == 0)
 	
 	// Add key-value pairs

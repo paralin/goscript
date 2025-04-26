@@ -359,8 +359,12 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			// Handle make for slices: make([]T, len, cap) or make([]T, len)
 			if len(exp.Args) >= 1 {
 				// Handle map creation: make(map[K]V)
-				if _, ok := exp.Args[0].(*ast.MapType); ok {
-					c.tsw.WriteLiterally("goscript.makeMap()")
+				if mapType, ok := exp.Args[0].(*ast.MapType); ok {
+					c.tsw.WriteLiterally("goscript.makeMap<")
+					c.WriteTypeExpr(mapType.Key) // Write the key type
+					c.tsw.WriteLiterally(", ")
+					c.WriteTypeExpr(mapType.Value) // Write the value type
+					c.tsw.WriteLiterally(">()")
 					return nil // Handled make for map
 				}
 

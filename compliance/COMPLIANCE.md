@@ -49,7 +49,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   **Data Structures:**
     *   Arrays (`[N]T`) - Including array literals and indexing.
     *   Slices (`[]T`) - Creation using `make([]T, len)` and `make([]T, len, cap)`.
-    *   Maps (`map[K]V`) - Creation using `make`, literals, access, assignment, `delete`, `len`, `range`.
+    *   Maps (`map[K]V`) - Creation using `make(map[K]V)` (generates `makeMap<TS_K, TS_V>()`), literals, access, assignment, `delete`, `len`, `range`.
     *   `struct` definitions (including exported/unexported fields).
     *   Composite Literals for structs (`MyStruct{...}`).
 *   **Functions & Methods:**

@@ -65,7 +65,8 @@ export async function compile(config: CompileConfig): Promise<void> {
       // Go compiler often prints status messages to stderr, treat as info unless exit code is non-zero
       console.info(`GoScript stderr:\n${stderr}`)
     }
-  } catch (error: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
+  } catch (error: any) {
+    // eslint-disable-line @typescript-eslint/no-explicit-any
     console.error(`GoScript compilation failed: ${error.message}`)
     if (error.stderr) {
       console.error(`GoScript stderr:\n${error.stderr}`)
