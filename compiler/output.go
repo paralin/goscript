@@ -1,4 +1,4 @@
-package output
+package compiler
 
 import (
 	"path/filepath"

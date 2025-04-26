@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/paralin/goscript/output"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/tools/go/packages"
 )
@@ -29,7 +28,7 @@ func NewPackageCompiler(
 		le:           le,
 		pkg:          pkg,
 		compilerConf: compilerConf,
-		outputPath:   output.ComputeModulePath(compilerConf.OutputPathRoot, pkg.PkgPath),
+		outputPath:   ComputeModulePath(compilerConf.OutputPathRoot, pkg.PkgPath),
 	}
 
 	return res, nil

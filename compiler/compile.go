@@ -3,12 +3,11 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
-	"go/token" // Added token import for containsAsyncOperations
+	"go/token"
 	"go/types"
 
+	gstypes "github.com/paralin/goscript/compiler/types"
 	"golang.org/x/tools/go/packages"
-
-	gstypes "github.com/paralin/goscript/types"
 )
 
 // GoToTSCompiler compiles Go code to TypeScript code.
