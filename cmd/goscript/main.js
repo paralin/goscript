@@ -15,7 +15,7 @@ const args = process.argv.slice(2);
 
 // Construct the go run command with the absolute path to the goscript executable
 // Use path.join for robustness
-const goscriptCmd = `go run "${path.join(projectRoot, "cmd", "goscript")}"`;
+const goscriptCmd = `go run ./cmd/goscript`;
 
 // Combine the goscript command with the arguments
 const command = `${goscriptCmd} ${args.join(" ")}`;
@@ -24,7 +24,7 @@ const command = `${goscriptCmd} ${args.join(" ")}`;
 const child = spawn(command, {
   shell: true, // Use shell to correctly parse the command string
   stdio: 'inherit', // Inherit stdin, stdout, and stderr
-  cwd: process.cwd(), // Execute in the current working directory where the script is run
+  cwd: projectRoot, // Execute in the current working directory where the script is run
 });
 
 child.on('error', (error) => {
