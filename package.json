@@ -1,6 +1,6 @@
 {
   "name": "goscript",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "description": "Go to TypeScript compiler",
   "bin": {
     "goscript": "./cmd/goscript/main.js"
