@@ -1493,44 +1493,43 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	// Get the type name string for the asserted type
 	typeName := c.getTypeNameString(assertedType)
 
-	// Generate temporary variable for the result of goscript.typeAssert
-	resultVar := c.newTempVar()
-	c.tsw.WriteLiterally("const ")
-	c.tsw.WriteLiterally(resultVar)
-	c.tsw.WriteLiterally(" = goscript.typeAssert<")
-	c.WriteTypeExpr(assertedType) // Write the asserted type for the generic
+	// Generate the destructuring assignment
+	if tok == token.DEFINE {
+		// Use 'let' for :=
+		c.tsw.WriteLiterally("let ")
+	}
+
+	c.tsw.WriteLiterally("{ ")
+	// Write value part of destructuring, handling blank identifier
+	c.tsw.WriteLiterally("value: ")
+	if valueIsBlank {
+		c.tsw.WriteLiterally("_")
+	} else {
+		c.tsw.WriteLiterally(valueName)
+	}
+	c.tsw.WriteLiterally(", ")
+
+	// Write ok part of destructuring, handling blank identifier
+	c.tsw.WriteLiterally("ok: ")
+	if okIsBlank {
+		c.tsw.WriteLiterally("_")
+	} else {
+		c.tsw.WriteLiterally(okName)
+	}
+	c.tsw.WriteLiterally(" } = goscript.typeAssert<")
+
+	// Write the asserted type for the generic
+	c.WriteTypeExpr(assertedType)
 	c.tsw.WriteLiterally(">(")
-	if err := c.WriteValueExpr(interfaceExpr); err != nil { // The interface expression
+
+	// Write the interface expression
+	if err := c.WriteValueExpr(interfaceExpr); err != nil {
 		return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
 	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
 	c.tsw.WriteLiterally(")")
-	c.tsw.WriteLine("")
-
-	// Assign to variables, declaring if needed (tok == token.DEFINE)
-	assignOrDeclare := func(varName string, isBlank bool, valueSource string) error {
-		if !isBlank {
-			if tok == token.DEFINE {
-				// Use 'let' for :=
-				c.tsw.WriteLiterally("let ")
-			}
-			c.tsw.WriteLiterally(varName)
-			c.tsw.WriteLiterally(" = ")
-			c.tsw.WriteLiterally(resultVar)
-			c.tsw.WriteLiterally(".")
-			c.tsw.WriteLiterally(valueSource)
-			c.tsw.WriteLine("")
-		}
-		return nil
-	}
-
-	if err := assignOrDeclare(valueName, valueIsBlank, "value"); err != nil {
-		return err
-	}
-	if err := assignOrDeclare(okName, okIsBlank, "ok"); err != nil {
-		return err
-	}
+	c.tsw.WriteLine("") // Add newline after the statement
 
 	return nil
 }

@@ -95,9 +95,8 @@ This is the typical package structure of the output TypeScript import path:
             i = s.clone()
 
             // goscript.typeAssert returns { value: T | null, ok: boolean }
-            const _tempVar1 = goscript.typeAssert<MyStruct>(i, 'MyStruct')
-            let ok = _tempVar1.ok // Extract boolean status
-            // let _ = _tempVar1.value // Value could be extracted if needed
+            // Use destructuring to extract 'ok' (and 'value' if needed)
+            let { value: _, ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')
             if (ok) {
                 console.log("Type assertion successful")
             }
@@ -120,8 +119,8 @@ This is the typical package structure of the output TypeScript import path:
             rwc = s.clone()
 
             // Type assertion checks if 'rwc' implements 'ReadCloser'
-            const _tempVar1 = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
-            let ok = _tempVar1.ok
+            // Use destructuring to extract 'ok' (and 'value' if needed)
+            let { value: _, ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
             if (ok) {
                 console.log("Embedded interface assertion successful")
             }
@@ -131,10 +130,9 @@ This is the typical package structure of the output TypeScript import path:
                 *   `<T>`: The target type (interface or class) is passed as a TypeScript generic parameter.
                 *   `'TypeName'`: The name of the target type `T` is passed as a string literal. This string is used by the runtime helper for type checking against registered type information.
             2.  The helper returns an object `{ value: T | null, ok: boolean }`.
-            3.  The `ok` boolean is extracted into the `ok` variable from the Go code.
-            4.  The `value` (which is `T` if `ok` is true, or `null` otherwise) is extracted into the `v` variable from the Go code (or assigned to a temporary variable if `v` is `_`).
+            3.  Object destructuring is used to extract the `value` and `ok` properties into the corresponding variables from the Go code (e.g., `let { value: v, ok } = ...`). If a variable is the blank identifier (`_`), it's assigned using `value: _` in the destructuring pattern.
 
-    -   **Panic Assertion (`v := i.(T)`):** This form asserts that `i` holds type `T` and panics if it doesn't. The translation uses the same `goscript.typeAssert` helper. After the call, the generated code would check the `ok` flag from the result. If `ok` is false, the code would trigger a runtime panic (e.g., by throwing an error) to mimic Go's behavior. The asserted value is assigned to `v` only if `ok` is true.
+    -   **Panic Assertion (`v := i.(T)`):** This form asserts that `i` holds type `T` and panics if it doesn't. The translation uses the same `goscript.typeAssert` helper. After the call, the generated code uses destructuring to get `value` and `ok`. It then checks the `ok` flag. If `ok` is false, the code triggers a runtime panic (e.g., by throwing an error) to mimic Go's behavior. The asserted `value` is assigned to `v` only if `ok` is true.
 - **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`). However, Go's slice semantics, particularly regarding length, capacity, and creation with `make`, require runtime support.
     -   **Creation (`make`):** `make([]T, len)` and `make([]T, len, cap)` are translated using a runtime helper `makeSlice`:
         ```go
