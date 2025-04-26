@@ -8,3 +8,6 @@ for pkg in ${pkgs[@]}; do
          compile \
          --package $pkg
 done
+
+# Copy for reference
+cp ./output/@go/example/main.gs.ts ./main.gs.ts

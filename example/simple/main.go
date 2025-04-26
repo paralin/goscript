@@ -118,6 +118,7 @@ func main() {
 	default:
 		println("Switch default")
 	}
+
 	// Goroutines and Channels
 	println("\nGoroutines and Channels:")
 	ch := make(chan string)
@@ -125,8 +126,23 @@ func main() {
 		println("Goroutine: Sending message")
 		ch <- "Hello from goroutine!"
 	}()
+
 	msg := <-ch
 	println("Main goroutine: Received message:", msg)
+
+	// Select statement
+	println("\nSelect statement:")
+	selectCh := make(chan string)
+	go func() {
+		selectCh <- "Message from select goroutine!"
+	}()
+	anotherCh := make(chan string)
+	select {
+	case selectMsg := <-selectCh:
+		println("Select received:", selectMsg)
+	case anotherMsg := <-anotherCh: // Add another case
+		println("Select received from another channel:", anotherMsg)
+	}
 
 	// Function Literals
 	println("\nFunction Literals:")
