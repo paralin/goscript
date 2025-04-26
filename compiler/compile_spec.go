@@ -3,6 +3,8 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
+	"sort"
 	"strings"
 )
 
@@ -57,20 +59,52 @@ func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 
 // collectInterfaceMethods returns a comma-separated string of method names for an interface
 func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceType) string {
-	var methodNames []string
+	// Use a map to ensure uniqueness of method names
+	methodNamesMap := make(map[string]struct{})
 
 	if interfaceType.Methods != nil {
 		for _, method := range interfaceType.Methods.List {
 			if len(method.Names) > 0 {
 				// Named method
-				methodNames = append(methodNames, fmt.Sprintf("'%s'", method.Names[0].Name))
+				methodNamesMap[method.Names[0].Name] = struct{}{}
 			} else {
-				// Embedded interface - should collect its methods too
-				// This is a simplification, as we'd need to resolve the embedded interface
-				c.tsw.WriteCommentLine("// Note: Methods from embedded interfaces are not automatically included")
+				// Embedded interface - resolve it and collect its methods
+				embeddedType := method.Type
+				
+				// Resolve the embedded interface using type information
+				if tv, ok := c.pkg.TypesInfo.Types[embeddedType]; ok && tv.Type != nil {
+					// Get the underlying interface type
+					var ifaceType *types.Interface
+					if named, ok := tv.Type.(*types.Named); ok {
+						if underlying, ok := named.Underlying().(*types.Interface); ok {
+							ifaceType = underlying
+						}
+					} else if underlying, ok := tv.Type.(*types.Interface); ok {
+						ifaceType = underlying
+					}
+					
+					// Collect methods from the interface
+					if ifaceType != nil {
+						for i := 0; i < ifaceType.NumMethods(); i++ {
+							methodNamesMap[ifaceType.Method(i).Name()] = struct{}{}
+						}
+					}
+				} else {
+					// Couldn't resolve the embedded interface
+					c.tsw.WriteCommentLine("// Note: Some embedded interface methods may not be fully resolved")
+				}
 			}
 		}
 	}
+
+	// Convert the map to a slice for a deterministic output order
+	var methodNames []string
+	for name := range methodNamesMap {
+		methodNames = append(methodNames, fmt.Sprintf("'%s'", name))
+	}
+	
+	// Sort for deterministic output
+	sort.Strings(methodNames)
 
 	return strings.Join(methodNames, ", ")
 }
