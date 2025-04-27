@@ -12,11 +12,12 @@ import (
 
 // GoToTSCompiler compiles Go code to TypeScript code.
 type GoToTSCompiler struct {
-	tsw        *TSCodeWriter
-	imports    map[string]*fileImport
-	pkg        *packages.Package
-	cmap       ast.CommentMap
-	asyncFuncs map[string]bool // Track which functions are async
+	tsw                 *TSCodeWriter
+	imports             map[string]*fileImport
+	pkg                 *packages.Package
+	cmap                ast.CommentMap
+	asyncFuncs          map[string]bool // Track which functions are async
+	nextBlockNeedsDefer bool            // Track if the next block should have a "using" statement
 
 	tempVarCounter int // Counter for generating unique temporary variable names
 }
@@ -68,15 +69,29 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	}
 }
 
+// scanForDefer checks if a block contains any defer statements (recursively).
+func (c *GoToTSCompiler) scanForDefer(block *ast.BlockStmt) bool {
+	hasDefer := false
+	ast.Inspect(block, func(n ast.Node) bool {
+		if _, ok := n.(*ast.DeferStmt); ok {
+			hasDefer = true
+			return false // Stop traversal
+		}
+		return true // Continue traversal
+	})
+	return hasDefer
+}
+
 // NewGoToTSCompiler builds a new GoToTSCompiler
 func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, cmap ast.CommentMap) *GoToTSCompiler {
 	return &GoToTSCompiler{
-		tsw:            tsw,
-		imports:        make(map[string]*fileImport),
-		pkg:            pkg,
-		cmap:           cmap,
-		asyncFuncs:     make(map[string]bool),
-		tempVarCounter: 0, // Initialize counter
+		tsw:                 tsw,
+		imports:             make(map[string]*fileImport),
+		pkg:                 pkg,
+		cmap:                cmap,
+		asyncFuncs:          make(map[string]bool),
+		nextBlockNeedsDefer: false,
+		tempVarCounter:      0, // Initialize counter
 	}
 }
 

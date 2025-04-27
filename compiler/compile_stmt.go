@@ -28,6 +28,10 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		if err := c.WriteStmtReturn(exp); err != nil {
 			return fmt.Errorf("failed to write return statement: %w", err)
 		}
+	case *ast.DeferStmt:
+		if err := c.WriteDeferStmt(exp); err != nil {
+			return fmt.Errorf("failed to write defer statement: %w", err)
+		}
 	case *ast.IfStmt:
 		if err := c.WriteStmtIf(exp); err != nil {
 			return fmt.Errorf("failed to write if statement: %w", err)
@@ -138,6 +142,24 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
 	}
+	return nil
+}
+
+// WriteDeferStmt writes a defer statement using TypeScript's DisposableStack.
+func (c *GoToTSCompiler) WriteDeferStmt(exp *ast.DeferStmt) error {
+	c.tsw.WriteLiterally("cleanup.defer(() => {")
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+
+	// Write the deferred call
+	if err := c.WriteValueExpr(exp.Call); err != nil {
+		return fmt.Errorf("failed to write deferred call: %w", err)
+	}
+
+	c.tsw.WriteLine("")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("});")
+
 	return nil
 }
 
@@ -491,6 +513,12 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 	// Opening brace
 	c.tsw.WriteLine("{")
 	c.tsw.Indent(1)
+
+	// Add "using" statement if needed
+	if c.nextBlockNeedsDefer {
+		c.tsw.WriteLine("using cleanup = new goscript.DisposableStack();")
+		c.nextBlockNeedsDefer = false
+	}
 
 	// Prepare line info
 	var file *token.File

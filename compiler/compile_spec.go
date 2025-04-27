@@ -259,6 +259,10 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	}
 
 	c.tsw.WriteLiterally(" ")
+
+	// Check if function body has defer statements
+	c.nextBlockNeedsDefer = c.scanForDefer(decl.Body)
+
 	// Bind receiver name to this
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
 		recvName := recvField.Names[0].Name
@@ -266,6 +270,13 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 			c.tsw.WriteLine("{")
 			c.tsw.Indent(1)
 			c.tsw.WriteLinef("const %s = this", recvName)
+
+			// Add using statement if needed
+			if c.nextBlockNeedsDefer {
+				c.tsw.WriteLine("using cleanup = new goscript.DisposableStack();")
+				c.nextBlockNeedsDefer = false
+			}
+
 			// write method body without outer braces
 			for _, stmt := range decl.Body.List {
 				if err := c.WriteStmt(stmt); err != nil {

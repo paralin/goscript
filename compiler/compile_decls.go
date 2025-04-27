@@ -65,6 +65,10 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	// WriteFuncType needs to be aware if the function is async
 	c.WriteFuncType(decl.Type, isAsync) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
+
+	// Check if function body has defer statements
+	c.nextBlockNeedsDefer = c.scanForDefer(decl.Body)
+
 	if err := c.WriteStmt(decl.Body); err != nil {
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
