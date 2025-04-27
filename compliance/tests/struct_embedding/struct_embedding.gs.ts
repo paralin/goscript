@@ -29,10 +29,9 @@ class Employee extends Person {
 	// Embedded struct
 	public ID: number = 0;
 	
-	constructor(init?: Partial<Employee>) {
+	constructor(init?: Partial<Employee> & { Person?: Partial<Person> }) {
 		super(init?.Person || init);
 		if (init) {
-			// Copy properties not related to the embedded type
 			const { Person, ...rest } = init as any;
 			Object.assign(this, rest);
 		}

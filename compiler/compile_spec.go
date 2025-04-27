@@ -195,24 +195,31 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		// constructor and clone using Object.assign for compactness
 		c.tsw.WriteLine("")
 		if embeddedExpr != nil {
-			// For a class with an embedded struct, call super()
-			c.tsw.WriteLinef("constructor(init?: Partial<%s>) {", className)
+			// Determine the embedded type's identifier (strip any package prefix)
+			embeddedTypeNameFull := c.getTypeExprName(embeddedExpr)
+			propName := embeddedTypeNameFull
+			if idx := strings.LastIndex(propName, "."); idx != -1 {
+				propName = propName[idx+1:] // keep only the last segment for the property key
+			}
+
+			// The init parameter allows either flattened fields or a nested {Embedded: {...}} object
+			c.tsw.WriteLinef(
+				"constructor(init?: Partial<%s> & { %s?: Partial<%s> }) {",
+				className, propName, propName,
+			)
 			c.tsw.Indent(1)
-			
-			// Get the name of the embedded type
-			embeddedTypeName := c.getTypeExprName(embeddedExpr)
-			
-			// Call super with either the embedded struct instance or the init object
-			c.tsw.WriteLinef("super(init?.%s || init);", embeddedTypeName)
-			
-			// Then assign any properties specific to this class (excluding the embedded struct property)
-			c.tsw.WriteLinef("if (init) {")
+
+			// Pass either the nested embedded object or the full init directly to super()
+			c.tsw.WriteLinef("super(init?.%s || init);", propName)
+
+			// Copy fields that belong only to this derived class
+			c.tsw.WriteLine("if (init) {")
 			c.tsw.Indent(1)
-			c.tsw.WriteLinef("// Copy properties not related to the embedded type")
-			c.tsw.WriteLinef("const { %s, ...rest } = init as any;", embeddedTypeName)
-			c.tsw.WriteLinef("Object.assign(this, rest);")
+			c.tsw.WriteLinef("const { %s, ...rest } = init as any;", propName)
+			c.tsw.WriteLine("Object.assign(this, rest);")
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
+
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
 		} else {
