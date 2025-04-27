@@ -57,6 +57,20 @@ func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 	return strings.Join(methodNames, ", ")
 }
 
+// getTypeExprName returns a string representation of a type expression.
+func (c *GoToTSCompiler) getTypeExprName(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		return t.Name
+	case *ast.SelectorExpr:
+		return fmt.Sprintf("%s.%s", c.getTypeExprName(t.X), t.Sel.Name)
+	case *ast.StarExpr:
+		return c.getTypeExprName(t.X) // Unwrap pointer type
+	default:
+		return "embedded" // Fallback for complex type expressions
+	}
+}
+
 // collectInterfaceMethods returns a comma-separated string of method names for an interface
 func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceType) string {
 	// Use a map to ensure uniqueness of method names
@@ -120,10 +134,26 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 	switch t := a.Type.(type) {
 	case *ast.StructType:
-		// write the class definition
+		// Detect embedded struct (anonymous field) to support Go struct embedding.
+		var embeddedExpr ast.Expr
+		for _, f := range t.Fields.List {
+			if len(f.Names) == 0 { // anonymous field ⇒ embedded type
+				embeddedExpr = f.Type
+				break // only the first embedded struct is supported for now
+			}
+		}
+		// Write the class header, adding "extends Embedded" when an embedded struct is present.
 		c.tsw.WriteLiterally("class ")
 		if err := c.WriteValueExpr(a.Name); err != nil { // Class name is a value identifier
 			return err
+		}
+		if embeddedExpr != nil {
+			// For pointer embedding (*T) unwrap the star so we extend T, not (T|null)
+			if star, ok := embeddedExpr.(*ast.StarExpr); ok {
+				embeddedExpr = star.X
+			}
+			c.tsw.WriteLiterally(" extends ")
+			c.WriteTypeExpr(embeddedExpr) // Embedded type name
 		}
 		c.tsw.WriteLine(" {")
 		c.tsw.Indent(1)
@@ -164,7 +194,31 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 		// constructor and clone using Object.assign for compactness
 		c.tsw.WriteLine("")
-		c.tsw.WriteLinef("constructor(init?: Partial<%s>) { if (init) Object.assign(this, init as any); }", className)
+		if embeddedExpr != nil {
+			// For a class with an embedded struct, call super()
+			c.tsw.WriteLinef("constructor(init?: Partial<%s>) {", className)
+			c.tsw.Indent(1)
+			
+			// Get the name of the embedded type
+			embeddedTypeName := c.getTypeExprName(embeddedExpr)
+			
+			// Call super with either the embedded struct instance or the init object
+			c.tsw.WriteLinef("super(init?.%s || init);", embeddedTypeName)
+			
+			// Then assign any properties specific to this class (excluding the embedded struct property)
+			c.tsw.WriteLinef("if (init) {")
+			c.tsw.Indent(1)
+			c.tsw.WriteLinef("// Copy properties not related to the embedded type")
+			c.tsw.WriteLinef("const { %s, ...rest } = init as any;", embeddedTypeName)
+			c.tsw.WriteLinef("Object.assign(this, rest);")
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+		} else {
+			// For a base class without embedding, use simple constructor
+			c.tsw.WriteLinef("constructor(init?: Partial<%s>) { if (init) Object.assign(this, init as any); }", className)
+		}
 		c.tsw.WriteLinef("public clone(): %s { return Object.assign(Object.create(%s.prototype) as %s, this); }", className, className, className)
 
 		// Add code to register the type with the runtime system

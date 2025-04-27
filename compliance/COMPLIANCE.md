@@ -78,6 +78,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   Slices (`[]T`) - Including slices of slices, compliant creation using `make([]T, len)` and `make([]T, len, cap)`, `len`, `cap`, `append`, and slicing expressions (`[low:high]`, `[low:high:max]`).
 *   Maps (`map[K]V`) - Creation using `make(map[K]V)` (generates `makeMap<TS_K, TS_V>()`), access, assignment, `delete`, `len`, `range`.
 *   `struct` definitions (including exported/unexported fields).
+    *   Struct Embedding.
     *   Composite Literals for structs (`MyStruct{...}`).
     *   Interfaces (`interface{}`) - Definition and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions and embedded interfaces using the `extends` keyword.
 *   **Functions & Methods:**
@@ -112,7 +113,6 @@ The following Go constructs, present in the "Go By Example" guide, do not appear
 *   **Control Flow:**
     *   `panic` / `recover`
 *   **Data Structures:**
-    *   Struct Embedding
 *   **Functions:**
     *   Variadic functions (`...T`)
     *   Closures
