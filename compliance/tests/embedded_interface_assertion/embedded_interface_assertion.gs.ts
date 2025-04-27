@@ -71,7 +71,7 @@ export async function main(): Promise<void> {
 	let s = new MyStruct({  })
 	rwc = s.clone()
 	
-	let { value: _, ok: ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
+	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
 	if (ok) {
 		console.log("Embedded interface assertion successful")
 	} else {

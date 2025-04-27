@@ -1569,27 +1569,22 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 	// Generate the destructuring assignment
 	if tok == token.DEFINE {
-		// Use 'let' for :=
 		c.tsw.WriteLiterally("let ")
+	} else {
+		// We must wrap in parenthesis.
+		c.tsw.WriteLiterally("(")
 	}
 
 	c.tsw.WriteLiterally("{ ")
-	// Write value part of destructuring, handling blank identifier
-	c.tsw.WriteLiterally("value: ")
-	if valueIsBlank {
-		c.tsw.WriteLiterally("_")
-	} else {
-		c.tsw.WriteLiterally(valueName)
+	// Dynamically build the destructuring pattern
+	parts := []string{}
+	if !valueIsBlank {
+		parts = append(parts, fmt.Sprintf("value: %s", valueName))
 	}
-	c.tsw.WriteLiterally(", ")
-
-	// Write ok part of destructuring, handling blank identifier
-	c.tsw.WriteLiterally("ok: ")
-	if okIsBlank {
-		c.tsw.WriteLiterally("_")
-	} else {
-		c.tsw.WriteLiterally(okName)
+	if !okIsBlank {
+		parts = append(parts, fmt.Sprintf("ok: %s", okName))
 	}
+	c.tsw.WriteLiterally(strings.Join(parts, ", "))
 	c.tsw.WriteLiterally(" } = goscript.typeAssert<")
 
 	// Write the asserted type for the generic
@@ -1603,6 +1598,11 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	c.tsw.WriteLiterally(", ")
 	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
 	c.tsw.WriteLiterally(")")
+
+	if tok != token.DEFINE {
+		c.tsw.WriteLiterally(")")
+	}
+
 	c.tsw.WriteLine("") // Add newline after the statement
 
 	return nil

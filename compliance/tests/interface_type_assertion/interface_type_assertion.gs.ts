@@ -42,7 +42,7 @@ export async function main(): Promise<void> {
 	let s = new MyStruct({ Value: 10 })
 	i = s.clone()
 	
-	let { value: _, ok: ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')
+	let { ok: ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')
 	if (ok) {
 		console.log("Type assertion successful")
 	} else {
