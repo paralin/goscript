@@ -12,7 +12,6 @@ export async function main(): Promise<void> {
 		console.log("deferred start")
 		await ch.receive()
 		console.log("deferred end")
-		
 	});
 	
 	console.log("main start")

@@ -6,8 +6,7 @@ import * as goscript from "@go/builtin";
 export async function main(): Promise<void> {
 	await using __defer = new goscript.AsyncDisposableStack();
 	__defer.defer(() => {
-		console.log("deferred")
-	});
+		console.log("deferred")});
 	console.log("main")
 }
 

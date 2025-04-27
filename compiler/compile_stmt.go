@@ -187,7 +187,6 @@ func (c *GoToTSCompiler) WriteDeferStmt(exp *ast.DeferStmt) error {
 		}
 	}
 
-	c.tsw.WriteLine("")
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("});")
 
