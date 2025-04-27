@@ -1,3 +1,8 @@
+//go:build doesntcompile
+
+// The tag is necessary to get go test to ignore this file.
+// Error: compliance/tests/interface_type_assertion_signature_mismatch/interface_type_assertion_signature_mismatch.go:26:14: impossible type assertion: no type can implement both github.com/paralin/goscript/compliance/tests/interface_type_assertion_signature_mismatch.InterfaceA and github.com/paralin/goscript/compliance/tests/interface_type_assertion_signature_mismatch.InterfaceB (conflicting types for DoSomething method)
+
 package main
 
 type InterfaceA interface {
