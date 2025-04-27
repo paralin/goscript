@@ -1,7 +1,7 @@
 package main
 
 func main() {
-	ch := make(chan bool)
+	ch := make(chan bool, 1)
 
 	defer func() {
 		println("deferred start")

@@ -5,7 +5,7 @@ import * as goscript from "@go/builtin";
 
 export async function main(): Promise<void> {
 	await using __defer = new goscript.AsyncDisposableStack();
-	let ch = goscript.makeChannel<boolean>(0, false)
+	let ch = goscript.makeChannel<boolean>(1, false)
 	
 	// Wait for signal from main
 	__defer.defer(async () => {

@@ -1,2 +1,5 @@
 main start
 main signaling defer
+main end
+deferred start
+deferred end
