@@ -67,6 +67,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Logical: `&&`, `||`, `!`
 *   **Control Flow:**
     *   `if`/`else` statements.
+    *   `switch` statements (with/without expression, type switches).
     *   `switch` statements.
     *   `select` statements (basic channel communication).
     *   `for` loops (condition-only, basic counter-based, infinite, `range` over arrays/slices/strings/maps).
@@ -107,7 +108,6 @@ Based on the existing tests, GoScript aims to support the following Go features:
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
 *   **Control Flow:**
-    *   `switch` statements (with/without expression, type switches)
     *   `defer` statement
     *   `panic` / `recover`
 *   **Data Structures:**
