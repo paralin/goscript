@@ -4,8 +4,8 @@
 import * as goscript from "@go/builtin";
 
 export async function main(): Promise<void> {
-	using cleanup = new goscript.DisposableStack();
-	cleanup.defer(() => {
+	await using __defer = new goscript.AsyncDisposableStack();
+	__defer.defer(() => {
 		console.log("deferred")
 	});
 	console.log("main")

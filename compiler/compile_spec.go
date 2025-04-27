@@ -219,8 +219,17 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 		c.WriteDoc(decl.Doc)
 	}
 
+	// Determine if method is async by checking for async operations in the body
+	isAsync := c.containsAsyncOperations(decl.Body)
+	
 	// Methods are typically public in the TS output
 	c.tsw.WriteLiterally("public ")
+	
+	// Add async modifier if needed
+	if isAsync {
+		c.tsw.WriteLiterally("async ")
+	}
+	
 	// Keep original Go casing for method names
 	if err := c.WriteValueExpr(decl.Name); err != nil { // Method name is a value identifier
 		return err
@@ -238,6 +247,9 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	// Handle return type
 	if funcType.Results != nil && len(funcType.Results.List) > 0 {
 		c.tsw.WriteLiterally(": ")
+		if isAsync {
+			c.tsw.WriteLiterally("Promise<")
+		}
 		if len(funcType.Results.List) == 1 {
 			// Single return value
 			resultType := funcType.Results.List[0].Type
@@ -253,15 +265,26 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 			}
 			c.tsw.WriteLiterally("]")
 		}
+		if isAsync {
+			c.tsw.WriteLiterally(">")
+		}
 	} else {
 		// No return value -> void
-		c.tsw.WriteLiterally(": void")
+		if isAsync {
+			c.tsw.WriteLiterally(": Promise<void>")
+		} else {
+			c.tsw.WriteLiterally(": void")
+		}
 	}
 
 	c.tsw.WriteLiterally(" ")
 
 	// Check if function body has defer statements
 	c.nextBlockNeedsDefer = c.scanForDefer(decl.Body)
+	
+	// Save previous async state and set current state based on isAsync
+	previousAsyncState := c.inAsyncFunction
+	c.inAsyncFunction = isAsync
 
 	// Bind receiver name to this
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
@@ -273,25 +296,37 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 
 			// Add using statement if needed
 			if c.nextBlockNeedsDefer {
-				c.tsw.WriteLine("using cleanup = new goscript.DisposableStack();")
+				if c.inAsyncFunction {
+					c.tsw.WriteLine("await using __defer = new goscript.AsyncDisposableStack();")
+				} else {
+					c.tsw.WriteLine("using cleanup = new goscript.DisposableStack();")
+				}
 				c.nextBlockNeedsDefer = false
 			}
 
 			// write method body without outer braces
 			for _, stmt := range decl.Body.List {
 				if err := c.WriteStmt(stmt); err != nil {
+					c.inAsyncFunction = previousAsyncState // Restore state before returning error
 					return fmt.Errorf("failed to write statement in function body: %w", err)
 				}
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
+			
+			// Restore previous async state
+			c.inAsyncFunction = previousAsyncState
 			return nil
 		}
 	}
 	// no named receiver, write whole body
 	if err := c.WriteStmt(decl.Body); err != nil {
+		c.inAsyncFunction = previousAsyncState // Restore state before returning error
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
+	
+	// Restore previous async state
+	c.inAsyncFunction = previousAsyncState
 	return nil
 }
 

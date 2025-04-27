@@ -18,6 +18,7 @@ type GoToTSCompiler struct {
 	cmap                ast.CommentMap
 	asyncFuncs          map[string]bool // Track which functions are async
 	nextBlockNeedsDefer bool            // Track if the next block should have a "using" statement
+	inAsyncFunction     bool            // Track if we're inside an async function
 
 	tempVarCounter int // Counter for generating unique temporary variable names
 }
@@ -91,6 +92,7 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, cmap ast.Commen
 		cmap:                cmap,
 		asyncFuncs:          make(map[string]bool),
 		nextBlockNeedsDefer: false,
+		inAsyncFunction:     false,
 		tempVarCounter:      0, // Initialize counter
 	}
 }

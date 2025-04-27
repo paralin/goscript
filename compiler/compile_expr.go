@@ -935,11 +935,18 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	}
 
 	c.tsw.WriteLiterally(" => ")
+	
+	// Save previous async state and set current state based on isAsync
+	previousAsyncState := c.inAsyncFunction
+	c.inAsyncFunction = isAsync
 
 	// Write function body
 	if err := c.WriteStmt(exp.Body); err != nil {
+		c.inAsyncFunction = previousAsyncState // Restore state before returning error
 		return fmt.Errorf("failed to write function literal body: %w", err)
 	}
-
+	
+	// Restore previous async state
+	c.inAsyncFunction = previousAsyncState
 	return nil
 }

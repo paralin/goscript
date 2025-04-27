@@ -8,6 +8,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 
 *   **`array_literal/`**: Tests array literal creation and indexing.
 *   **`async_basic/`**: Verifies basic goroutine (`go func()`) translation using `async`/`await`.
+*   **`async_defer_statement/`**: Tests `defer` statements containing async operations (channel ops), ensuring correct use of `AsyncDisposableStack` and `async` callbacks.
 *   **`basic_arithmetic/`**: Verifies basic arithmetic operations (`+`, `-`, `*`, `/`, `%`).
 *   **`boolean_logic/`**: Tests boolean logic operators (`&&`, `||`, `!`) and comparisons (`==`, `!=`, `<`, `>`, `<=`, `>=`).
 *   **`channel_basic/`**: Covers basic channel operations (make, send, receive, close) for unbuffered channels.
@@ -67,6 +68,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Logical: `&&`, `||`, `!`
 *   **Control Flow:**
     *   `if`/`else` statements.
+    *   `defer` statement (including async operations)
     *   `switch` statements (with/without expression, type switches).
     *   `switch` statements.
     *   `select` statements (basic channel communication).
@@ -108,7 +110,6 @@ Based on the existing tests, GoScript aims to support the following Go features:
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
 *   **Control Flow:**
-    *   `defer` statement
     *   `panic` / `recover`
 *   **Data Structures:**
     *   Struct Embedding

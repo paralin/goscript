@@ -68,9 +68,17 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 
 	// Check if function body has defer statements
 	c.nextBlockNeedsDefer = c.scanForDefer(decl.Body)
+	
+	// Save previous async state and set current state based on isAsync
+	previousAsyncState := c.inAsyncFunction
+	c.inAsyncFunction = isAsync
 
 	if err := c.WriteStmt(decl.Body); err != nil {
+		c.inAsyncFunction = previousAsyncState // Restore state before returning error
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
+	
+	// Restore previous async state
+	c.inAsyncFunction = previousAsyncState
 	return nil
 }

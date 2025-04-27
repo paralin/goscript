@@ -147,13 +147,44 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 
 // WriteDeferStmt writes a defer statement using TypeScript's DisposableStack.
 func (c *GoToTSCompiler) WriteDeferStmt(exp *ast.DeferStmt) error {
-	c.tsw.WriteLiterally("cleanup.defer(() => {")
+	// Check if deferred call contains async operations
+	hasAsyncOps := c.containsAsyncOperations(exp.Call)
+
+	// Choose the right stack variable and async modifier
+	stackVar := "cleanup"
+	asyncPrefix := ""
+
+	if c.inAsyncFunction {
+		stackVar = "__defer"
+		if hasAsyncOps {
+			asyncPrefix = "async "
+		}
+	}
+
+	c.tsw.WriteLiterally(fmt.Sprintf("%s.defer(%s() => {", stackVar, asyncPrefix))
 	c.tsw.Indent(1)
 	c.tsw.WriteLine("")
 
-	// Write the deferred call
-	if err := c.WriteValueExpr(exp.Call); err != nil {
-		return fmt.Errorf("failed to write deferred call: %w", err)
+	// Write the deferred call or inline the body when it's an immediately-invoked
+	// function literal (defer func(){ ... }()).
+	if funcLit, ok := exp.Call.Fun.(*ast.FuncLit); ok && len(exp.Call.Args) == 0 {
+		// Inline the function literal's body to avoid nested arrow invocation.
+		prevAsyncState := c.inAsyncFunction
+		c.inAsyncFunction = hasAsyncOps
+
+		for _, stmt := range funcLit.Body.List {
+			if err := c.WriteStmt(stmt); err != nil {
+				c.inAsyncFunction = prevAsyncState
+				return fmt.Errorf("failed to write statement in deferred function body: %w", err)
+			}
+		}
+
+		c.inAsyncFunction = prevAsyncState
+	} else {
+		// Fallback: write the call expression as-is.
+		if err := c.WriteValueExpr(exp.Call); err != nil {
+			return fmt.Errorf("failed to write deferred call: %w", err)
+		}
 	}
 
 	c.tsw.WriteLine("")
@@ -467,10 +498,12 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 		s.tsw.WriteLiterally(" else ")
 		switch elseStmt := exp.Else.(type) {
 		case *ast.BlockStmt:
+			// Always pass false for suppressNewline here
 			if err := s.WriteStmtBlock(elseStmt, false); err != nil {
 				return fmt.Errorf("failed to write else block statement in if statement: %w", err)
 			}
 		case *ast.IfStmt:
+			// Recursive call handles its own block formatting
 			if err := s.WriteStmtIf(elseStmt); err != nil {
 				return fmt.Errorf("failed to write else if statement in if statement: %w", err)
 			}
@@ -516,7 +549,11 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 
 	// Add "using" statement if needed
 	if c.nextBlockNeedsDefer {
-		c.tsw.WriteLine("using cleanup = new goscript.DisposableStack();")
+		if c.inAsyncFunction {
+			c.tsw.WriteLine("await using __defer = new goscript.AsyncDisposableStack();")
+		} else {
+			c.tsw.WriteLine("using cleanup = new goscript.DisposableStack();")
+		}
 		c.nextBlockNeedsDefer = false
 	}
 
