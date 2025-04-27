@@ -23,4 +23,13 @@ func main() {
 	} else {
 		println("Type assertion failed")
 	}
+
+	// try a second time since this generates something different when using = and not :=
+	_, ok = i.(*MyStruct)
+	if ok {
+		println("Type assertion successful")
+	} else {
+		// expected
+		println("Type assertion failed")
+	}
 }

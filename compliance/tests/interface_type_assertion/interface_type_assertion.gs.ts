@@ -48,5 +48,16 @@ export async function main(): Promise<void> {
 	} else {
 		console.log("Type assertion failed")
 	}
+	
+	// try a second time since this generates something different when using = and not :=
+	({ ok: ok } = goscript.typeAssert<MyStruct | null>(i, 'unknown'))
+	
+	// expected
+	if (ok) {
+		console.log("Type assertion successful")
+	} else {
+		// expected
+		console.log("Type assertion failed")
+	}
 }
 
