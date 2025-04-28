@@ -65,6 +65,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   `string(rune)`
 *   `string(string)`
 *   `string([]rune)`
+*   `[]rune(string)`
 *   **Operators:**
     *   Arithmetic: `+`, `-`, `*`, `/`, `%`
     *   Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`

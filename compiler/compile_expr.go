@@ -377,6 +377,28 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
 
+	// Handle array type conversions like []rune(string)
+	if arrayType, isArrayType := expFun.(*ast.ArrayType); isArrayType {
+		// Check if it's a []rune type
+		if ident, isIdent := arrayType.Elt.(*ast.Ident); isIdent && ident.Name == "rune" {
+			// Check if the argument is a string
+			if len(exp.Args) == 1 {
+				arg := exp.Args[0]
+				if tv, ok := c.pkg.TypesInfo.Types[arg]; ok && tv.Type != nil {
+					if basic, isBasic := tv.Type.Underlying().(*gtypes.Basic); isBasic && basic.Kind() == gtypes.String {
+						// Translate []rune(stringValue) to goscript.stringToRunes(stringValue)
+						c.tsw.WriteLiterally("goscript.stringToRunes(")
+						if err := c.WriteValueExpr(arg); err != nil {
+							return fmt.Errorf("failed to write argument for []rune(string) conversion: %w", err)
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled []rune(string)
+					}
+				}
+			}
+		}
+	}
+
 	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
 		switch funIdent.String() {
 		case "println":

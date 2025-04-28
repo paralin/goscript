@@ -26,4 +26,19 @@ func main() {
 	emptyRunes := []rune{}
 	emptyStringFromRunes := string(emptyRunes)
 	println(emptyStringFromRunes)
+
+	// === []rune(string) and string([]rune) Round Trip ===
+	originalString := "你好世界" // Example with multi-byte characters
+	runesFromString := []rune(originalString)
+	stringFromRunes := string(runesFromString)
+	println(originalString)
+	println(stringFromRunes)
+	println(originalString == stringFromRunes)
+
+	// === Modify []rune and convert back to string ===
+	mutableRunes := []rune("Mutable String")
+	mutableRunes[0] = 'm'
+	mutableRunes[8] = 's'
+	modifiedString := string(mutableRunes)
+	println(modifiedString)
 }

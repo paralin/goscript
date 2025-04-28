@@ -31,5 +31,20 @@ export async function main(): Promise<void> {
 	let emptyRunes = []
 	let emptyStringFromRunes = goscript.runesToString(emptyRunes)
 	console.log(emptyStringFromRunes)
+	
+	// === []rune(string) and string([]rune) Round Trip ===
+	let originalString = "你好世界" // Example with multi-byte characters
+	let runesFromString = goscript.stringToRunes(originalString)
+	let stringFromRunes = goscript.runesToString(runesFromString)
+	console.log(originalString)
+	console.log(stringFromRunes)
+	console.log(originalString == stringFromRunes)
+	
+	// === Modify []rune and convert back to string ===
+	let mutableRunes = goscript.stringToRunes("Mutable String")
+	mutableRunes[0] = 109
+	mutableRunes[8] = 115
+	let modifiedString = goscript.runesToString(mutableRunes)
+	console.log(modifiedString)
 }
 
