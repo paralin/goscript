@@ -507,10 +507,18 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			// Fallthrough for unhandled make calls (e.g., channels)
 			return errors.New("unhandled make call")
 		case "string":
-			// Handle string() conversion, specifically for rune to string
+			// Handle string() conversion
 			if len(exp.Args) == 1 {
-				// Check if the argument is a rune (int32) or a call to rune()
 				arg := exp.Args[0]
+
+				// Case 1: Argument is a string literal string("...")
+				if basicLit, isBasicLit := arg.(*ast.BasicLit); isBasicLit && basicLit.Kind == token.STRING {
+					// Translate string("...") to "..." (no-op)
+					c.WriteBasicLitValue(basicLit)
+					return nil // Handled string literal conversion
+				}
+
+				// Case 2: Argument is a rune (int32) or a call to rune()
 				innerCall, isCallExpr := arg.(*ast.CallExpr)
 
 				if isCallExpr {
@@ -935,7 +943,7 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	}
 
 	c.tsw.WriteLiterally(" => ")
-	
+
 	// Save previous async state and set current state based on isAsync
 	previousAsyncState := c.inAsyncFunction
 	c.inAsyncFunction = isAsync
@@ -945,7 +953,7 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 		c.inAsyncFunction = previousAsyncState // Restore state before returning error
 		return fmt.Errorf("failed to write function literal body: %w", err)
 	}
-	
+
 	// Restore previous async state
 	c.inAsyncFunction = previousAsyncState
 	return nil

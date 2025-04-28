@@ -61,7 +61,9 @@ Each test should have only three files:
 Based on the existing tests, GoScript aims to support the following Go features:
 
 *   **Basic Types:** `int`, `string`, `bool`, `float64` (implicitly tested).
-*   **Type Conversions:** `string(rune)`
+*   **Type Conversions:**
+*   `string(rune)`
+*   `string(string)`
 *   **Operators:**
     *   Arithmetic: `+`, `-`, `*`, `/`, `%`
     *   Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
