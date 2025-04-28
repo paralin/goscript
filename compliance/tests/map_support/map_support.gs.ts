@@ -7,23 +7,23 @@ export async function main(): Promise<void> {
 	// Create map using make
 	let scores = goscript.makeMap<string, number>()
 	console.log("Empty map created: Expected: true, Actual:", goscript.len(scores) == 0)
-	
+
 	// Add key-value pairs
 	goscript.mapSet(scores, "Alice", 90)
 	goscript.mapSet(scores, "Bob", 85)
 	goscript.mapSet(scores, "Charlie", 92)
-	
+
 	// Map size
 	console.log("Map size after adding 3 items: Expected: 3, Actual:", goscript.len(scores))
-	
+
 	// Access values
 	console.log("Alice's score: Expected: 90, Actual:", scores.get("Alice"))
 	console.log("Bob's score: Expected: 85, Actual:", scores.get("Bob"))
-	
+
 	// Modify a value
 	goscript.mapSet(scores, "Bob", 88)
 	console.log("Bob's updated score: Expected: 88, Actual:", scores.get("Bob"))
-	
+
 	// Check if key exists (comma-ok idiom)
 	let value
 	let exists
@@ -31,22 +31,22 @@ export async function main(): Promise<void> {
 	value = scores.get("David") ?? 0
 	console.log("Does David exist in map? Expected: false, Actual:", exists)
 	console.log("Value for non-existent key: Expected: 0, Actual:", value)
-	
+
 	// Delete a key
 	goscript.deleteMapEntry(scores, "Charlie")
 	exists = scores.has("Charlie")
 	console.log("After delete, does Charlie exist? Expected: false, Actual:", exists)
-	
+
 	// Create map with literal syntax
 	let colors = new Map([["red", "#ff0000"], ["green", "#00ff00"], ["blue", "#0000ff"]])
 	console.log("Map literal size: Expected: 3, Actual:", goscript.len(colors))
 	console.log("Color code for red: Expected: #ff0000, Actual:", colors.get("red"))
-	
+
 	// Iterate over a map with range
 	console.log("Iterating over scores map:")
 	// Note: Map iteration is not ordered in Go, so we will collect the results and sort them for consistent test output.
 	let scoreResults: string[] = [];
-	
+
 	// Using string concatenation to build the output string
 	for (const [k, v] of scores.entries()) {
 		const name = k
@@ -57,7 +57,7 @@ export async function main(): Promise<void> {
 			scoreResults = goscript.append(scoreResults, result)
 		}
 	}
-	
+
 	// Inline bubble sort for string slice
 	// (avoid importing sort package yet)
 	let n = goscript.len(scoreResults)
@@ -69,7 +69,7 @@ export async function main(): Promise<void> {
 			}
 		}
 	}
-	
+
 	for (let i = 0; i < scoreResults.length; i++) {
 		const result = scoreResults[i]
 		{

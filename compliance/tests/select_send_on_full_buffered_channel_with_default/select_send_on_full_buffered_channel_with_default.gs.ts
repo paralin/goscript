@@ -6,9 +6,9 @@ import * as goscript from "@goscript/builtin";
 export async function main(): Promise<void> {
 	let ch = goscript.makeChannel<number>(1, 0)
 	await ch.send(1)
-	
+
 	// Should not be reached
-	
+
 	// Should be reached
 	await goscript.selectStatement([
 		{

@@ -7,8 +7,8 @@ export async function main(): Promise<void> {
 	let greet = (name: string): string => {
 		return "Hello, " + name
 	}
-	
-	
+
+
 	let message = greet("world")
 	console.log(message)
 }

@@ -30,7 +30,7 @@ func (w *TSCodeWriter) WriteLinePreamble() {
 
 // WriteLine writes a line of code to the output.
 func (w *TSCodeWriter) WriteLine(line string) {
-	if w.lineWritten {
+	if line != "" && w.lineWritten {
 		w.WriteLinePreamble()
 	}
 	w.w.Write([]byte(line))       //nolint:errcheck

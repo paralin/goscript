@@ -12,11 +12,11 @@ export async function main(): Promise<void> {
 	console.log(a)
 	console.log(b)
 	console.log(c)
-	
+
 	let [x, , z] = multipleReturnValues()
 	console.log(x)
 	console.log(z)
-	
+
 	let [, y, ] = multipleReturnValues()
 	console.log(y)
 }

@@ -6,10 +6,10 @@ import * as goscript from "@goscript/builtin";
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
-	
+
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
-	
+
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'MyStruct',
@@ -30,7 +30,7 @@ export async function main(): Promise<void> {
 	let valueCopy2 = dereferencedStructCopy.clone()
 	valueCopy2.MyString = "value copy 2"
 	let pointerCopy = structPointer
-	
+
 	// === Verifying Copy Independence ===
 	// Expected: "hello world"
 	console.log("pointerCopy (points to original structPointer): Expected: hello world, Actual: " + pointerCopy.MyString)

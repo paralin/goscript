@@ -20,7 +20,7 @@ export async function main(): Promise<void> {
 			console.log("other integer")
 			break
 	}
-	
+
 	let s = "hello"
 	console.log("\nString switch:")
 	switch (s) {
@@ -36,7 +36,7 @@ export async function main(): Promise<void> {
 	}
 	let x = -5
 	console.log("\nSwitch without expression:")
-	
+
 	// x > 0
 	switch (true) {
 		case x < 0:
@@ -49,10 +49,10 @@ export async function main(): Promise<void> {
 			console.log("positive")
 			break
 	}
-	
+
 	x = 0
 	console.log("\nSwitch without expression (zero):")
-	
+
 	// x > 0
 	switch (true) {
 		case x < 0:
@@ -65,10 +65,10 @@ export async function main(): Promise<void> {
 			console.log("positive")
 			break
 	}
-	
+
 	x = 10
 	console.log("\nSwitch without expression (positive):")
-	
+
 	// x > 0
 	switch (true) {
 		case x < 0:

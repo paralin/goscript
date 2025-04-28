@@ -19,10 +19,10 @@ const MyInterface__typeInfo = goscript.registerType(
 class MyStruct {
 	public PointerField: number | null = null;
 	public InterfaceField: MyInterface | null = null;
-	
+
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
-	
+
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'MyStruct',
@@ -37,11 +37,11 @@ export async function main(): Promise<void> {
 	let s = new MyStruct({})
 	console.log(s.PointerField)
 	console.log(s.InterfaceField)
-	
+
 	let i = 10
 	s.PointerField = i
 	console.log(s.PointerField)
-	
+
 	let mi: MyInterface | null = null;
 	s.InterfaceField = mi
 	console.log(s.InterfaceField)

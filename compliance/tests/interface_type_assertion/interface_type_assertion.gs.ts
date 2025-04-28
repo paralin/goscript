@@ -18,15 +18,15 @@ const MyInterface__typeInfo = goscript.registerType(
 
 class MyStruct {
 	public Value: number = 0;
-	
+
 	public Method1(): number {
 		const m = this
 		return m.Value
 	}
-	
+
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
-	
+
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'MyStruct',
@@ -41,17 +41,17 @@ export async function main(): Promise<void> {
 	let i: MyInterface | null = null;
 	let s = new MyStruct({Value: 10})
 	i = s.clone()
-	
+
 	let { ok: ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')
 	if (ok) {
 		console.log("Type assertion successful")
 	} else {
 		console.log("Type assertion failed")
 	}
-	
+
 	// try a second time since this generates something different when using = and not :=
 	({ ok: ok } = goscript.typeAssert<MyStruct | null>(i, 'unknown'))
-	
+
 	// expected
 	if (ok) {
 		console.log("Type assertion successful")

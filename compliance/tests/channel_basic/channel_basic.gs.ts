@@ -5,13 +5,13 @@ import * as goscript from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	let messages = goscript.makeChannel<string>(0, "")
-	
+
 	queueMicrotask(async () => {
 		{
 			await messages.send("ping")
 		}
 	})
-	
+
 	let msg = await messages.receive()
 	console.log(msg)
 }

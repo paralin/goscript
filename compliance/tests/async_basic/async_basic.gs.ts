@@ -20,11 +20,11 @@ export async function main(): Promise<void> {
 	// Create a buffered channel
 	let myChan = goscript.makeChannel<number>(1, 0)
 	await myChan.send(10)
-	
+
 	// Call the async caller function
 	let finalResult = await caller(myChan)
 	console.log(finalResult) // Expected output: 11
-	
+
 	myChan.close()
 }
 

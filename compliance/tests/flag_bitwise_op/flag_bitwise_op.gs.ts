@@ -19,7 +19,7 @@ export async function main(): Promise<void> {
 	} else {
 		console.log("O_TRUNC is not set: Expected: O_TRUNC is not set, Actual: O_TRUNC is not set")
 	}
-	
+
 	flag = (O_WRONLY | O_CREATE)
 	if ((flag & O_APPEND) != 0) {
 		console.log("O_APPEND is set: Expected: (no output)")

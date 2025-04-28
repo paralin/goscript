@@ -42,20 +42,20 @@ const ReadCloser__typeInfo = goscript.registerType(
 );
 
 class MyStruct {
-	
+
 	public Read(p: number[]): [number, goscript.Error] {
 		const m = this
 		return [0, null]
 	}
-	
+
 	public Close(): goscript.Error {
 		const m = this
 		return null
 	}
-	
+
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
-	
+
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'MyStruct',
@@ -70,7 +70,7 @@ export async function main(): Promise<void> {
 	let rwc: ReadCloser | null = null;
 	let s = new MyStruct({})
 	rwc = s.clone()
-	
+
 	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
 	if (ok) {
 		console.log("Embedded interface assertion successful")
