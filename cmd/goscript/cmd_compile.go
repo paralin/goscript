@@ -12,7 +12,7 @@ import (
 var (
 	cliCompiler       *compiler.Compiler
 	cliCompilerConfig compiler.Config
-	cliCompilerPkg    string
+	cliCompilerPkg    cli.StringSlice
 )
 
 // CompileCommands are commands related to compiling code.
@@ -29,9 +29,10 @@ var CompileCommands = []*cli.Command{{
 		return
 	},
 	Flags: []cli.Flag{
-		&cli.StringFlag{
+		&cli.StringSliceFlag{
 			Name:        "package",
-			Usage:       "the package to compile",
+			Usage:       "the package(s) to compile",
+			Aliases:     []string{"p", "packages"},
 			Destination: &cliCompilerPkg,
 		},
 		&cli.StringFlag{
@@ -51,9 +52,10 @@ var CompileCommands = []*cli.Command{{
 
 // compilePackage tries to compile the package.
 func compilePackage(c *cli.Context) error {
-	if cliCompilerPkg == "" {
-		return errors.New("package must be specified")
+	pkgs := cliCompilerPkg.Value()
+	if len(pkgs) == 0 {
+		return errors.New("package(s) must be specified")
 	}
 
-	return cliCompiler.CompilePackages(context.Background(), cliCompilerPkg)
+	return cliCompiler.CompilePackages(context.Background(), pkgs...)
 }
