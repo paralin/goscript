@@ -53,7 +53,8 @@ var CompileCommands = []*cli.Command{{
 			EnvVars:     []string{"GOSCRIPT_DIR"},
 		},
 		&cli.StringSliceFlag{
-			Name:        "buildflags",
+			Name:        "build-flags",
+			Aliases:     []string{"b", "buildflags", "build-flag", "buildflag"},
 			Usage:       "Go build flags (tags) to use during analysis",
 			Destination: &cliCompilerBuildFlags,
 			EnvVars:     []string{"GOSCRIPT_BUILD_FLAGS"},
