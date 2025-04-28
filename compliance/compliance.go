@@ -242,16 +242,6 @@ func copyFile(src, dst string) error {
 func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	t.Helper()
 
-	// Check for expect-fail file
-	expectFailPath := filepath.Join(testDir, "expect-fail")
-	if _, err := os.Stat(expectFailPath); err == nil {
-		t.Skipf("Skipping test %s: expect-fail file found", filepath.Base(testDir))
-		return // Skip the test
-	} else if !os.IsNotExist(err) {
-		// If there was an error other than "not exists", fail the test
-		t.Fatalf("failed to check for expect-fail file in %s: %v", testDir, err)
-	}
-
 	log := logrus.New()
 	log.SetLevel(logrus.DebugLevel)
 	le := logrus.NewEntry(log)
@@ -288,6 +278,17 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	}
 
 	tsRunner := WriteTypeScriptRunner(t, tempDir)
+
+	// Check for expect-fail file
+	expectFailPath := filepath.Join(testDir, "expect-fail")
+	if _, err := os.Stat(expectFailPath); err == nil {
+		t.Skipf("Skipping test %s: expect-fail file found", filepath.Base(testDir))
+		return // Skip the test
+	} else if !os.IsNotExist(err) {
+		// If there was an error other than "not exists", fail the test
+		t.Fatalf("failed to check for expect-fail file in %s: %v", testDir, err)
+	}
+
 	actual := strings.TrimSpace(RunTypeScriptRunner(t, workspaceDir, tempDir, tsRunner)) // Pass workspaceDir
 
 	expectedLogPath := filepath.Join(testDir, "expected.log")
