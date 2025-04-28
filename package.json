@@ -1,11 +1,26 @@
 {
   "name": "goscript",
+  "description": "Go to TypeScript transpiler",
   "version": "0.0.13",
-  "description": "Go to TypeScript compiler",
+  "author": {
+    "name": "Aperture Robotics LLC.",
+    "email": "support@aperture.us",
+    "url": "http://aperture.us"
+  },
+  "contributors": [
+    {
+      "name": "Christian Stewart",
+      "email": "christian@aperture.us",
+      "url": "http://github.com/paralin"
+    }
+  ],
+  "repository": {
+    "url": "git+ssh://git@github.com/aperturerobotics/goscript.git"
+  },
+  "type": "module",
   "bin": {
     "goscript": "./cmd/goscript/main.js"
   },
-  "type": "module",
   "exports": {
     ".": {
       "import": {
