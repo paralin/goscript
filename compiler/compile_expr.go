@@ -872,7 +872,7 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 			// Typed literal, likely a struct: new Type({...})
 			c.tsw.WriteLiterally("new ")
 			c.WriteTypeExpr(exp.Type)
-			c.tsw.WriteLiterally("({ ")
+			c.tsw.WriteLiterally("({")
 			for i, elm := range exp.Elts {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
@@ -881,7 +881,7 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 					return fmt.Errorf("failed to write struct literal field: %w", err)
 				}
 			}
-			c.tsw.WriteLiterally(" })")
+			c.tsw.WriteLiterally("})")
 			return nil
 		}
 	}

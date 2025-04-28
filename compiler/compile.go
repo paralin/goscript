@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
+	gtypes "go/types"
 
 	gstypes "github.com/paralin/goscript/compiler/types"
 	"golang.org/x/tools/go/packages"
@@ -24,9 +24,9 @@ type GoToTSCompiler struct {
 }
 
 // WriteGoType writes a Go type as a TypeScript type.
-func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
+func (c *GoToTSCompiler) WriteGoType(typ gtypes.Type) {
 	switch t := typ.(type) {
-	case *types.Basic:
+	case *gtypes.Basic:
 		// Handle basic types (int, string, etc.)
 		name := t.Name()
 		if tsType, ok := gstypes.GoBuiltinToTypescript(name); ok {
@@ -34,31 +34,31 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 		} else {
 			c.tsw.WriteLiterally(name)
 		}
-	case *types.Named:
+	case *gtypes.Named:
 		// Handle named types (custom types)
 		c.tsw.WriteLiterally(t.Obj().Name())
-	case *types.Pointer:
+	case *gtypes.Pointer:
 		// Handle pointer types (*T becomes T | null)
 		c.WriteGoType(t.Elem())
 		c.tsw.WriteLiterally(" | null")
-	case *types.Slice, *types.Array:
+	case *gtypes.Slice, *gtypes.Array:
 		// Handle array/slice types ([]T or [N]T becomes T[])
-		var elemType types.Type
-		if slice, ok := t.(*types.Slice); ok {
+		var elemType gtypes.Type
+		if slice, ok := t.(*gtypes.Slice); ok {
 			elemType = slice.Elem()
-		} else if array, ok := t.(*types.Array); ok {
+		} else if array, ok := t.(*gtypes.Array); ok {
 			elemType = array.Elem()
 		}
 		c.WriteGoType(elemType)
 		c.tsw.WriteLiterally("[]")
-	case *types.Map:
+	case *gtypes.Map:
 		// Handle map types (map[K]V becomes Map<K, V>)
 		c.tsw.WriteLiterally("Map<")
 		c.WriteGoType(t.Key())
 		c.tsw.WriteLiterally(", ")
 		c.WriteGoType(t.Elem())
 		c.tsw.WriteLiterally(">")
-	case *types.Chan:
+	case *gtypes.Chan:
 		// Handle channel types (chan T becomes goscript.Channel<T>)
 		c.tsw.WriteLiterally("goscript.Channel<")
 		c.WriteGoType(t.Elem())
@@ -145,7 +145,7 @@ func (c *GoToTSCompiler) containsAsyncOperations(node ast.Node) bool {
 // Handles array types recursively.
 func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 	switch t := typ.(type) {
-	case *types.Array:
+	case *gtypes.Array:
 		c.tsw.WriteLiterally("[")
 		for i := 0; i < int(t.Len()); i++ {
 			if i > 0 {
@@ -170,11 +170,11 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 			c.WriteZeroValueForType(t.Elt)
 		}
 		c.tsw.WriteLiterally("]")
-	case *types.Basic:
+	case *gtypes.Basic:
 		switch t.Kind() {
-		case types.Bool:
+		case gtypes.Bool:
 			c.tsw.WriteLiterally("false")
-		case types.String:
+		case gtypes.String:
 			c.tsw.WriteLiterally(`""`)
 		default:
 			c.tsw.WriteLiterally("0")

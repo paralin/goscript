@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	gtypes "go/types"
 )
 
 // WriteFieldList writes a field list.
@@ -68,14 +69,33 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 			c.tsw.WriteLiterally(name.Name)
 		}
 
+		// Check if field type is an interface
+		isInterface := false
+		if c.pkg != nil && c.pkg.TypesInfo != nil {
+			if tv, ok := c.pkg.TypesInfo.Types[field.Type]; ok && tv.Type != nil {
+				_, isInterface = tv.Type.Underlying().(*gtypes.Interface)
+			}
+		}
+
 		// write type for struct fields (not arguments)
 		c.tsw.WriteLiterally(": ")
 		c.WriteTypeExpr(field.Type) // Use WriteTypeExpr for field type
 
+		// Append "| null" for interface fields
+		if !isArguments && isInterface {
+			c.tsw.WriteLiterally(" | null")
+		}
+
 		if !isArguments {
 			// write initializer with zero value for struct fields
 			c.tsw.WriteLiterally(" = ")
-			c.WriteZeroValueForType(field.Type)
+
+			// Special initialization for interface fields
+			if isInterface {
+				c.tsw.WriteLiterally("null")
+			} else {
+				c.WriteZeroValueForType(field.Type)
+			}
 
 			// write tag comment if any for struct fields
 			if field.Tag != nil {

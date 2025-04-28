@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
+	gtypes "go/types"
 	"sort"
 	"strings"
 )
@@ -282,15 +283,15 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 
 	// Determine if method is async by checking for async operations in the body
 	isAsync := c.containsAsyncOperations(decl.Body)
-	
+
 	// Methods are typically public in the TS output
 	c.tsw.WriteLiterally("public ")
-	
+
 	// Add async modifier if needed
 	if isAsync {
 		c.tsw.WriteLiterally("async ")
 	}
-	
+
 	// Keep original Go casing for method names
 	if err := c.WriteValueExpr(decl.Name); err != nil { // Method name is a value identifier
 		return err
@@ -342,7 +343,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 
 	// Check if function body has defer statements
 	c.nextBlockNeedsDefer = c.scanForDefer(decl.Body)
-	
+
 	// Save previous async state and set current state based on isAsync
 	previousAsyncState := c.inAsyncFunction
 	c.inAsyncFunction = isAsync
@@ -374,7 +375,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
-			
+
 			// Restore previous async state
 			c.inAsyncFunction = previousAsyncState
 			return nil
@@ -385,7 +386,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 		c.inAsyncFunction = previousAsyncState // Restore state before returning error
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
-	
+
 	// Restore previous async state
 	c.inAsyncFunction = previousAsyncState
 	return nil
@@ -403,13 +404,30 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 	if len(a.Names) == 1 {
 		name := a.Names[0]
 		c.tsw.WriteLiterally(name.Name)
+
+		// Check if it's an interface type
+		isInterface := false
+		if c.pkg != nil && c.pkg.TypesInfo != nil && a.Type != nil {
+			if tv, ok := c.pkg.TypesInfo.Types[a.Type]; ok && tv.Type != nil {
+				_, isInterface = tv.Type.Underlying().(*gtypes.Interface)
+			}
+		}
+
 		if a.Type != nil {
 			c.tsw.WriteLiterally(": ")
 			c.WriteTypeExpr(a.Type) // Variable type annotation
 
+			// Append "| null" for interface types
+			if isInterface {
+				c.tsw.WriteLiterally(" | null")
+			}
+
 			// Check if it's an array type declaration without an initial value
 			if _, isArrayType := a.Type.(*ast.ArrayType); isArrayType && len(a.Values) == 0 {
 				c.tsw.WriteLiterally(" = []")
+			} else if isInterface && len(a.Values) == 0 {
+				// Interface with no initialization value, initialize to null
+				c.tsw.WriteLiterally(" = null")
 			}
 		}
 		if len(a.Values) > 0 {
@@ -473,6 +491,14 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 
 // WriteInterfaceMethodSignature writes a TypeScript interface method signature from a Go ast.Field.
 func (c *GoToTSCompiler) WriteInterfaceMethodSignature(field *ast.Field) error {
+	// Include comments
+	if field.Doc != nil {
+		c.WriteDoc(field.Doc)
+	}
+	if field.Comment != nil {
+		c.WriteDoc(field.Comment)
+	}
+
 	if len(field.Names) == 0 {
 		// Should not happen for named methods in an interface, but handle defensively
 		return fmt.Errorf("interface method field has no name")
