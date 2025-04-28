@@ -1,7 +1,7 @@
 // Generated file based on struct_pointer_interface_fields.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 interface MyInterface {
 	Method(): void;

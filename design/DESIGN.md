@@ -3,8 +3,8 @@
 This is the typical package structure of the output TypeScript import path:
 
 ```
-@go/ # Typical Go workspace, all packages live here. Includes the '@go/builtin' alias for the runtime.
-  # Compiled Go packages go here (e.g., @go/my/package)
+@goscript/ # Typical Go workspace, all packages live here. Includes the '@goscript/builtin' alias for the runtime.
+  # Compiled Go packages go here (e.g., @goscript/my/package)
 ```
 
 # Go to TypeScript Compiler Design
@@ -35,7 +35,7 @@ This is the typical package structure of the output TypeScript import path:
         ```
         becomes (conceptual translation using a runtime helper):
         ```typescript
-        import * as goscript from "@go/builtin"
+        import * as goscript from "@goscript/builtin"
         let runes = goscript.stringToRunes("Go€") // runes becomes [71, 111, 8364]
         ```
         *(This helper was also seen in the `for range` over strings translation).*
@@ -45,7 +45,7 @@ This is the typical package structure of the output TypeScript import path:
         ```
         becomes (conceptual translation using a runtime helper):
         ```typescript
-        import * as goscript from "@go/builtin"
+        import * as goscript from "@goscript/builtin"
         let s = goscript.runesToString([71, 111, 8364]) // s becomes "Go€"
         ```
     *Note: Direct conversion between `string` and `[]byte` would involve different runtime helpers focusing on byte representations.*
@@ -122,7 +122,7 @@ This is the typical package structure of the output TypeScript import path:
             becomes:
             ```typescript
             // TypeScript translation
-            import * as goscript from "@go/builtin";
+            import * as goscript from "@goscript/builtin";
 
             let i: MyInterface;
             let s = new MyStruct({ Value: 10 })
@@ -146,7 +146,7 @@ This is the typical package structure of the output TypeScript import path:
             becomes:
             ```typescript
             // TypeScript translation
-            import * as goscript from "@go/builtin";
+            import * as goscript from "@goscript/builtin";
 
             let rwc: ReadCloser;
             let s = new MyStruct({  })
@@ -167,7 +167,7 @@ This is the typical package structure of the output TypeScript import path:
             3.  Object destructuring is used to extract the `value` and `ok` properties into the corresponding variables from the Go code (e.g., `let { value: v, ok } = ...`). If a variable is the blank identifier (`_`), it's assigned using `value: _` in the destructuring pattern.
 
     -   **Panic Assertion (`v := i.(T)`):** This form asserts that `i` holds type `T` and panics if it doesn't. The translation uses the same `goscript.typeAssert` helper. After the call, the generated code uses destructuring to get `value` and `ok`. It then checks the `ok` flag. If `ok` is false, the code triggers a runtime panic (e.g., by throwing an error) to mimic Go's behavior. The asserted `value` is assigned to `v` only if `ok` is true.
-- **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`) augmented with a hidden `__capacity` property to emulate Go's slice semantics. Runtime helpers from `@go/builtin` are crucial for correct behavior.
+- **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`) augmented with a hidden `__capacity` property to emulate Go's slice semantics. Runtime helpers from `@goscript/builtin` are crucial for correct behavior.
     -   **Representation:** A Go slice is represented in TypeScript as `Array<T> & { __capacity?: number }`. The `__capacity` property stores the slice's capacity.
     -   **Creation (`make`):** `make([]T, len)` and `make([]T, len, cap)` are translated using the generic runtime helper `goscript.makeSlice<T>(len, cap?)`.
         ```go
@@ -177,7 +177,7 @@ This is the typical package structure of the output TypeScript import path:
         ```
         becomes:
         ```typescript
-        import * as goscript from "@go/builtin"
+        import * as goscript from "@goscript/builtin"
         let s1 = goscript.makeSlice<number>(5)      // Creates array len 5, sets __capacity = 5
         let s2 = goscript.makeSlice<number>(5, 10) // Creates array len 5, sets __capacity = 10
         let s3: string[] = []                     // Represents nil slice as empty array
@@ -236,7 +236,7 @@ This is the typical package structure of the output TypeScript import path:
         ```
         becomes:
         ```typescript
-        import * as goscript from "@go/builtin"
+        import * as goscript from "@goscript/builtin"
         let m = goscript.makeMap<string, number>() // Using generics for type information
         ```
     -   **Literals:** Map literals are translated to `new Map(...)`:
@@ -304,7 +304,7 @@ This is the typical package structure of the output TypeScript import path:
             // ...
         }
         ```
-    *Note: The reliance on runtime helpers (`@go/builtin`) is crucial for correctly emulating Go's map semantics, especially regarding zero values and potentially type information for `makeMap`.*
+    *Note: The reliance on runtime helpers (`@goscript/builtin`) is crucial for correctly emulating Go's map semantics, especially regarding zero values and potentially type information for `makeMap`.*
 - **Functions:** Converted to TypeScript `function`s. Exported functions are prefixed with `export`.
 - **Function Literals:** Go function literals (anonymous functions) are translated into TypeScript arrow functions (`=>`).
     ```go
@@ -502,7 +502,7 @@ Go's `for range` construct is translated differently depending on the type being
     ```
     becomes:
     ```typescript
-    import * as goscript from "@go/builtin"
+    import * as goscript from "@goscript/builtin"
     let str = "go"
     const _runes = goscript.stringToRunes(str) // Convert to array of runes (numbers)
     for (let i = 0; i < _runes.length; i++) { // i is rune index here
@@ -591,7 +591,7 @@ default:
 becomes:
 
 ```typescript
-import * as goscript from "@go/builtin"
+import * as goscript from "@goscript/builtin"
 
 await goscript.selectStatement([
     {
@@ -684,8 +684,8 @@ Go's zero values are mapped as follows:
 
 ## Packages and Imports
 
-- Go packages are mapped to TypeScript modules under the `@go/` scope (e.g., `import { MyType } from '@go/my/package';`).
-- The GoScript runtime is imported using the `@go/builtin` alias, which maps to the `builtin/builtin.ts` file.
+- Go packages are mapped to TypeScript modules under the `@goscript/` scope (e.g., `import { MyType } from '@goscript/my/package';`).
+- The GoScript runtime is imported using the `@goscript/builtin` alias, which maps to the `builtin/builtin.ts` file.
 - Standard Go library packages might require specific runtime implementations or shims.
 
 ## Code Generation Conventions
@@ -783,7 +783,7 @@ func main() {
 This translates to the following TypeScript:
 
 ```typescript
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 // Marked async because it contains 'await ch.receive()'
 async function receiveFromChan(ch: goscript.Channel<number>): Promise<number> {

@@ -1,7 +1,7 @@
 // Generated file based on function_call_result_assignment.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 class MyStruct {
 	public MyInt: number = 0;

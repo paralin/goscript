@@ -1,7 +1,7 @@
 // Generated file based on async_basic.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 // This function receives from a channel, making it async.
 async function receiveFromChan(ch: goscript.Channel<number>): Promise<number> {

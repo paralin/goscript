@@ -1,4 +1,4 @@
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 class MyStruct {
 	// MyInt is a public integer field, initialized to zero.

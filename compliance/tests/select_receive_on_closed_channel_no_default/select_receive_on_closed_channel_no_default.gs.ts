@@ -1,7 +1,7 @@
 // Generated file based on select_receive_on_closed_channel_no_default.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	let ch = goscript.makeChannel<number>(0, 0) // Unbuffered

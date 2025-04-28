@@ -1,7 +1,7 @@
 // Generated file based on for_range_index_use.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	let slice = [10, 20, 30, 40, 50]

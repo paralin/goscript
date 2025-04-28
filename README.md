@@ -306,7 +306,7 @@ func main() {
 Generated with `goscript compile .`:
 
 ```typescript
-import * as goscript from "@go/builtin"
+import * as goscript from "@goscript/builtin"
 
 class MyStruct {
   // MyInt is a public integer field, initialized to zero.
@@ -460,10 +460,10 @@ export async function main(): Promise<void> {
 
 Code is compiled with `GOARCH=js` and uses a 32-bit environment similar to wasm.
 
-All Go import paths are prefixed with `@go/` and can be imported in TypeScript:
+All Go import paths are prefixed with `@goscript/` and can be imported in TypeScript:
 
 ```typescript
-import { MyAsyncFunction, MyStruct } from '@go/github.com/myorg/mypackage';
+import { MyAsyncFunction, MyStruct } from '@goscript/github.com/myorg/mypackage';
 
 // Example of importing and using a compiled Go async function
 async function runGoCode() {

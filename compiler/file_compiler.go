@@ -69,7 +69,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg, cmap)
 
 	// Add import for the goscript runtime using namespace import and alias
-	c.codeWriter.WriteLine("import * as goscript from \"@go/builtin\";")
+	c.codeWriter.WriteLine("import * as goscript from \"@goscript/builtin\";")
 	c.codeWriter.WriteLine("") // Add a newline after the import
 
 	if err := goWriter.WriteDecls(f.Decls); err != nil {

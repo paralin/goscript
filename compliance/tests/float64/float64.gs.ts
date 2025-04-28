@@ -1,7 +1,7 @@
 // Generated file based on float64.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	//nolint:staticcheck

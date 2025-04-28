@@ -1,7 +1,7 @@
 // Generated file based on interface_method_comments.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 interface MyInterface {
 	// MyMethod is a method with a comment

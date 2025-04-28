@@ -1,7 +1,7 @@
 // Generated file based on select_statement.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	// Test 1: Simple deterministic select with default

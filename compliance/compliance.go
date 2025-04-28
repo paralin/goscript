@@ -117,7 +117,7 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 				t.Logf("failed to get relative path for %s: %v", path, err)
 				return nil // Continue walking
 			}
-			// relPath is like "@go/tempmod/file.gs.ts", so extract the base file name
+			// relPath is like "@goscript/tempmod/file.gs.ts", so extract the base file name
 			parts := strings.Split(relPath, string(filepath.Separator))
 			if len(parts) < 3 {
 				t.Logf("unexpected path structure for %s", path)
@@ -174,7 +174,7 @@ func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
 	}
 	goSourceBase := filepath.Base(goFiles[0])
 	tsFileName := strings.TrimSuffix(goSourceBase, ".go") + ".gs.ts"
-	tsImportPath := fmt.Sprintf("./output/@go/tempmod/%s", tsFileName)
+	tsImportPath := fmt.Sprintf("./output/@goscript/tempmod/%s", tsFileName)
 
 	tsRunner := filepath.Join(tempDir, "runner.ts")
 	// Import the goscript runtime and the main function from the compiled code
@@ -257,7 +257,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	 "compilerOptions": {
 	   "baseUrl": ".",
 	   "paths": {
-	     "@go/builtin": ["%s"]
+	     "@goscript/builtin": ["%s"]
 	   }
 	 }
 }`, builtinTsPathForJSON) // Use dynamic path

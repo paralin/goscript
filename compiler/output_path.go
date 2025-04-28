@@ -13,7 +13,7 @@ func translateGoPathToTypescriptPath(goImportPath string) string {
 	if strings.HasPrefix(goImportPath, typeScriptGoStubPrefix) {
 		return goImportPath[len(typeScriptGoStubPrefix):]
 	}
-	return fmt.Sprintf("@go/%s", goImportPath)
+	return fmt.Sprintf("@goscript/%s", goImportPath)
 }
 
 // packageNameFromGoPath attempts to determine the package name from the last segment of the go path.

@@ -1,7 +1,7 @@
 // Generated file based on interface_to_interface_type_assertion.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 interface MyInterface {
 	Method1(): number;

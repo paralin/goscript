@@ -1,7 +1,7 @@
 // Generated file based on for_range.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@go/builtin";
+import * as goscript from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	let nums = [2, 3, 4]

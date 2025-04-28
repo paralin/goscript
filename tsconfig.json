@@ -12,7 +12,7 @@
     "declaration": true, // Generate .d.ts files
     "sourceMap": true, // Generate source maps for debugging
     "paths": {
-      "@go/builtin": ["./builtin/builtin.ts"]
+      "@goscript/builtin": ["./builtin/builtin.ts"]
     }
   },
   "include": ["compiler", "builtin", "compliance"],

@@ -42,7 +42,7 @@ func TestBuildRunExampleSimple(t *testing.T) {
 	}
 
 	// Log the compiled file
-	outFile, err := os.ReadFile(filepath.Join(outputDir, "@go/example/main.gs.ts"))
+	outFile, err := os.ReadFile(filepath.Join(outputDir, "@goscript/example/main.gs.ts"))
 	if err != nil {
 		t.Fatalf("failed to read output file: %v", err)
 	}

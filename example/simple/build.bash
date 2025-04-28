@@ -10,4 +10,4 @@ for pkg in ${pkgs[@]}; do
 done
 
 # Copy for reference
-cp ./output/@go/example/main.gs.ts ./main.gs.ts
+cp ./output/@goscript/example/main.gs.ts ./main.gs.ts
