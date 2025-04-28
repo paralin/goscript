@@ -15,6 +15,8 @@ type Config struct {
 	Dir string
 	// OutputPathRoot is the output path root.
 	OutputPathRoot string
+	// BuildFlags are the Go build flags (tags) to use during analysis.
+	BuildFlags []string
 }
 
 // Validate checks the config.

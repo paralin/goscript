@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"slices"
 
 	"github.com/aperturerobotics/cli"
 	"github.com/paralin/goscript/compiler"
@@ -10,9 +11,10 @@ import (
 )
 
 var (
-	cliCompiler       *compiler.Compiler
-	cliCompilerConfig compiler.Config
-	cliCompilerPkg    cli.StringSlice
+	cliCompiler           *compiler.Compiler
+	cliCompilerConfig     compiler.Config
+	cliCompilerPkg        cli.StringSlice
+	cliCompilerBuildFlags cli.StringSlice
 )
 
 // CompileCommands are commands related to compiling code.
@@ -33,6 +35,7 @@ var CompileCommands = []*cli.Command{{
 			Name:        "package",
 			Usage:       "the package(s) to compile",
 			Aliases:     []string{"p", "packages"},
+			EnvVars:     []string{"GOSCRIPT_PACKAGES"},
 			Destination: &cliCompilerPkg,
 		},
 		&cli.StringFlag{
@@ -40,12 +43,20 @@ var CompileCommands = []*cli.Command{{
 			Usage:       "the output typescript path to use",
 			Destination: &cliCompilerConfig.OutputPathRoot,
 			Value:       "./output",
+			EnvVars:     []string{"GOSCRIPT_OUTPUT"},
 		},
 		&cli.StringFlag{
 			Name:        "dir",
 			Usage:       "the working directory to use for the compiler (default: current directory)",
 			Destination: &cliCompilerConfig.Dir,
 			Value:       "",
+			EnvVars:     []string{"GOSCRIPT_DIR"},
+		},
+		&cli.StringSliceFlag{
+			Name:        "buildflags",
+			Usage:       "Go build flags (tags) to use during analysis",
+			Destination: &cliCompilerBuildFlags,
+			EnvVars:     []string{"GOSCRIPT_BUILD_FLAGS"},
 		},
 	},
 }}
@@ -56,6 +67,9 @@ func compilePackage(c *cli.Context) error {
 	if len(pkgs) == 0 {
 		return errors.New("package(s) must be specified")
 	}
+
+	// build flags
+	cliCompilerConfig.BuildFlags = slices.Clone(cliCompilerBuildFlags.Value())
 
 	return cliCompiler.CompilePackages(context.Background(), pkgs...)
 }

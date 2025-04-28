@@ -29,6 +29,7 @@ func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compil
 	opts.Tests = false
 	opts.Env = append(opts.Env, "GOOS=js", "GOARCH=wasm")
 	opts.Dir = conf.Dir
+	opts.BuildFlags = conf.BuildFlags
 
 	// NeedName adds Name and PkgPath.
 	// NeedFiles adds GoFiles and OtherFiles.
