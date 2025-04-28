@@ -5,12 +5,12 @@ import (
 	"slices"
 
 	"github.com/aperturerobotics/cli"
-	"github.com/paralin/goscript/compiler"
+	"github.com/aperturerobotics/goscript/compiler"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
 	// _ ensure we include the builtin package
-	_ "github.com/paralin/goscript/builtin"
+	_ "github.com/aperturerobotics/goscript/builtin"
 )
 
 var (

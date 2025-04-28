@@ -7,7 +7,7 @@ import (
 	gtypes "go/types"
 	"strings"
 
-	gstypes "github.com/paralin/goscript/compiler/types"
+	gstypes "github.com/aperturerobotics/goscript/compiler/types"
 	"github.com/sanity-io/litter"
 	"golang.org/x/tools/go/packages"
 )

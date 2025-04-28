@@ -2,4 +2,4 @@
 
 package main
 
-import _ "github.com/paralin/goscript/cmd/goscript"
+import _ "github.com/aperturerobotics/goscript/cmd/goscript"

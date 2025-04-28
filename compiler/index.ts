@@ -19,7 +19,7 @@ export interface CompileConfig {
   output?: string;
   /** The working directory for the compiler. Defaults to the current working directory. */
   dir?: string;
-  /** The path to the goscript executable. Defaults to 'go run github.com/paralin/goscript/cmd/goscript'. */
+  /** The path to the goscript executable. Defaults to 'go run github.com/aperturerobotics/goscript/cmd/goscript'. */
   goscriptPath?: string;
 }
 

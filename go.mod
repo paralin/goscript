@@ -1,4 +1,4 @@
-module github.com/paralin/goscript
+module github.com/aperturerobotics/goscript
 
 go 1.24
 

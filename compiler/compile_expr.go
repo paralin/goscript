@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	gstypes "github.com/paralin/goscript/compiler/types"
+	gstypes "github.com/aperturerobotics/goscript/compiler/types"
 )
 
 // WriteTypeExpr writes an expression that represents a type.

@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/paralin/goscript/compiler"
+	"github.com/aperturerobotics/goscript/compiler"
 	"github.com/sirupsen/logrus"
 )
 

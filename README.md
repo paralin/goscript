@@ -2,10 +2,10 @@
 
 [![GoDoc Widget]][GoDoc] [![Go Report Card Widget]][Go Report Card]
 
-[GoDoc]: https://godoc.org/github.com/paralin/goscript
-[GoDoc Widget]: https://godoc.org/github.com/paralin/goscript?status.svg
-[Go Report Card Widget]: https://goreportcard.com/badge/github.com/paralin/goscript
-[Go Report Card]: https://goreportcard.com/report/github.com/paralin/goscript
+[GoDoc]: https://godoc.org/github.com/aperturerobotics/goscript
+[GoDoc Widget]: https://godoc.org/github.com/aperturerobotics/goscript?status.svg
+[Go Report Card Widget]: https://goreportcard.com/badge/github.com/aperturerobotics/goscript
+[Go Report Card]: https://goreportcard.com/report/github.com/aperturerobotics/goscript
 
 ## Introduction
 
@@ -67,7 +67,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/paralin/goscript/compiler"
+	"github.com/aperturerobotics/goscript/compiler"
 	"github.com/sirupsen/logrus"
 )
 

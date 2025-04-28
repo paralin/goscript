@@ -14,7 +14,7 @@
       "enabled": false
     },
     {
-      "matchPackageNames": ["github.com/paralin/goscript"],
+      "matchPackageNames": ["github.com/aperturerobotics/goscript"],
       "enabled": false
     }
   ]

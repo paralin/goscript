@@ -6,7 +6,7 @@ import (
 	"go/token"
 	gtypes "go/types"
 
-	gstypes "github.com/paralin/goscript/compiler/types"
+	gstypes "github.com/aperturerobotics/goscript/compiler/types"
 	"golang.org/x/tools/go/packages"
 )
 
