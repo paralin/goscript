@@ -785,6 +785,16 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 
 		// Handle array literals
 		if arrType, isArrayType := exp.Type.(*ast.ArrayType); isArrayType {
+			// Special case: empty slice literal
+			if len(exp.Elts) == 0 {
+				// Generate: ([] as ElementType[])
+				c.tsw.WriteLiterally("([] as ")
+				// Write the element type using the existing function
+				c.WriteTypeExpr(arrType.Elt)
+				c.tsw.WriteLiterally("[])") // Close the type assertion
+				return nil                  // Handled empty slice literal
+			}
+
 			c.tsw.WriteLiterally("[")
 			// Use type info to get array length and element type
 			var arrayLen int
