@@ -148,15 +148,19 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		if err := c.WriteValueExpr(a.Name); err != nil { // Class name is a value identifier
 			return err
 		}
+		c.tsw.WriteLiterally(" ")
+
 		if embeddedExpr != nil {
 			// For pointer embedding (*T) unwrap the star so we extend T, not (T|null)
 			if star, ok := embeddedExpr.(*ast.StarExpr); ok {
 				embeddedExpr = star.X
 			}
-			c.tsw.WriteLiterally(" extends ")
+			c.tsw.WriteLiterally("extends ")
 			c.WriteTypeExpr(embeddedExpr) // Embedded type name
+			c.tsw.WriteLiterally(" ")
 		}
-		c.tsw.WriteLine(" {")
+
+		c.tsw.WriteLine("{")
 		c.tsw.Indent(1)
 
 		// className is the name of the class type

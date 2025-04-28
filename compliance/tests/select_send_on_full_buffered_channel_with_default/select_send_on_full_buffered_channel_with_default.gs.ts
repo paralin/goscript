@@ -7,6 +7,8 @@ export async function main(): Promise<void> {
 	let ch = goscript.makeChannel<number>(1, 0)
 	await ch.send(1)
 
+	// TODO: The comments on the following cases are written twice in the output.
+
 	// Should not be reached
 
 	// Should be reached

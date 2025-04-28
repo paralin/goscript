@@ -29,7 +29,7 @@ const Closer__typeInfo = goscript.registerType(
   undefined
 );
 
-interface ReadCloser  extends Reader, Closer{
+interface ReadCloser extends Reader, Closer {
 }
 
 // Register this interface with the runtime type system

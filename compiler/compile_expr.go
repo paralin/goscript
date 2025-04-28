@@ -315,13 +315,14 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 
 	// If there are embedded interfaces, write the extends clause
 	if len(embeddedInterfaces) > 0 {
-		c.tsw.WriteLiterally(" extends ")
+		c.tsw.WriteLiterally("extends ")
 		c.tsw.WriteLiterally(strings.Join(embeddedInterfaces, ", "))
+		c.tsw.WriteLiterally(" ")
 	}
 
 	// Write the interface body on the same line
-	c.tsw.WriteLiterally("{") // Removed leading space
-	c.tsw.WriteLine("")       // Newline after opening brace
+	c.tsw.WriteLiterally("{")
+	c.tsw.WriteLine("") // Newline after opening brace
 	c.tsw.Indent(1)
 
 	// Write named methods

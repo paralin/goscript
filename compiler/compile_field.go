@@ -51,6 +51,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 			c.WriteDoc(field.Comment)
 		}
 	}
+
 	for _, name := range field.Names {
 		isExported := name.IsExported()
 
