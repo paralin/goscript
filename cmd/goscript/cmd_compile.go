@@ -8,6 +8,9 @@ import (
 	"github.com/paralin/goscript/compiler"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
+
+	// _ ensure we include the builtin package
+	_ "github.com/paralin/goscript/builtin"
 )
 
 var (
