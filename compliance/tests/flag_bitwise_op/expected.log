@@ -1,0 +1,3 @@
+O_APPEND is set: Expected: O_APPEND is set, Actual: O_APPEND is set
+O_TRUNC is not set: Expected: O_TRUNC is not set, Actual: O_TRUNC is not set
+O_APPEND is not set: Expected: O_APPEND is not set, Actual: O_APPEND is not set

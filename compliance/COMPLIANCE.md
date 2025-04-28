@@ -70,6 +70,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Arithmetic: `+`, `-`, `*`, `/`, `%`
     *   Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`
     *   Logical: `&&`, `||`, `!`
+*   Bitwise operator precedence in if conditions (`&`, `|`, `^`, `<<`, `>>`, `&^`)
 *   **Control Flow:**
     *   `if`/`else` statements.
     *   `defer` statement (including async operations)

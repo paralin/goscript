@@ -710,6 +710,17 @@ func (c *GoToTSCompiler) WriteBinaryExprValue(exp *ast.BinaryExpr) error {
 		return nil
 	}
 
+	// Check if the operator is a bitwise operator
+	isBitwise := false
+	switch exp.Op {
+	case token.AND, token.OR, token.XOR, token.SHL, token.SHR, token.AND_NOT:
+		isBitwise = true
+	}
+
+	if isBitwise {
+		c.tsw.WriteLiterally("(") // Add opening parenthesis for bitwise operations
+	}
+
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write binary expression left operand: %w", err)
 	}
@@ -725,6 +736,11 @@ func (c *GoToTSCompiler) WriteBinaryExprValue(exp *ast.BinaryExpr) error {
 	if err := c.WriteValueExpr(exp.Y); err != nil {
 		return fmt.Errorf("failed to write binary expression right operand: %w", err)
 	}
+
+	if isBitwise {
+		c.tsw.WriteLiterally(")") // Add closing parenthesis for bitwise operations
+	}
+
 	return nil
 }
 

@@ -10,6 +10,7 @@ var tokenMap = map[token.Token]string{
 	token.MUL: "*",
 	token.QUO: "/",
 	token.REM: "%",
+	token.AND: "&",
 	token.OR:  "|",
 	token.XOR: "^",
 	token.SHL: "<<",
