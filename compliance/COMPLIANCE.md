@@ -44,7 +44,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`simple/`**: A basic test covering simple struct definition, field access, method calls, and `println`.
 *   **`simple_deref_assignment/`**: Tests simple assignment involving pointer dereferencing (`*ptr`), ensuring value copying.
 *   **`slices/`**: Covers slice creation (`make`), length (`len`), capacity (`cap`), and appending (`append`).
-*   **`string_rune_conversion/`**: Tests the conversion between `string` and `rune`.
+*   **`string_conversion/`**: Tests the conversion between `string` and `rune` and `[]rune`.
 *   **`struct_field_access/`**: Verifies accessing fields of struct values and struct pointers.
 *   **`struct_value_init_clone/`**: Checks struct initialization via composite literal (`T{...}`) and subsequent assignment (ensuring `.clone()` is used).
 *   **`switch_statement/`**: Verifies basic `switch` statements with integer and string tags and default cases.
@@ -64,6 +64,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   **Type Conversions:**
 *   `string(rune)`
 *   `string(string)`
+*   `string([]rune)`
 *   **Operators:**
     *   Arithmetic: `+`, `-`, `*`, `/`, `%`
     *   Comparison: `==`, `!=`, `<`, `>`, `<=`, `>=`

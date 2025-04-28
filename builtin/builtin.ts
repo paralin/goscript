@@ -91,6 +91,15 @@ export const stringToRunes = (str: string): number[] => {
 }
 
 /**
+ * Converts an array of Unicode code points (runes) to a string.
+ * @param runes The input array of numbers representing Unicode code points.
+ * @returns The resulting string.
+ */
+export const runesToString = (runes: number[]): string => {
+  return String.fromCharCode(...runes);
+};
+
+/**
  * Gets a value from a map, with a default value if the key doesn't exist.
  * @param map The map to get from.
  * @param key The key to get.

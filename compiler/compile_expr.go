@@ -548,6 +548,19 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 						c.tsw.WriteLiterally(")")
 						return nil // Handled string(int32)
 					}
+
+					// Case 3: Argument is a slice of runes string([]rune{...})
+					if sliceType, isSlice := tv.Type.Underlying().(*gtypes.Slice); isSlice {
+						if basic, isBasic := sliceType.Elem().Underlying().(*gtypes.Basic); isBasic && basic.Kind() == gtypes.Int32 {
+							// Translate string([]rune) to goscript.runesToString(...)
+							c.tsw.WriteLiterally("goscript.runesToString(")
+							if err := c.WriteValueExpr(arg); err != nil {
+								return fmt.Errorf("failed to write argument for string([]rune) conversion: %w", err)
+							}
+							c.tsw.WriteLiterally(")")
+							return nil // Handled string([]rune)
+						}
+					}
 				}
 			}
 			// Return error for other unhandled string conversions
