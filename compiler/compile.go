@@ -19,8 +19,6 @@ type GoToTSCompiler struct {
 	asyncFuncs          map[string]bool // Track which functions are async
 	nextBlockNeedsDefer bool            // Track if the next block should have a "using" statement
 	inAsyncFunction     bool            // Track if we're inside an async function
-
-	tempVarCounter int // Counter for generating unique temporary variable names
 }
 
 // WriteGoType writes a Go type as a TypeScript type.
@@ -93,14 +91,7 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, cmap ast.Commen
 		asyncFuncs:          make(map[string]bool),
 		nextBlockNeedsDefer: false,
 		inAsyncFunction:     false,
-		tempVarCounter:      0, // Initialize counter
 	}
-}
-
-// newTempVar generates a unique temporary variable name.
-func (c *GoToTSCompiler) newTempVar() string {
-	c.tempVarCounter++
-	return fmt.Sprintf("_tempVar%d", c.tempVarCounter)
 }
 
 // isAsyncFunc determines if a function is asynchronous

@@ -806,43 +806,50 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 		return fmt.Errorf("unhandled LHS expression type for ok in channel receive: %T", lhs[1])
 	}
 
-	// Generate temporary variable for the result
-	resultVar := c.newTempVar()
-	c.tsw.WriteLiterally("const ")
-	c.tsw.WriteLiterally(resultVar)
+	// Generate destructuring assignment/declaration for val, ok := <-channel
+	keyword := ""
+	if tok == token.DEFINE {
+		keyword = "const " // Use const for destructuring declaration
+	}
+
+	// Build the destructuring pattern, handling blank identifiers correctly for TS
+	patternParts := []string{}
+	if !valueIsBlank {
+		// Map the 'value' field to the Go variable name
+		patternParts = append(patternParts, fmt.Sprintf("value: %s", valueName))
+	} else {
+		// If both are blank, just await the call and return
+		if okIsBlank {
+			c.tsw.WriteLiterally("await ")
+			if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
+				return fmt.Errorf("failed to write channel expression in receive: %w", err)
+			}
+			c.tsw.WriteLiterally(".receiveWithOk()")
+			c.tsw.WriteLine("")
+			return nil // Nothing to assign
+		}
+		// Only value is blank, need to map 'ok' property
+		patternParts = append(patternParts, fmt.Sprintf("ok: %s", okName))
+	}
+
+	if !okIsBlank && !valueIsBlank { // Both are present
+		patternParts = append(patternParts, fmt.Sprintf("ok: %s", okName))
+	} else if !okIsBlank && valueIsBlank { // Only ok is present (already handled above)
+		// No need to add ok again
+	}
+	// If both are blank, patternParts remains empty, handled earlier.
+
+	destructuringPattern := fmt.Sprintf("{ %s }", strings.Join(patternParts, ", "))
+
+	// Write the destructuring assignment/declaration
+	c.tsw.WriteLiterally(keyword) // "const " or ""
+	c.tsw.WriteLiterally(destructuringPattern)
 	c.tsw.WriteLiterally(" = await ")
 	if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
 		return fmt.Errorf("failed to write channel expression in receive: %w", err)
 	}
 	c.tsw.WriteLiterally(".receiveWithOk()")
 	c.tsw.WriteLine("")
-
-	// Assign to variables, declaring if needed (tok == token.DEFINE)
-	assignOrDeclare := func(varName string, isBlank bool, valueSource string) error {
-		if !isBlank {
-			if tok == token.DEFINE {
-				// Check if the variable is already declared in the current scope to avoid redeclaration error
-				// This requires scope tracking, which is complex. For now, assume := might redeclare.
-				// A safer approach might be to always assign, assuming prior declaration or handling scope elsewhere.
-				// Let's stick with 'let' for := for now, acknowledging potential issues.
-				c.tsw.WriteLiterally("let ")
-			}
-			c.tsw.WriteLiterally(varName)
-			c.tsw.WriteLiterally(" = ")
-			c.tsw.WriteLiterally(resultVar)
-			c.tsw.WriteLiterally(".")
-			c.tsw.WriteLiterally(valueSource)
-			c.tsw.WriteLine("")
-		}
-		return nil
-	}
-
-	if err := assignOrDeclare(valueName, valueIsBlank, "value"); err != nil {
-		return err
-	}
-	if err := assignOrDeclare(okName, okIsBlank, "ok"); err != nil {
-		return err
-	}
 
 	return nil
 }

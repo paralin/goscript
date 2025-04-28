@@ -211,9 +211,7 @@ export async function main(): Promise<void> {
 	// Test 9: Channel closing test case for a separate test
 	let chClose = goscript.makeChannel<boolean>(0, false)
 	chClose.close()
-	const _tempVar1 = await chClose.receiveWithOk()
-	let val = _tempVar1.value
-	let ok = _tempVar1.ok
+	const { value: val, ok: ok } = await chClose.receiveWithOk()
 	if (!ok) {
 		console.log("TEST9: Channel is closed, ok is false, val:", val)
 	} else {
