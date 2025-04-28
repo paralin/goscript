@@ -271,7 +271,7 @@ export function typeAssert<T>(
       }
       break
 
-    case TypeKind.Basic:
+    case TypeKind.Basic: {
       // For basic types, check if the value matches the expected JavaScript type
       // This is a simple check for common basic types
       const basicType = typeof value
@@ -283,6 +283,7 @@ export function typeAssert<T>(
         return { value: value as T, ok: true }
       }
       break
+    }
 
     case TypeKind.Pointer:
       // For pointers, check if value is not null or undefined
