@@ -28,7 +28,7 @@ export async function main(): Promise<void> {
 	let myStringFromRunes = goscript.runesToString(myRunes)
 	console.log(myStringFromRunes)
 	
-	let emptyRunes = []
+	let emptyRunes = ([] as number[])
 	let emptyStringFromRunes = goscript.runesToString(emptyRunes)
 	console.log(emptyStringFromRunes)
 	

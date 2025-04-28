@@ -5,7 +5,7 @@ import * as fs from "fs/promises";
 
 const exampleDir = path.resolve(__dirname, "../example/simple");
 const outputDir = path.join(exampleDir, "output"); // Use a separate output dir for tests
-const expectedOutputFile = path.join(outputDir, "@go", "example", "main.gs.ts");
+const expectedOutputFile = path.join(outputDir, "@goscript", "example", "main.gs.ts");
 
 describe("GoScript Compiler API", () => {
   // Clean up before and after tests

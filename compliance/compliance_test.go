@@ -2,6 +2,7 @@ package compliance
 
 import (
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sync"
 	"testing"
@@ -54,4 +55,25 @@ func TestCompliance(t *testing.T) {
 
 	// Wait for all tests to complete
 	wg.Wait()
+}
+
+// Add a new test function for type checking
+func TestTypeCheck(t *testing.T) {
+	// Get workspace directory (project root)
+	workspaceDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("failed to get working directory: %v", err)
+	}
+	workspaceDir = filepath.Join(workspaceDir, "..")
+
+	t.Log("running: npm run typecheck")
+	cmd := exec.Command("npm", "run", "typecheck")
+	cmd.Dir = workspaceDir // Run in the workspace directory
+	cmd.Stdout = os.Stderr
+	cmd.Stderr = os.Stderr
+
+	err = cmd.Run()
+	if err != nil {
+		t.Errorf("npm run typecheck failed: %v", err)
+	}
 }
