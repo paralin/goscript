@@ -21,7 +21,7 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let original = new MyStruct({ MyInt: 10, MyString: "original" })
+	let original = new MyStruct({MyInt: 10, MyString: "original"})
 	
 	// === Pointer Assignment (No Copy) ===
 	// Assigning a pointer variable to another pointer variable.

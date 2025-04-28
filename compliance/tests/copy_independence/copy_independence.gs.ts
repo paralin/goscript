@@ -22,7 +22,7 @@ class MyStruct {
 
 export async function main(): Promise<void> {
 	// Setup from previous steps (simplified for this test)
-	let structPointer = new MyStruct({ MyInt: 4, MyString: "hello world" })
+	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	let dereferencedStructCopy = structPointer.clone()
 	dereferencedStructCopy.MyString = "original dereferenced copy modified"
 	let valueCopy1 = dereferencedStructCopy.clone()

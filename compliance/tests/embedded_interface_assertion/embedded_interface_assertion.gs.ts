@@ -67,8 +67,8 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let rwc: ReadCloser;
-	let s = new MyStruct({  })
+	let rwc: ReadCloser | null = null;
+	let s = new MyStruct({})
 	rwc = s.clone()
 	
 	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')

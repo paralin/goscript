@@ -24,7 +24,7 @@ class MyStruct {
 
 // NewMyStruct creates a new MyStruct instance.
 export function NewMyStruct(s: string): MyStruct {
-	return new MyStruct({ MyString: s })
+	return new MyStruct({MyString: s})
 }
 
 export async function main(): Promise<void> {

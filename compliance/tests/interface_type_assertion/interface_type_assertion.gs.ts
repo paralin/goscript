@@ -38,8 +38,8 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let i: MyInterface;
-	let s = new MyStruct({ Value: 10 })
+	let i: MyInterface | null = null;
+	let s = new MyStruct({Value: 10})
 	i = s.clone()
 	
 	let { ok: ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')

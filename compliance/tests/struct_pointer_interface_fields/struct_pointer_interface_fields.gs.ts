@@ -34,7 +34,7 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let s = new MyStruct({  })
+	let s = new MyStruct({})
 	console.log(s.PointerField)
 	console.log(s.InterfaceField)
 	

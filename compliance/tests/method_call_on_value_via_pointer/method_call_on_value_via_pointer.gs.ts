@@ -27,7 +27,7 @@ class MyStruct {
 
 export async function main(): Promise<void> {
 	// Create a struct value
-	let msValue = new MyStruct({ MyInt: 100 })
+	let msValue = new MyStruct({MyInt: 100})
 	// Create a pointer to the struct value
 	let msPointer = msValue
 	

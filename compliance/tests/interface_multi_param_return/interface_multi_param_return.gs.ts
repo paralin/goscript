@@ -42,8 +42,8 @@ class MyProcessor {
 }
 
 export async function main(): Promise<void> {
-	let processor: MultiParamReturner;
-	processor = new MyProcessor({  })
+	let processor: MultiParamReturner | null = null;
+	processor = new MyProcessor({})
 	
 	let data = [1, 2, 3]
 	let [success, ] = processor.Process(data, 5, "unused")

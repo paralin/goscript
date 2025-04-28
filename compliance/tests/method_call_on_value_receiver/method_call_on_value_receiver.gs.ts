@@ -27,7 +27,7 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let ms = new MyStruct({ MyInt: 1, MyString: "bar" })
+	let ms = new MyStruct({MyInt: 1, MyString: "bar"})
 	console.log("Method call on value: Expected: bar, Actual:", ms.GetMyString())
 }
 

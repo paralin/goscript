@@ -49,7 +49,7 @@ class Employee extends Person {
 }
 
 export async function main(): Promise<void> {
-	let e = new Employee({ Person: new Person({ Name: "Alice", Age: 30 }), ID: 123 })
+	let e = new Employee({Person: new Person({Name: "Alice", Age: 30}), ID: 123})
 	
 	// Accessing embedded fields
 	console.log("Employee Name:", e.Name)
@@ -60,7 +60,7 @@ export async function main(): Promise<void> {
 	e.Greet()
 	
 	// Test with a pointer to Employee
-	let ep = new Employee({ Person: new Person({ Name: "Bob", Age: 25 }), ID: 456 })
+	let ep = new Employee({Person: new Person({Name: "Bob", Age: 25}), ID: 456})
 	
 	// Accessing embedded fields via pointer
 	console.log("Employee Pointer Name:", ep.Name)

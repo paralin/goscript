@@ -21,7 +21,7 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let dereferencedStructCopy = new MyStruct({ MyString: "original" })
+	let dereferencedStructCopy = new MyStruct({MyString: "original"})
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.
 	let valueCopy1 = dereferencedStructCopy.clone()
