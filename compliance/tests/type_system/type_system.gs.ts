@@ -53,7 +53,7 @@ const Data__ptrTypeInfo = goscript.registerType(
   goscript.GoTypeKind.Pointer,
   null,
   [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-  undefined
+  Data.__typeInfo
 );
 
 type Processor = (_p0: number) => number;

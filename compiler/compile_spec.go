@@ -487,7 +487,9 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.WriteLinef("  null,") // Zero value for pointer is null
 		// Pointer type has the same method set (including promoted methods from value receiver)
 		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
-		c.tsw.WriteLinef("  undefined") // No constructor for pointer type
+		// Pass the base struct's type info as the element type for the pointer type
+		// Reference the static member via the class name to ensure it's defined
+		c.tsw.WriteLinef("  %s.__typeInfo", className) // Pass the base struct's type info
 		c.tsw.WriteLinef(");")
 		return nil // Prevent fallthrough to InterfaceType case
 	case *ast.InterfaceType:
