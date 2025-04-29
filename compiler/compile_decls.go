@@ -63,12 +63,13 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	}
 
 	// WriteFuncType needs to be aware if the function is async
-	c.WriteFuncType(decl.Type, isAsync) // Write signature (params, return type)
+	// Function declarations use ':' for return type, so useArrowForReturnType is false.
+	c.WriteFuncType(decl.Type, isAsync, false) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
 
 	// Check if function body has defer statements
 	c.nextBlockNeedsDefer = c.scanForDefer(decl.Body)
-	
+
 	// Save previous async state and set current state based on isAsync
 	previousAsyncState := c.inAsyncFunction
 	c.inAsyncFunction = isAsync
@@ -77,7 +78,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 		c.inAsyncFunction = previousAsyncState // Restore state before returning error
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
-	
+
 	// Restore previous async state
 	c.inAsyncFunction = previousAsyncState
 	return nil

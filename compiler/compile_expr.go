@@ -28,7 +28,8 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	case *ast.InterfaceType:
 		c.WriteInterfaceType(exp)
 	case *ast.FuncType:
-		c.WriteFuncType(exp, false) // Function types are not async
+		// Function types (e.g., in type aliases) use '=>' for return type.
+		c.WriteFuncType(exp, false, true) // isAsync=false, useArrowForReturnType=true
 	case *ast.ArrayType:
 		// Translate [N]T to T[]
 		c.WriteTypeExpr(exp.Elt)
@@ -190,9 +191,24 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 		if ident, ok := t.X.(*ast.Ident); ok {
 			return fmt.Sprintf("%s.%s", ident.Name, t.Sel.Name)
 		}
+	case *ast.StarExpr:
+		// Handle pointer types
+		return fmt.Sprintf("*%s", c.getTypeNameString(t.X))
+	case *ast.ArrayType:
+		// Handle array/slice types
+		return fmt.Sprintf("[]%s", c.getTypeNameString(t.Elt))
+	case *ast.MapType:
+		// Handle map types
+		return fmt.Sprintf("map[%s]%s", c.getTypeNameString(t.Key), c.getTypeNameString(t.Value))
+	case *ast.InterfaceType:
+		// Handle interface{} specifically
+		if t.Methods == nil || len(t.Methods.List) == 0 {
+			return "interface{}"
+		}
+		// TODO: Handle non-empty anonymous interfaces?
 	}
-	// Default case, use a placeholder for complex types
-	return "unknown"
+	// Fallback for other complex types
+	return "unknown" // Or perhaps generate a more descriptive placeholder
 }
 
 // --- Exported Node-Specific Writers ---
@@ -337,13 +353,18 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 }
 
 // WriteFuncType writes a function type signature.
-func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
+// useArrowForReturnType determines if '=>' (for type expressions) or ':' (for declarations) is used.
+func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool, useArrowForReturnType bool) {
 	c.tsw.WriteLiterally("(")
 	c.WriteFieldList(exp.Params, true) // true = arguments
 	c.tsw.WriteLiterally(")")
 	if exp.Results != nil && len(exp.Results.List) > 0 {
-		// Use colon for return type annotation
-		c.tsw.WriteLiterally(": ")
+		// Use ':' or '=>' for return type annotation
+		if useArrowForReturnType {
+			c.tsw.WriteLiterally(" => ")
+		} else {
+			c.tsw.WriteLiterally(": ")
+		}
 		if isAsync {
 			c.tsw.WriteLiterally("Promise<")
 		}
@@ -366,10 +387,18 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 		}
 	} else {
 		// No return value -> void
-		if isAsync {
-			c.tsw.WriteLiterally(": Promise<void>")
+		if useArrowForReturnType {
+			if isAsync {
+				c.tsw.WriteLiterally(" => Promise<void>")
+			} else {
+				c.tsw.WriteLiterally(" => void")
+			}
 		} else {
-			c.tsw.WriteLiterally(": void")
+			if isAsync {
+				c.tsw.WriteLiterally(": Promise<void>")
+			} else {
+				c.tsw.WriteLiterally(": void")
+			}
 		}
 	}
 }

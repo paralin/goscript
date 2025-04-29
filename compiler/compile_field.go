@@ -25,12 +25,26 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 		}
 
 		if isArguments {
-			// For function parameters, write "name: type"
-			c.WriteField(field, true)
-			c.tsw.WriteLiterally(": ")
-			c.WriteTypeExpr(field.Type) // Use WriteTypeExpr for parameter type
+			// For function parameters, write "name: type" or "_pI: type" if unnamed
+			if len(field.Names) == 0 || (len(field.Names) == 1 && field.Names[0].Name == "_") {
+				// Unnamed parameter or explicitly ignored (_)
+				c.tsw.WriteLiterally(fmt.Sprintf("_p%d", i))
+				c.tsw.WriteLiterally(": ")
+				c.WriteTypeExpr(field.Type)
+			} else {
+				// Named parameter(s) like (a int) or (a, b int)
+				for j, name := range field.Names {
+					if j > 0 {
+						c.tsw.WriteLiterally(", ") // Add comma between names for the same type
+					}
+					c.tsw.WriteLiterally(name.Name)
+				}
+				c.tsw.WriteLiterally(": ")
+				c.WriteTypeExpr(field.Type)
+			}
 		} else {
 			// For struct fields and other non-argument fields
+			// WriteField handles multiple names for the same type internally
 			c.WriteField(field, false)
 		}
 	}

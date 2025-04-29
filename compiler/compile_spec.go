@@ -476,7 +476,20 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.WriteLinef(");")
 
 		c.tsw.Indent(-1)
-		c.tsw.WriteLine("}")
+		c.tsw.WriteLine("}") // Close class definition
+
+		// Also register the pointer type *T (outside the class definition)
+		c.tsw.WriteLinef("// Register the pointer type *%s with the runtime type system", className)
+		// Use a different const name to avoid conflicts if multiple types are in one file
+		c.tsw.WriteLinef("const %s__ptrTypeInfo = goscript.registerType(", className)
+		c.tsw.WriteLinef("  '*%s',", className) // Pointer type name
+		c.tsw.WriteLinef("  goscript.GoTypeKind.Pointer,")
+		c.tsw.WriteLinef("  null,") // Zero value for pointer is null
+		// Pointer type has the same method set (including promoted methods from value receiver)
+		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
+		c.tsw.WriteLinef("  undefined") // No constructor for pointer type
+		c.tsw.WriteLinef(");")
+		return nil // Prevent fallthrough to InterfaceType case
 	case *ast.InterfaceType:
 		c.tsw.WriteLiterally("interface ")
 		if err := c.WriteValueExpr(a.Name); err != nil { // Interface name is a value identifier

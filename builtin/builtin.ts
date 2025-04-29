@@ -1,6 +1,32 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
+ * Represents a Go pointer in TypeScript.
+ * A nil pointer is represented by `null`.
+ */
+export class GoPtr<T> {
+  constructor(public ref: T | null) {}
+}
+
+/**
+ * Type alias for a Go pointer, which can be a GoPtr instance or null (for nil).
+ */
+export type Ptr<T> = GoPtr<T> | null;
+
+/**
+ * Creates a new Go pointer.
+ * @param v The value the pointer refers to, or null for a nil pointer.
+ * @returns A new Go pointer instance or null.
+ */
+export const newPtr = <T>(v: T | null): Ptr<T> => {
+  if (v === null) {
+    return null;
+  }
+  return new GoPtr(v);
+};
+
+
+/**
  * Creates a new slice (TypeScript array) with the specified length and capacity.
  * @param len The length of the slice.
  * @param cap The capacity of the slice (optional).
@@ -342,10 +368,23 @@ export function registerType(
       } as BasicTypeInfo;
       break;
     // Add cases for Pointer, Slice, Map, Chan, Func as needed
-    // Example for Pointer (assuming elemType is passed somehow):
-    // case GoTypeKind.Pointer:
-    //   info = { kind: GoTypeKind.Pointer, name, zero, elem: elemType } as PointerTypeInfo;
-    //   break;
+    case GoTypeKind.Pointer:
+      // For pointer types, the element type must be provided as the 'ctor' argument
+      const elemType = ctor as GoTypeInfo;
+      if (!elemType) {
+        throw new Error(`Element type not provided for PointerTypeInfo registration: ${name}`);
+      }
+      info = {
+        kind: GoTypeKind.Pointer,
+        name,
+        zero, // Should be null for pointers
+        elem: elemType,
+      } as PointerTypeInfo;
+      break;
+    // case GoTypeKind.Slice: // Slice type info handled by computeKey for now
+    // case GoTypeKind.Map: // Map type info handled by computeKey for now
+    // case GoTypeKind.Chan: // Chan type info handled by computeKey for now
+    // case GoTypeKind.Func: // Func type info handled by computeKey for now
     default:
       // Fallback for unhandled kinds - might need more specific handling
       info = { kind, name, zero };
@@ -455,37 +494,57 @@ export function isAssignable(value: any, target: GoTypeInfo): boolean {
 function typeofGo(value: any): GoTypeInfo {
   // For now, use a simple heuristic based on the constructor name and value type
   // This would be replaced with proper type tracking in the full implementation
-  
+
   if (value === null || value === undefined) {
     return registry.get('nil')!;
   }
-  
+
+  // Handle the new GoPtr type
+  if (value instanceof GoPtr) {
+    // We need the element type of the pointer. This is not stored in GoPtr itself.
+    // This highlights a limitation of this typeofGo heuristic.
+    // A proper solution requires compiler-generated type information associated with values.
+    // For now, we'll try to infer based on the constructor name of the *referenced* value.
+    if (value.ref !== null && value.ref.constructor) {
+      const refTypeName = value.ref.constructor.name;
+      // Try to find the pointer type based on the referenced type name
+      const ptrTypeName = `*${refTypeName}`;
+      const ptrType = registry.get(ptrTypeName);
+      if (ptrType && ptrType.kind === GoTypeKind.Pointer) {
+        return ptrType;
+      }
+    }
+    // Fallback if we can't determine the specific pointer type
+    return registry.get('*interface{}')!; // Assuming *interface{} is registered
+  }
+
+
   if (typeof value === 'string') {
     return registry.get('string')!;
   }
-  
+
   if (typeof value === 'number') {
     // Simplification: return int for all numbers
     return registry.get('int')!;
   }
-  
+
   if (typeof value === 'boolean') {
     return registry.get('bool')!;
   }
-  
+
   if (Array.isArray(value)) {
     // For arrays, we'd need element type info for accuracy
     // This is simplified
     return registry.get('[]interface{}')!;
   }
-  
+
   if (value instanceof Map) {
     // For maps, we'd need key/value type info for accuracy
     // This is simplified
     return registry.get('map[interface{}]interface{}')!;
   }
-  
-  // For objects, use their constructor name to find the type
+
+  // For objects (likely structs), use their constructor name to find the type
   if (typeof value === 'object' && value.constructor) {
     const typeName = value.constructor.name;
     const type = Array.from(registry.values()).find(t => t.name === typeName);
@@ -493,7 +552,7 @@ function typeofGo(value: any): GoTypeInfo {
       return type;
     }
   }
-  
+
   // Default to interface{} for unknown types
   return registry.get('interface{}')!;
 }
@@ -612,9 +671,34 @@ export function typeAssert<T>(
   }
 
   // Check if the value is assignable to the target type
-  if (isAssignable(value, typeInfo)) {
-    return { value: value as T, ok: true };
+  // Special handling for assertion to pointer types
+  if (target.kind === GoTypeKind.Pointer) {
+    const targetElemType = (target as PointerTypeInfo).elem;
+    // If the value is a GoPtr, check if its element is assignable to the target element type
+    if (value instanceof GoPtr) {
+      if (value.ref === null) {
+        // Nil pointer can be asserted to any pointer type
+        return { value: value as T, ok: true };
+      }
+      // Check if the referenced value is assignable to the target element type
+      if (isAssignable(value.ref, targetElemType)) {
+        return { value: value as T, ok: true };
+      }
+    } else {
+      // If the value is not a GoPtr, check if it's assignable to the target element type
+      // This handles asserting a concrete value to a pointer type (*T)
+      if (isAssignable(value, targetElemType)) {
+         // Wrap the value in a GoPtr to represent the pointer
+        return { value: new GoPtr(value) as T, ok: true };
+      }
+    }
+  } else {
+     // For non-pointer targets, use the existing assignability check
+     if (isAssignable(value, typeInfo)) {
+       return { value: value as T, ok: true };
+     }
   }
+
 
   // Assertion failed
   return { value: typeInfo.zero as T, ok: false };
@@ -1119,3 +1203,5 @@ registerType('nil', GoTypeKind.Basic, null);
 // Placeholder for simplified array/map types used in typeofGo
 registerType('[]interface{}', GoTypeKind.Slice, null); // Simplified slice type
 registerType('map[interface{}]interface{}', GoTypeKind.Map, null); // Simplified map type
+// Placeholder for simplified pointer type used in typeofGo
+registerType('*interface{}', GoTypeKind.Pointer, null, [], registry.get('interface{}')!); // *interface{}
