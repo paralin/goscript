@@ -1,0 +1,16 @@
+Testing pointer receiver assignment:
+Data value: 20 Label: B
+Value from p2: 20
+Testing type assertions (comma-ok):
+p1.(*Data): false
+p2.(*Data): true undefined
+p2.(Printer): true
+Testing type assertions (panic form):
+Data value: 20 Label: B
+Value from data4: undefined
+Declared zero values (compiler check)
+dZero.value is zero
+pZero is nil
+iZero is nil
+mZero is nil
+fnZero is nil

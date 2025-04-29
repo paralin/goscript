@@ -27,15 +27,23 @@ class MyStruct {
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
-	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
-	  MyStruct
-	);
 }
+// Register this type with the runtime type system
+MyStruct.__typeInfo = goscript.registerType(
+  'MyStruct',
+  goscript.GoTypeKind.Struct,
+  new MyStruct(),
+  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
+  MyStruct
+);
+// Register the pointer type *MyStruct with the runtime type system
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
+  MyStruct.__typeInfo
+);
 
 export async function main(): Promise<void> {
 	let i: MyInterface | null = null;
@@ -50,7 +58,7 @@ export async function main(): Promise<void> {
 	}
 
 	// try a second time since this generates something different when using = and not :=
-	({ ok: ok } = goscript.typeAssert<MyStruct | null>(i, 'unknown'))
+	({ ok: ok } = goscript.typeAssert<MyStruct | null>(i, '*MyStruct'))
 
 	// expected
 	if (ok) {

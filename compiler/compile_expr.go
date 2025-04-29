@@ -306,6 +306,78 @@ func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
 
 // WriteInterfaceType writes an interface type definition.
 func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
+	// writeInterfaceMethodSignature is a local helper function to write a method signature
+	writeInterfaceMethodSignature := func(field *ast.Field) error {
+		// Include comments
+		if field.Doc != nil {
+			c.WriteDoc(field.Doc)
+		}
+		if field.Comment != nil {
+			c.WriteDoc(field.Comment)
+		}
+
+		if len(field.Names) == 0 {
+			// Should not happen for named methods in an interface, but handle defensively
+			return fmt.Errorf("interface method field has no name")
+		}
+
+		methodName := field.Names[0]
+		funcType, ok := field.Type.(*ast.FuncType)
+		if !ok {
+			// Should not happen for valid interface methods, but handle defensively
+			c.tsw.WriteCommentInline("unexpected interface method type")
+			return fmt.Errorf("interface method type is not a FuncType")
+		}
+
+		// Write method name
+		c.WriteIdentValue(methodName)
+
+		// Write parameter list (name: type)
+		c.tsw.WriteLiterally("(")
+		if funcType.Params != nil {
+			for i, param := range funcType.Params.List {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				// Determine parameter name
+				paramName := fmt.Sprintf("_p%d", i) // Default placeholder
+				if len(param.Names) > 0 && param.Names[0].Name != "" && param.Names[0].Name != "_" {
+					paramName = param.Names[0].Name
+				}
+				c.tsw.WriteLiterally(paramName)
+				c.tsw.WriteLiterally(": ")
+				c.WriteTypeExpr(param.Type)
+			}
+		}
+		c.tsw.WriteLiterally(")")
+
+		// Write return type
+		// Use WriteFuncType's logic for return types, but without the async handling
+		if funcType.Results != nil && len(funcType.Results.List) > 0 {
+			c.tsw.WriteLiterally(": ")
+			if len(funcType.Results.List) == 1 && len(funcType.Results.List[0].Names) == 0 {
+				// Single unnamed return type
+				c.WriteTypeExpr(funcType.Results.List[0].Type)
+			} else {
+				// Multiple or named return types -> tuple
+				c.tsw.WriteLiterally("[")
+				for i, result := range funcType.Results.List {
+					if i > 0 {
+						c.tsw.WriteLiterally(", ")
+					}
+					c.WriteTypeExpr(result.Type)
+				}
+				c.tsw.WriteLiterally("]")
+			}
+		} else {
+			// No return value -> void
+			c.tsw.WriteLiterally(": void")
+		}
+
+		c.tsw.WriteLine(";") // Semicolon at the end of the method signature
+		return nil
+	}
+
 	var embeddedInterfaces []string
 	var methods []*ast.Field
 
@@ -343,7 +415,7 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) {
 
 	// Write named methods
 	for _, method := range methods {
-		if err := c.WriteInterfaceMethodSignature(method); err != nil {
+		if err := writeInterfaceMethodSignature(method); err != nil {
 			c.tsw.WriteCommentInline(fmt.Sprintf("error writing interface method signature: %v", err))
 		}
 	}

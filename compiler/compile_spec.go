@@ -465,30 +465,27 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 		// Add code to register the type with the runtime system
 		c.tsw.WriteLine("")
-		c.tsw.WriteLinef("// Register this type with the runtime type system")
-		c.tsw.WriteLinef("static __typeInfo = goscript.registerType(")
-		c.tsw.WriteLinef("  '%s',", className)
-		c.tsw.WriteLinef("  goscript.GoTypeKind.Struct,")
-		c.tsw.WriteLinef("  new %s(),", className)
-		// Use collectMethodSignatures to get detailed signatures
-		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
-		c.tsw.WriteLinef("  %s", className)
-		c.tsw.WriteLinef(");")
 
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("}") // Close class definition
 
-		// Also register the pointer type *T (outside the class definition)
+		// Register the struct type after the class is defined
+		c.tsw.WriteLinef("// Register this type with the runtime type system")
+		c.tsw.WriteLinef("%s.__typeInfo = goscript.registerType(", className)
+		c.tsw.WriteLinef("  '%s',", className)
+		c.tsw.WriteLinef("  goscript.GoTypeKind.Struct,")
+		c.tsw.WriteLinef("  new %s(),", className)
+		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
+		c.tsw.WriteLinef("  %s", className)
+		c.tsw.WriteLinef(");")
+
+		// Register the pointer type *T after the struct type is registered
 		c.tsw.WriteLinef("// Register the pointer type *%s with the runtime type system", className)
-		// Use a different const name to avoid conflicts if multiple types are in one file
 		c.tsw.WriteLinef("const %s__ptrTypeInfo = goscript.registerType(", className)
 		c.tsw.WriteLinef("  '*%s',", className) // Pointer type name
 		c.tsw.WriteLinef("  goscript.GoTypeKind.Pointer,")
 		c.tsw.WriteLinef("  null,") // Zero value for pointer is null
-		// Pointer type has the same method set (including promoted methods from value receiver)
 		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
-		// Pass the base struct's type info as the element type for the pointer type
-		// Reference the static member via the class name to ensure it's defined
 		c.tsw.WriteLinef("  %s.__typeInfo", className) // Pass the base struct's type info
 		c.tsw.WriteLinef(");")
 		return nil // Prevent fallthrough to InterfaceType case
@@ -662,24 +659,51 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 				_, isInterface = tv.Type.Underlying().(*types.Interface)
 			}
 		}
+if a.Type != nil {
+	c.tsw.WriteLiterally(": ")
+	c.WriteTypeExpr(a.Type) // Variable type annotation
 
-		if a.Type != nil {
-			c.tsw.WriteLiterally(": ")
-			c.WriteTypeExpr(a.Type) // Variable type annotation
+	// Append "| null" for interface types
+	if isInterface {
+		c.tsw.WriteLiterally(" | null")
+	}
 
-			// Append "| null" for interface types
-			if isInterface {
-				c.tsw.WriteLiterally(" | null")
-			}
-
-			// Check if it's an array type declaration without an initial value
-			if _, isArrayType := a.Type.(*ast.ArrayType); isArrayType && len(a.Values) == 0 {
-				c.tsw.WriteLiterally(" = []")
-			} else if isInterface && len(a.Values) == 0 {
-				// Interface with no initialization value, initialize to null
-				c.tsw.WriteLiterally(" = null")
+	// For zero values, initialize appropriately based on type
+	if len(a.Values) == 0 {
+		// Check if it's a struct type
+		isStruct := false
+		structName := ""
+		if ident, ok := a.Type.(*ast.Ident); ok && ident.Name != "" {
+			// Check if it's a known struct type by looking at its object and type information
+			if ident.Obj != nil && ident.Obj.Kind == ast.Typ && c.pkg != nil && c.pkg.TypesInfo != nil {
+				if tv, ok := c.pkg.TypesInfo.Types[ident]; ok && tv.Type != nil {
+					if _, isStructType := tv.Type.Underlying().(*types.Struct); isStructType {
+						isStruct = true
+						structName = ident.Name
+					}
+				}
+			} else {
+				// If we can't determine from type info, make a conservative guess
+				// Assume any capitalized identifier could be a struct type
+				if len(ident.Name) > 0 && ident.Name[0] >= 'A' && ident.Name[0] <= 'Z' {
+					isStruct = true
+					structName = ident.Name
+				}
 			}
 		}
+
+		// Check if it's an array type declaration without an initial value
+		if _, isArrayType := a.Type.(*ast.ArrayType); isArrayType {
+			c.tsw.WriteLiterally(" = []")
+		} else if isInterface {
+			// Interface with no initialization value, initialize to null
+			c.tsw.WriteLiterally(" = null")
+		} else if isStruct && structName != "" {
+			// Struct type, initialize with constructor
+			c.tsw.WriteLinef(" = new %s()", structName)
+		}
+	}
+}
 		if len(a.Values) > 0 {
 			c.tsw.WriteLiterally(" = ")
 			for i, val := range a.Values {
@@ -739,74 +763,3 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 	c.tsw.WriteImport(impName, importPath)
 }
 
-// WriteInterfaceMethodSignature writes a TypeScript interface method signature from a Go ast.Field.
-func (c *GoToTSCompiler) WriteInterfaceMethodSignature(field *ast.Field) error {
-	// Include comments
-	if field.Doc != nil {
-		c.WriteDoc(field.Doc)
-	}
-	if field.Comment != nil {
-		c.WriteDoc(field.Comment)
-	}
-
-	if len(field.Names) == 0 {
-		// Should not happen for named methods in an interface, but handle defensively
-		return fmt.Errorf("interface method field has no name")
-	}
-
-	methodName := field.Names[0]
-	funcType, ok := field.Type.(*ast.FuncType)
-	if !ok {
-		// Should not happen for valid interface methods, but handle defensively
-		c.tsw.WriteCommentInline("unexpected interface method type")
-		return fmt.Errorf("interface method type is not a FuncType")
-	}
-
-	// Write method name
-	c.WriteIdentValue(methodName)
-
-	// Write parameter list (name: type)
-	c.tsw.WriteLiterally("(")
-	if funcType.Params != nil {
-		for i, param := range funcType.Params.List {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-			// Determine parameter name
-			paramName := fmt.Sprintf("_p%d", i) // Default placeholder
-			if len(param.Names) > 0 && param.Names[0].Name != "" && param.Names[0].Name != "_" {
-				paramName = param.Names[0].Name
-			}
-			c.tsw.WriteLiterally(paramName)
-			c.tsw.WriteLiterally(": ")
-			c.WriteTypeExpr(param.Type)
-		}
-	}
-	c.tsw.WriteLiterally(")")
-
-	// Write return type
-	// Use WriteFuncType's logic for return types, but without the async handling
-	if funcType.Results != nil && len(funcType.Results.List) > 0 {
-		c.tsw.WriteLiterally(": ")
-		if len(funcType.Results.List) == 1 && len(funcType.Results.List[0].Names) == 0 {
-			// Single unnamed return type
-			c.WriteTypeExpr(funcType.Results.List[0].Type)
-		} else {
-			// Multiple or named return types -> tuple
-			c.tsw.WriteLiterally("[")
-			for i, result := range funcType.Results.List {
-				if i > 0 {
-					c.tsw.WriteLiterally(", ")
-				}
-				c.WriteTypeExpr(result.Type)
-			}
-			c.tsw.WriteLiterally("]")
-		}
-	} else {
-		// No return value -> void
-		c.tsw.WriteLiterally(": void")
-	}
-
-	c.tsw.WriteLine(";") // Semicolon at the end of the method signature
-	return nil
-}

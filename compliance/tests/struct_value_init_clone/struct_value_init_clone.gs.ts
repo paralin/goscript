@@ -10,15 +10,23 @@ class Point {
 	constructor(init?: Partial<Point>) { if (init) Object.assign(this, init as any); }
 	public clone(): Point { return Object.assign(Object.create(Point.prototype) as Point, this); }
 
-	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
-	  'Point',
-	  goscript.GoTypeKind.Struct,
-	  new Point(),
-	  [],
-	  Point
-	);
 }
+// Register this type with the runtime type system
+Point.__typeInfo = goscript.registerType(
+  'Point',
+  goscript.GoTypeKind.Struct,
+  new Point(),
+  [],
+  Point
+);
+// Register the pointer type *Point with the runtime type system
+const Point__ptrTypeInfo = goscript.registerType(
+  '*Point',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  Point.__typeInfo
+);
 
 export async function main(): Promise<void> {
 	// Initialize directly

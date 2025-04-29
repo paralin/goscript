@@ -38,15 +38,15 @@ class Data {
 	constructor(init?: Partial<Data>) { if (init) Object.assign(this, init as any); }
 	public clone(): Data { return Object.assign(Object.create(Data.prototype) as Data, this); }
 
-	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
-	  'Data',
-	  goscript.GoTypeKind.Struct,
-	  new Data(),
-	  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-	  Data
-	);
 }
+// Register this type with the runtime type system
+Data.__typeInfo = goscript.registerType(
+  'Data',
+  goscript.GoTypeKind.Struct,
+  new Data(),
+  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+  Data
+);
 // Register the pointer type *Data with the runtime type system
 const Data__ptrTypeInfo = goscript.registerType(
   '*Data',
@@ -110,7 +110,8 @@ export async function main(): Promise<void> {
 	console.log("Value from data4:", data4.value)
 
 	// Test zero values implicitly
-	let dZero: Data;
+	let dZero: Data = new Data()
+	;
 	let pZero: Data | null;
 	let iZero: Printer | null = null;
 	let sZero: number[] = [];

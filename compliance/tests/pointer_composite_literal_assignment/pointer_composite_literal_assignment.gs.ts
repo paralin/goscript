@@ -10,15 +10,23 @@ class MyStruct {
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
-	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [],
-	  MyStruct
-	);
 }
+// Register this type with the runtime type system
+MyStruct.__typeInfo = goscript.registerType(
+  'MyStruct',
+  goscript.GoTypeKind.Struct,
+  new MyStruct(),
+  [],
+  MyStruct
+);
+// Register the pointer type *MyStruct with the runtime type system
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  MyStruct.__typeInfo
+);
 
 export async function main(): Promise<void> {
 	// === Pointer Composite Literal Assignment ===

@@ -329,7 +329,7 @@ export function registerType(
   kind: GoTypeKind,
   zero: any,
   methods?: Set<string> | MethodSig[],
-  ctor?: new (...a: any[]) => any
+  elemOrCtor?: GoTypeInfo | (new (...a: any[]) => any)
 ): GoTypeInfo {
   // Check if a type with this name (if named) is already registered
   if (name && registry.has(name)) {
@@ -348,7 +348,7 @@ export function registerType(
         zero,
         fields: [], // Fields would be populated by the compiler later if needed
         methods: methodSigs,
-        ctor,
+        ctor: elemOrCtor as (new (...a: any[]) => any) | undefined,
       } as StructTypeInfo;
       break;
     case GoTypeKind.Interface:
@@ -368,9 +368,19 @@ export function registerType(
       } as BasicTypeInfo;
       break;
     // Add cases for Pointer, Slice, Map, Chan, Func as needed
+    case GoTypeKind.Struct:
+      info = {
+        kind: GoTypeKind.Struct,
+        name,
+        zero,
+        fields: [], // Fields would be populated by the compiler later if needed
+        methods: methodSigs,
+        ctor: elemOrCtor as (new (...a: any[]) => any) | undefined,
+      } as StructTypeInfo;
+      break;
     case GoTypeKind.Pointer:
-      // For pointer types, the element type must be provided as the 'ctor' argument
-      const elemType = ctor as GoTypeInfo;
+      // For pointer types, the element type must be provided as the 'elemOrCtor' argument
+      const elemType = elemOrCtor as GoTypeInfo;
       if (!elemType) {
         throw new Error(`Element type not provided for PointerTypeInfo registration: ${name}`);
       }
@@ -672,31 +682,31 @@ export function typeAssert<T>(
 
   // Check if the value is assignable to the target type
   // Special handling for assertion to pointer types
-  if (target.kind === GoTypeKind.Pointer) {
-    const targetElemType = (target as PointerTypeInfo).elem;
-    // If the value is a GoPtr, check if its element is assignable to the target element type
-    if (value instanceof GoPtr) {
-      if (value.ref === null) {
-        // Nil pointer can be asserted to any pointer type
-        return { value: value as T, ok: true };
-      }
-      // Check if the referenced value is assignable to the target element type
-      if (isAssignable(value.ref, targetElemType)) {
-        return { value: value as T, ok: true };
-      }
-    } else {
-      // If the value is not a GoPtr, check if it's assignable to the target element type
-      // This handles asserting a concrete value to a pointer type (*T)
-      if (isAssignable(value, targetElemType)) {
-         // Wrap the value in a GoPtr to represent the pointer
-        return { value: new GoPtr(value) as T, ok: true };
-      }
-    }
+  if (typeInfo.kind === GoTypeKind.Pointer) {
+  	const targetElemType = (typeInfo as PointerTypeInfo).elem;
+  	// If the value is a GoPtr, check if its element is assignable to the target element type
+  	if (value instanceof GoPtr) {
+  		if (value.ref === null) {
+  			// Nil pointer can be asserted to any pointer type
+  			return { value: value as T, ok: true };
+  		}
+  		// Check if the referenced value is assignable to the target element type
+  		if (isAssignable(value.ref, targetElemType)) {
+  			return { value: value as T, ok: true };
+  		}
+  	} else {
+  		// If the value is not a GoPtr, check if it's assignable to the target element type
+  		// This handles asserting a concrete value to a pointer type (*T)
+  		if (isAssignable(value, targetElemType)) {
+  			 // Wrap the value in a GoPtr to represent the pointer
+  			return { value: new GoPtr(value) as T, ok: true };
+  		}
+  	}
   } else {
-     // For non-pointer targets, use the existing assignability check
-     if (isAssignable(value, typeInfo)) {
-       return { value: value as T, ok: true };
-     }
+  	// For non-pointer targets, use the existing assignability check
+  	if (isAssignable(value, typeInfo)) {
+  		return { value: value as T, ok: true };
+  	}
   }
 
 
