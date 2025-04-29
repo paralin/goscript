@@ -89,7 +89,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 				baseType = ptr.Elem()
 				isPointer = true
 			}
-			
+
 			// Check if it's a map type
 			if _, isMap := baseType.Underlying().(*gtypes.Map); isMap {
 				if isPointer {
@@ -104,7 +104,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 					}
 					c.tsw.WriteLiterally(".get(")
 				}
-				
+
 				if err := c.WriteValueExpr(exp.Index); err != nil {
 					return err
 				}
@@ -125,7 +125,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		if c.pkg != nil && c.pkg.TypesInfo != nil {
 			if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
 				_, isPointer = tv.Type.(*gtypes.Pointer)
-				
+
 				// Check if this might be a GoPtr at runtime (e.g., from an interface variable)
 				if ident, ok := exp.X.(*ast.Ident); ok {
 					if c.pkg.TypesInfo.Uses[ident] != nil {
@@ -140,7 +140,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 				}
 			}
 		}
-		
+
 		if isPointer {
 			// For declared pointer types, use .ref directly
 			c.tsw.WriteLiterally("(")
@@ -155,7 +155,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 				return err
 			}
 			c.tsw.WriteLiterally(" instanceof goscript.GoPtr ? ")
-			
+
 			// If it's a GoPtr, access through .ref
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
@@ -165,7 +165,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 				return err
 			}
 			c.tsw.WriteLiterally("] : ")
-			
+
 			// If it's not a GoPtr, access directly
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
@@ -182,7 +182,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 			}
 			c.tsw.WriteLiterally("[")
 		}
-		
+
 		if err := c.WriteValueExpr(exp.Index); err != nil {
 			return err
 		}
@@ -350,17 +350,34 @@ func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) error {
 }
 
 // WriteSelectorExprValue writes a selector expression used as a value (e.g., obj.Field).
+// WriteSelectorExprValue writes a selector expression used as a value (e.g., obj.Field).
 func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
+	// Check if we are inside a method with a pointer receiver and the base expression is the receiver.
+	if c.currentReceiverObj != nil {
+		if ident, ok := exp.X.(*ast.Ident); ok {
+			if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil && obj == c.currentReceiverObj {
+				// It's the receiver identifier. Check if the receiver type is a pointer.
+				if _, isPointerRecv := c.currentReceiverObj.Type().(*gtypes.Pointer); isPointerRecv {
+					// It's a method with a pointer receiver, and we are accessing a field/method on the receiver.
+					// In TS, 'this' corresponds to the value type, so access directly.
+					c.tsw.WriteLiterally("this.")
+					c.WriteIdentValue(exp.Sel)
+					return nil
+				}
+			}
+		}
+	}
+
 	// Check if the expression X is a pointer type
 	isPointer := false
 	isGoPtr := false
 	var tvType gtypes.Type
-	
+
 	if c.pkg != nil && c.pkg.TypesInfo != nil {
 		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
 			tvType = tv.Type
 			_, isPointer = tv.Type.(*gtypes.Pointer)
-			
+
 			// Check if this is potentially a GoPtr instance at runtime
 			// This handles the case where we might be accessing through an interface variable
 			// that actually contains a pointer at runtime
@@ -413,14 +430,14 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 			return fmt.Errorf("failed to write selector expression object: %w", err)
 		}
 		c.tsw.WriteLiterally(" instanceof goscript.GoPtr ? ")
-		
+
 		// If it's a GoPtr, access through .ref
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write selector expression GoPtr check: %w", err)
 		}
 		c.tsw.WriteLiterally(".ref!.")
 		c.WriteIdentValue(exp.Sel)
-		
+
 		// If it's not a GoPtr, access directly
 		c.tsw.WriteLiterally(" : ")
 		if err := c.WriteValueExpr(exp.X); err != nil {

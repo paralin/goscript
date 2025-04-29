@@ -596,6 +596,15 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	previousAsyncState := c.inAsyncFunction
 	c.inAsyncFunction = isAsync
 
+	// Set current receiver object for context
+	var receiverObj types.Object
+	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
+		if recvIdent := recvField.Names[0]; recvIdent != nil {
+			receiverObj = c.pkg.TypesInfo.Defs[recvIdent]
+			c.currentReceiverObj = receiverObj
+		}
+	}
+
 	// Bind receiver name to this
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
 		recvName := recvField.Names[0].Name
@@ -618,25 +627,29 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 			for _, stmt := range decl.Body.List {
 				if err := c.WriteStmt(stmt); err != nil {
 					c.inAsyncFunction = previousAsyncState // Restore state before returning error
+					c.currentReceiverObj = nil             // Reset receiver object on error
 					return fmt.Errorf("failed to write statement in function body: %w", err)
 				}
 			}
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
 
-			// Restore previous async state
+			// Restore previous async state and reset receiver object
 			c.inAsyncFunction = previousAsyncState
+			c.currentReceiverObj = nil
 			return nil
 		}
 	}
 	// no named receiver, write whole body
 	if err := c.WriteStmt(decl.Body); err != nil {
 		c.inAsyncFunction = previousAsyncState // Restore state before returning error
+		c.currentReceiverObj = nil             // Reset receiver object on error
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
 
-	// Restore previous async state
+	// Restore previous async state and reset receiver object
 	c.inAsyncFunction = previousAsyncState
+	c.currentReceiverObj = nil
 	return nil
 }
 
@@ -674,7 +687,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 
 		// Write initialization
 		c.tsw.WriteLiterally(" = ")
-		
+
 		if len(a.Values) > 0 {
 			// Initialize with provided values
 			for i, val := range a.Values {
@@ -735,10 +748,10 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 			c.tsw.WriteLiterally(name.Name)
 		}
 		c.tsw.WriteLiterally("}")
-		
+
 		// Always provide an initialization value
 		c.tsw.WriteLiterally(" = ")
-		
+
 		if len(a.Values) > 0 {
 			// Use provided values
 			for i, val := range a.Values {
@@ -781,4 +794,3 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 
 	c.tsw.WriteImport(impName, importPath)
 }
-

@@ -19,6 +19,7 @@ type GoToTSCompiler struct {
 	asyncFuncs          map[string]bool // Track which functions are async
 	nextBlockNeedsDefer bool            // Track if the next block should have a "using" statement
 	inAsyncFunction     bool            // Track if we're inside an async function
+	currentReceiverObj  gtypes.Object   // Track the object of the current method receiver, if any
 }
 
 // WriteGoType writes a Go type as a TypeScript type.

@@ -10,7 +10,7 @@ class MyStruct {
 	// GetMyString returns the MyString field.
 	public GetMyString(): string {
 		const m = this
-		return (m).ref!.MyString
+		return this.MyString
 	}
 
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }

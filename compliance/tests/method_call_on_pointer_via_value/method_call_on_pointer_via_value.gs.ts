@@ -9,7 +9,7 @@ class MyStruct {
 	// SetValue sets the MyInt field (pointer receiver).
 	public SetValue(v: number): void {
 		const m = this
-		(m).ref!.MyInt = v
+		this.MyInt = v
 	}
 
 	// GetValue returns the MyInt field (value receiver for verification).

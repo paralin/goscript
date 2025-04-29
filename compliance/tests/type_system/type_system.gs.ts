@@ -32,7 +32,7 @@ class Data {
 	// Implement Printer interface with a pointer receiver
 	public GetValue(): number {
 		const d = this
-		return (d).ref!.value
+		return this.value
 	}
 
 	constructor(init?: Partial<Data>) { if (init) Object.assign(this, init as any); }
