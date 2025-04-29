@@ -53,7 +53,7 @@ export async function main(): Promise<void> {
 
 	// Create slice with 0 len/cap and append
 	console.log("--- Zero len/cap append ---")
-	let zeroSlice = goscript.makeSlice<number>(0, 0)
+	let zeroSlice = goscript.makeSlice<number>(0, 0) // 
 	console.log(goscript.len(zeroSlice)) // 0
 	console.log(goscript.cap(zeroSlice)) // 0
 	zeroSlice = goscript.append(zeroSlice, 100)

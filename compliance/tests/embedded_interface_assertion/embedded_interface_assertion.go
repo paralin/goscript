@@ -32,7 +32,8 @@ func main() {
 	s := MyStruct{}
 	rwc = s
 
-	_, ok := rwc.(ReadCloser)
+	var rwcAny any = rwc
+	_, ok := rwcAny.(ReadCloser)
 	if ok {
 		println("Embedded interface assertion successful")
 	} else {

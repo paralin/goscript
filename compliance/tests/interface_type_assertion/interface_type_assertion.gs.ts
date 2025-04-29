@@ -10,9 +10,9 @@ interface MyInterface {
 // Register this interface with the runtime type system
 const MyInterface__typeInfo = goscript.registerType(
   'MyInterface',
-  goscript.TypeKind.Interface,
+  goscript.GoTypeKind.Interface,
   null,
-  new Set(['Method1']),
+  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
   undefined
 );
 
@@ -30,9 +30,9 @@ class MyStruct {
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'MyStruct',
-	  goscript.TypeKind.Struct,
+	  goscript.GoTypeKind.Struct,
 	  new MyStruct(),
-	  new Set(['Method1']),
+	  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
 	  MyStruct
 	);
 }

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	gtypes "go/types"
-	"sort"
 	"strings"
 )
 
@@ -28,9 +26,9 @@ func (c *GoToTSCompiler) WriteSpec(a ast.Spec) error {
 	return nil
 }
 
-// collectMethodNames returns a comma-separated string of method names for a struct
-func (c *GoToTSCompiler) collectMethodNames(structName string) string {
-	var methodNames []string
+// collectMethodSignatures returns an array of method signature objects for a struct
+func (c *GoToTSCompiler) collectMethodSignatures(structName string) string {
+	var methodSignatures []string
 
 	for _, fileSyntax := range c.pkg.Syntax {
 		for _, decl := range fileSyntax.Decls {
@@ -50,12 +48,63 @@ func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 			// Check if the receiver identifier name matches the struct name
 			if ident, ok := recvType.(*ast.Ident); ok && ident.Name == structName {
 				// Found a method for this struct
-				methodNames = append(methodNames, fmt.Sprintf("'%s'", funcDecl.Name.Name))
+				signature := c.buildMethodSignature(funcDecl)
+				methodSignatures = append(methodSignatures, signature)
 			}
 		}
 	}
 
-	return strings.Join(methodNames, ", ")
+	return strings.Join(methodSignatures, ", ")
+}
+
+// buildMethodSignature creates a MethodSig object for a method
+func (c *GoToTSCompiler) buildMethodSignature(funcDecl *ast.FuncDecl) string {
+	var sb strings.Builder
+
+	sb.WriteString("{ name: '")
+	sb.WriteString(funcDecl.Name.Name)
+	sb.WriteString("', params: [")
+
+	// Add parameters
+	if funcDecl.Type.Params != nil && len(funcDecl.Type.Params.List) > 0 {
+		paramSigs := make([]string, 0, len(funcDecl.Type.Params.List))
+		for _, param := range funcDecl.Type.Params.List {
+			isVariadic := false
+			paramType := param.Type
+
+			// Check if parameter is variadic
+			if ellipsis, ok := paramType.(*ast.Ellipsis); ok {
+				isVariadic = true
+				paramType = ellipsis.Elt
+			}
+
+			// Build parameter type info
+			paramSig := fmt.Sprintf("{ type: %s, isVariadic: %t }",
+				c.getTypeReference(paramType),
+				isVariadic)
+
+			paramSigs = append(paramSigs, paramSig)
+		}
+		sb.WriteString(strings.Join(paramSigs, ", "))
+	}
+
+	sb.WriteString("], results: [")
+
+	// Add results
+	if funcDecl.Type.Results != nil && len(funcDecl.Type.Results.List) > 0 {
+		resultSigs := make([]string, 0, len(funcDecl.Type.Results.List))
+		for _, result := range funcDecl.Type.Results.List {
+			resultSig := fmt.Sprintf("{ type: %s }",
+				c.getTypeReference(result.Type))
+
+			resultSigs = append(resultSigs, resultSig)
+		}
+		sb.WriteString(strings.Join(resultSigs, ", "))
+	}
+
+	sb.WriteString("] }")
+
+	return sb.String()
 }
 
 // getTypeExprName returns a string representation of a type expression.
@@ -72,16 +121,25 @@ func (c *GoToTSCompiler) getTypeExprName(expr ast.Expr) string {
 	}
 }
 
-// collectInterfaceMethods returns a comma-separated string of method names for an interface
-func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceType) string {
-	// Use a map to ensure uniqueness of method names
-	methodNamesMap := make(map[string]struct{})
+// collectInterfaceMethodSignatures returns an array of method signature objects for an interface
+func (c *GoToTSCompiler) collectInterfaceMethodSignatures(interfaceType *ast.InterfaceType) string {
+	var methodSignatures []string
 
 	if interfaceType.Methods != nil {
 		for _, method := range interfaceType.Methods.List {
 			if len(method.Names) > 0 {
 				// Named method
-				methodNamesMap[method.Names[0].Name] = struct{}{}
+				methodName := method.Names[0].Name
+
+				// Get the function type
+				funcType, ok := method.Type.(*ast.FuncType)
+				if !ok {
+					continue
+				}
+
+				// Build method signature
+				sig := c.buildInterfaceMethodSignature(methodName, funcType)
+				methodSignatures = append(methodSignatures, sig)
 			} else {
 				// Embedded interface - resolve it and collect its methods
 				embeddedType := method.Type
@@ -101,27 +159,193 @@ func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceTyp
 					// Collect methods from the interface
 					if ifaceType != nil {
 						for i := 0; i < ifaceType.NumMethods(); i++ {
-							methodNamesMap[ifaceType.Method(i).Name()] = struct{}{}
+							method := ifaceType.Method(i)
+							// Get the method signature
+							sig, ok := method.Type().(*types.Signature)
+							if !ok {
+								continue
+							}
+
+							// Build parameter signatures
+							paramSigs := make([]string, 0, sig.Params().Len())
+							for j := 0; j < sig.Params().Len(); j++ {
+								param := sig.Params().At(j)
+								isVariadic := sig.Variadic() && j == sig.Params().Len()-1
+								paramSig := fmt.Sprintf("{ type: %s, isVariadic: %t }",
+									c.getTypeReferenceFromType(param.Type()),
+									isVariadic)
+								paramSigs = append(paramSigs, paramSig)
+							}
+
+							// Build result signatures
+							resultSigs := make([]string, 0, sig.Results().Len())
+							for j := 0; j < sig.Results().Len(); j++ {
+								result := sig.Results().At(j)
+								resultSig := fmt.Sprintf("{ type: %s }",
+									c.getTypeReferenceFromType(result.Type()))
+								resultSigs = append(resultSigs, resultSig)
+							}
+
+							// Build the full method signature string
+							methodSig := fmt.Sprintf("{ name: '%s', params: [%s], results: [%s] }",
+								method.Name(),
+								strings.Join(paramSigs, ", "),
+								strings.Join(resultSigs, ", "))
+							methodSignatures = append(methodSignatures, methodSig)
 						}
 					}
 				} else {
 					// Couldn't resolve the embedded interface
-					c.tsw.WriteCommentLine("// Note: Some embedded interface methods may not be fully resolved")
+					methodSignatures = append(methodSignatures,
+						"{ name: 'embeddedInterface', params: [], results: [] } /* embedded interface methods */")
 				}
 			}
 		}
 	}
 
-	// Convert the map to a slice for a deterministic output order
-	var methodNames []string
-	for name := range methodNamesMap {
-		methodNames = append(methodNames, fmt.Sprintf("'%s'", name))
+	return strings.Join(methodSignatures, ", ")
+}
+
+// buildInterfaceMethodSignature creates a MethodSig object for an interface method
+func (c *GoToTSCompiler) buildInterfaceMethodSignature(methodName string, funcType *ast.FuncType) string {
+	var sb strings.Builder
+
+	sb.WriteString("{ name: '")
+	sb.WriteString(methodName)
+	sb.WriteString("', params: [")
+
+	// Add parameters
+	if funcType.Params != nil && len(funcType.Params.List) > 0 {
+		paramSigs := make([]string, 0, len(funcType.Params.List))
+		for _, param := range funcType.Params.List {
+			isVariadic := false
+			paramType := param.Type
+
+			// Check if parameter is variadic
+			if ellipsis, ok := paramType.(*ast.Ellipsis); ok {
+				isVariadic = true
+				paramType = ellipsis.Elt
+			}
+
+			// Build parameter type info
+			paramSig := fmt.Sprintf("{ type: %s, isVariadic: %t }",
+				c.getTypeReference(paramType),
+				isVariadic)
+
+			paramSigs = append(paramSigs, paramSig)
+		}
+		sb.WriteString(strings.Join(paramSigs, ", "))
 	}
 
-	// Sort for deterministic output
-	sort.Strings(methodNames)
+	sb.WriteString("], results: [")
 
-	return strings.Join(methodNames, ", ")
+	// Add results
+	if funcType.Results != nil && len(funcType.Results.List) > 0 {
+		resultSigs := make([]string, 0, len(funcType.Results.List))
+		for _, result := range funcType.Results.List {
+			resultSig := fmt.Sprintf("{ type: %s }",
+				c.getTypeReference(result.Type))
+
+			resultSigs = append(resultSigs, resultSig)
+		}
+		sb.WriteString(strings.Join(resultSigs, ", "))
+	}
+
+	sb.WriteString("] }")
+
+	return sb.String()
+}
+
+// getTypeReference returns a reference to the type's registered TypeInfo
+func (c *GoToTSCompiler) getTypeReference(expr ast.Expr) string {
+	switch t := expr.(type) {
+	case *ast.Ident:
+		// Add '!' for non-null assertion
+		return fmt.Sprintf("goscript.getType('%s')!", t.Name)
+	case *ast.SelectorExpr:
+		// Handle package qualified types
+		if x, ok := t.X.(*ast.Ident); ok {
+			// Add '!' for non-null assertion
+			return fmt.Sprintf("goscript.getType('%s.%s')!", x.Name, t.Sel.Name)
+		}
+	case *ast.StarExpr:
+		// Handle pointer types
+		// Add '!' for non-null assertion
+		return fmt.Sprintf("goscript.getType('*%s')!", c.getTypeNameString(t.X))
+	case *ast.ArrayType:
+		// Handle array types (assuming slice for now)
+		// Add '!' for non-null assertion
+		return fmt.Sprintf("goscript.getType('[]%s')!", c.getTypeNameString(t.Elt))
+	case *ast.MapType:
+		// Handle map types
+		// Add '!' for non-null assertion
+		return fmt.Sprintf("goscript.getType('map[%s]%s')!",
+			c.getTypeNameString(t.Key), c.getTypeNameString(t.Value))
+	}
+
+	// For more complex types, we'd need more sophisticated handling
+	// Add '!' for non-null assertion
+	return "goscript.getType('interface{}')!"
+}
+
+// getTypeReferenceFromType returns a reference to the type's registered TypeInfo from a types.Type
+func (c *GoToTSCompiler) getTypeReferenceFromType(typ types.Type) string {
+	switch t := typ.(type) {
+	case *types.Basic:
+		// Map basic Go types to their names
+		name := t.Name()
+		// Handle potential aliases like 'byte' or 'rune' if needed, though basic name should work
+		return fmt.Sprintf("goscript.getType('%s')!", name)
+	case *types.Pointer:
+		// Handle pointer types
+		elemRef := c.getTypeReferenceFromType(t.Elem())
+		// Need to strip the '!' from the element type reference before prepending '*'
+		elemName := strings.TrimSuffix(elemRef, "!")
+		// Reconstruct the pointer type name for lookup
+		return fmt.Sprintf("goscript.getType('*%s')!", elemName[len("goscript.getType('"):len(elemName)-len("')")])
+	case *types.Slice:
+		// Handle slice types
+		elemRef := c.getTypeReferenceFromType(t.Elem())
+		// Need to strip the '!' from the element type reference before prepending '[]'
+		elemName := strings.TrimSuffix(elemRef, "!")
+		// Reconstruct the slice type name for lookup
+		return fmt.Sprintf("goscript.getType('[]%s')!", elemName[len("goscript.getType('"):len(elemName)-len("')")])
+	case *types.Map:
+		// Handle map types
+		keyRef := c.getTypeReferenceFromType(t.Key())
+		valueRef := c.getTypeReferenceFromType(t.Elem())
+		// Strip '!' and surrounding getType call
+		keyName := strings.TrimSuffix(keyRef, "!")
+		keyName = keyName[len("goscript.getType('") : len(keyName)-len("')")]
+		valueName := strings.TrimSuffix(valueRef, "!")
+		valueName = valueName[len("goscript.getType('") : len(valueName)-len("')")]
+		// Reconstruct the map type name for lookup
+		return fmt.Sprintf("goscript.getType('map[%s]%s')!", keyName, valueName)
+	case *types.Named:
+		// Handle named types (structs, interfaces, type aliases)
+		obj := t.Obj()
+		if pkg := obj.Pkg(); pkg != nil {
+			// Qualify with package name if not in the current package
+			if pkg != c.pkg.Types {
+				return fmt.Sprintf("goscript.getType('%s.%s')!", pkg.Name(), obj.Name())
+			}
+		}
+		return fmt.Sprintf("goscript.getType('%s')!", obj.Name())
+	case *types.Interface:
+		// Handle anonymous interface types (e.g., interface{})
+		if t.Empty() {
+			return "goscript.getType('interface{}')!"
+		}
+		// TODO: Handle non-empty anonymous interfaces if needed by generating a canonical key
+		return "goscript.getType('interface{}')!" // Fallback
+	case *types.Signature:
+		// Handle function types
+		// TODO: Implement function type signature generation if needed
+		return "goscript.getType('func()')!" // Placeholder
+	}
+
+	// Fallback for unhandled types
+	return "goscript.getType('interface{}')!"
 }
 
 // WriteTypeSpec writes the type specification to the output.
@@ -212,9 +436,12 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 				"constructor(init?: Partial<%s> & { %s?: Partial<%s> }) {",
 				className, propName, propName,
 			)
+			// Add a comment explaining the constructor behavior for embedded structs
+			c.tsw.WriteLine("// Handles initialization of embedded struct fields.")
 			c.tsw.Indent(1)
 
 			// Pass either the nested embedded object or the full init directly to super()
+			// Ensure we pass the object literal for the embedded struct, not a new instance
 			c.tsw.WriteLinef("super(init?.%s || init);", propName)
 
 			// Copy fields that belong only to this derived class
@@ -233,14 +460,18 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		}
 		c.tsw.WriteLinef("public clone(): %s { return Object.assign(Object.create(%s.prototype) as %s, this); }", className, className, className)
 
+		// Remove the unused collectMethodNames function
+		// This was identified by the linter earlier.
+
 		// Add code to register the type with the runtime system
 		c.tsw.WriteLine("")
 		c.tsw.WriteLinef("// Register this type with the runtime type system")
 		c.tsw.WriteLinef("static __typeInfo = goscript.registerType(")
 		c.tsw.WriteLinef("  '%s',", className)
-		c.tsw.WriteLinef("  goscript.TypeKind.Struct,")
+		c.tsw.WriteLinef("  goscript.GoTypeKind.Struct,")
 		c.tsw.WriteLinef("  new %s(),", className)
-		c.tsw.WriteLinef("  new Set([%s]),", c.collectMethodNames(className))
+		// Use collectMethodSignatures to get detailed signatures
+		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
 		c.tsw.WriteLinef("  %s", className)
 		c.tsw.WriteLinef(");")
 
@@ -260,9 +491,9 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.WriteLinef("// Register this interface with the runtime type system")
 		c.tsw.WriteLinef("const %s__typeInfo = goscript.registerType(", interfaceName)
 		c.tsw.WriteLinef("  '%s',", interfaceName)
-		c.tsw.WriteLinef("  goscript.TypeKind.Interface,")
+		c.tsw.WriteLinef("  goscript.GoTypeKind.Interface,")
 		c.tsw.WriteLinef("  null,") // Zero value for interface is null
-		c.tsw.WriteLinef("  new Set([%s]),", c.collectInterfaceMethods(t))
+		c.tsw.WriteLinef("  [%s],", c.collectInterfaceMethodSignatures(t))
 		c.tsw.WriteLinef("  undefined")
 		c.tsw.WriteLinef(");")
 	default:
@@ -413,7 +644,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		isInterface := false
 		if c.pkg != nil && c.pkg.TypesInfo != nil && a.Type != nil {
 			if tv, ok := c.pkg.TypesInfo.Types[a.Type]; ok && tv.Type != nil {
-				_, isInterface = tv.Type.Underlying().(*gtypes.Interface)
+				_, isInterface = tv.Type.Underlying().(*types.Interface)
 			}
 		}
 

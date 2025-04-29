@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+
 /**
  * Creates a new slice (TypeScript array) with the specified length and capacity.
  * @param len The length of the slice.
@@ -162,61 +164,420 @@ export const append = <T>(
 }
 
 /**
- * Represents the kinds of Go types that can be registered at runtime.
+ * Enum representing the kinds of Go types.
  */
-export enum TypeKind {
-  Struct = 'struct',
-  Interface = 'interface',
-  Basic = 'basic',
-  Pointer = 'pointer',
-  Slice = 'slice',
-  Map = 'map',
-  Channel = 'channel',
-  Function = 'function',
+export enum GoTypeKind {
+  Basic,
+  Pointer,
+  Slice,
+  Array,     // reserved – not required for assertions yet
+  Map,
+  Chan,
+  Struct,
+  Interface,
+  Func,
 }
 
 /**
- * Represents type information for a Go type in the runtime.
+ * Name & type of one struct field.
  */
-export interface TypeInfo {
+export interface FieldInfo {
   name: string
-  kind: TypeKind
-  zeroValue: any
-  // For interfaces, the set of methods
-  methods?: Set<string>
-  // For structs, the constructor
-  constructor?: new (...args: any[]) => any
+  type: GoTypeInfo
+  tag?: string               // raw struct tag
+  exported: boolean
 }
 
-// Registry to store runtime type information
-const typeRegistry = new Map<string, TypeInfo>()
+/**
+ * Name & type of one formal parameter or result.
+ */
+export interface VarInfo {
+  type: GoTypeInfo
+  // Parameter names are irrelevant for assignability => omitted
+  isVariadic?: boolean       // only for the last parameter
+}
 
 /**
- * Registers a type with the runtime type system.
- *
- * @param name The name of the type.
- * @param kind The kind of the type.
- * @param zeroValue The zero value for the type.
- * @param methods Optional set of method names for interfaces.
- * @param constructor Optional constructor for structs.
- * @returns The type information object for chaining.
+ * Complete method signature *without receiver*.
  */
-export const registerType = (
+export interface MethodSig {
+  name: string
+  params: readonly VarInfo[]
+  results: readonly VarInfo[]
+}
+
+/**
+ * Base interface for all Go type information.
+ */
+export interface GoTypeInfo {
+  readonly kind: GoTypeKind
+  readonly name?: string          // present for named types
+  readonly zero: any              // canonical zero value
+}
+
+/**
+ * Type information for basic types (string, int, bool, etc.)
+ */
+export interface BasicTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Basic
+  readonly builtinName: string  // 'string' | 'int' | 'bool' | etc.
+}
+
+/**
+ * Type information for pointer types (*T)
+ */
+export interface PointerTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Pointer
+  readonly elem: GoTypeInfo
+}
+
+/**
+ * Type information for slice types ([]T)
+ */
+export interface SliceTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Slice
+  readonly elem: GoTypeInfo
+}
+
+/**
+ * Type information for map types (map[K]V)
+ */
+export interface MapTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Map
+  readonly key: GoTypeInfo
+  readonly value: GoTypeInfo
+}
+
+/**
+ * Type information for channel types (chan T)
+ */
+export interface ChanTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Chan
+  readonly elem: GoTypeInfo
+  readonly dir: 'send' | 'recv' | 'both'
+}
+
+/**
+ * Type information for function types (func(...) ...)
+ */
+export interface FuncTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Func
+  readonly params: readonly VarInfo[]
+  readonly results: readonly VarInfo[]
+  readonly variadic: boolean         // convenience flag
+}
+
+/**
+ * Type information for struct types
+ */
+export interface StructTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Struct
+  readonly fields: readonly FieldInfo[]
+  readonly methods: readonly MethodSig[]   // value methods (pointer recv omitted)
+  readonly ctor?: new (...a: any[]) => any
+}
+
+/**
+ * Type information for interface types
+ */
+export interface InterfaceTypeInfo extends GoTypeInfo {
+  readonly kind: GoTypeKind.Interface
+  readonly methods: readonly MethodSig[]
+}
+
+// Global registry keyed by fully-qualified name OR synthetic signature.
+const registry = new Map<string, GoTypeInfo>()
+
+/**
+ * Registers a type with the runtime type system and ensures canonicalization.
+ * 
+ * @param name The name of the type
+ * @param kind The kind of the type
+ * @param zero The zero value for the type
+ * @param methods Optional set of methods (for interfaces/structs)
+ * @param ctor Optional constructor (for structs)
+ * @returns The canonicalized type information object
+ */
+export function registerType(
   name: string,
-  kind: TypeKind,
-  zeroValue: any,
-  methods?: Set<string>,
-  constructor?: new (...args: any[]) => any,
-): TypeInfo => {
-  const typeInfo: TypeInfo = {
-    name,
-    kind,
-    zeroValue,
-    methods,
-    constructor,
+  kind: GoTypeKind,
+  zero: any,
+  methods?: Set<string> | MethodSig[],
+  ctor?: new (...a: any[]) => any
+): GoTypeInfo {
+  // Check if a type with this name (if named) is already registered
+  if (name && registry.has(name)) {
+    return registry.get(name)!;
   }
-  typeRegistry.set(name, typeInfo)
-  return typeInfo
+
+  let info: GoTypeInfo;
+  const methodSigs = Array.isArray(methods) ? methods : [];
+
+  // Construct the specific type info object directly
+  switch (kind) {
+    case GoTypeKind.Struct:
+      info = {
+        kind: GoTypeKind.Struct,
+        name,
+        zero,
+        fields: [], // Fields would be populated by the compiler later if needed
+        methods: methodSigs,
+        ctor,
+      } as StructTypeInfo;
+      break;
+    case GoTypeKind.Interface:
+      info = {
+        kind: GoTypeKind.Interface,
+        name,
+        zero,
+        methods: methodSigs,
+      } as InterfaceTypeInfo;
+      break;
+    case GoTypeKind.Basic:
+      info = {
+        kind: GoTypeKind.Basic,
+        name,
+        zero,
+        builtinName: name, // For basic types, name and builtinName are the same
+      } as BasicTypeInfo;
+      break;
+    // Add cases for Pointer, Slice, Map, Chan, Func as needed
+    // Example for Pointer (assuming elemType is passed somehow):
+    // case GoTypeKind.Pointer:
+    //   info = { kind: GoTypeKind.Pointer, name, zero, elem: elemType } as PointerTypeInfo;
+    //   break;
+    default:
+      // Fallback for unhandled kinds - might need more specific handling
+      info = { kind, name, zero };
+      break;
+  }
+
+  // Compute the final, canonical key now that the object is constructed
+  const finalKey = computeKey(info);
+
+  // Check registry again with the final key for unnamed types
+  if (registry.has(finalKey)) {
+    return registry.get(finalKey)!;
+  }
+
+  // Add the newly created type info to the registry
+  registry.set(finalKey, info);
+  // If it was a named type, also register it under its simple name if different
+  if (name && finalKey !== name) {
+      registry.set(name, info);
+  }
+
+  return info;
+}
+
+/**
+ * Gets a type from the registry by its key.
+ * 
+ * @param key The type key
+ * @returns The type information or undefined if not found
+ */
+export function getType(key: string): GoTypeInfo | undefined {
+  return registry.get(key);
+}
+
+/**
+ * Compute a unique key for a type.
+ * - Named types: their package-qualified name
+ * - Un-named composite types: textual canonical form
+ * 
+ * @param info The type information
+ * @returns A unique string key
+ */
+function computeKey(info: GoTypeInfo): string {
+  // For named types, use the qualified name
+  if (info.name) {
+    return info.name;
+  }
+  
+  // For unnamed types, construct a canonical representation
+  switch (info.kind) {
+    case GoTypeKind.Pointer:
+      return `*${computeKey((info as PointerTypeInfo).elem)}`;
+    case GoTypeKind.Slice:
+      return `[]${computeKey((info as SliceTypeInfo).elem)}`;
+    case GoTypeKind.Map: {
+      const mapInfo = info as MapTypeInfo;
+      return `map[${computeKey(mapInfo.key)}]${computeKey(mapInfo.value)}`;
+    }
+    case GoTypeKind.Chan: {
+      const chanInfo = info as ChanTypeInfo;
+      return `chan ${computeKey(chanInfo.elem)}`;
+    }
+    case GoTypeKind.Func: {
+      const funcInfo = info as FuncTypeInfo;
+      const params = funcInfo.params.map(p => 
+        computeKey(p.type) + (p.isVariadic ? '...' : '')).join(',');
+      const results = funcInfo.results.map(r => computeKey(r.type)).join(',');
+      return `func(${params}) (${results})`;
+    }
+    default:
+      return `unknown-${info.kind}`;
+  }
+}
+
+/**
+ * Checks if a value is assignable to a target type.
+ * 
+ * @param value The value to check
+ * @param target The target type
+ * @returns true if the value is assignable to the target type
+ */
+export function isAssignable(value: any, target: GoTypeInfo): boolean {
+  // Get the source type
+  const sourceType = typeofGo(value);
+  
+  // Quick exit if identical reference (same canonical type)
+  if (sourceType === target) {
+    return true;
+  }
+  
+  // For interface targets, check if source implements the interface
+  if (target.kind === GoTypeKind.Interface) {
+    return implementsInterface(sourceType, target as InterfaceTypeInfo);
+  }
+  
+  // For other types, require exact type match
+  return false;
+}
+
+/**
+ * Gets the Go type of a value.
+ * This is a simplified implementation for now.
+ * 
+ * @param value The value to get the type of
+ * @returns The Go type information
+ */
+function typeofGo(value: any): GoTypeInfo {
+  // For now, use a simple heuristic based on the constructor name and value type
+  // This would be replaced with proper type tracking in the full implementation
+  
+  if (value === null || value === undefined) {
+    return registry.get('nil')!;
+  }
+  
+  if (typeof value === 'string') {
+    return registry.get('string')!;
+  }
+  
+  if (typeof value === 'number') {
+    // Simplification: return int for all numbers
+    return registry.get('int')!;
+  }
+  
+  if (typeof value === 'boolean') {
+    return registry.get('bool')!;
+  }
+  
+  if (Array.isArray(value)) {
+    // For arrays, we'd need element type info for accuracy
+    // This is simplified
+    return registry.get('[]interface{}')!;
+  }
+  
+  if (value instanceof Map) {
+    // For maps, we'd need key/value type info for accuracy
+    // This is simplified
+    return registry.get('map[interface{}]interface{}')!;
+  }
+  
+  // For objects, use their constructor name to find the type
+  if (typeof value === 'object' && value.constructor) {
+    const typeName = value.constructor.name;
+    const type = Array.from(registry.values()).find(t => t.name === typeName);
+    if (type) {
+      return type;
+    }
+  }
+  
+  // Default to interface{} for unknown types
+  return registry.get('interface{}')!;
+}
+
+/**
+ * Checks if a concrete type implements an interface.
+ * 
+ * @param concrete The concrete type
+ * @param iface The interface type
+ * @returns true if the concrete type implements the interface
+ */
+function implementsInterface(concrete: GoTypeInfo, iface: InterfaceTypeInfo): boolean {
+  // For each required method in the interface
+  for (const req of iface.methods) {
+    // Find the method in the concrete type
+    const cand = allMethodsOf(concrete).find(m => m.name === req.name);
+    
+    // If method not found or signatures don't match, return false
+    if (!cand || !sigEqual(cand, req)) {
+      return false;
+    }
+  }
+  
+  // All methods are implemented correctly
+  return true;
+}
+
+/**
+ * Gets all methods of a type, including methods from embedded types.
+ * 
+ * @param type The type to get methods for
+ * @returns A readonly array of method signatures
+ */
+function allMethodsOf(type: GoTypeInfo): readonly MethodSig[] {
+  switch (type.kind) {
+    case GoTypeKind.Struct:
+      return (type as StructTypeInfo).methods;
+    case GoTypeKind.Pointer:
+      // For pointers, get methods of the element type
+      return allMethodsOf((type as PointerTypeInfo).elem);
+    default:
+      return [];
+  }
+}
+
+/**
+ * Checks if two method signatures are equal.
+ * 
+ * @param a The first method signature
+ * @param b The second method signature
+ * @returns true if the signatures are equal
+ */
+function sigEqual(a: MethodSig, b: MethodSig): boolean {
+  // Check name
+  if (a.name !== b.name) {
+    return false;
+  }
+  
+  // Check parameter count
+  if (a.params.length !== b.params.length) {
+    return false;
+  }
+  
+  // Check result count
+  if (a.results.length !== b.results.length) {
+    return false;
+  }
+  
+  // Check parameter types
+  for (let i = 0; i < a.params.length; i++) {
+    if (a.params[i].type !== b.params[i].type || 
+        a.params[i].isVariadic !== b.params[i].isVariadic) {
+      return false;
+    }
+  }
+  
+  // Check result types
+  for (let i = 0; i < a.results.length; i++) {
+    if (a.results[i].type !== b.results[i].type) {
+      return false;
+    }
+  }
+  
+  return true;
 }
 
 /**
@@ -230,114 +591,33 @@ export interface TypeAssertResult<T> {
 /**
  * Performs a type assertion at runtime.
  *
- * @param value The value to assert.
- * @param typeName The name of the target type.
- * @returns An object with the asserted value and whether the assertion succeeded.
+ * @param value The value to assert
+ * @param typeName The name of the target type
+ * @returns An object with the asserted value and whether the assertion succeeded
  */
 export function typeAssert<T>(
   value: any,
   typeName: string,
 ): TypeAssertResult<T> {
   // Get the type information from the registry
-  const typeInfo = typeRegistry.get(typeName)
+  const typeInfo = getType(typeName);
   if (!typeInfo) {
-    console.warn(`Type information for '${typeName}' not found in registry.`)
-    return { value: null as unknown as T, ok: false }
+    console.warn(`Type information for '${typeName}' not found in registry.`);
+    return { value: null as unknown as T, ok: false };
   }
 
   // If value is null or undefined, assertion fails
   if (value === null || value === undefined) {
-    return { value: typeInfo.zeroValue as T, ok: false }
+    return { value: typeInfo.zero as T, ok: false };
   }
 
-  // Check based on the kind of the target type
-  switch (typeInfo.kind) {
-    case TypeKind.Struct:
-      // For structs, use instanceof with the constructor
-      if (typeInfo.constructor && value instanceof typeInfo.constructor) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Interface:
-      // For interfaces, check if the value has all the required methods
-      if (typeInfo.methods && typeof value === 'object') {
-        const allMethodsPresent = Array.from(typeInfo.methods).every(
-          (method) => typeof (value as any)[method] === 'function',
-        )
-        if (allMethodsPresent) {
-          return { value: value as T, ok: true }
-        }
-      }
-      break
-
-    case TypeKind.Basic: {
-      // For basic types, check if the value matches the expected JavaScript type
-      // This is a simple check for common basic types
-      const basicType = typeof value
-      if (
-        basicType === 'string' ||
-        basicType === 'number' ||
-        basicType === 'boolean'
-      ) {
-        return { value: value as T, ok: true }
-      }
-      break
-    }
-
-    case TypeKind.Pointer:
-      // For pointers, check if value is not null or undefined
-      // In Go, pointers can be nil which we represent as null/undefined in TS
-      if (value !== null && value !== undefined) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Slice:
-      // For slices, check if the value is an array
-      if (Array.isArray(value)) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Map:
-      // For maps, check if the value is a Map
-      if (value instanceof Map) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Channel:
-      // For channels, check if the value has the required Channel interface methods
-      if (
-        typeof value === 'object' &&
-        value !== null &&
-        'send' in value &&
-        'receive' in value &&
-        'close' in value &&
-        typeof value.send === 'function' &&
-        typeof value.receive === 'function' &&
-        typeof value.close === 'function'
-      ) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Function:
-      // For functions, check if the value is a function
-      if (typeof value === 'function') {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    default:
-      console.warn(
-        `Type assertion for kind '${typeInfo.kind}' not implemented.`,
-      )
+  // Check if the value is assignable to the target type
+  if (isAssignable(value, typeInfo)) {
+    return { value: value as T, ok: true };
   }
 
   // Assertion failed
-  return { value: typeInfo.zeroValue as T, ok: false }
+  return { value: typeInfo.zero as T, ok: false };
 }
 
 /**
@@ -821,3 +1101,21 @@ export class AsyncDisposableStack implements AsyncDisposable {
     }
   }
 }
+
+// Initialize the type information: register built-in types.
+registerType('int', GoTypeKind.Basic, 0);
+registerType('string', GoTypeKind.Basic, "");
+registerType('bool', GoTypeKind.Basic, false);
+// Add other basic types as needed (float64, byte, rune, etc.)
+registerType('float64', GoTypeKind.Basic, 0.0);
+registerType('byte', GoTypeKind.Basic, 0); // Assuming byte is alias for uint8 -> number
+registerType('rune', GoTypeKind.Basic, 0); // Assuming rune is alias for int32 -> number
+registerType('error', GoTypeKind.Interface, null, []); // Basic error interface
+registerType('any', GoTypeKind.Interface, null, []); // Alias for interface{}
+registerType('interface{}', GoTypeKind.Interface, null, []); // Empty interface
+
+// Placeholder for nil type if needed for typeofGo
+registerType('nil', GoTypeKind.Basic, null);
+// Placeholder for simplified array/map types used in typeofGo
+registerType('[]interface{}', GoTypeKind.Slice, null); // Simplified slice type
+registerType('map[interface{}]interface{}', GoTypeKind.Map, null); // Simplified map type

@@ -11,9 +11,9 @@ interface MyInterface {
 // Register this interface with the runtime type system
 const MyInterface__typeInfo = goscript.registerType(
   'MyInterface',
-  goscript.TypeKind.Interface,
+  goscript.GoTypeKind.Interface,
   null,
-  new Set(['MyMethod']),
+  [{ name: 'MyMethod', params: [], results: [] }],
   undefined
 );
 

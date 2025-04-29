@@ -74,8 +74,8 @@ This is the typical package structure of the output TypeScript import path:
             ```
         *Note: The distinction between pointer and value initialization in Go is primarily relevant for assignment semantics (cloning for values) and method receiver types, rather than the initial object creation in TypeScript.*
 - **Pointers (`*T`):** Mapped to TypeScript union types (`T | null`).
-- **Interfaces:** Mapped to TypeScript `interface` types. Methods retain their original Go casing.
-- **Embedded Interfaces:** Go interfaces can embed other interfaces. This is translated using TypeScript's `extends` keyword. The generated TypeScript interface extends all the interfaces embedded in the original Go interface.
+- **Interfaces:** Mapped to TypeScript `interface` types. Methods retain their original Go casing. Interfaces are registered with the runtime type system using `goscript.registerType`, providing detailed method signatures.
+    - **Embedded Interfaces:** Go interfaces can embed other interfaces. This is translated using TypeScript's `extends` keyword. The generated TypeScript interface extends all the interfaces embedded in the original Go interface.
         ```go
         // Go code
         type Reader interface { Read(p []byte) (n int, err error) }
@@ -98,75 +98,128 @@ This is the typical package structure of the output TypeScript import path:
         interface ReadCloser extends Reader, Closer {
         }
         ```
-    - **Runtime Registration:** When registering an interface type with the runtime (`goscript.registerType`), the set of method names includes all methods from the interface itself *and* all methods from any embedded interfaces.
+    - **Runtime Registration (V2):** When registering an interface type with the runtime (`goscript.registerType`), an array of `MethodSig` objects is provided. Each `MethodSig` details the method name, parameter types (`VarInfo[]`), and result types (`VarInfo[]`). This includes methods from embedded interfaces.
         ```typescript
-        // Example registration for ReadCloser
+        // Example registration for MyInterface (from compliance test)
+        interface MyInterface {
+        	Method1(): number;
+        }
+        const MyInterface__typeInfo = goscript.registerType(
+          'MyInterface',
+          goscript.GoTypeKind.Interface,
+          null, // Zero value for interface is null
+          // Array of MethodSig objects
+          [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
+          undefined // No constructor for interfaces
+        );
+
+        // Example registration for ReadCloser (conceptual)
         const ReadCloser__typeInfo = goscript.registerType(
           'ReadCloser',
-          goscript.TypeKind.Interface,
+          goscript.GoTypeKind.Interface,
           null,
-          new Set(['Close', 'Read']), // Includes methods from Reader and Closer
+          [ // Array includes methods from Reader and Closer
+            { name: 'Read', params: [{ type: goscript.getType('[]byte')! }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] },
+            { name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }
+          ],
           undefined
         );
         ```
-- **Type Assertions:** Go's type assertion syntax (`i.(T)`) allows checking if an interface variable `i` holds a value of a specific concrete type `T` or implements another interface `T`. This is translated using the `goscript.typeAssert` runtime helper function.
-    -   **Comma-Ok Assertion (`v, ok := i.(T)`):** This form checks if the assertion holds and returns the asserted value (or zero value) and a boolean status.
+        *Note: `goscript.getType('...')` is used to retrieve the canonical `GoTypeInfo` objects for parameter and result types.*
+- **Type Assertions (V2):** Go's type assertion syntax (`i.(T)`) checks if an interface variable `i` holds a value whose type is assignable to the target type `T` (either a concrete type or another interface). This is translated using the `goscript.typeAssert` runtime helper function, which leverages the V2 runtime type system (`GoTypeInfo`).
+    -   **Core Principle:** The assertion `i.(T)` succeeds if and only if the runtime type of the value stored in `i` is *assignable* to the target type `T`.
+        -   If `T` is a concrete type (e.g., `MyStruct`), the runtime type of `i` must be exactly `T`.
+        -   If `T` is an interface type (e.g., `MyInterface`), the runtime type of `i` must implement `T`. This means the concrete type must have all methods required by `T`, and the signatures of those methods must match exactly (same number of parameters/results, same types, same variadic status).
+    -   **Comma-Ok Assertion (`v, ok := i.(T)`):** This form checks assignability and returns the value and status.
         -   **Interface-to-Concrete Example:**
             ```go
             // Go code (from compliance/tests/interface_type_assertion)
             var i MyInterface
-            s := MyStruct{Value: 10}
+            s := MyStruct{Value: 10} // MyStruct implements MyInterface
             i = s
             _, ok := i.(MyStruct) // Assert interface 'i' holds concrete type 'MyStruct'
             ```
             becomes:
             ```typescript
-            // TypeScript translation
+            // TypeScript translation (using V2 runtime)
             import * as goscript from "@goscript/builtin";
 
-            let i: MyInterface;
-            let s = new MyStruct({ Value: 10 })
-            i = s.clone()
+            // Interface definition...
+            interface MyInterface { Method1(): number; }
+            // Interface type registration...
+            const MyInterface__typeInfo = goscript.registerType( /* ... see above ... */ );
+
+            // Struct definition...
+            class MyStruct {
+                public Value: number = 0;
+                public Method1(): number { /* ... */ }
+                constructor(init?: Partial<MyStruct>) { /* ... */ }
+                public clone(): MyStruct { /* ... */ }
+                // Struct type registration...
+                static __typeInfo = goscript.registerType(
+                  'MyStruct',
+                  goscript.GoTypeKind.Struct,
+                  new MyStruct(),
+                  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
+                  MyStruct
+                );
+            }
+
+            let i: MyInterface | null = null;
+            let s = new MyStruct({Value: 10})
+            i = s.clone() // Assign struct value to interface
 
             // goscript.typeAssert returns { value: T | null, ok: boolean }
-            // Use destructuring to extract 'ok' (and 'value' if needed)
-            let { value: _, ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')
-            if (ok) {
+            // It checks if the runtime type of 'i' (MyStruct) is assignable to 'MyStruct'
+            let { ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')
+            if (ok) { // This will be true
                 console.log("Type assertion successful")
+            } else {
+                console.log("Type assertion failed")
+            }
+
+            // Example of a failing assertion
+            let { ok: ok2 } = goscript.typeAssert<string>(i, 'string') // Fails: MyStruct is not assignable to string
+            if (!ok2) {
+                 console.log("Second type assertion failed as expected")
             }
             ```
         -   **Interface-to-Interface Example:**
             ```go
-            // Go code (from compliance/tests/embedded_interface_assertion)
-            var rwc ReadCloser
-            s := MyStruct{} // MyStruct implements ReadCloser
-            rwc = s
-            _, ok := rwc.(ReadCloser) // Assert interface 'rwc' holds type 'ReadCloser'
+            // Go code (conceptual)
+            var r Reader // Assume Reader interface { Read(...) }
+            var rc ReadCloser // Assume ReadCloser interface { Reader; Closer }
+            s := MyReadCloserStruct{} // Implements ReadCloser
+            rc = s
+            r, ok := rc.(Reader) // Assert interface 'rc' implements 'Reader'
             ```
             becomes:
             ```typescript
-            // TypeScript translation
+            // TypeScript translation (conceptual)
             import * as goscript from "@goscript/builtin";
+            // Assume Reader, Closer, ReadCloser interfaces and MyReadCloserStruct class are defined and registered
 
-            let rwc: ReadCloser;
-            let s = new MyStruct({  })
-            rwc = s.clone()
+            let rc: ReadCloser | null = new MyReadCloserStruct().clone();
 
-            // Type assertion checks if 'rwc' implements 'ReadCloser'
-            // Use destructuring to extract 'ok' (and 'value' if needed)
-            let { value: _, ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
-            if (ok) {
-                console.log("Embedded interface assertion successful")
+            // Type assertion checks if the runtime type of 'rc' (MyReadCloserStruct)
+            // implements the 'Reader' interface by comparing required method signatures.
+            let { value: r, ok } = goscript.typeAssert<Reader>(rc, 'Reader')
+            if (ok) { // This will be true if MyReadCloserStruct correctly implements Read
+                console.log("Interface-to-interface assertion successful")
             }
             ```
         -   **Translation Details:** The Go assertion `v, ok := i.(T)` is translated to:
             1.  A call to `goscript.typeAssert<T>(i, 'TypeName')`.
                 *   `<T>`: The target type (interface or class) is passed as a TypeScript generic parameter.
-                *   `'TypeName'`: The name of the target type `T` is passed as a string literal. This string is used by the runtime helper for type checking against registered type information.
-            2.  The helper returns an object `{ value: T | null, ok: boolean }`.
-            3.  Object destructuring is used to extract the `value` and `ok` properties into the corresponding variables from the Go code (e.g., `let { value: v, ok } = ...`). If a variable is the blank identifier (`_`), it's assigned using `value: _` in the destructuring pattern.
+                *   `'TypeName'`: The *registered name* of the target type `T` is passed as a string literal. This string is used by the runtime helper (`getType`) to look up the canonical `GoTypeInfo` for the target type.
+            2.  The `typeAssert` helper performs the assignability check using `isAssignable(typeofGo(i), targetTypeInfo)`.
+                *   `isAssignable` checks if the source type (`typeofGo(i)`) and target type (`targetTypeInfo`) are identical *or* if the target is an interface and the source implements it (`implementsInterface`).
+                *   `implementsInterface` iterates through the target interface's required methods and checks if the source type provides methods with matching names and signatures (`sigEqual`).
+                *   `sigEqual` compares parameter/result counts, types (recursively, using `===` on canonical `GoTypeInfo` objects), and variadic status.
+            3.  The helper returns an object `{ value: T | ZeroValue<T>, ok: boolean }`. If `ok` is true, `value` is `i`; otherwise, `value` is the zero value of type `T`.
+            4.  Object destructuring is used to extract the `value` and `ok` properties (e.g., `let { value: v, ok } = ...`).
 
-    -   **Panic Assertion (`v := i.(T)`):** This form asserts that `i` holds type `T` and panics if it doesn't. The translation uses the same `goscript.typeAssert` helper. After the call, the generated code uses destructuring to get `value` and `ok`. It then checks the `ok` flag. If `ok` is false, the code triggers a runtime panic (e.g., by throwing an error) to mimic Go's behavior. The asserted `value` is assigned to `v` only if `ok` is true.
+    -   **Panic Assertion (`v := i.(T)`):** This form uses the same `goscript.typeAssert` helper. The generated code checks the `ok` flag after the call. If `ok` is false, it triggers a runtime panic (e.g., throws an error). The `value` is assigned to `v` only if `ok` is true.
 - **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`) augmented with a hidden `__capacity` property to emulate Go's slice semantics. Runtime helpers from `@goscript/builtin` are crucial for correct behavior.
     -   **Representation:** A Go slice is represented in TypeScript as `Array<T> & { __capacity?: number }`. The `__capacity` property stores the slice's capacity.
     -   **Creation (`make`):** `make([]T, len)` and `make([]T, len, cap)` are translated using the generic runtime helper `goscript.makeSlice<T>(len, cap?)`.

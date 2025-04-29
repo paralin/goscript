@@ -50,9 +50,9 @@ func main() {
 
 	// Create slice with 0 len/cap and append
 	println("--- Zero len/cap append ---")
-	zeroSlice := make([]int, 0, 0)
-	println(len(zeroSlice)) // 0
-	println(cap(zeroSlice)) // 0
+	zeroSlice := make([]int, 0, 0) //nolint:staticcheck
+	println(len(zeroSlice))        // 0
+	println(cap(zeroSlice))        // 0
 	zeroSlice = append(zeroSlice, 100)
 	println(len(zeroSlice)) // 1
 	println(cap(zeroSlice)) // 1 (or more, implementation dependent)

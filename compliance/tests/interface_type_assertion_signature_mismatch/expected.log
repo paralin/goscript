@@ -1,2 +1,3 @@
 Type assertion to InterfaceB failed
 Type assertion to InterfaceA successful
+MyStruct.DoSomething called

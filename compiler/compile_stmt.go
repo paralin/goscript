@@ -834,9 +834,9 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 
 	if !okIsBlank && !valueIsBlank { // Both are present
 		patternParts = append(patternParts, fmt.Sprintf("ok: %s", okName))
-	} else if !okIsBlank && valueIsBlank { // Only ok is present (already handled above)
-		// No need to add ok again
-	}
+	} // else if !okIsBlank && valueIsBlank { // Only ok is present (already handled above)
+	// No need to add ok again
+	// }
 	// If both are blank, patternParts remains empty, handled earlier.
 
 	destructuringPattern := fmt.Sprintf("{ %s }", strings.Join(patternParts, ", "))

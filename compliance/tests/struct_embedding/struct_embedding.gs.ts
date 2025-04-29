@@ -18,9 +18,9 @@ class Person {
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'Person',
-	  goscript.TypeKind.Struct,
+	  goscript.GoTypeKind.Struct,
 	  new Person(),
-	  new Set(['Greet']),
+	  [{ name: 'Greet', params: [], results: [] }],
 	  Person
 	);
 }
@@ -30,6 +30,7 @@ class Employee extends Person {
 	public ID: number = 0;
 
 	constructor(init?: Partial<Employee> & { Person?: Partial<Person> }) {
+	// Handles initialization of embedded struct fields.
 		super(init?.Person || init);
 		if (init) {
 			const { Person, ...rest } = init as any;
@@ -41,15 +42,15 @@ class Employee extends Person {
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'Employee',
-	  goscript.TypeKind.Struct,
+	  goscript.GoTypeKind.Struct,
 	  new Employee(),
-	  new Set([]),
+	  [],
 	  Employee
 	);
 }
 
 export async function main(): Promise<void> {
-	let e = new Employee({Person: new Person({Name: "Alice", Age: 30}), ID: 123})
+	let e = new Employee({Person: {Name: "Alice", Age: 30}, ID: 123})
 
 	// Accessing embedded fields
 	console.log("Employee Name:", e.Name)
@@ -60,7 +61,7 @@ export async function main(): Promise<void> {
 	e.Greet()
 
 	// Test with a pointer to Employee
-	let ep = new Employee({Person: new Person({Name: "Bob", Age: 25}), ID: 456})
+	let ep = new Employee({Person: {Name: "Bob", Age: 25}, ID: 456})
 
 	// Accessing embedded fields via pointer
 	console.log("Employee Pointer Name:", ep.Name)

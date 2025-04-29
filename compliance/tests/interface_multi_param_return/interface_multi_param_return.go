@@ -17,7 +17,7 @@ func (p MyProcessor) Process(data []byte, count int, _ string) (bool, error) {
 }
 
 func main() {
-	var processor MultiParamReturner
+	var processor MultiParamReturner //nolint:staticcheck
 	processor = MyProcessor{}
 
 	data := []byte{1, 2, 3}

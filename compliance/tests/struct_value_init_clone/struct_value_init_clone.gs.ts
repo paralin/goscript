@@ -13,9 +13,9 @@ class Point {
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'Point',
-	  goscript.TypeKind.Struct,
+	  goscript.GoTypeKind.Struct,
 	  new Point(),
-	  new Set([]),
+	  [],
 	  Point
 	);
 }

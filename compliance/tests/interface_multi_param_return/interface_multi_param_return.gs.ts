@@ -10,9 +10,9 @@ interface MultiParamReturner {
 // Register this interface with the runtime type system
 const MultiParamReturner__typeInfo = goscript.registerType(
   'MultiParamReturner',
-  goscript.TypeKind.Interface,
+  goscript.GoTypeKind.Interface,
   null,
-  new Set(['Process']),
+  [{ name: 'Process', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }, { type: goscript.getType('int')!, isVariadic: false }, { type: goscript.getType('string')!, isVariadic: false }], results: [{ type: goscript.getType('bool')! }, { type: goscript.getType('error')! }] }],
   undefined
 );
 
@@ -34,14 +34,15 @@ class MyProcessor {
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'MyProcessor',
-	  goscript.TypeKind.Struct,
+	  goscript.GoTypeKind.Struct,
 	  new MyProcessor(),
-	  new Set(['Process']),
+	  [{ name: 'Process', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }, { type: goscript.getType('int')!, isVariadic: false }, { type: goscript.getType('string')!, isVariadic: false }], results: [{ type: goscript.getType('bool')! }, { type: goscript.getType('error')! }] }],
 	  MyProcessor
 	);
 }
 
 export async function main(): Promise<void> {
+	//nolint:staticcheck
 	let processor: MultiParamReturner | null = null;
 	processor = new MyProcessor({})
 

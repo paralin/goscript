@@ -900,12 +900,116 @@ func (c *GoToTSCompiler) WriteCompositeLitValue(exp *ast.CompositeLit) error {
 			c.tsw.WriteLiterally("new ")
 			c.WriteTypeExpr(exp.Type)
 			c.tsw.WriteLiterally("({")
+			// Get the type information for the struct being initialized
+			structTypeInfo := c.pkg.TypesInfo.TypeOf(exp.Type)
+			if structTypeInfo == nil {
+				return errors.New("could not get type information for struct in composite literal")
+			}
+			structType, ok := structTypeInfo.Underlying().(*gtypes.Struct)
+			if !ok {
+				return errors.New("expected struct type for composite literal")
+			}
+
 			for i, elm := range exp.Elts {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				if err := c.WriteValueExpr(elm); err != nil {
-					return fmt.Errorf("failed to write struct literal field: %w", err)
+
+				// Check if this element corresponds to an embedded field
+				isEmbeddedField := false
+				if kv, ok := elm.(*ast.KeyValueExpr); ok {
+					// If it's a KeyValueExpr, check if the key matches an embedded field name
+					if keyIdent, ok := kv.Key.(*ast.Ident); ok {
+						for j := 0; j < structType.NumFields(); j++ {
+							field := structType.Field(j)
+							if field.Embedded() && field.Name() == keyIdent.Name {
+								isEmbeddedField = true
+								break
+							}
+						}
+					}
+				} /* else {
+					// If it's not a KeyValueExpr, it's an ordered field.
+					// We need to find the corresponding field in the struct type.
+					// This is more complex and might require tracking the field index.
+					// For now, assume non-keyed elements are not embedded structs directly.
+					// TODO: Handle ordered embedded struct initialization if needed.
+				}*/
+
+				if isEmbeddedField {
+					// If it's an embedded field, write the key and then the value as an object literal
+					// The value should be a composite literal for the embedded struct.
+					if kv, ok := elm.(*ast.KeyValueExpr); ok {
+						if err := c.WriteValueExpr(kv.Key); err != nil {
+							return fmt.Errorf("failed to write embedded struct field key: %w", err)
+						}
+						c.tsw.WriteLiterally(": ")
+						// The value should be the composite literal for the embedded struct
+						if embeddedLit, ok := kv.Value.(*ast.CompositeLit); ok {
+							// Write the embedded composite literal, but without the 'new Type({...})' part
+							// This means recursively calling WriteCompositeLitValue but with a flag
+							// or a different function to indicate it's an embedded literal.
+							// For now, let's manually write the object literal structure.
+							c.tsw.WriteLiterally("{")
+							if embeddedLit.Elts != nil {
+								for j, embeddedElm := range embeddedLit.Elts {
+									if j > 0 {
+										c.tsw.WriteLiterally(", ")
+									}
+									// Write the fields of the embedded struct
+									if err := c.WriteValueExpr(embeddedElm); err != nil {
+										return fmt.Errorf("failed to write embedded struct inner field: %w", err)
+									}
+								}
+							}
+							c.tsw.WriteLiterally("}")
+						} else {
+							return fmt.Errorf("expected composite literal for embedded struct initialization")
+						}
+					} else {
+						return fmt.Errorf("expected key-value pair for embedded struct initialization")
+					}
+				} else {
+					// Detect ordered initialiser matching an embedded struct.
+					if compLit, ok := elm.(*ast.CompositeLit); ok {
+						// Resolve the Go type of this composite literal.
+						var compTyp gtypes.Type
+						if compLit.Type != nil {
+							compTyp = c.pkg.TypesInfo.TypeOf(compLit.Type)
+						} else {
+							compTyp = c.pkg.TypesInfo.TypeOf(compLit)
+						}
+
+						// Try to find an embedded field whose type equals compTyp.
+						var embeddedName string
+						for j := 0; j < structType.NumFields(); j++ {
+							f := structType.Field(j)
+							if f.Embedded() && compTyp != nil && gtypes.Identical(f.Type(), compTyp) {
+								embeddedName = f.Name()
+								break
+							}
+						}
+
+						if embeddedName != "" { // Ordered embedded struct initialiser detected.
+							c.tsw.WriteLiterally(embeddedName)
+							c.tsw.WriteLiterally(": {")
+							for k, inner := range compLit.Elts {
+								if k > 0 {
+									c.tsw.WriteLiterally(", ")
+								}
+								if err := c.WriteValueExpr(inner); err != nil {
+									return fmt.Errorf("failed to write embedded struct ordered field: %w", err)
+								}
+							}
+							c.tsw.WriteLiterally("}")
+							continue // Skip default handling
+						}
+					}
+
+					// Not an embedded field, write as a regular field initializer
+					if err := c.WriteValueExpr(elm); err != nil {
+						return fmt.Errorf("failed to write struct literal field: %w", err)
+					}
 				}
 			}
 			c.tsw.WriteLiterally("})")

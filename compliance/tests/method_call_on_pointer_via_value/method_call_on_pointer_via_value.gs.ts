@@ -24,9 +24,9 @@ class MyStruct {
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
 	  'MyStruct',
-	  goscript.TypeKind.Struct,
+	  goscript.GoTypeKind.Struct,
 	  new MyStruct(),
-	  new Set(['SetValue', 'GetValue']),
+	  [{ name: 'SetValue', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
 	  MyStruct
 	);
 }
