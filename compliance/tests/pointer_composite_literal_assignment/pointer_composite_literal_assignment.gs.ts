@@ -36,13 +36,13 @@ export async function main(): Promise<void> {
 
 	// Access fields through the pointer
 	// Expected: 42
-	console.log("MyInt via pointer: Expected: 42, Actual:", (structPointer).ref!.MyInt)
+	console.log("MyInt via pointer: Expected: 42, Actual:", (structPointer)?.ref?.MyInt)
 	// Expected: "composite literal pointer"
-	console.log("MyString via pointer: Expected: composite literal pointer, Actual: " + (structPointer).ref!.MyString)
+	console.log("MyString via pointer: Expected: composite literal pointer, Actual: " + (structPointer)?.ref?.MyString)
 
 	// Modify through the pointer
-	(structPointer).ref!.MyInt = 99
+	(structPointer)?.ref?.MyInt = 99
 	// Expected: 99
-	console.log("MyInt after modification: Expected: 99, Actual:", (structPointer).ref!.MyInt)
+	console.log("MyInt after modification: Expected: 99, Actual:", (structPointer)?.ref?.MyInt)
 }
 

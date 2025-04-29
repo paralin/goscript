@@ -56,7 +56,7 @@ export async function main(): Promise<void> {
 	processor = (goscript.isAssignable(new MyProcessor({}), goscript.getType('MultiParamReturner')!) ? new MyProcessor({}) : null)
 
 	let data = [1, 2, 3]
-	let [success, ] = (processor instanceof goscript.GoPtr ? processor.ref!.Process : processor.Process)(data, 5, "unused")
+	let [success, ] = (processor instanceof goscript.GoPtr ? processor.ref?.Process : processor.Process)(data, 5, "unused")
 
 	if (success) {
 		console.log("Main: Success reported")

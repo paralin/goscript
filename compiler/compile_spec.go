@@ -598,10 +598,24 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 
 	// Set current receiver object for context
 	var receiverObj types.Object
+	isPointerReceiver := false
+	
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
 		if recvIdent := recvField.Names[0]; recvIdent != nil {
 			receiverObj = c.pkg.TypesInfo.Defs[recvIdent]
 			c.currentReceiverObj = receiverObj
+			
+			// Check if this method has a pointer receiver
+			if starExpr, ok := recvField.Type.(*ast.StarExpr); ok {
+				isPointerReceiver = true
+				
+				// Store this in our map of pointer receiver methods
+				if ident, ok := starExpr.X.(*ast.Ident); ok {
+					methodKey := ident.Name + "." + decl.Name.Name
+					c.pointerReceiverMethods[methodKey] = true
+				}
+			}
+			c.currentReceiverIsPointer = isPointerReceiver
 		}
 	}
 
@@ -628,6 +642,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 				if err := c.WriteStmt(stmt); err != nil {
 					c.inAsyncFunction = previousAsyncState // Restore state before returning error
 					c.currentReceiverObj = nil             // Reset receiver object on error
+					c.currentReceiverIsPointer = false     // Reset receiver pointer flag on error
 					return fmt.Errorf("failed to write statement in function body: %w", err)
 				}
 			}
@@ -647,9 +662,10 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
 
-	// Restore previous async state and reset receiver object
+	// Restore previous async state and reset receiver info
 	c.inAsyncFunction = previousAsyncState
 	c.currentReceiverObj = nil
+	c.currentReceiverIsPointer = false
 	return nil
 }
 

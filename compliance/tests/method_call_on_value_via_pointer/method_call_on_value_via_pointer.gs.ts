@@ -44,13 +44,13 @@ export async function main(): Promise<void> {
 	// Call the value-receiver method using the pointer variable.
 	// Go implicitly dereferences msPointer to call GetValue on the value.
 	// Expected: 100
-	console.log("Value via pointer call: Expected: 100, Actual:", (msPointer).ref!.GetValue())
+	console.log("Value via pointer call: Expected: 100, Actual:", (msPointer)?.ref?.GetValue())
 
 	// Modify the value through the original value variable
 	msValue.MyInt = 200
 
 	// The pointer still points to the modified value
 	// Expected: 200
-	console.log("Value via pointer call after modification: Expected: 200, Actual:", (msPointer).ref!.GetValue())
+	console.log("Value via pointer call after modification: Expected: 200, Actual:", (msPointer)?.ref?.GetValue())
 }
 

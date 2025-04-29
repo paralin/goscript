@@ -86,7 +86,7 @@ export async function main(): Promise<void> {
 	// if the assertion to InterfaceA succeeds.
 	{let { value: assertedA, ok: ok } = goscript.typeAssert<InterfaceA>(a, 'InterfaceA')
 		if (ok) {
-			(assertedA instanceof goscript.GoPtr ? assertedA.ref!.DoSomething : assertedA.DoSomething)(123)
+			(assertedA instanceof goscript.GoPtr ? assertedA.ref?.DoSomething : assertedA.DoSomething)(123)
 		}
 	}}
 

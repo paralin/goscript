@@ -37,17 +37,17 @@ export async function main(): Promise<void> {
 	let pointerCopy = original
 
 	// Modify the struct through the original pointer.
-	(original).ref!.MyString = "modified original"
+	(original)?.ref?.MyString = "modified original"
 
 	// The change should be reflected when accessing through the copied pointer.
 	// Expected: "modified original"
-	console.log("Pointer copy value: Expected: modified original, Actual: " + (pointerCopy).ref!.MyString)
+	console.log("Pointer copy value: Expected: modified original, Actual: " + (pointerCopy)?.ref?.MyString)
 
 	// Modify the struct through the copied pointer.
-	(pointerCopy).ref!.MyInt = 20
+	(pointerCopy)?.ref?.MyInt = 20
 
 	// The change should be reflected when accessing through the original pointer.
 	// Expected: 20
-	console.log("Original value after pointer copy modification: Expected: 20, Actual:", (original).ref!.MyInt)
+	console.log("Original value after pointer copy modification: Expected: 20, Actual:", (original)?.ref?.MyInt)
 }
 

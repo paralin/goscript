@@ -12,14 +12,16 @@ import (
 
 // GoToTSCompiler compiles Go code to TypeScript code.
 type GoToTSCompiler struct {
-	tsw                 *TSCodeWriter
-	imports             map[string]*fileImport
-	pkg                 *packages.Package
-	cmap                ast.CommentMap
-	asyncFuncs          map[string]bool // Track which functions are async
-	nextBlockNeedsDefer bool            // Track if the next block should have a "using" statement
-	inAsyncFunction     bool            // Track if we're inside an async function
-	currentReceiverObj  gtypes.Object   // Track the object of the current method receiver, if any
+	tsw                      *TSCodeWriter
+	imports                  map[string]*fileImport
+	pkg                      *packages.Package
+	cmap                     ast.CommentMap
+	asyncFuncs               map[string]bool // Track which functions are async
+	nextBlockNeedsDefer      bool            // Track if the next block should have a "using" statement
+	inAsyncFunction          bool            // Track if we're inside an async function
+	currentReceiverObj       gtypes.Object   // Track the object of the current method receiver, if any
+	currentReceiverIsPointer bool            // Track if the current method receiver is a pointer
+	pointerReceiverMethods   map[string]bool // Track which methods have pointer receivers for each type
 }
 
 // WriteGoType writes a Go type as a TypeScript type.
@@ -85,13 +87,15 @@ func (c *GoToTSCompiler) scanForDefer(block *ast.BlockStmt) bool {
 // NewGoToTSCompiler builds a new GoToTSCompiler
 func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, cmap ast.CommentMap) *GoToTSCompiler {
 	return &GoToTSCompiler{
-		tsw:                 tsw,
-		imports:             make(map[string]*fileImport),
-		pkg:                 pkg,
-		cmap:                cmap,
-		asyncFuncs:          make(map[string]bool),
-		nextBlockNeedsDefer: false,
-		inAsyncFunction:     false,
+		tsw:                      tsw,
+		imports:                  make(map[string]*fileImport),
+		pkg:                      pkg,
+		cmap:                     cmap,
+		asyncFuncs:               make(map[string]bool),
+		nextBlockNeedsDefer:      false,
+		inAsyncFunction:          false,
+		pointerReceiverMethods:   make(map[string]bool),
+		currentReceiverIsPointer: false,
 	}
 }
 

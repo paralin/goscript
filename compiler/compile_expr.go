@@ -247,6 +247,9 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	// Get the type name string for the asserted type
 	typeName := c.getTypeNameString(exp.Type)
 
+	// Check if we're asserting to a pointer type
+	_, isPointerType := exp.Type.(*ast.StarExpr)
+
 	// Generate a call to goscript.typeAssert
 	c.tsw.WriteLiterally("goscript.typeAssert<")
 	c.WriteTypeExpr(exp.Type) // Write the asserted type for the generic
@@ -256,10 +259,15 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	}
 	c.tsw.WriteLiterally(", ")
 	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
-	c.tsw.WriteLiterally(").value") // Access the value field directly in expression context
+	
+	// When asserting to a pointer type, we need to handle the possibility
+	// that we might get a GoPtr wrapper back
+	if isPointerType {
+		c.tsw.WriteLiterally(")") // Don't access .value directly for pointer types
+	} else {
+		c.tsw.WriteLiterally(").value") // Access the value field directly for non-pointer types
+	}
 
-	// For non-binary expression contexts (value access), we're already
-	// using .value which will get us to the value regardless of pointer/non-pointer
 	return nil
 }
 
@@ -350,16 +358,14 @@ func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) error {
 }
 
 // WriteSelectorExprValue writes a selector expression used as a value (e.g., obj.Field).
-// WriteSelectorExprValue writes a selector expression used as a value (e.g., obj.Field).
 func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 	// Check if we are inside a method with a pointer receiver and the base expression is the receiver.
 	if c.currentReceiverObj != nil {
 		if ident, ok := exp.X.(*ast.Ident); ok {
 			if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil && obj == c.currentReceiverObj {
-				// It's the receiver identifier. Check if the receiver type is a pointer.
-				if _, isPointerRecv := c.currentReceiverObj.Type().(*gtypes.Pointer); isPointerRecv {
-					// It's a method with a pointer receiver, and we are accessing a field/method on the receiver.
-					// In TS, 'this' corresponds to the value type, so access directly.
+				// It's the receiver identifier. When we're in a pointer receiver method,
+				// 'this' in TS is directly the value type, so access fields/methods directly.
+				if c.currentReceiverIsPointer {
 					c.tsw.WriteLiterally("this.")
 					c.WriteIdentValue(exp.Sel)
 					return nil
@@ -372,11 +378,21 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 	isPointer := false
 	isGoPtr := false
 	var tvType gtypes.Type
+	var baseTypeName string
 
 	if c.pkg != nil && c.pkg.TypesInfo != nil {
 		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
 			tvType = tv.Type
 			_, isPointer = tv.Type.(*gtypes.Pointer)
+
+			// Get the base type name (for later checking against pointer receiver methods)
+			if named, ok := tvType.(*gtypes.Named); ok {
+				baseTypeName = named.Obj().Name()
+			} else if ptr, ok := tvType.(*gtypes.Pointer); ok {
+				if named, ok := ptr.Elem().(*gtypes.Named); ok {
+					baseTypeName = named.Obj().Name()
+				}
+			}
 
 			// Check if this is potentially a GoPtr instance at runtime
 			// This handles the case where we might be accessing through an interface variable
@@ -397,9 +413,15 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 
 	// Determine if we need to check for method with pointer receiver
 	mayNeedAddressOfForMethod := false
-	if c.pkg != nil {
-		// Only check for method calls, not field access
-		if !isPointer && tvType != nil {
+	methodKey := ""
+	
+	if c.pkg != nil && baseTypeName != "" {
+		// Check if the selector is a method with a pointer receiver
+		methodKey = baseTypeName + "." + exp.Sel.Name
+		if c.pointerReceiverMethods[methodKey] {
+			// This is a known method with a pointer receiver
+			mayNeedAddressOfForMethod = !isPointer // Only need to take address if not already a pointer
+		} else if !isPointer && tvType != nil {
 			// Check if the selector refers to a method in the type's method set
 			if obj := c.pkg.TypesInfo.Uses[exp.Sel]; obj != nil {
 				if fun, ok := obj.(*gtypes.Func); ok && fun.Type() != nil {
@@ -408,6 +430,8 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 						if _, isPointerRecv := sig.Recv().Type().(*gtypes.Pointer); isPointerRecv {
 							// It's a method with pointer receiver being called on a value
 							mayNeedAddressOfForMethod = true
+							// Remember this for future checks
+							c.pointerReceiverMethods[methodKey] = true
 						}
 					}
 				}
@@ -421,7 +445,7 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write selector expression pointer object: %w", err)
 		}
-		c.tsw.WriteLiterally(").ref!.")
+		c.tsw.WriteLiterally(")?.ref?.")
 		c.WriteIdentValue(exp.Sel)
 	} else if isGoPtr {
 		// For values that might be GoPtr instances at runtime, use safe access pattern
@@ -435,7 +459,7 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write selector expression GoPtr check: %w", err)
 		}
-		c.tsw.WriteLiterally(".ref!.")
+		c.tsw.WriteLiterally(".ref?.")
 		c.WriteIdentValue(exp.Sel)
 
 		// If it's not a GoPtr, access directly
@@ -447,14 +471,23 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 		c.WriteIdentValue(exp.Sel)
 		c.tsw.WriteLiterally(")")
 	} else if mayNeedAddressOfForMethod {
-		// Method with pointer receiver called on a value
-		// Need to implicitly take the address of the value
-		c.tsw.WriteLiterally("(new goscript.GoPtr(")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write value for implicit pointer conversion: %w", err)
+		// Method with pointer receiver called on a value - implicitly take the address
+		if methodKey != "" {
+			// Taking address of value when calling a pointer receiver method
+			c.tsw.WriteLiterally("(new goscript.GoPtr(")
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write value for implicit pointer conversion: %w", err)
+			}
+			c.tsw.WriteLiterally(")).ref!.")
+			c.WriteIdentValue(exp.Sel)
+		} else {
+			// Regular field access, no pointer method involved
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write selector expression object: %w", err)
+			}
+			c.tsw.WriteLiterally(".")
+			c.WriteIdentValue(exp.Sel)
 		}
-		c.tsw.WriteLiterally(")).ref!.")
-		c.WriteIdentValue(exp.Sel)
 	} else {
 		// For non-pointer types, access directly
 		if err := c.WriteValueExpr(exp.X); err != nil {
@@ -477,12 +510,12 @@ func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 // WriteStarExprValue writes a pointer dereference value (e.g., *myVar).
 func (c *GoToTSCompiler) WriteStarExprValue(exp *ast.StarExpr) error {
 	// Dereferencing a pointer in Go (*p) gets the value.
-	// In TS with GoPtr representation, we need to access the .ref property.
+	// In TS with GoPtr representation, we need to access the .ref property with null checks.
 	c.tsw.WriteLiterally("(")
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write star expression operand: %w", err)
 	}
-	c.tsw.WriteLiterally(").ref")
+	c.tsw.WriteLiterally(")?.ref") // Use optional chaining for null safety
 	return nil
 }
 

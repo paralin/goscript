@@ -34,6 +34,6 @@ export async function main(): Promise<void> {
 	// Create a pointer to a MyStruct instance using a composite literal.
 	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// Expected: "hello world"
-	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + (structPointer).ref!.MyString)
+	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + (structPointer)?.ref?.MyString)
 }
 

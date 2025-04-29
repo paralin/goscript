@@ -32,11 +32,11 @@ const MyStruct__ptrTypeInfo = goscript.registerType(
 export async function main(): Promise<void> {
 	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// === Simple Dereference Assignment (Value Copy) ===
-	let simpleDereferencedCopy = (structPointer).ref.clone()
+	let simpleDereferencedCopy = (structPointer)?.ref.clone()
 	// Modifying the copy does not affect the original struct pointed to by structPointer.
 	simpleDereferencedCopy.MyString = "modified dereferenced copy"
 	// Expected: "hello world"
-	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + (structPointer).ref!.MyString)
+	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + (structPointer)?.ref?.MyString)
 	// Expected: "modified dereferenced copy"
 	console.log("Simple Dereferenced Copy: Expected: modified dereferenced copy, Actual: " + simpleDereferencedCopy.MyString)
 }

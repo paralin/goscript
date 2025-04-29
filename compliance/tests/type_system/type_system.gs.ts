@@ -76,8 +76,8 @@ export async function main(): Promise<void> {
 	p2 = (goscript.isAssignable(d2, goscript.getType('Printer')!) ? d2 : null) // OK: *Data has both Print() (promoted) and GetValue()
 
 	console.log("Testing pointer receiver assignment:")
-	(p2 instanceof goscript.GoPtr ? p2.ref!.Print : p2.Print)() // Can call value receiver method via pointer
-	let val = (p2 instanceof goscript.GoPtr ? p2.ref!.GetValue : p2.GetValue)() // Can call pointer receiver method
+	(p2 instanceof goscript.GoPtr ? p2.ref?.Print : p2.Print)() // Can call value receiver method via pointer
+	let val = (p2 instanceof goscript.GoPtr ? p2.ref?.GetValue : p2.GetValue)() // Can call pointer receiver method
 	console.log("Value from p2:", val)
 
 	// Assert p1 (interface is nil) to Data (should fail)
@@ -91,7 +91,7 @@ export async function main(): Promise<void> {
 
 	// Assert p2 (holding *Data) to *Data
 	let { value: dataPtr2, ok: ok3 } = goscript.typeAssert<goscript.Ptr<Data>>(p2, '*Data')
-	console.log("p2.(*Data):", ok3, (dataPtr2).ref!.value)
+	console.log("p2.(*Data):", ok3, (dataPtr2)?.ref?.value)
 
 	// Assert p2 (holding *Data) to Data (IMPOSSIBLE: Data does not implement Printer)
 	// _, ok4 := p2.(Data)
@@ -104,11 +104,11 @@ export async function main(): Promise<void> {
 	console.log("Testing type assertions (panic form):")
 	// This should succeed
 	let data3 = goscript.typeAssert<Printer>(p2, 'Printer').value
-	(data3 instanceof goscript.GoPtr ? data3.ref!.Print : data3.Print)()
+	(data3 instanceof goscript.GoPtr ? data3.ref?.Print : data3.Print)()
 
 	// This should succeed
-	let data4 = goscript.typeAssert<goscript.Ptr<Data>>(p2, '*Data').value
-	console.log("Value from data4:", (data4).ref!.value)
+	let data4 = goscript.typeAssert<goscript.Ptr<Data>>(p2, '*Data')
+	console.log("Value from data4:", (data4)?.ref?.value)
 
 	// Test zero values implicitly
 	let dZero: Data = new Data()
