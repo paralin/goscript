@@ -48,11 +48,11 @@ export async function main(): Promise<void> {
 	console.log(s.InterfaceField)
 
 	let i = 10
-	s.PointerField = i
+	s.PointerField = new goscript.GoPtr(i)
 	console.log(s.PointerField)
 
 	let mi: MyInterface | null = null;
-	s.InterfaceField = mi
+	s.InterfaceField = (goscript.isAssignable(mi, goscript.getType('MyInterface')!) ? mi : null)
 	console.log(s.InterfaceField)
 }
 

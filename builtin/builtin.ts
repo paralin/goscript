@@ -695,12 +695,9 @@ export function typeAssert<T>(
   			return { value: value as T, ok: true };
   		}
   	} else {
-  		// If the value is not a GoPtr, check if it's assignable to the target element type
-  		// This handles asserting a concrete value to a pointer type (*T)
-  		if (isAssignable(value, targetElemType)) {
-  			 // Wrap the value in a GoPtr to represent the pointer
-  			return { value: new GoPtr(value) as T, ok: true };
-  		}
+  		// If the value is not a GoPtr, it can't be asserted to a pointer type
+  		// In Go, a concrete value like MyStruct{} cannot be asserted to *MyStruct
+  		return { value: null as unknown as T, ok: false };
   	}
   } else {
   	// For non-pointer targets, use the existing assignability check

@@ -53,10 +53,10 @@ const MyProcessor__ptrTypeInfo = goscript.registerType(
 export async function main(): Promise<void> {
 	//nolint:staticcheck
 	let processor: MultiParamReturner | null = null;
-	processor = new MyProcessor({})
+	processor = (goscript.isAssignable(new MyProcessor({}), goscript.getType('MultiParamReturner')!) ? new MyProcessor({}) : null)
 
 	let data = [1, 2, 3]
-	let [success, ] = processor.Process(data, 5, "unused")
+	let [success, ] = (processor instanceof goscript.GoPtr ? processor.ref!.Process : processor.Process)(data, 5, "unused")
 
 	if (success) {
 		console.log("Main: Success reported")

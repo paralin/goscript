@@ -79,14 +79,14 @@ export async function main(): Promise<void> {
 	e.Greet()
 
 	// Test with a pointer to Employee
-	let ep = new Employee({Person: {Name: "Bob", Age: 25}, ID: 456})
+	let ep = new goscript.GoPtr(new Employee({Person: {Name: "Bob", Age: 25}, ID: 456}))
 
 	// Accessing embedded fields via pointer
-	console.log("Employee Pointer Name:", ep.Name)
-	console.log("Employee Pointer Age:", ep.Age)
-	console.log("Employee Pointer ID:", ep.ID)
+	console.log("Employee Pointer Name:", (ep).ref!.Name)
+	console.log("Employee Pointer Age:", (ep).ref!.Age)
+	console.log("Employee Pointer ID:", (ep).ref!.ID)
 
 	// Calling embedded method via pointer
-	ep.Greet()
+	(ep).ref!.Greet()
 }
 

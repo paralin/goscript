@@ -9,7 +9,7 @@ class MyStruct {
 	// SetValue sets the MyInt field (pointer receiver).
 	public SetValue(v: number): void {
 		const m = this
-		m.MyInt = v
+		(m).ref!.MyInt = v
 	}
 
 	// GetValue returns the MyInt field (value receiver for verification).
@@ -47,7 +47,7 @@ export async function main(): Promise<void> {
 	// === Method Call on Pointer Receiver via Value ===
 	// Call the pointer-receiver method using the value variable.
 	// Go implicitly takes the address of msValue (&msValue) to call SetValue.
-	msValue.SetValue(200)
+	(new goscript.GoPtr(msValue)).ref!.SetValue(200)
 
 	// Verify the value was modified through the method call.
 	// Expected: 200

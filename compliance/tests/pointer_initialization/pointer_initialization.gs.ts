@@ -32,8 +32,8 @@ const MyStruct__ptrTypeInfo = goscript.registerType(
 export async function main(): Promise<void> {
 	// === Pointer Initialization ===
 	// Create a pointer to a MyStruct instance using a composite literal.
-	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
+	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// Expected: "hello world"
-	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + structPointer.MyString)
+	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + (structPointer).ref!.MyString)
 }
 

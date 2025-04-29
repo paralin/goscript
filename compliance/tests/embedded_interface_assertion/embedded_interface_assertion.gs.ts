@@ -78,7 +78,7 @@ const MyStruct__ptrTypeInfo = goscript.registerType(
 export async function main(): Promise<void> {
 	let rwc: ReadCloser | null = null;
 	let s = new MyStruct({})
-	rwc = s.clone()
+	rwc = (goscript.isAssignable(s, goscript.getType('ReadCloser')!) ? s : null)
 
 	let rwcAny: any | null = rwc;
 	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwcAny, 'ReadCloser')

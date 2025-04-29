@@ -31,11 +31,11 @@ const MyStruct__ptrTypeInfo = goscript.registerType(
 );
 
 export async function main(): Promise<void> {
-	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
+	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// === Pointer Dereference and Multi-Assignment ===
 	// Dereference structPointer to get a copy of the struct.
 	// Also demonstrates multi-variable assignment and the use of the blank identifier '_'.
-	let dereferencedStructCopy = structPointer.clone()
+	let dereferencedStructCopy = (structPointer).ref.clone()
 	let unusedString = "hello" // testing _ set
 }
 

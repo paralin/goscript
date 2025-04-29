@@ -62,7 +62,7 @@ const MyOtherInterface__typeInfo = goscript.registerType(
 export async function main(): Promise<void> {
 	let i: MyInterface | null = null;
 	let s = new MyStruct({Value: 10})
-	i = s.clone()
+	i = (goscript.isAssignable(s, goscript.getType('MyInterface')!) ? s : null)
 
 	let { ok: ok } = goscript.typeAssert<MyOtherInterface>(i, 'MyOtherInterface')
 	if (ok) {

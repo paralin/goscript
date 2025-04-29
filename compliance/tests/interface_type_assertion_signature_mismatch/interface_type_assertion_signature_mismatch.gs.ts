@@ -63,7 +63,7 @@ const MyStruct__ptrTypeInfo = goscript.registerType(
 export async function main(): Promise<void> {
 	let a: any | null = null;
 	let s = new MyStruct({Name: "TestStruct"})
-	a = s.clone()
+	a = (goscript.isAssignable(s, goscript.getType('interface{}')!) ? s : null)
 
 	// This assertion should fail at runtime because InterfaceB.DoSomething has a different signature
 	let { ok: ok } = goscript.typeAssert<InterfaceB>(a, 'InterfaceB')
@@ -86,7 +86,7 @@ export async function main(): Promise<void> {
 	// if the assertion to InterfaceA succeeds.
 	{let { value: assertedA, ok: ok } = goscript.typeAssert<InterfaceA>(a, 'InterfaceA')
 		if (ok) {
-			assertedA.DoSomething(123)
+			(assertedA instanceof goscript.GoPtr ? assertedA.ref!.DoSomething : assertedA.DoSomething)(123)
 		}
 	}}
 

@@ -700,6 +700,19 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 	// --- Original logic for other assignments ---
 	isMapIndexLHS := false // Track if the first LHS is a map index
+	
+	// Check if we're assigning to an interface
+	isInterfaceAssign := false
+	var interfaceLHS ast.Expr
+	if len(lhs) == 1 && c.pkg != nil && c.pkg.TypesInfo != nil {
+		if tv, ok := c.pkg.TypesInfo.Types[lhs[0]]; ok && tv.Type != nil {
+			_, isInterfaceAssign = tv.Type.Underlying().(*gtypes.Interface)
+			if isInterfaceAssign {
+				interfaceLHS = lhs[0]
+			}
+		}
+	}
+	
 	for i, l := range lhs {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
@@ -748,6 +761,38 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			c.tsw.WriteLiterally(tokStr)
 		}
 		c.tsw.WriteLiterally(" ")
+	}
+
+	// Check if we need to use runtime type checking for interface assignment
+	if isInterfaceAssign && len(rhs) == 1 {
+		// Check if right-hand side might be a pointer type
+		rhsType := c.pkg.TypesInfo.TypeOf(rhs[0])
+		if rhsType != nil {
+			// For interface assignment, use runtime type check
+			// This handles both value-to-interface and pointer-to-interface assignments
+			c.tsw.WriteLiterally("(goscript.isAssignable(")
+			if err := c.WriteValueExpr(rhs[0]); err != nil {
+				return err
+			}
+			// Pass the interface type itself for type checking
+			lhsType := c.pkg.TypesInfo.TypeOf(interfaceLHS)
+			if lhsType != nil {
+				ifaceTypeName := c.getTypeNameForInterface(lhsType)
+				c.tsw.WriteLiterally(", goscript.getType('")
+				c.tsw.WriteLiterally(ifaceTypeName)
+				c.tsw.WriteLiterally("')!) ? ")
+			} else {
+				c.tsw.WriteLiterally(", goscript.getType('interface{}')!) ? ")
+			}
+			
+			// Actual value to assign if compatible
+			if err := c.WriteValueExpr(rhs[0]); err != nil {
+				return err
+			}
+			
+			c.tsw.WriteLiterally(" : null)")
+			return nil
+		}
 	}
 
 	for i, r := range rhs {
@@ -1539,6 +1584,36 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 func isSlice(typ gtypes.Type) bool {
 	_, ok := typ.(*gtypes.Slice)
 	return ok
+}
+
+// getTypeNameForInterface returns the name of an interface type
+func (c *GoToTSCompiler) getTypeNameForInterface(typ gtypes.Type) string {
+	if typ == nil {
+		return "interface{}"
+	}
+	
+	// If it's a named type, return the qualified name
+	if named, ok := typ.(*gtypes.Named); ok {
+		if named.Obj() != nil {
+			if pkg := named.Obj().Pkg(); pkg != nil {
+				if pkg.Path() != c.pkg.PkgPath {
+					// External package, use fully qualified name
+					return fmt.Sprintf("%s.%s", pkg.Name(), named.Obj().Name())
+				}
+			}
+			return named.Obj().Name()
+		}
+	}
+	
+	// For unnamed interface{}, return the special name
+	if iface, ok := typ.Underlying().(*gtypes.Interface); ok {
+		if iface.Empty() {
+			return "interface{}"
+		}
+	}
+	
+	// Fallback for other interface types
+	return "interface{}"
 }
 
 // writeTypeAssertion handles multi-variable assignment from a type assertion.

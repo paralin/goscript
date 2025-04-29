@@ -10,7 +10,7 @@ class MyStruct {
 	// GetMyString returns the MyString field.
 	public GetMyString(): string {
 		const m = this
-		return m.MyString
+		return (m).ref!.MyString
 	}
 
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
@@ -36,9 +36,9 @@ const MyStruct__ptrTypeInfo = goscript.registerType(
 );
 
 export async function main(): Promise<void> {
-	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
+	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// === Method Call on Pointer Receiver ===
 	// Calling a method with a pointer receiver (*MyStruct) using a pointer variable.
-	console.log("Method call on pointer (structPointer): Expected: hello world, Actual: " + structPointer.GetMyString())
+	console.log("Method call on pointer (structPointer): Expected: hello world, Actual: " + (structPointer).ref!.GetMyString())
 }
 
