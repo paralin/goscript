@@ -6,20 +6,21 @@ import * as goscript from "@goscript/builtin";
 class MyStruct {
 	public MyInt: number = 0;
 	public MyString: string = "";
-	private myBool: boolean = false;
+	public myBool: boolean = false;
 
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
+
+  // Type information for runtime type system
+  static __typeInfo = goscript.registerType(
+    'MyStruct',
+    goscript.GoTypeKind.Struct,
+    new MyStruct(),
+    [],
+    MyStruct
+  );
 }
-// Register this type with the runtime type system
-MyStruct.__typeInfo = goscript.registerType(
-  'MyStruct',
-  goscript.GoTypeKind.Struct,
-  new MyStruct(),
-  [],
-  MyStruct
-);
 // Register the pointer type *MyStruct with the runtime type system
 const MyStruct__ptrTypeInfo = goscript.registerType(
   '*MyStruct',

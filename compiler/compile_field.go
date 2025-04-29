@@ -67,20 +67,14 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 	}
 
 	for _, name := range field.Names {
-		isExported := name.IsExported()
-
 		// argument names: keep original casing, no access modifier
 		if isArguments {
 			c.tsw.WriteLiterally(name.Name)
 			// Argument type is handled in WriteFieldList, so continue
 			continue
-		} else if isExported {
-			// exported struct fields become public, keep original casing
-			c.tsw.WriteLiterally("public ")
-			c.tsw.WriteLiterally(name.Name)
 		} else {
-			// unexported struct fields become private, keep original casing
-			c.tsw.WriteLiterally("private ")
+			// All struct fields should be public for object literal initialization and access
+			c.tsw.WriteLiterally("public ")
 			c.tsw.WriteLiterally(name.Name)
 		}
 

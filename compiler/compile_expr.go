@@ -30,17 +30,18 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	case *ast.FuncType:
 		// Function types (e.g., in type aliases) use '=>' for return type.
 		c.WriteFuncType(exp, false, true) // isAsync=false, useArrowForReturnType=true
+		c.tsw.WriteLiterally(" | null")
 	case *ast.ArrayType:
 		// Translate [N]T to T[]
 		c.WriteTypeExpr(exp.Elt)
 		c.tsw.WriteLiterally("[]")
 	case *ast.MapType:
-		// Map<K,V> → TS object type { [key: K]: V }
-		c.tsw.WriteLiterally("{ [key: ")
+		// Use Map<K,V> | null for map types to allow null as zero value
+		c.tsw.WriteLiterally("Map<")
 		c.WriteTypeExpr(exp.Key)
-		c.tsw.WriteLiterally("]: ")
+		c.tsw.WriteLiterally(", ")
 		c.WriteTypeExpr(exp.Value)
-		c.tsw.WriteLiterally(" }")
+		c.tsw.WriteLiterally("> | null")
 	case *ast.ChanType:
 		// Translate channel types to goscript.Channel<T>
 		c.tsw.WriteLiterally("goscript.Channel<")
@@ -279,9 +280,10 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 
 // WriteStarExprType writes a pointer type (e.g., *MyStruct).
 func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
-	// Map pointer types to T | null
+	// Use goscript.Ptr<T> for pointer types
+	c.tsw.WriteLiterally("goscript.Ptr<")
 	c.WriteTypeExpr(exp.X)
-	c.tsw.WriteLiterally(" | null")
+	c.tsw.WriteLiterally(">")
 }
 
 // WriteStarExprValue writes a pointer dereference value (e.g., *myVar).

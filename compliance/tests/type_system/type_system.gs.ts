@@ -18,10 +18,10 @@ const Printer__typeInfo = goscript.registerType(
 );
 
 class Data {
-	private value: number = 0;
-	private label: string = "";
-	private tags: string[] = [];
-	private lookup: { [key: string]: boolean } = null;
+	public value: number = 0;
+	public label: string = "";
+	public tags: string[] = [];
+	public lookup: Map<string, boolean> | null = null;
 
 	// Implement Printer interface with a value receiver
 	public Print(): void {
@@ -38,15 +38,16 @@ class Data {
 	constructor(init?: Partial<Data>) { if (init) Object.assign(this, init as any); }
 	public clone(): Data { return Object.assign(Object.create(Data.prototype) as Data, this); }
 
+
+  // Type information for runtime type system
+  static __typeInfo = goscript.registerType(
+    'Data',
+    goscript.GoTypeKind.Struct,
+    new Data(),
+    [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+    Data
+  );
 }
-// Register this type with the runtime type system
-Data.__typeInfo = goscript.registerType(
-  'Data',
-  goscript.GoTypeKind.Struct,
-  new Data(),
-  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-  Data
-);
 // Register the pointer type *Data with the runtime type system
 const Data__ptrTypeInfo = goscript.registerType(
   '*Data',
@@ -56,7 +57,7 @@ const Data__ptrTypeInfo = goscript.registerType(
   Data.__typeInfo
 );
 
-type Processor = (_p0: number) => number;
+type Processor = (_p0: number) => number | null;
 
 export async function main(): Promise<void> {
 	// Create struct value
@@ -85,11 +86,11 @@ export async function main(): Promise<void> {
 	console.log("Testing type assertions (comma-ok):")
 
 	// Assert p1 (interface is nil) to *Data (should fail)
-	let { ok: ok2 } = goscript.typeAssert<Data | null>(p1, '*Data')
+	let { ok: ok2 } = goscript.typeAssert<goscript.Ptr<Data>>(p1, '*Data')
 	console.log("p1.(*Data):", ok2) // p1 is nil, so assertion fails
 
 	// Assert p2 (holding *Data) to *Data
-	let { value: dataPtr2, ok: ok3 } = goscript.typeAssert<Data | null>(p2, '*Data')
+	let { value: dataPtr2, ok: ok3 } = goscript.typeAssert<goscript.Ptr<Data>>(p2, '*Data')
 	console.log("p2.(*Data):", ok3, dataPtr2.value)
 
 	// Assert p2 (holding *Data) to Data (IMPOSSIBLE: Data does not implement Printer)
@@ -106,17 +107,17 @@ export async function main(): Promise<void> {
 	data3.Print()
 
 	// This should succeed
-	let data4 = goscript.typeAssert<Data | null>(p2, '*Data').value
+	let data4 = goscript.typeAssert<goscript.Ptr<Data>>(p2, '*Data').value
 	console.log("Value from data4:", data4.value)
 
 	// Test zero values implicitly
 	let dZero: Data = new Data()
 	;
-	let pZero: Data | null;
+	let pZero: goscript.Ptr<Data> = null;
 	let iZero: Printer | null = null;
 	let sZero: number[] = [];
-	let mZero: { [key: number]: string };
-	let fnZero: Processor;
+	let mZero: Map<number, string> | null = null;
+	let fnZero: Processor = null;
 
 	// Cannot easily print zero values without fmt, but their declaration tests compiler handling
 	console.log("Declared zero values (compiler check)")

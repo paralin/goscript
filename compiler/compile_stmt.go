@@ -1303,8 +1303,11 @@ func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 				c.tsw.WriteLiterally("new ")
 				c.WriteTypeExpr(t) // Write the type name
 				c.tsw.WriteLiterally("()")
-			case *gtypes.Pointer, *gtypes.Interface, *gtypes.Slice, *gtypes.Map, *gtypes.Chan, *gtypes.Signature: // Use gotypes alias
-				// Pointers, interfaces, slices, maps, channels, functions zero value is null/undefined
+			case *gtypes.Pointer: // Handle pointer types separately
+				// Zero value for pointer is null
+				c.tsw.WriteLiterally("null")
+			case *gtypes.Interface, *gtypes.Slice, *gtypes.Map, *gtypes.Chan, *gtypes.Signature: // Use gotypes alias
+				// Interfaces, slices, maps, channels, functions zero value is null/undefined
 				c.tsw.WriteLiterally("null")
 			default:
 				c.tsw.WriteLiterally("null // unknown underlying type")
@@ -1323,8 +1326,11 @@ func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 				c.tsw.WriteLiterally("null // unresolved identifier")
 			}
 		}
-	case *ast.StarExpr, *ast.InterfaceType, *ast.ArrayType, *ast.MapType, *ast.ChanType, *ast.FuncType:
-		// Pointers, interfaces, arrays, maps, channels, functions zero value is null/undefined
+	case *ast.StarExpr:
+		// Pointer types use null as zero value
+		c.tsw.WriteLiterally("null")
+	case *ast.InterfaceType, *ast.ArrayType, *ast.MapType, *ast.ChanType, *ast.FuncType:
+		// Interfaces, arrays, maps, channels, functions zero value is null/undefined
 		c.tsw.WriteLiterally("null")
 	case *ast.StructType:
 		// Anonymous struct zero value is complex, default to null for now

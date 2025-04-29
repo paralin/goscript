@@ -31,15 +31,16 @@ class MyProcessor {
 	constructor(init?: Partial<MyProcessor>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyProcessor { return Object.assign(Object.create(MyProcessor.prototype) as MyProcessor, this); }
 
+
+  // Type information for runtime type system
+  static __typeInfo = goscript.registerType(
+    'MyProcessor',
+    goscript.GoTypeKind.Struct,
+    new MyProcessor(),
+    [{ name: 'Process', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }, { type: goscript.getType('int')!, isVariadic: false }, { type: goscript.getType('string')!, isVariadic: false }], results: [{ type: goscript.getType('bool')! }, { type: goscript.getType('error')! }] }],
+    MyProcessor
+  );
 }
-// Register this type with the runtime type system
-MyProcessor.__typeInfo = goscript.registerType(
-  'MyProcessor',
-  goscript.GoTypeKind.Struct,
-  new MyProcessor(),
-  [{ name: 'Process', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }, { type: goscript.getType('int')!, isVariadic: false }, { type: goscript.getType('string')!, isVariadic: false }], results: [{ type: goscript.getType('bool')! }, { type: goscript.getType('error')! }] }],
-  MyProcessor
-);
 // Register the pointer type *MyProcessor with the runtime type system
 const MyProcessor__ptrTypeInfo = goscript.registerType(
   '*MyProcessor',

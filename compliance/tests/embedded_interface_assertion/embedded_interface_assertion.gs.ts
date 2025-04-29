@@ -56,15 +56,16 @@ class MyStruct {
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
+
+  // Type information for runtime type system
+  static __typeInfo = goscript.registerType(
+    'MyStruct',
+    goscript.GoTypeKind.Struct,
+    new MyStruct(),
+    [{ name: 'Read', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] }, { name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }],
+    MyStruct
+  );
 }
-// Register this type with the runtime type system
-MyStruct.__typeInfo = goscript.registerType(
-  'MyStruct',
-  goscript.GoTypeKind.Struct,
-  new MyStruct(),
-  [{ name: 'Read', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] }, { name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }],
-  MyStruct
-);
 // Register the pointer type *MyStruct with the runtime type system
 const MyStruct__ptrTypeInfo = goscript.registerType(
   '*MyStruct',

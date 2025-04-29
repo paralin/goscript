@@ -467,19 +467,20 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.WriteLine("")
 
 		c.tsw.Indent(-1)
+		// Add type information as static property
+		c.tsw.WriteLine("")
+		c.tsw.WriteLinef("  // Type information for runtime type system")
+		c.tsw.WriteLinef("  static __typeInfo = goscript.registerType(")
+		c.tsw.WriteLinef("    '%s',", className)
+		c.tsw.WriteLinef("    goscript.GoTypeKind.Struct,")
+		c.tsw.WriteLinef("    new %s(),", className)
+		c.tsw.WriteLinef("    [%s],", c.collectMethodSignatures(className))
+		c.tsw.WriteLinef("    %s", className)
+		c.tsw.WriteLinef("  );")
+
 		c.tsw.WriteLine("}") // Close class definition
 
-		// Register the struct type after the class is defined
-		c.tsw.WriteLinef("// Register this type with the runtime type system")
-		c.tsw.WriteLinef("%s.__typeInfo = goscript.registerType(", className)
-		c.tsw.WriteLinef("  '%s',", className)
-		c.tsw.WriteLinef("  goscript.GoTypeKind.Struct,")
-		c.tsw.WriteLinef("  new %s(),", className)
-		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
-		c.tsw.WriteLinef("  %s", className)
-		c.tsw.WriteLinef(");")
-
-		// Register the pointer type *T after the struct type is registered
+		// Register the pointer type *T after the class is defined
 		c.tsw.WriteLinef("// Register the pointer type *%s with the runtime type system", className)
 		c.tsw.WriteLinef("const %s__ptrTypeInfo = goscript.registerType(", className)
 		c.tsw.WriteLinef("  '*%s',", className) // Pointer type name
@@ -659,63 +660,73 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 				_, isInterface = tv.Type.Underlying().(*types.Interface)
 			}
 		}
-if a.Type != nil {
-	c.tsw.WriteLiterally(": ")
-	c.WriteTypeExpr(a.Type) // Variable type annotation
 
-	// Append "| null" for interface types
-	if isInterface {
-		c.tsw.WriteLiterally(" | null")
-	}
+		// Write type annotation if type is specified
+		if a.Type != nil {
+			c.tsw.WriteLiterally(": ")
+			c.WriteTypeExpr(a.Type)
 
-	// For zero values, initialize appropriately based on type
-	if len(a.Values) == 0 {
-		// Check if it's a struct type
-		isStruct := false
-		structName := ""
-		if ident, ok := a.Type.(*ast.Ident); ok && ident.Name != "" {
-			// Check if it's a known struct type by looking at its object and type information
-			if ident.Obj != nil && ident.Obj.Kind == ast.Typ && c.pkg != nil && c.pkg.TypesInfo != nil {
-				if tv, ok := c.pkg.TypesInfo.Types[ident]; ok && tv.Type != nil {
-					if _, isStructType := tv.Type.Underlying().(*types.Struct); isStructType {
-						isStruct = true
-						structName = ident.Name
-					}
-				}
-			} else {
-				// If we can't determine from type info, make a conservative guess
-				// Assume any capitalized identifier could be a struct type
-				if len(ident.Name) > 0 && ident.Name[0] >= 'A' && ident.Name[0] <= 'Z' {
-					isStruct = true
-					structName = ident.Name
-				}
+			// Append "| null" for interface types
+			if isInterface {
+				c.tsw.WriteLiterally(" | null")
 			}
 		}
 
-		// Check if it's an array type declaration without an initial value
-		if _, isArrayType := a.Type.(*ast.ArrayType); isArrayType {
-			c.tsw.WriteLiterally(" = []")
-		} else if isInterface {
-			// Interface with no initialization value, initialize to null
-			c.tsw.WriteLiterally(" = null")
-		} else if isStruct && structName != "" {
-			// Struct type, initialize with constructor
-			c.tsw.WriteLinef(" = new %s()", structName)
-		}
-	}
-}
+		// Write initialization
+		c.tsw.WriteLiterally(" = ")
+		
 		if len(a.Values) > 0 {
-			c.tsw.WriteLiterally(" = ")
+			// Initialize with provided values
 			for i, val := range a.Values {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				if err := c.WriteValueExpr(val); err != nil { // Initializer is a value
+				if err := c.WriteValueExpr(val); err != nil {
 					return err
 				}
 			}
+		} else {
+			// No explicit initialization value, use zero value based on type
+			if a.Type != nil {
+				// Check if it's a struct type
+				isStruct := false
+				structName := ""
+				if ident, ok := a.Type.(*ast.Ident); ok && ident.Name != "" {
+					// Check if it's a known struct type
+					if ident.Obj != nil && ident.Obj.Kind == ast.Typ && c.pkg != nil && c.pkg.TypesInfo != nil {
+						if tv, ok := c.pkg.TypesInfo.Types[ident]; ok && tv.Type != nil {
+							if _, isStructType := tv.Type.Underlying().(*types.Struct); isStructType {
+								isStruct = true
+								structName = ident.Name
+							}
+						}
+					} else if len(ident.Name) > 0 && ident.Name[0] >= 'A' && ident.Name[0] <= 'Z' {
+						// Conservative guess for struct types
+						isStruct = true
+						structName = ident.Name
+					}
+				}
+
+				if _, isArrayType := a.Type.(*ast.ArrayType); isArrayType {
+					// Array type
+					c.tsw.WriteLiterally("[]")
+				} else if isInterface {
+					// Interface type
+					c.tsw.WriteLiterally("null")
+				} else if isStruct && structName != "" {
+					// Struct type
+					c.tsw.WriteLinef("new %s()", structName)
+				} else {
+					// Other types
+					c.WriteZeroValueForType(a.Type)
+				}
+			} else {
+				// If no type specified, fallback to null
+				c.tsw.WriteLiterally("null")
+			}
 		}
 	} else {
+		// Multiple names (destructuring assignment)
 		c.tsw.WriteLiterally("{")
 		for i, name := range a.Names {
 			if i != 0 {
@@ -724,15 +735,23 @@ if a.Type != nil {
 			c.tsw.WriteLiterally(name.Name)
 		}
 		c.tsw.WriteLiterally("}")
-		for i, val := range a.Values {
-			if i == 0 {
-				c.tsw.WriteLiterally(" = ")
-			} else {
-				c.tsw.WriteLiterally(", ")
+		
+		// Always provide an initialization value
+		c.tsw.WriteLiterally(" = ")
+		
+		if len(a.Values) > 0 {
+			// Use provided values
+			for i, val := range a.Values {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				if err := c.WriteValueExpr(val); err != nil { // Initializers are values
+					return err
+				}
 			}
-			if err := c.WriteValueExpr(val); err != nil { // Initializers are values
-				return err
-			}
+		} else {
+			// No explicit values, initialize with an empty array (safest default)
+			c.tsw.WriteLiterally("[]")
 		}
 	}
 	c.tsw.WriteLine(";")
