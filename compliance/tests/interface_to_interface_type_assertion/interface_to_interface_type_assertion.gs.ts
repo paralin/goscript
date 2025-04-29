@@ -27,24 +27,16 @@ class MyStruct {
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
+	// Type information for runtime type system
+	static __typeInfo = goscript.registerType(
+	  'MyStruct',
+	  goscript.GoTypeKind.Struct,
+	  new MyStruct(),
+	  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
+	  MyStruct
+	);
 
-  // Type information for runtime type system
-  static __typeInfo = goscript.registerType(
-    'MyStruct',
-    goscript.GoTypeKind.Struct,
-    new MyStruct(),
-    [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
-    MyStruct
-  );
 }
-// Register the pointer type *MyStruct with the runtime type system
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
-  MyStruct.__typeInfo
-);
 
 interface MyOtherInterface {
 	Method1(): number;

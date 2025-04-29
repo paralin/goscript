@@ -21,24 +21,16 @@ class MyStruct {
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
+	// Type information for runtime type system
+	static __typeInfo = goscript.registerType(
+	  'MyStruct',
+	  goscript.GoTypeKind.Struct,
+	  new MyStruct(),
+	  [{ name: 'SetValue', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+	  MyStruct
+	);
 
-  // Type information for runtime type system
-  static __typeInfo = goscript.registerType(
-    'MyStruct',
-    goscript.GoTypeKind.Struct,
-    new MyStruct(),
-    [{ name: 'SetValue', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-    MyStruct
-  );
 }
-// Register the pointer type *MyStruct with the runtime type system
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'SetValue', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	// Create a struct value

@@ -259,7 +259,7 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	}
 	c.tsw.WriteLiterally(", ")
 	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
-	
+
 	// When asserting to a pointer type, we need to handle the possibility
 	// that we might get a GoPtr wrapper back
 	if isPointerType {
@@ -414,7 +414,7 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 	// Determine if we need to check for method with pointer receiver
 	mayNeedAddressOfForMethod := false
 	methodKey := ""
-	
+
 	if c.pkg != nil && baseTypeName != "" {
 		// Check if the selector is a method with a pointer receiver
 		methodKey = baseTypeName + "." + exp.Sel.Name
@@ -472,24 +472,28 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 		c.tsw.WriteLiterally(")")
 	} else if mayNeedAddressOfForMethod {
 		// Method with pointer receiver called on a value - implicitly take the address
-		if methodKey != "" {
-			// Taking address of value when calling a pointer receiver method
+		// Check if the selector is a method or a field
+		obj := c.pkg.TypesInfo.Uses[exp.Sel]
+		if _, isMethod := obj.(*gtypes.Func); isMethod {
+			// It's a method - generate method call syntax
 			c.tsw.WriteLiterally("(new goscript.GoPtr(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
-				return fmt.Errorf("failed to write value for implicit pointer conversion: %w", err)
+				return fmt.Errorf("failed to write value for implicit pointer conversion (method call): %w", err)
 			}
 			c.tsw.WriteLiterally(")).ref!.")
-			c.WriteIdentValue(exp.Sel)
+			c.WriteIdentValue(exp.Sel) // Write the method name
+			// Note: Arguments for the method call are handled in WriteCallExpr
 		} else {
-			// Regular field access, no pointer method involved
+			// It's a field access - generate field access syntax
+			c.tsw.WriteLiterally("(new goscript.GoPtr(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
-				return fmt.Errorf("failed to write selector expression object: %w", err)
+				return fmt.Errorf("failed to write value for implicit pointer conversion (field access): %w", err)
 			}
-			c.tsw.WriteLiterally(".")
-			c.WriteIdentValue(exp.Sel)
+			c.tsw.WriteLiterally(")).ref!.")
+			c.WriteIdentValue(exp.Sel) // Write the field name
 		}
 	} else {
-		// For non-pointer types, access directly
+		// For non-pointer types or when no implicit address-of is needed, access directly
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write selector expression object: %w", err)
 		}

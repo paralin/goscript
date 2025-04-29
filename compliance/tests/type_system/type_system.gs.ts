@@ -38,24 +38,16 @@ class Data {
 	constructor(init?: Partial<Data>) { if (init) Object.assign(this, init as any); }
 	public clone(): Data { return Object.assign(Object.create(Data.prototype) as Data, this); }
 
+	// Type information for runtime type system
+	static __typeInfo = goscript.registerType(
+	  'Data',
+	  goscript.GoTypeKind.Struct,
+	  new Data(),
+	  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+	  Data
+	);
 
-  // Type information for runtime type system
-  static __typeInfo = goscript.registerType(
-    'Data',
-    goscript.GoTypeKind.Struct,
-    new Data(),
-    [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-    Data
-  );
 }
-// Register the pointer type *Data with the runtime type system
-const Data__ptrTypeInfo = goscript.registerType(
-  '*Data',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-  Data.__typeInfo
-);
 
 type Processor = ((_p0: number) => number) | null;
 

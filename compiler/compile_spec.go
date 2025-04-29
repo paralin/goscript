@@ -466,29 +466,22 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		// Add code to register the type with the runtime system
 		c.tsw.WriteLine("")
 
-		c.tsw.Indent(-1)
-		// Add type information as static property
-		c.tsw.WriteLine("")
-		c.tsw.WriteLinef("  // Type information for runtime type system")
-		c.tsw.WriteLinef("  static __typeInfo = goscript.registerType(")
-		c.tsw.WriteLinef("    '%s',", className)
-		c.tsw.WriteLinef("    goscript.GoTypeKind.Struct,")
-		c.tsw.WriteLinef("    new %s(),", className)
-		c.tsw.WriteLinef("    [%s],", c.collectMethodSignatures(className))
-		c.tsw.WriteLinef("    %s", className)
-		c.tsw.WriteLinef("  );")
+		// Add type information as static property (inside the class)
+		// Indentation is already correct here (one level inside the class)
+		c.tsw.WriteLine("// Type information for runtime type system")
+		c.tsw.WriteLinef("static __typeInfo = goscript.registerType(")
+		c.tsw.WriteLinef("  '%s',", className)
+		c.tsw.WriteLinef("  goscript.GoTypeKind.Struct,")
+		c.tsw.WriteLinef("  new %s(),", className)
+		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
+		c.tsw.WriteLinef("  %s", className)
+		c.tsw.WriteLinef(");")
 
+		c.tsw.WriteLine("") // Add space after static property
+
+		c.tsw.Indent(-1)     // Decrease indentation for the closing brace of the class
 		c.tsw.WriteLine("}") // Close class definition
 
-		// Register the pointer type *T after the class is defined
-		c.tsw.WriteLinef("// Register the pointer type *%s with the runtime type system", className)
-		c.tsw.WriteLinef("const %s__ptrTypeInfo = goscript.registerType(", className)
-		c.tsw.WriteLinef("  '*%s',", className) // Pointer type name
-		c.tsw.WriteLinef("  goscript.GoTypeKind.Pointer,")
-		c.tsw.WriteLinef("  null,") // Zero value for pointer is null
-		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
-		c.tsw.WriteLinef("  %s.__typeInfo", className) // Pass the base struct's type info
-		c.tsw.WriteLinef(");")
 		return nil // Prevent fallthrough to InterfaceType case
 	case *ast.InterfaceType:
 		c.tsw.WriteLiterally("interface ")
@@ -599,16 +592,16 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	// Set current receiver object for context
 	var receiverObj types.Object
 	isPointerReceiver := false
-	
+
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
 		if recvIdent := recvField.Names[0]; recvIdent != nil {
 			receiverObj = c.pkg.TypesInfo.Defs[recvIdent]
 			c.currentReceiverObj = receiverObj
-			
+
 			// Check if this method has a pointer receiver
 			if starExpr, ok := recvField.Type.(*ast.StarExpr); ok {
 				isPointerReceiver = true
-				
+
 				// Store this in our map of pointer receiver methods
 				if ident, ok := starExpr.X.(*ast.Ident); ok {
 					methodKey := ident.Name + "." + decl.Name.Name

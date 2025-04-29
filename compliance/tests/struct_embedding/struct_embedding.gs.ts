@@ -15,24 +15,16 @@ class Person {
 	constructor(init?: Partial<Person>) { if (init) Object.assign(this, init as any); }
 	public clone(): Person { return Object.assign(Object.create(Person.prototype) as Person, this); }
 
+	// Type information for runtime type system
+	static __typeInfo = goscript.registerType(
+	  'Person',
+	  goscript.GoTypeKind.Struct,
+	  new Person(),
+	  [{ name: 'Greet', params: [], results: [] }],
+	  Person
+	);
 
-  // Type information for runtime type system
-  static __typeInfo = goscript.registerType(
-    'Person',
-    goscript.GoTypeKind.Struct,
-    new Person(),
-    [{ name: 'Greet', params: [], results: [] }],
-    Person
-  );
 }
-// Register the pointer type *Person with the runtime type system
-const Person__ptrTypeInfo = goscript.registerType(
-  '*Person',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'Greet', params: [], results: [] }],
-  Person.__typeInfo
-);
 
 class Employee extends Person {
 	// Embedded struct
@@ -48,24 +40,16 @@ class Employee extends Person {
 	}
 	public clone(): Employee { return Object.assign(Object.create(Employee.prototype) as Employee, this); }
 
+	// Type information for runtime type system
+	static __typeInfo = goscript.registerType(
+	  'Employee',
+	  goscript.GoTypeKind.Struct,
+	  new Employee(),
+	  [],
+	  Employee
+	);
 
-  // Type information for runtime type system
-  static __typeInfo = goscript.registerType(
-    'Employee',
-    goscript.GoTypeKind.Struct,
-    new Employee(),
-    [],
-    Employee
-  );
 }
-// Register the pointer type *Employee with the runtime type system
-const Employee__ptrTypeInfo = goscript.registerType(
-  '*Employee',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  Employee.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	let e = new Employee({Person: {Name: "Alice", Age: 30}, ID: 123})

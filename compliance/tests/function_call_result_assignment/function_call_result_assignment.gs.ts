@@ -12,24 +12,16 @@ class MyStruct {
 	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
+	// Type information for runtime type system
+	static __typeInfo = goscript.registerType(
+	  'MyStruct',
+	  goscript.GoTypeKind.Struct,
+	  new MyStruct(),
+	  [],
+	  MyStruct
+	);
 
-  // Type information for runtime type system
-  static __typeInfo = goscript.registerType(
-    'MyStruct',
-    goscript.GoTypeKind.Struct,
-    new MyStruct(),
-    [],
-    MyStruct
-  );
 }
-// Register the pointer type *MyStruct with the runtime type system
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  MyStruct.__typeInfo
-);
 
 // NewMyStruct creates a new MyStruct instance.
 export function NewMyStruct(s: string): MyStruct {
