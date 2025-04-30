@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * Creates a new slice (TypeScript array) with the specified length and capacity.
@@ -511,29 +510,11 @@ export function typeofGo(value: any): GoTypeInfo {
     return BOOL_TYPE;
   }
   if (Array.isArray(value)) {
-    // For array/slice, create a dynamic SliceTypeInfo
-    return {
-      kind: GoTypeKind.Slice,
-      name: '[]interface{}',
-      zero: [],
-      elem: EMPTY_INTERFACE_TYPE
-    } as SliceTypeInfo;
-  }
-  if (value instanceof Map) {
-    // For Map, create a dynamic MapTypeInfo
-    return {
-      kind: GoTypeKind.Map,
-      name: 'map[interface{}]interface{}',
-      zero: new Map(),
-      key: EMPTY_INTERFACE_TYPE,
-      value: EMPTY_INTERFACE_TYPE
-    } as MapTypeInfo;
+    // TODO
   }
 
-  // For struct objects, prefer static __typeInfo attached by the compiler
-  if (typeof value === 'object' && value.constructor && (value.constructor as any).__typeInfo) {
-      return (value.constructor as any).__typeInfo as GoTypeInfo;
-  }
+  // TODO Map
+  // TODO struct objects
 
   // Default to interface{} for any other unknown types
   return EMPTY_INTERFACE_TYPE;
@@ -644,86 +625,16 @@ export interface TypeAssertResult<T> {
 }
 
 /**
- * Finds a type by name.
- * This is used by typeAssert to look up types.
- * 
- * @param typeName The name of the type to find
- * @returns The type info or undefined if not found
- */
-function findTypeByName(typeName: string): GoTypeInfo | undefined {
-  // Check built-in types first
-  switch (typeName) {
-    case 'int': return INT_TYPE;
-    case 'string': return STRING_TYPE;
-    case 'bool': return BOOL_TYPE;
-    case 'float64': return FLOAT64_TYPE;
-    case 'byte': return BYTE_TYPE;
-    case 'rune': return RUNE_TYPE;
-    case 'nil': return NIL_TYPE;
-    case 'interface{}': return EMPTY_INTERFACE_TYPE;
-    case 'any': return ANY_TYPE;
-    case 'error': return ERROR_TYPE;
-  }
-
-  // Check if it's a pointer type
-  if (typeName.startsWith('*')) {
-    const elemTypeName = typeName.substring(1);
-    const elemType = findTypeByName(elemTypeName);
-    if (elemType) {
-      return {
-        kind: GoTypeKind.Pointer,
-        name: typeName,
-        zero: null,
-        elem: elemType
-      } as PointerTypeInfo;
-    }
-  }
-
-  // Look up in global scope (this assumes the generated type info variables follow a naming convention)
-  try {
-    // For types with type info stored in a constant, like MyType__typeInfo
-    const typeInfoVarName = `${typeName}__typeInfo`;
-    if (typeof globalThis !== 'undefined' && typeInfoVarName in globalThis) {
-      return (globalThis as any)[typeInfoVarName];
-    }
-    
-    // For classes with static __typeInfo
-    const parts = typeName.split('.');
-    let obj: any = globalThis;
-    for (const part of parts) {
-      if (obj && part in obj) {
-        obj = obj[part];
-      } else {
-        return undefined;
-      }
-    }
-    
-    if (obj && obj.__typeInfo) {
-      return obj.__typeInfo;
-    }
-  } catch (e) {
-    console.warn(`Error finding type ${typeName}:`, e);
-  }
-
-  return undefined;
-}
-
-/**
  * Performs a type assertion at runtime.
  *
  * @param value The value to assert
  * @param typeName The name of the target type
  * @returns An object with the asserted value and whether the assertion succeeded
  */
-export function typeAssert<T>(
-  value: any,
-  typeName: string, // Can be 'T' or '*T' or 'I'
+export function typeAssert<T, V>(
+  value: V,
+  targetTypeInfo: GoTypeInfo,
 ): TypeAssertResult<T> {
-  const targetTypeInfo = findTypeByName(typeName);
-  if (!targetTypeInfo) {
-    throw new Error(`Type assertion failed: type '${typeName}' not found`);
-  }
-
   // Handle nil input value
   if (value === null || value === undefined) {
     // Assertion from nil to types whose zero value is nil succeeds (returns nil)
