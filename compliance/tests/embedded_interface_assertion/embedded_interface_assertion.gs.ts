@@ -67,6 +67,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'Read', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] }, { name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }],
+  MyStruct.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	let rwc: ReadCloser | null = null;
 	let s = new MyStruct({})

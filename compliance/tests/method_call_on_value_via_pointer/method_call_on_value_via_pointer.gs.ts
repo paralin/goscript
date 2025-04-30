@@ -26,6 +26,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+  MyStruct.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	// Create a struct value
 	let msValue = new MyStruct({MyInt: 100})

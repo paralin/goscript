@@ -23,6 +23,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  MyStruct.__typeInfo
+);
+
 // NewMyStruct creates a new MyStruct instance.
 export function NewMyStruct(s: string): MyStruct {
 	return new MyStruct({MyString: s})

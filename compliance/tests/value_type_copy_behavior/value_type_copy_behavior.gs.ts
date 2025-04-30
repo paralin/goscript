@@ -21,6 +21,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  MyStruct.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	let dereferencedStructCopy = new MyStruct({MyString: "original"})
 	// === Value-Type Copy Behavior ===

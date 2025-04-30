@@ -21,6 +21,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  MyStruct.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	// === Pointer Composite Literal Assignment ===
 	// Creating a pointer to a struct directly using a composite literal with &

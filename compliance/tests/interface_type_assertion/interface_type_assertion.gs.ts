@@ -38,6 +38,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
+  MyStruct.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	let i: MyInterface | null = null;
 	let s = new MyStruct({Value: 10})

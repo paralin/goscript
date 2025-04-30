@@ -27,6 +27,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'GetMyString', params: [], results: [{ type: goscript.getType('string')! }] }],
+  MyStruct.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	let ms = new MyStruct({MyInt: 1, MyString: "bar"})
 	console.log("Method call on value: Expected: bar, Actual:", ms.GetMyString())

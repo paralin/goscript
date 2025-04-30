@@ -21,6 +21,15 @@ class Point {
 
 }
 
+// Register pointer type
+const Point__ptrTypeInfo = goscript.registerType(
+  '*Point',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  Point.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	// Initialize directly
 	let p1 = new Point({X: 1, Y: 2})

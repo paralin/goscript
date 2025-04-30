@@ -26,6 +26,15 @@ class Person {
 
 }
 
+// Register pointer type
+const Person__ptrTypeInfo = goscript.registerType(
+  '*Person',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'Greet', params: [], results: [] }],
+  Person.__typeInfo
+);
+
 class Employee extends Person {
 	// Embedded struct
 	public ID: number = 0;
@@ -50,6 +59,15 @@ class Employee extends Person {
 	);
 
 }
+
+// Register pointer type
+const Employee__ptrTypeInfo = goscript.registerType(
+  '*Employee',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  Employee.__typeInfo
+);
 
 export async function main(): Promise<void> {
 	let e = new Employee({Person: {Name: "Alice", Age: 30}, ID: 123})

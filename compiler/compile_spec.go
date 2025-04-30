@@ -26,8 +26,7 @@ func (c *GoToTSCompiler) WriteSpec(a ast.Spec) error {
 	return nil
 }
 
-// collectMethodSignatures returns an array of method signature objects for a struct
-func (c *GoToTSCompiler) collectMethodSignatures(structName string) string {
+func (c *GoToTSCompiler) collectMethodSignatures(structName string, valueOnly bool) string {
 	var methodSignatures []string
 
 	for _, fileSyntax := range c.pkg.Syntax {
@@ -40,9 +39,17 @@ func (c *GoToTSCompiler) collectMethodSignatures(structName string) string {
 			// Check if the receiver type matches the struct name
 			recvField := funcDecl.Recv.List[0]
 			recvType := recvField.Type
-			// Handle pointer receivers (*MyStruct) and value receivers (MyStruct)
+			
+			// Check if this is a pointer receiver
+			isPointerRecv := false
 			if starExpr, ok := recvType.(*ast.StarExpr); ok {
+				isPointerRecv = true
 				recvType = starExpr.X // Get the type being pointed to
+			}
+			
+			// If valueOnly is true, skip pointer receivers
+			if valueOnly && isPointerRecv {
+				continue
 			}
 
 			// Check if the receiver identifier name matches the struct name
@@ -473,7 +480,7 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.WriteLinef("  '%s',", className)
 		c.tsw.WriteLinef("  goscript.GoTypeKind.Struct,")
 		c.tsw.WriteLinef("  new %s(),", className)
-		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className))
+		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className, true)) // Only value receiver methods
 		c.tsw.WriteLinef("  %s", className)
 		c.tsw.WriteLinef(");")
 
@@ -481,6 +488,17 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 		c.tsw.Indent(-1)     // Decrease indentation for the closing brace of the class
 		c.tsw.WriteLine("}") // Close class definition
+
+		// Add pointer type registration outside the class
+		c.tsw.WriteLine("")
+		c.tsw.WriteLinef("// Register pointer type")
+		c.tsw.WriteLinef("const %s__ptrTypeInfo = goscript.registerType(", className)
+		c.tsw.WriteLinef("  '*%s',", className)
+		c.tsw.WriteLinef("  goscript.GoTypeKind.Pointer,")
+		c.tsw.WriteLinef("  null,") // Zero value for pointers is null
+		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className, false)) // All methods
+		c.tsw.WriteLinef("  %s.__typeInfo", className) // Element type is the struct type
+		c.tsw.WriteLinef(");")
 
 		return nil // Prevent fallthrough to InterfaceType case
 	case *ast.InterfaceType:

@@ -21,6 +21,15 @@ class MyStruct {
 
 }
 
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [],
+  MyStruct.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	// Setup from previous steps (simplified for this test)
 	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))

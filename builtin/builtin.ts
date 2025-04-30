@@ -601,7 +601,12 @@ function allMethodsOf(type: GoTypeInfo): readonly MethodSig[] {
     case GoTypeKind.Struct:
       return (type as StructTypeInfo).methods;
     case GoTypeKind.Pointer:
-      // For pointers, get methods of the element type
+      // For pointer types, use their methods array if available
+      // This handles the case where we generated pointer type info with all methods
+      if ((type as any).methods) {
+        return (type as any).methods;
+      }
+      // Fallback to element methods if no methods array is available
       return allMethodsOf((type as PointerTypeInfo).elem);
     default:
       return [];

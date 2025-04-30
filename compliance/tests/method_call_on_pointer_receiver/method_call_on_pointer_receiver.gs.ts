@@ -21,11 +21,20 @@ class MyStruct {
 	  'MyStruct',
 	  goscript.GoTypeKind.Struct,
 	  new MyStruct(),
-	  [{ name: 'GetMyString', params: [], results: [{ type: goscript.getType('string')! }] }],
+	  [],
 	  MyStruct
 	);
 
 }
+
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'GetMyString', params: [], results: [{ type: goscript.getType('string')! }] }],
+  MyStruct.__typeInfo
+);
 
 export async function main(): Promise<void> {
 	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))

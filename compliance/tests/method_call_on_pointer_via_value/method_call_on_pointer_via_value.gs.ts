@@ -26,11 +26,20 @@ class MyStruct {
 	  'MyStruct',
 	  goscript.GoTypeKind.Struct,
 	  new MyStruct(),
-	  [{ name: 'SetValue', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+	  [{ name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
 	  MyStruct
 	);
 
 }
+
+// Register pointer type
+const MyStruct__ptrTypeInfo = goscript.registerType(
+  '*MyStruct',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'SetValue', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+  MyStruct.__typeInfo
+);
 
 export async function main(): Promise<void> {
 	// Create a struct value

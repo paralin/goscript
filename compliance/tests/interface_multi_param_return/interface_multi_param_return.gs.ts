@@ -42,6 +42,15 @@ class MyProcessor {
 
 }
 
+// Register pointer type
+const MyProcessor__ptrTypeInfo = goscript.registerType(
+  '*MyProcessor',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'Process', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }, { type: goscript.getType('int')!, isVariadic: false }, { type: goscript.getType('string')!, isVariadic: false }], results: [{ type: goscript.getType('bool')! }, { type: goscript.getType('error')! }] }],
+  MyProcessor.__typeInfo
+);
+
 export async function main(): Promise<void> {
 	//nolint:staticcheck
 	let processor: MultiParamReturner | null = null;

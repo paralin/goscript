@@ -43,11 +43,20 @@ class Data {
 	  'Data',
 	  goscript.GoTypeKind.Struct,
 	  new Data(),
-	  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+	  [{ name: 'Print', params: [], results: [] }],
 	  Data
 	);
 
 }
+
+// Register pointer type
+const Data__ptrTypeInfo = goscript.registerType(
+  '*Data',
+  goscript.GoTypeKind.Pointer,
+  null,
+  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+  Data.__typeInfo
+);
 
 type Processor = ((_p0: number) => number) | null;
 
