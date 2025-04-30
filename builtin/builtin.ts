@@ -1,4 +1,3 @@
-
 /**
  * Creates a new slice (TypeScript array) with the specified length and capacity.
  * @param len The length of the slice.
@@ -97,8 +96,8 @@ export const stringToRunes = (str: string): number[] => {
  * @returns The resulting string.
  */
 export const runesToString = (runes: number[]): string => {
-  return String.fromCharCode(...runes);
-};
+  return String.fromCharCode(...runes)
+}
 
 /**
  * Gets a value from a map, with a default value if the key doesn't exist.
@@ -169,7 +168,7 @@ export enum GoTypeKind {
   Basic,
   Pointer,
   Slice,
-  Array,     // reserved – not required for assertions yet
+  Array, // reserved – not required for assertions yet
   Map,
   Chan,
   Struct,
@@ -183,7 +182,7 @@ export enum GoTypeKind {
 export interface FieldInfo {
   name: string
   type: GoTypeInfo
-  tag?: string               // raw struct tag
+  tag?: string // raw struct tag
   exported: boolean
 }
 
@@ -193,7 +192,7 @@ export interface FieldInfo {
 export interface VarInfo {
   type: GoTypeInfo
   // Parameter names are irrelevant for assignability => omitted
-  isVariadic?: boolean       // only for the last parameter
+  isVariadic?: boolean // only for the last parameter
 }
 
 /**
@@ -211,76 +210,82 @@ export interface MethodSig {
  * throwing an error for nil pointers and forwarding to the underlying reference.
  */
 class goPtrProxy<T extends object> {
-  public _ptr: T | null; // Store the actual reference
+  public _ptr: T | null // Store the actual reference
 
   constructor(ref: T | null) {
-    this._ptr = ref;
+    this._ptr = ref
 
     // Return a Proxy to intercept access
     return new Proxy(this, {
       get: (target, prop, receiver) => {
         // Handle access to the internal _ptr property directly
         if (prop === '_ptr') {
-          return target._ptr;
+          return target._ptr
         }
         // Handle access to prototype properties (like constructor)
-        if (Object.prototype.hasOwnProperty.call(target, prop) || typeof prop === 'symbol') {
-             return Reflect.get(target, prop, receiver);
+        if (
+          Object.prototype.hasOwnProperty.call(target, prop) ||
+          typeof prop === 'symbol'
+        ) {
+          return Reflect.get(target, prop, receiver)
         }
 
         // Check for nil pointer
         if (target._ptr === null) {
-          throw new Error(`runtime error: invalid memory address or nil pointer dereference accessing property '${String(prop)}'`);
+          throw new Error(
+            `runtime error: invalid memory address or nil pointer dereference accessing property '${String(prop)}'`,
+          )
         }
 
         // Forward access to the underlying referenced object
-        const value = Reflect.get(target._ptr, prop, target._ptr);
+        const value = Reflect.get(target._ptr, prop, target._ptr)
 
         // If the accessed property is a function (method), bind it to the underlying object
         if (typeof value === 'function') {
-          return value.bind(target._ptr);
+          return value.bind(target._ptr)
         }
 
-        return value;
+        return value
       },
       set: (target, prop, value, receiver) => {
-         // Handle setting the internal _ptr property directly
-         if (prop === '_ptr') {
-             target._ptr = value;
-             return true;
-         }
+        // Handle setting the internal _ptr property directly
+        if (prop === '_ptr') {
+          target._ptr = value
+          return true
+        }
         // Check for nil pointer
         if (target._ptr === null) {
-          throw new Error(`runtime error: invalid memory address or nil pointer dereference setting property '${String(prop)}'`);
+          throw new Error(
+            `runtime error: invalid memory address or nil pointer dereference setting property '${String(prop)}'`,
+          )
         }
 
         // Forward setting to the underlying referenced object
-        return Reflect.set(target._ptr, prop, value, target._ptr);
+        return Reflect.set(target._ptr, prop, value, target._ptr)
       },
       has: (target, prop) => {
-         // Handle check for the internal _ptr property directly
-         if (prop === '_ptr') {
-             return true;
-         }
+        // Handle check for the internal _ptr property directly
+        if (prop === '_ptr') {
+          return true
+        }
         // Check for nil pointer before checking property existence
         if (target._ptr === null) {
-           // A nil pointer technically doesn't "have" any properties of the target type
-           return false;
+          // A nil pointer technically doesn't "have" any properties of the target type
+          return false
         }
         // Forward check to the underlying referenced object
-        return Reflect.has(target._ptr, prop);
-      }
-    }) as goPtrProxy<T>;
+        return Reflect.has(target._ptr, prop)
+      },
+    }) as goPtrProxy<T>
   }
 }
-
 
 /**
  * Type alias for a Go pointer, which can be a goPtrProxy instance or null (for nil).
  * The `& T` part is crucial for TypeScript to understand that the pointer
  * should also satisfy the methods and properties of the underlying type T.
  */
-export type Ptr<T extends object> = (goPtrProxy<T> & T) | null;
+export type Ptr<T extends object> = (goPtrProxy<T> & T) | null
 
 /**
  * Creates a new Go pointer proxy wrapping the given value.
@@ -291,29 +296,31 @@ export type Ptr<T extends object> = (goPtrProxy<T> & T) | null;
  */
 export function makePtr<T extends object>(value: T | null | undefined): Ptr<T> {
   if (value === null || value === undefined) {
-    return null;
+    return null
   }
-  return new goPtrProxy(value ?? null) as Ptr<T>;
+  return new goPtrProxy(value ?? null) as Ptr<T>
 }
 
-export interface GoTypeInfo {
-  readonly kind: GoTypeKind
-  readonly name?: string          // present for named types
-  readonly zero: any              // canonical zero value
+/**
+ * Base interface with common properties for all Go type info interfaces
+ */
+interface BaseTypeInfo {
+  readonly name?: string // present for named types
+  readonly zero: any // canonical zero value
 }
 
 /**
  * Type information for basic types (string, int, bool, etc.)
  */
-export interface BasicTypeInfo extends GoTypeInfo {
+export interface BasicTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Basic
-  readonly builtinName: string  // 'string' | 'int' | 'bool' | etc.
+  readonly builtinName: string // 'string' | 'int' | 'bool' | etc.
 }
 
 /**
  * Type information for pointer types (*T)
  */
-export interface PointerTypeInfo extends GoTypeInfo {
+export interface PointerTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Pointer
   readonly elem: GoTypeInfo
 }
@@ -321,7 +328,7 @@ export interface PointerTypeInfo extends GoTypeInfo {
 /**
  * Type information for slice types ([]T)
  */
-export interface SliceTypeInfo extends GoTypeInfo {
+export interface SliceTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Slice
   readonly elem: GoTypeInfo
 }
@@ -329,7 +336,7 @@ export interface SliceTypeInfo extends GoTypeInfo {
 /**
  * Type information for map types (map[K]V)
  */
-export interface MapTypeInfo extends GoTypeInfo {
+export interface MapTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Map
   readonly key: GoTypeInfo
   readonly value: GoTypeInfo
@@ -338,7 +345,7 @@ export interface MapTypeInfo extends GoTypeInfo {
 /**
  * Type information for channel types (chan T)
  */
-export interface ChanTypeInfo extends GoTypeInfo {
+export interface ChanTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Chan
   readonly elem: GoTypeInfo
   readonly dir: 'send' | 'recv' | 'both'
@@ -347,29 +354,56 @@ export interface ChanTypeInfo extends GoTypeInfo {
 /**
  * Type information for function types (func(...) ...)
  */
-export interface FuncTypeInfo extends GoTypeInfo {
+export interface FuncTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Func
   readonly params: readonly VarInfo[]
   readonly results: readonly VarInfo[]
-  readonly variadic: boolean         // convenience flag
+  readonly variadic: boolean // convenience flag
 }
 
 /**
  * Type information for struct types
  */
-export interface StructTypeInfo extends GoTypeInfo {
+export interface StructTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Struct
   readonly fields: readonly FieldInfo[]
-  readonly methods: readonly MethodSig[]   // value methods (pointer recv omitted)
+  readonly methods: readonly MethodSig[] // value methods (pointer recv omitted)
   readonly ctor?: new (...a: any[]) => any
 }
 
 /**
  * Type information for interface types
  */
-export interface InterfaceTypeInfo extends GoTypeInfo {
+export interface InterfaceTypeInfo extends BaseTypeInfo {
   readonly kind: GoTypeKind.Interface
   readonly methods: readonly MethodSig[]
+}
+
+/**
+ * Union type of all Go type information interfaces
+ */
+export type GoTypeInfo =
+  | BasicTypeInfo
+  | PointerTypeInfo
+  | SliceTypeInfo
+  | MapTypeInfo
+  | ChanTypeInfo
+  | FuncTypeInfo
+  | StructTypeInfo
+  | InterfaceTypeInfo
+
+/**
+ * Creates a pointer type info for a given type
+ * @param elemType The element type info
+ * @returns A PointerTypeInfo object
+ */
+export function makePointerTypeInfo(elemType: GoTypeInfo): PointerTypeInfo {
+  return {
+    kind: GoTypeKind.Pointer,
+    name: `*${elemType.name || 'unknown'}`,
+    zero: null,
+    elem: elemType
+  }
 }
 
 // Define built-in type information constants
@@ -377,137 +411,139 @@ export const INT_TYPE: BasicTypeInfo = {
   kind: GoTypeKind.Basic,
   name: 'int',
   builtinName: 'int',
-  zero: 0
-};
+  zero: 0,
+}
 
 export const STRING_TYPE: BasicTypeInfo = {
   kind: GoTypeKind.Basic,
   name: 'string',
   builtinName: 'string',
-  zero: ""
-};
+  zero: '',
+}
 
 export const BOOL_TYPE: BasicTypeInfo = {
   kind: GoTypeKind.Basic,
   name: 'bool',
   builtinName: 'bool',
-  zero: false
-};
+  zero: false,
+}
 
 export const FLOAT64_TYPE: BasicTypeInfo = {
   kind: GoTypeKind.Basic,
   name: 'float64',
   builtinName: 'float64',
-  zero: 0.0
-};
+  zero: 0.0,
+}
 
 export const BYTE_TYPE: BasicTypeInfo = {
   kind: GoTypeKind.Basic,
   name: 'byte',
   builtinName: 'byte',
-  zero: 0
-};
+  zero: 0,
+}
 
 export const RUNE_TYPE: BasicTypeInfo = {
   kind: GoTypeKind.Basic,
   name: 'rune',
   builtinName: 'rune',
-  zero: 0
-};
+  zero: 0,
+}
 
 export const NIL_TYPE: BasicTypeInfo = {
   kind: GoTypeKind.Basic,
   name: 'nil',
   builtinName: 'nil',
-  zero: null
-};
+  zero: null,
+}
 
 export const EMPTY_INTERFACE_TYPE: InterfaceTypeInfo = {
   kind: GoTypeKind.Interface,
   name: 'interface{}',
   zero: null,
-  methods: []
-};
+  methods: [],
+}
 
 export const ANY_TYPE: InterfaceTypeInfo = {
   kind: GoTypeKind.Interface,
   name: 'any',
   zero: null,
-  methods: []
-};
+  methods: [],
+}
 
 export const ERROR_TYPE: InterfaceTypeInfo = {
   kind: GoTypeKind.Interface,
   name: 'error',
   zero: null,
-  methods: [{
-    name: 'Error',
-    params: [],
-    results: [{ type: STRING_TYPE }]
-  }]
-};
+  methods: [
+    {
+      name: 'Error',
+      params: [],
+      results: [{ type: STRING_TYPE }],
+    },
+  ],
+}
 
 /**
  * Checks if a value is assignable to a target type.
- * 
+ *
  * @param value The value to check
  * @param target The target type
  * @returns true if the value is assignable to the target type
  */
 export function isAssignable(value: any, target: GoTypeInfo): boolean {
   // Get the source type
-  const sourceType = typeofGo(value);
-  
+  const sourceType = typeofGo(value)
+
   // Quick exit if identical reference (same canonical type)
   if (sourceType === target) {
-    return true;
+    return true
   }
-  
+
   // For interface targets, check if source implements the interface
   if (target.kind === GoTypeKind.Interface) {
-    return implementsInterface(value, sourceType, target as InterfaceTypeInfo);
+    return implementsInterface(value, sourceType, target as InterfaceTypeInfo)
   }
-  
+
   // For other types, require exact type match
-  return false;
+  return false
 }
 
 /**
  * Gets the Go type of a value.
- * 
+ *
  * @param value The value to get the type of
  * @returns The Go type information
  */
 export function typeofGo(value: any): GoTypeInfo {
   // Handle null/undefined first
   if (value === null || value === undefined) {
-    return NIL_TYPE;
+    return NIL_TYPE
   }
 
   // Check if it's a pointer proxy by structure
   if (isPointer(value)) {
-    const internalPtr = value._ptr; // Access the internal _ptr
- 
+    const internalPtr = value._ptr // Access the internal _ptr
+
     if (internalPtr === null) {
-        // A nil pointer value doesn't have a concrete type, return nil type
-        return NIL_TYPE;
+      // A nil pointer value doesn't have a concrete type, return nil type
+      return NIL_TYPE
     } else {
-        // If the pointer is not nil, return the type of the referenced value
-        return typeofGo(internalPtr); // Recursive call
+      // If the pointer is not nil, return the type of the referenced value
+      return typeofGo(internalPtr) // Recursive call
     }
   }
 
   // --- Checks for non-pointer types ---
 
   if (typeof value === 'string') {
-    return STRING_TYPE;
+    return STRING_TYPE
   }
   if (typeof value === 'number') {
     // Simplification: return int for all numbers. Could refine based on value if needed.
-    return INT_TYPE; // Or FLOAT64_TYPE depending on context
+    return INT_TYPE // Or FLOAT64_TYPE depending on context
   }
   if (typeof value === 'boolean') {
-    return BOOL_TYPE;
+    return BOOL_TYPE
   }
   if (Array.isArray(value)) {
     // TODO
@@ -517,67 +553,76 @@ export function typeofGo(value: any): GoTypeInfo {
   // TODO struct objects
 
   // Default to interface{} for any other unknown types
-  return EMPTY_INTERFACE_TYPE;
+  return EMPTY_INTERFACE_TYPE
 }
 
 // Helper function to check if a value is a Go pointer proxy by structure
 function isPointer(value: any): value is Ptr<any> {
-    // Check if it's an object (not null) and has the '_ptr' property
-    return typeof value === 'object' && value !== null && '_ptr' in value;
+  // Check if it's an object (not null) and has the '_ptr' property
+  return typeof value === 'object' && value !== null && '_ptr' in value
 }
 
 /**
  * Checks if a concrete type implements an interface.
- * 
+ *
  * @param value The value to check
  * @param sourceType The source type info
  * @param iface The interface type information
  * @returns true if the value implements the interface
  */
-function implementsInterface(value: any, sourceType: GoTypeInfo, iface: InterfaceTypeInfo): boolean {
-    if (value === null || value === undefined) {
-        return false; // nil does not implement non-empty interfaces
+function implementsInterface(
+  value: any,
+  sourceType: GoTypeInfo,
+  iface: InterfaceTypeInfo,
+): boolean {
+  if (value === null || value === undefined) {
+    return false // nil does not implement non-empty interfaces
+  }
+
+  // For empty interfaces, all values are assignable
+  if (iface.methods.length === 0) {
+    return true
+  }
+
+  // Get the method set from the source type if it's a struct
+  let methods: MethodSig[] = []
+  if (sourceType.kind === GoTypeKind.Struct) {
+    methods = (sourceType as StructTypeInfo).methods || []
+  }
+
+  // Check each required method
+  for (const req of iface.methods) {
+    // First try to find the method in the declared methods
+    const cand = methods.find((m) => m.name === req.name)
+
+    // If method found and signatures match, continue
+    if (cand && sigEqual(cand, req)) {
+      continue
     }
 
-    // For empty interfaces, all values are assignable
-    if (iface.methods.length === 0) {
-        return true;
+    // Otherwise check if the method exists directly on the value
+    if (
+      typeof value === 'object' &&
+      value !== null &&
+      req.name in value &&
+      typeof value[req.name] === 'function'
+    ) {
+      // Method exists on the value, but we can't easily verify its signature
+      // For now, assume it's compatible (runtime will catch real incompatibilities)
+      continue
     }
 
-    // Get the method set from the source type if it's a struct
-    let methods: MethodSig[] = [];
-    if (sourceType.kind === GoTypeKind.Struct) {
-        methods = (sourceType as StructTypeInfo).methods || [];
-    }
+    // Method not found or incompatible signature
+    return false
+  }
 
-    // Check each required method
-    for (const req of iface.methods) {
-        // First try to find the method in the declared methods
-        const cand = methods.find(m => m.name === req.name);
-        
-        // If method found and signatures match, continue
-        if (cand && sigEqual(cand, req)) {
-            continue;
-        }
-        
-        // Otherwise check if the method exists directly on the value
-        if (typeof value === 'object' && value !== null && req.name in value && typeof value[req.name] === 'function') {
-            // Method exists on the value, but we can't easily verify its signature
-            // For now, assume it's compatible (runtime will catch real incompatibilities)
-            continue;
-        }
-        
-        // Method not found or incompatible signature
-        return false;
-    }
-
-    // All methods are properly implemented
-    return true;
+  // All methods are properly implemented
+  return true
 }
 
 /**
  * Checks if two method signatures are equal.
- * 
+ *
  * @param a The first method signature
  * @param b The second method signature
  * @returns true if the signatures are equal
@@ -585,35 +630,37 @@ function implementsInterface(value: any, sourceType: GoTypeInfo, iface: Interfac
 function sigEqual(a: MethodSig, b: MethodSig): boolean {
   // Check name
   if (a.name !== b.name) {
-    return false;
+    return false
   }
-  
+
   // Check parameter count
   if (a.params.length !== b.params.length) {
-    return false;
+    return false
   }
-  
+
   // Check result count
   if (a.results.length !== b.results.length) {
-    return false;
+    return false
   }
-  
+
   // Check parameter types
   for (let i = 0; i < a.params.length; i++) {
-    if (a.params[i].type !== b.params[i].type || 
-        a.params[i].isVariadic !== b.params[i].isVariadic) {
-      return false;
+    if (
+      a.params[i].type !== b.params[i].type ||
+      a.params[i].isVariadic !== b.params[i].isVariadic
+    ) {
+      return false
     }
   }
-  
+
   // Check result types
   for (let i = 0; i < a.results.length; i++) {
     if (a.results[i].type !== b.results[i].type) {
-      return false;
+      return false
     }
   }
-  
-  return true;
+
+  return true
 }
 
 /**
@@ -628,71 +675,76 @@ export interface TypeAssertResult<T> {
  * Performs a type assertion at runtime.
  *
  * @param value The value to assert
- * @param typeName The name of the target type
+ * @param targetTypeInfo Information about the target type
  * @returns An object with the asserted value and whether the assertion succeeded
  */
-export function typeAssert<T, V>(
+export function typeAssert<T, V=unknown>(
   value: V,
   targetTypeInfo: GoTypeInfo,
 ): TypeAssertResult<T> {
   // Handle nil input value
-  if (value === null || value === undefined) {
-    // Assertion from nil to types whose zero value is nil succeeds (returns nil)
-    if (targetTypeInfo.kind === GoTypeKind.Interface || 
-        targetTypeInfo.kind === GoTypeKind.Pointer || 
-        targetTypeInfo.kind === GoTypeKind.Slice || 
-        targetTypeInfo.kind === GoTypeKind.Map || 
-        targetTypeInfo.kind === GoTypeKind.Chan || 
-        targetTypeInfo.kind === GoTypeKind.Func) {
-        return { value: null as unknown as T, ok: true };
-    } else { // Assertion from nil to other types fails (returns zero value)
-        return { value: targetTypeInfo.zero as T, ok: false };
+  if (value == null) {
+    // In Go, assertion from nil to interface types succeeds with nil result
+    if (targetTypeInfo.kind === GoTypeKind.Interface) {
+      return { value: null as T, ok: true }
     }
+    // Assertion from nil to any non-interface type fails
+    return { value: targetTypeInfo.zero as T, ok: false }
   }
- 
-  const sourceValueIsPointer = isPointer(value); // Check if the value itself is a pointer proxy
-  // Get the type of the underlying value (element type if pointer)
-  const underlyingSourceType = typeofGo(value); // Returns element type if value is proxy
-
-  // --- Handle assertion based on TARGET type ---
-
-  // Target: Pointer (*T)
+  
+  // Determine the source type
+  const sourceIsPointer = isPointer(value)
+  const sourceType = typeofGo(value)
+  
+  // CASE 1: Target is an interface
+  if (targetTypeInfo.kind === GoTypeKind.Interface) {
+    // Check if the value (or the value pointed to) implements the interface
+    if (implementsInterface(value, sourceType, targetTypeInfo as InterfaceTypeInfo)) {
+      return { value: value as T, ok: true }
+    }
+    // If value is a pointer and we didn't check its element yet
+    if (sourceIsPointer && (value as any)._ptr) {
+      const ptrValue = (value as any)._ptr
+      const ptrType = typeofGo(ptrValue)
+      if (implementsInterface(ptrValue, ptrType, targetTypeInfo as InterfaceTypeInfo)) {
+        return { value: value as T, ok: true }
+      }
+    }
+    // Interface assertion failed
+    return { value: targetTypeInfo.zero as T, ok: false }
+  }
+  
+  // CASE 2: Target is a pointer type (*T)
   if (targetTypeInfo.kind === GoTypeKind.Pointer) {
-    const targetElemType = (targetTypeInfo as PointerTypeInfo).elem;
-
-    // Source must be a pointer for assertion to *T to succeed
-    if (sourceValueIsPointer) {
-        // Check if element types are identical OR target is *interface{}
-        // Note: underlyingSourceType is the element type here.
-        if (underlyingSourceType === targetElemType || 
-            (targetElemType.kind === GoTypeKind.Interface && 
-             (targetElemType as InterfaceTypeInfo).methods.length === 0)) {
-            return { value: value as T, ok: true }; // Return the original proxy
-        }
+    const targetElemType = (targetTypeInfo as PointerTypeInfo).elem
+    
+    // Only pointer values can be asserted to pointer types
+    if (sourceIsPointer) {
+      // Get the element type of the source pointer
+      const sourceElemType = sourceType === NIL_TYPE 
+        ? typeofGo((value as any)._ptr)
+        : sourceType
+        
+      // Compare element types (or check if target is *interface{})
+      if (sourceElemType === targetElemType || 
+          (targetElemType.kind === GoTypeKind.Interface &&
+           (targetElemType as InterfaceTypeInfo).methods.length === 0)) {
+        return { value: value as T, ok: true }
+      }
     }
-    // Assertion fails if source is not a pointer or element types don't match
-    return { value: targetTypeInfo.zero as T, ok: false };
+    // Non-pointer value can't be asserted to pointer type
+    return { value: targetTypeInfo.zero as T, ok: false }
   }
-  // Target: Interface (I)
-  else if (targetTypeInfo.kind === GoTypeKind.Interface) {
-    // Check if the value implements the target interface
-    if (implementsInterface(value, underlyingSourceType, targetTypeInfo as InterfaceTypeInfo)) {
-      return { value: value as T, ok: true }; // Return the original value
-    }
+  
+  // CASE 3: Target is a concrete type (not interface, not pointer)
+  // Go requires the dynamic type to be *exactly* the target type
+  if (sourceType === targetTypeInfo) {
+    // Direct type match
+    return { value: sourceIsPointer ? (value as any)._ptr as T : value as T, ok: true }
   }
-  // Target: Concrete types (Struct, Basic, Slice, Map, Chan, Func, Array)
-  else {
-    // Go requires the dynamic type to be *exactly* the target type T.
-    // If source is a pointer (*T), its underlying type is T. Assertion T -> T succeeds.
-    // If source is concrete (T), its underlying type is T. Assertion T -> T succeeds.
-    // We must ensure the source was NOT a pointer if asserting to a non-pointer type.
-    if (!sourceValueIsPointer && underlyingSourceType === targetTypeInfo) {
-       return { value: value as T, ok: true };
-    }
-  }
-
-  // Assertion failed
-  return { value: targetTypeInfo.zero as T, ok: false };
+  
+  // Type assertion failed
+  return { value: targetTypeInfo.zero as T, ok: false }
 }
 
 /**
@@ -1126,13 +1178,15 @@ export const makeChannel = <T>(
  * Implements the `Disposable` interface for use with `using` declarations.
  */
 export class DisposableStack implements Disposable {
-  #stack: (() => void)[] = [];
+  #stack: (() => void)[] = []
 
   /**
    * Adds a function to be executed when the stack is disposed.
    * @param fn The function to defer.
    */
-  defer(fn: () => void): void { this.#stack.push(fn); }
+  defer(fn: () => void): void {
+    this.#stack.push(fn)
+  }
 
   /**
    * Disposes of the resources in the stack by executing the deferred functions
@@ -1143,8 +1197,8 @@ export class DisposableStack implements Disposable {
   [Symbol.dispose](): void {
     // Emulate Go: if a deferred throws, stop and rethrow
     while (this.#stack.length) {
-      const fn = this.#stack.pop()!;
-      fn();
+      const fn = this.#stack.pop()!
+      fn()
     }
   }
 }
@@ -1155,14 +1209,14 @@ export class DisposableStack implements Disposable {
  * Implements the `AsyncDisposable` interface for use with `await using` declarations.
  */
 export class AsyncDisposableStack implements AsyncDisposable {
-  #stack: (() => Promise<void> | void)[] = [];
+  #stack: (() => Promise<void> | void)[] = []
 
   /**
    * Adds a synchronous or asynchronous function to be executed when the stack is disposed.
    * @param fn The function to defer. Can return void or a Promise<void>.
    */
   defer(fn: () => Promise<void> | void): void {
-    this.#stack.push(fn);
+    this.#stack.push(fn)
   }
 
   /**
@@ -1172,7 +1226,7 @@ export class AsyncDisposableStack implements AsyncDisposable {
   async [Symbol.asyncDispose](): Promise<void> {
     // Execute in LIFO order, awaiting each potentially async function
     for (let i = this.#stack.length - 1; i >= 0; --i) {
-      await this.#stack[i]();
+      await this.#stack[i]()
     }
   }
 }

@@ -11,30 +11,22 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	// === Pointer Initialization ===
 	// Create a pointer to a MyStruct instance using a composite literal.
-	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
+	let structPointer = goscript.makePtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// Expected: "hello world"
-	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + (structPointer)?.ref?.MyString)
+	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + (structPointer)?._ptr?.MyString)
 }
 

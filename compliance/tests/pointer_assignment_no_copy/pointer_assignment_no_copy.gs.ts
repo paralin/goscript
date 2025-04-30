@@ -11,44 +11,36 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [],
+	  ctor: MyStruct
+	};
 
 }
 
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  MyStruct.__typeInfo
-);
-
 export async function main(): Promise<void> {
-	let original = new goscript.GoPtr(new MyStruct({MyInt: 10, MyString: "original"}))
+	let original = goscript.makePtr(new MyStruct({MyInt: 10, MyString: "original"}))
 
 	// === Pointer Assignment (No Copy) ===
 	// Assigning a pointer variable to another pointer variable.
 	let pointerCopy = original
 
 	// Modify the struct through the original pointer.
-	(original)?.ref?.MyString = "modified original"
+	(original)?._ptr?.MyString = "modified original"
 
 	// The change should be reflected when accessing through the copied pointer.
 	// Expected: "modified original"
-	console.log("Pointer copy value: Expected: modified original, Actual: " + (pointerCopy)?.ref?.MyString)
+	console.log("Pointer copy value: Expected: modified original, Actual: " + (pointerCopy)?._ptr?.MyString)
 
 	// Modify the struct through the copied pointer.
-	(pointerCopy)?.ref?.MyInt = 20
+	(pointerCopy)?._ptr?.MyInt = 20
 
 	// The change should be reflected when accessing through the original pointer.
 	// Expected: 20
-	console.log("Original value after pointer copy modification: Expected: 20, Actual:", (original)?.ref?.MyInt)
+	console.log("Original value after pointer copy modification: Expected: 20, Actual:", (original)?._ptr?.MyInt)
 }
 

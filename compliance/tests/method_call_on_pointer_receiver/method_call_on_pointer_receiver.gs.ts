@@ -17,29 +17,21 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [],
+	  ctor: MyStruct
+	};
 
 }
 
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'GetMyString', params: [], results: [{ type: goscript.getType('string')! }] }],
-  MyStruct.__typeInfo
-);
-
 export async function main(): Promise<void> {
-	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
+	let structPointer = goscript.makePtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// === Method Call on Pointer Receiver ===
 	// Calling a method with a pointer receiver (*MyStruct) using a pointer variable.
-	console.log("Method call on pointer (structPointer): Expected: hello world, Actual: " + (structPointer)?.ref?.GetMyString())
+	console.log("Method call on pointer (structPointer): Expected: hello world, Actual: " + (structPointer)?._ptr?.GetMyString())
 }
 

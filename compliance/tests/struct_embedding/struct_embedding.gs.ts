@@ -16,24 +16,16 @@ class Person {
 	public clone(): Person { return Object.assign(Object.create(Person.prototype) as Person, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'Person',
-	  goscript.GoTypeKind.Struct,
-	  new Person(),
-	  [{ name: 'Greet', params: [], results: [] }],
-	  Person
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'Person',
+	  zero: new Person(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [{ name: 'Greet', params: [], results: [] }],
+	  ctor: Person
+	};
 
 }
-
-// Register pointer type
-const Person__ptrTypeInfo = goscript.registerType(
-  '*Person',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'Greet', params: [], results: [] }],
-  Person.__typeInfo
-);
 
 class Employee extends Person {
 	// Embedded struct
@@ -50,24 +42,16 @@ class Employee extends Person {
 	public clone(): Employee { return Object.assign(Object.create(Employee.prototype) as Employee, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'Employee',
-	  goscript.GoTypeKind.Struct,
-	  new Employee(),
-	  [],
-	  Employee
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'Employee',
+	  zero: new Employee(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [],
+	  ctor: Employee
+	};
 
 }
-
-// Register pointer type
-const Employee__ptrTypeInfo = goscript.registerType(
-  '*Employee',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  Employee.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	let e = new Employee({Person: {Name: "Alice", Age: 30}, ID: 123})
@@ -81,14 +65,14 @@ export async function main(): Promise<void> {
 	e.Greet()
 
 	// Test with a pointer to Employee
-	let ep = new goscript.GoPtr(new Employee({Person: {Name: "Bob", Age: 25}, ID: 456}))
+	let ep = goscript.makePtr(new Employee({Person: {Name: "Bob", Age: 25}, ID: 456}))
 
 	// Accessing embedded fields via pointer
-	console.log("Employee Pointer Name:", (ep)?.ref?.Name)
-	console.log("Employee Pointer Age:", (ep)?.ref?.Age)
-	console.log("Employee Pointer ID:", (ep)?.ref?.ID)
+	console.log("Employee Pointer Name:", (ep)?._ptr?.Name)
+	console.log("Employee Pointer Age:", (ep)?._ptr?.Age)
+	console.log("Employee Pointer ID:", (ep)?._ptr?.ID)
 
 	// Calling embedded method via pointer
-	(ep)?.ref?.Greet()
+	(ep)?._ptr?.Greet()
 }
 

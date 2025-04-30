@@ -7,27 +7,25 @@ interface InterfaceA {
 	DoSomething(_p0: number): string;
 }
 
-// Register this interface with the runtime type system
-const InterfaceA__typeInfo = goscript.registerType(
-  'InterfaceA',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'DoSomething', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [{ type: goscript.getType('string')! }] }],
-  undefined
-);
+// Define interface type information
+const InterfaceA__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'InterfaceA',
+  zero: null,
+  methods: [{ name: 'DoSomething', params: [{ type: goscript.INT_TYPE, isVariadic: false }], results: [{ type: goscript.STRING_TYPE }] }]
+};
 
 interface InterfaceB {
 	DoSomething(_p0: string): string;
 }
 
-// Register this interface with the runtime type system
-const InterfaceB__typeInfo = goscript.registerType(
-  'InterfaceB',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'DoSomething', params: [{ type: goscript.getType('string')!, isVariadic: false }], results: [{ type: goscript.getType('string')! }] }],
-  undefined
-);
+// Define interface type information
+const InterfaceB__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'InterfaceB',
+  zero: null,
+  methods: [{ name: 'DoSomething', params: [{ type: goscript.STRING_TYPE, isVariadic: false }], results: [{ type: goscript.STRING_TYPE }] }]
+};
 
 class MyStruct {
 	public Name: string = "";
@@ -42,32 +40,24 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [{ name: 'DoSomething', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [{ type: goscript.getType('string')! }] }],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [{ name: 'DoSomething', params: [{ type: goscript.INT_TYPE, isVariadic: false }], results: [{ type: goscript.STRING_TYPE }] }],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'DoSomething', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [{ type: goscript.getType('string')! }] }],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	let a: any | null = null;
 	let s = new MyStruct({Name: "TestStruct"})
-	a = (goscript.isAssignable(s, goscript.getType('interface{}')!) ? s : null)
+	a = (goscript.isAssignable(s, goscript.EMPTY_INTERFACE_TYPE) ? s : null)
 
 	// This assertion should fail at runtime because InterfaceB.DoSomething has a different signature
-	let { ok: ok } = goscript.typeAssert<InterfaceB>(a, 'InterfaceB')
+	let { ok: ok } = goscript.typeAssert<InterfaceB>(a, InterfaceB__typeInfo)
 	if (ok) {
 		console.log("Type assertion to InterfaceB successful")
 	} else {
@@ -75,7 +65,7 @@ export async function main(): Promise<void> {
 	}
 
 	// This assertion should succeed
-	({ ok: ok } = goscript.typeAssert<InterfaceA>(a, 'InterfaceA'))
+	({ ok: ok } = goscript.typeAssert<InterfaceA>(a, InterfaceA__typeInfo))
 	if (ok) {
 		console.log("Type assertion to InterfaceA successful")
 	} else {
@@ -85,9 +75,9 @@ export async function main(): Promise<void> {
 	// Call the method on the asserted interface to ensure the generated code works
 	// This is not strictly necessary for the type assertion test but good practice
 	// if the assertion to InterfaceA succeeds.
-	{let { value: assertedA, ok: ok } = goscript.typeAssert<InterfaceA>(a, 'InterfaceA')
+	{let { value: assertedA, ok: ok } = goscript.typeAssert<InterfaceA>(a, InterfaceA__typeInfo)
 		if (ok) {
-			(assertedA instanceof goscript.GoPtr ? assertedA.ref?.DoSomething : assertedA.DoSomething)(123)
+			assertedA.DoSomething(123)
 		}
 	}}
 

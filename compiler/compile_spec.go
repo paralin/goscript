@@ -296,16 +296,15 @@ func (c *GoToTSCompiler) getTypeReference(expr ast.Expr) string {
 			return fmt.Sprintf("%s.%s__typeInfo", x.Name, t.Sel.Name)
 		}
 	case *ast.StarExpr:
-		// Handle pointer types
-		// Create a reference to the pointer type info constant
+		// Handle pointer types - create the pointer type info dynamically
 		baseTypeName := c.getTypeNameString(t.X)
 		// If it's a basic type, construct a pointer to it
 		if isBasicType(baseTypeName) {
-			return fmt.Sprintf("{ kind: goscript.GoTypeKind.Pointer, name: '*%s', zero: null, elem: %s }",
-				baseTypeName, getBasicTypeConstName(baseTypeName))
+			return fmt.Sprintf("goscript.makePointerTypeInfo(%s)",
+				getBasicTypeConstName(baseTypeName))
 		}
-		// Otherwise, use the generated pointer type info
-		return fmt.Sprintf("%s__ptrTypeInfo", baseTypeName)
+		// Create pointer type info dynamically for user-defined types
+		return fmt.Sprintf("goscript.makePointerTypeInfo(%s.__typeInfo)", baseTypeName)
 	case *ast.ArrayType:
 		// Handle array/slice types
 		elemType := c.getTypeReference(t.Elt)
@@ -333,15 +332,15 @@ func (c *GoToTSCompiler) getTypeReferenceFromType(typ types.Type) string {
 	case *types.Pointer:
 		// Handle pointer types
 		elemType := c.getTypeReferenceFromType(t.Elem())
+		// Create pointer type info dynamically
 		if isBasicTypeConstRef(elemType) {
-			// For pointers to basic types, create an inline PointerTypeInfo
-			return fmt.Sprintf("{ kind: goscript.GoTypeKind.Pointer, name: '*%s', zero: null, elem: %s }",
-				t.Elem().String(), elemType)
+			// For pointers to basic types
+			return fmt.Sprintf("goscript.makePointerTypeInfo(%s)", elemType)
 		}
 
-		// For pointers to named types, use the pointer type info constant
+		// For pointers to named types
 		if named, ok := t.Elem().(*types.Named); ok {
-			return fmt.Sprintf("%s__ptrTypeInfo", named.Obj().Name())
+			return fmt.Sprintf("goscript.makePointerTypeInfo(%s.__typeInfo)", named.Obj().Name())
 		}
 	case *types.Slice:
 		// Handle slice types
@@ -357,6 +356,11 @@ func (c *GoToTSCompiler) getTypeReferenceFromType(typ types.Type) string {
 	case *types.Named:
 		// Handle named types (structs, interfaces, type aliases)
 		obj := t.Obj()
+		// Special case for the built-in 'error' type
+		if obj.Name() == "error" && (obj.Pkg() == nil || obj.Pkg().Path() == "builtin") {
+			return "goscript.ERROR_TYPE"
+		}
+		
 		if pkg := obj.Pkg(); pkg != nil {
 			// Qualify with package name if not in the current package
 			if pkg != c.pkg.Types {
@@ -559,15 +563,7 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.Indent(-1)     // Decrease indentation for the closing brace of the class
 		c.tsw.WriteLine("}") // Close class definition
 
-		// Add pointer type registration outside the class
-		c.tsw.WriteLine("")
-		c.tsw.WriteLinef("// Define pointer type information")
-		c.tsw.WriteLinef("const %s__ptrTypeInfo: goscript.PointerTypeInfo = {", className)
-		c.tsw.WriteLinef("  kind: goscript.GoTypeKind.Pointer,")
-		c.tsw.WriteLinef("  name: '*%s',", className)
-		c.tsw.WriteLinef("  zero: null,")                    // Zero value for pointers is null
-		c.tsw.WriteLinef("  elem: %s.__typeInfo", className) // Element type is the struct type
-		c.tsw.WriteLinef("};")
+		// No need to define separate pointer type info - it will be created dynamically when needed
 
 		return nil // Prevent fallthrough to InterfaceType case
 	case *ast.InterfaceType:

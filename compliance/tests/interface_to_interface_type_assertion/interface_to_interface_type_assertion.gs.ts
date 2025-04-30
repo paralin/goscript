@@ -7,14 +7,13 @@ interface MyInterface {
 	Method1(): number;
 }
 
-// Register this interface with the runtime type system
-const MyInterface__typeInfo = goscript.registerType(
-  'MyInterface',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
-  undefined
-);
+// Define interface type information
+const MyInterface__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'MyInterface',
+  zero: null,
+  methods: [{ name: 'Method1', params: [], results: [{ type: goscript.INT_TYPE }] }]
+};
 
 class MyStruct {
 	public Value: number = 0;
@@ -28,44 +27,35 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [{ name: 'Method1', params: [], results: [{ type: goscript.INT_TYPE }] }],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
-  MyStruct.__typeInfo
-);
 
 interface MyOtherInterface {
 	Method1(): number;
 }
 
-// Register this interface with the runtime type system
-const MyOtherInterface__typeInfo = goscript.registerType(
-  'MyOtherInterface',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'Method1', params: [], results: [{ type: goscript.getType('int')! }] }],
-  undefined
-);
+// Define interface type information
+const MyOtherInterface__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'MyOtherInterface',
+  zero: null,
+  methods: [{ name: 'Method1', params: [], results: [{ type: goscript.INT_TYPE }] }]
+};
 
 export async function main(): Promise<void> {
 	let i: MyInterface | null = null;
 	let s = new MyStruct({Value: 10})
-	i = (goscript.isAssignable(s, goscript.getType('MyInterface')!) ? s : null)
+	i = (goscript.isAssignable(s, MyInterface__typeInfo) ? s : null)
 
-	let { ok: ok } = goscript.typeAssert<MyOtherInterface>(i, 'MyOtherInterface')
+	let { ok: ok } = goscript.typeAssert<MyOtherInterface>(i, MyOtherInterface__typeInfo)
 	if (ok) {
 		console.log("Type assertion successful")
 	} else {

@@ -7,39 +7,36 @@ interface Reader {
 	Read(_p0: number[]): [number, goscript.Error];
 }
 
-// Register this interface with the runtime type system
-const Reader__typeInfo = goscript.registerType(
-  'Reader',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'Read', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] }],
-  undefined
-);
+// Define interface type information
+const Reader__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'Reader',
+  zero: null,
+  methods: [{ name: 'Read', params: [{ type: { kind: goscript.GoTypeKind.Slice, name: '[]byte', zero: [], elem: goscript.BYTE_TYPE }, isVariadic: false }], results: [{ type: goscript.INT_TYPE }, { type: goscript.ERROR_TYPE }] }]
+};
 
 interface Closer {
 	Close(): goscript.Error;
 }
 
-// Register this interface with the runtime type system
-const Closer__typeInfo = goscript.registerType(
-  'Closer',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }],
-  undefined
-);
+// Define interface type information
+const Closer__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'Closer',
+  zero: null,
+  methods: [{ name: 'Close', params: [], results: [{ type: goscript.ERROR_TYPE }] }]
+};
 
 interface ReadCloser extends Reader, Closer {
 }
 
-// Register this interface with the runtime type system
-const ReadCloser__typeInfo = goscript.registerType(
-  'ReadCloser',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'Read', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] }, { name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }],
-  undefined
-);
+// Define interface type information
+const ReadCloser__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'ReadCloser',
+  zero: null,
+  methods: [{ name: 'Read', params: [{ type: { kind: goscript.GoTypeKind.Slice, name: '[]byte', zero: [], elem: goscript.BYTE_TYPE }, isVariadic: false }], results: [{ type: goscript.INT_TYPE }, { type: goscript.ERROR_TYPE }] }, { name: 'Close', params: [], results: [{ type: goscript.ERROR_TYPE }] }]
+};
 
 class MyStruct {
 
@@ -57,32 +54,24 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [{ name: 'Read', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] }, { name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [{ name: 'Read', params: [{ type: { kind: goscript.GoTypeKind.Slice, name: '[]byte', zero: [], elem: goscript.BYTE_TYPE }, isVariadic: false }], results: [{ type: goscript.INT_TYPE }, { type: goscript.ERROR_TYPE }] }, { name: 'Close', params: [], results: [{ type: goscript.ERROR_TYPE }] }],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'Read', params: [{ type: goscript.getType('[]byte')!, isVariadic: false }], results: [{ type: goscript.getType('int')! }, { type: goscript.getType('error')! }] }, { name: 'Close', params: [], results: [{ type: goscript.getType('error')! }] }],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	let rwc: ReadCloser | null = null;
 	let s = new MyStruct({})
-	rwc = (goscript.isAssignable(s, goscript.getType('ReadCloser')!) ? s : null)
+	rwc = (goscript.isAssignable(s, ReadCloser__typeInfo) ? s : null)
 
 	let rwcAny: any | null = rwc;
-	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwcAny, 'ReadCloser')
+	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwcAny, ReadCloser__typeInfo)
 	if (ok) {
 		console.log("Embedded interface assertion successful")
 	} else {

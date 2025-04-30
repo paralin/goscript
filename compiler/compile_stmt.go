@@ -1653,9 +1653,6 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		return fmt.Errorf("unhandled LHS expression type for ok in type assertion: %T", lhs[1])
 	}
 
-	// Get the type name string for the asserted type
-	typeName := c.getTypeNameString(assertedType)
-
 	// Generate the destructuring assignment
 	if tok == token.DEFINE {
 		c.tsw.WriteLiterally("let ")
@@ -1685,7 +1682,11 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+	
+	// Get the type info reference for the asserted type
+	typeInfoRef := c.getTypeInfoRef(assertedType)
+	c.tsw.WriteLiterally(typeInfoRef)
+	
 	c.tsw.WriteLiterally(")")
 
 	if tok != token.DEFINE {

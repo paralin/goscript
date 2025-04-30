@@ -8,14 +8,13 @@ interface MyInterface {
 	MyMethod(): void;
 }
 
-// Register this interface with the runtime type system
-const MyInterface__typeInfo = goscript.registerType(
-  'MyInterface',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'MyMethod', params: [], results: [] }],
-  undefined
-);
+// Define interface type information
+const MyInterface__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'MyInterface',
+  zero: null,
+  methods: [{ name: 'MyMethod', params: [], results: [] }]
+};
 
 export async function main(): Promise<void> {
 	// This test verifies that comments on interface methods are preserved.

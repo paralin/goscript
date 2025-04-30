@@ -22,24 +22,16 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [{ name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [{ name: 'GetValue', params: [], results: [{ type: goscript.INT_TYPE }] }],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'SetValue', params: [{ type: goscript.getType('int')!, isVariadic: false }], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	// Create a struct value
@@ -48,7 +40,7 @@ export async function main(): Promise<void> {
 	// === Method Call on Pointer Receiver via Value ===
 	// Call the pointer-receiver method using the value variable.
 	// Go implicitly takes the address of msValue (&msValue) to call SetValue.
-	(new goscript.GoPtr(msValue)).ref!.SetValue(200)
+	(goscript.makePtr(msValue))._ptr!.SetValue(200)
 
 	// Verify the value was modified through the method call.
 	// Expected: 200

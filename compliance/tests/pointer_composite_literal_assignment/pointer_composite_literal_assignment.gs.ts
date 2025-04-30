@@ -11,39 +11,31 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	// === Pointer Composite Literal Assignment ===
 	// Creating a pointer to a struct directly using a composite literal with &
-	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 42, MyString: "composite literal pointer"}))
+	let structPointer = goscript.makePtr(new MyStruct({MyInt: 42, MyString: "composite literal pointer"}))
 
 	// Access fields through the pointer
 	// Expected: 42
-	console.log("MyInt via pointer: Expected: 42, Actual:", (structPointer)?.ref?.MyInt)
+	console.log("MyInt via pointer: Expected: 42, Actual:", (structPointer)?._ptr?.MyInt)
 	// Expected: "composite literal pointer"
-	console.log("MyString via pointer: Expected: composite literal pointer, Actual: " + (structPointer)?.ref?.MyString)
+	console.log("MyString via pointer: Expected: composite literal pointer, Actual: " + (structPointer)?._ptr?.MyString)
 
 	// Modify through the pointer
-	(structPointer)?.ref?.MyInt = 99
+	(structPointer)?._ptr?.MyInt = 99
 	// Expected: 99
-	console.log("MyInt after modification: Expected: 99, Actual:", (structPointer)?.ref?.MyInt)
+	console.log("MyInt after modification: Expected: 99, Actual:", (structPointer)?._ptr?.MyInt)
 }
 

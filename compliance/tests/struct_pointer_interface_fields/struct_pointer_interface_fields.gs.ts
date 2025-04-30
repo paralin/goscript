@@ -7,14 +7,13 @@ interface MyInterface {
 	Method(): void;
 }
 
-// Register this interface with the runtime type system
-const MyInterface__typeInfo = goscript.registerType(
-  'MyInterface',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'Method', params: [], results: [] }],
-  undefined
-);
+// Define interface type information
+const MyInterface__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'MyInterface',
+  zero: null,
+  methods: [{ name: 'Method', params: [], results: [] }]
+};
 
 class MyStruct {
 	public PointerField: goscript.Ptr<number> = null;
@@ -24,24 +23,16 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	let s = new MyStruct({})
@@ -49,11 +40,11 @@ export async function main(): Promise<void> {
 	console.log(s.InterfaceField)
 
 	let i = 10
-	s.PointerField = new goscript.GoPtr(i)
+	s.PointerField = goscript.makePtr(i)
 	console.log(s.PointerField)
 
 	let mi: MyInterface | null = null;
-	s.InterfaceField = (goscript.isAssignable(mi, goscript.getType('MyInterface')!) ? mi : null)
+	s.InterfaceField = (goscript.isAssignable(mi, MyInterface__typeInfo) ? mi : null)
 	console.log(s.InterfaceField)
 }
 

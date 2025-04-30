@@ -16,42 +16,34 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [{ name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [{ name: 'GetValue', params: [], results: [{ type: goscript.INT_TYPE }] }],
+	  ctor: MyStruct
+	};
 
 }
-
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-  MyStruct.__typeInfo
-);
 
 export async function main(): Promise<void> {
 	// Create a struct value
 	let msValue = new MyStruct({MyInt: 100})
 	// Create a pointer to the struct value
-	let msPointer = new goscript.GoPtr(msValue)
+	let msPointer = goscript.makePtr(msValue)
 
 	// === Method Call on Value Receiver via Pointer ===
 	// Call the value-receiver method using the pointer variable.
 	// Go implicitly dereferences msPointer to call GetValue on the value.
 	// Expected: 100
-	console.log("Value via pointer call: Expected: 100, Actual:", (msPointer)?.ref?.GetValue())
+	console.log("Value via pointer call: Expected: 100, Actual:", (msPointer)?._ptr?.GetValue())
 
 	// Modify the value through the original value variable
 	msValue.MyInt = 200
 
 	// The pointer still points to the modified value
 	// Expected: 200
-	console.log("Value via pointer call after modification: Expected: 200, Actual:", (msPointer)?.ref?.GetValue())
+	console.log("Value via pointer call after modification: Expected: 200, Actual:", (msPointer)?._ptr?.GetValue())
 }
 

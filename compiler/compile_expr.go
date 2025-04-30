@@ -142,12 +142,12 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		}
 
 		if isPointer {
-			// For declared pointer types, use .ref directly
+			// For declared pointer types, use ._ptr directly
 			c.tsw.WriteLiterally("(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
 			}
-			c.tsw.WriteLiterally(").ref![")
+			c.tsw.WriteLiterally(")?._ptr?.[")
 		} else if isGoPtr {
 			// For values that might be GoPtr instances at runtime, use safe access
 			c.tsw.WriteLiterally("(")
@@ -157,11 +157,11 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 			}
 			c.tsw.WriteLiterally(") ? ") // Close the function call and add ternary operator
 
-			// If it's a GoPtr, access through .ref
+			// If it's a GoPtr, access through ._ptr
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
 			}
-			c.tsw.WriteLiterally(".ref![")
+			c.tsw.WriteLiterally("._ptr![")
 			if err := c.WriteValueExpr(exp.Index); err != nil {
 				return err
 			}
@@ -245,9 +245,6 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 
 // WriteTypeAssertExpr writes a type assertion expression.
 func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
-	// Get the type name string for the asserted type
-	typeName := c.getTypeNameString(exp.Type)
-
 	// Generate a call to goscript.typeAssert
 	c.tsw.WriteLiterally("goscript.typeAssert<")
 	c.WriteTypeExpr(exp.Type) // Write the asserted type for the generic
@@ -256,8 +253,11 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	// Use the type name directly
-	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+	
+	// Get the type info reference for the asserted type
+	// We need to use .__typeInfo for user-defined types instead of the old style
+	typeInfoRef := c.getTypeInfoRef(exp.Type)
+	c.tsw.WriteLiterally(typeInfoRef)
 
 	c.tsw.WriteLiterally(").value") // Always access .value for the panic form
 
@@ -269,7 +269,73 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	return nil
 }
 
+// getTypeInfoRef returns the TypeScript reference to the type information for a given AST type expression
+func (c *GoToTSCompiler) getTypeInfoRef(typeExpr ast.Expr) string {
+	switch t := typeExpr.(type) {
+	case *ast.Ident:
+		// Check for built-in types
+		switch t.Name {
+		case "int":
+			return "goscript.INT_TYPE"
+		case "string":
+			return "goscript.STRING_TYPE"
+		case "bool":
+			return "goscript.BOOL_TYPE"
+		case "float64":
+			return "goscript.FLOAT64_TYPE"
+		case "byte":
+			return "goscript.BYTE_TYPE"
+		case "rune":
+			return "goscript.RUNE_TYPE"
+		case "interface{}":
+			return "goscript.EMPTY_INTERFACE_TYPE"
+		case "any":
+			return "goscript.ANY_TYPE"
+		case "error":
+			return "goscript.ERROR_TYPE"
+		default:
+			// Named user-defined type
+			return fmt.Sprintf("%s__typeInfo", t.Name)
+		}
+	case *ast.SelectorExpr:
+		// For imported types like pkg.Type
+		if ident, ok := t.X.(*ast.Ident); ok {
+			return fmt.Sprintf("%s.%s__typeInfo", ident.Name, t.Sel.Name)
+		}
+	case *ast.StarExpr:
+		// Handle pointer types - create the pointer type info dynamically
+		baseType := c.getTypeExprName(t.X)
+		// Check if it's a basic type
+		if isBasicType(baseType) {
+			return fmt.Sprintf("goscript.makePointerTypeInfo(%s)", 
+				getBasicTypeConstName(baseType))
+		}
+		return fmt.Sprintf("goscript.makePointerTypeInfo(%s.__typeInfo)", baseType)
+	case *ast.ArrayType:
+		// Handle array/slice types - construct an inline SliceTypeInfo
+		elemTypeRef := c.getTypeInfoRef(t.Elt)
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Slice, name: '[]%s', zero: [], elem: %s }", 
+			c.getTypeExprName(t.Elt), elemTypeRef)
+	case *ast.MapType:
+		// Handle map types - construct an inline MapTypeInfo
+		keyTypeRef := c.getTypeInfoRef(t.Key)
+		valueTypeRef := c.getTypeInfoRef(t.Value)
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Map, name: 'map[%s]%s', zero: new Map(), key: %s, value: %s }", 
+			c.getTypeExprName(t.Key), c.getTypeExprName(t.Value), keyTypeRef, valueTypeRef)
+	case *ast.InterfaceType:
+		// Handle interface{} specifically
+		if t.Methods == nil || len(t.Methods.List) == 0 {
+			return "goscript.EMPTY_INTERFACE_TYPE"
+		}
+		// TODO: Handle non-empty anonymous interfaces
+		return "goscript.EMPTY_INTERFACE_TYPE"
+	}
+	// Fallback for unhandled types
+	return "goscript.EMPTY_INTERFACE_TYPE"
+}
+
 // getTypeNameString returns the string representation of a type name
+// This is kept for backward compatibility with existing code
 func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 	switch t := typeExpr.(type) {
 	case *ast.Ident:
@@ -438,12 +504,12 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 	}
 
 	if isPointer {
-		// For pointer types (declared as *T), need to access .ref property first
+		// For pointer types (declared as *T), need to access ._ptr property first
 		c.tsw.WriteLiterally("(")
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write selector expression pointer object: %w", err)
 		}
-		c.tsw.WriteLiterally(")?.ref?.")
+		c.tsw.WriteLiterally(")?._ptr?.")
 		c.WriteIdentValue(exp.Sel)
 	} else if isGoPtr {
 		// For values that might be GoPtr instances at runtime (interfaces holding pointers),
@@ -459,20 +525,20 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 		obj := c.pkg.TypesInfo.Uses[exp.Sel]
 		if _, isMethod := obj.(*gtypes.Func); isMethod {
 			// It's a method - generate method call syntax
-			c.tsw.WriteLiterally("(goscript.createGoPtr(")
+			c.tsw.WriteLiterally("(goscript.makePtr(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write value for implicit pointer conversion (method call): %w", err)
 			}
-			c.tsw.WriteLiterally(")).ref!.")
+			c.tsw.WriteLiterally("))._ptr!.")
 			c.WriteIdentValue(exp.Sel) // Write the method name
 			// Note: Arguments for the method call are handled in WriteCallExpr
 		} else {
 			// It's a field access - generate field access syntax
-			c.tsw.WriteLiterally("(goscript.createGoPtr(")
+			c.tsw.WriteLiterally("(goscript.makePtr(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write value for implicit pointer conversion (field access): %w", err)
 			}
-			c.tsw.WriteLiterally(")).ref!.")
+			c.tsw.WriteLiterally("))._ptr!.")
 			c.WriteIdentValue(exp.Sel) // Write the field name
 		}
 	} else {
@@ -497,12 +563,12 @@ func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 // WriteStarExprValue writes a pointer dereference value (e.g., *myVar).
 func (c *GoToTSCompiler) WriteStarExprValue(exp *ast.StarExpr) error {
 	// Dereferencing a pointer in Go (*p) gets the value.
-	// In TS with GoPtr representation, we need to access the .ref property with null checks.
+	// In TS with goPtrProxy, we need to access the ._ptr property with proper null checks.
 	c.tsw.WriteLiterally("(")
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write star expression operand: %w", err)
 	}
-	c.tsw.WriteLiterally(")?.ref") // Use optional chaining for null safety
+	c.tsw.WriteLiterally(")?._ptr") // Use optional chaining for null safety
 	return nil
 }
 

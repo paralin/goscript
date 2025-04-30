@@ -11,33 +11,25 @@ class MyStruct {
 	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyStruct',
-	  goscript.GoTypeKind.Struct,
-	  new MyStruct(),
-	  [],
-	  MyStruct
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyStruct',
+	  zero: new MyStruct(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [],
+	  ctor: MyStruct
+	};
 
 }
 
-// Register pointer type
-const MyStruct__ptrTypeInfo = goscript.registerType(
-  '*MyStruct',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [],
-  MyStruct.__typeInfo
-);
-
 export async function main(): Promise<void> {
-	let structPointer = new goscript.GoPtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
+	let structPointer = goscript.makePtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// === Simple Dereference Assignment (Value Copy) ===
-	let simpleDereferencedCopy = (structPointer)?.ref.clone()
+	let simpleDereferencedCopy = (structPointer)?._ptr.clone()
 	// Modifying the copy does not affect the original struct pointed to by structPointer.
 	simpleDereferencedCopy.MyString = "modified dereferenced copy"
 	// Expected: "hello world"
-	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + (structPointer)?.ref?.MyString)
+	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + (structPointer)?._ptr?.MyString)
 	// Expected: "modified dereferenced copy"
 	console.log("Simple Dereferenced Copy: Expected: modified dereferenced copy, Actual: " + simpleDereferencedCopy.MyString)
 }

@@ -47,14 +47,6 @@ class MyData {
 
 }
 
-// Define pointer type information
-const MyData__ptrTypeInfo: goscript.PointerTypeInfo = {
-  kind: goscript.GoTypeKind.Pointer,
-  name: '*MyData',
-  zero: null,
-  elem: MyData.__typeInfo
-};
-
 export async function main(): Promise<void> {
 	// Create struct pointer
 	let dataPtr = goscript.makePtr(new MyData({num: 20, label: "B"}))
@@ -72,15 +64,15 @@ export async function main(): Promise<void> {
 
 	console.log("\n--- Type Assertions (Comma-Ok) ---")
 	// Assert interface (holding *MyData) to *MyData
-	let { value: mdPtr1, ok: ok1 } = goscript.typeAssert<goscript.Ptr<MyData>>(np, '*MyData')
+	let { value: mdPtr1, ok: ok1 } = goscript.typeAssert<goscript.Ptr<MyData>>(np, goscript.makePointerTypeInfo(MyData.__typeInfo))
 	if (ok1) {
-		console.log("np.(*MyData) OK:", ok1, "Num:", (mdPtr1)?.ref?.num)
+		console.log("np.(*MyData) OK:", ok1, "Num:", (mdPtr1)?._ptr?.num)
 	} else {
 		console.log("np.(*MyData) FAILED:", ok1)
 	}
 
 	// Assert interface (holding *MyData) to NumPrinter (interface to itself)
-	let { value: np2, ok: ok2 } = goscript.typeAssert<NumPrinter>(np, 'NumPrinter')
+	let { value: np2, ok: ok2 } = goscript.typeAssert<NumPrinter>(np, NumPrinter__typeInfo)
 	if (ok2) {
 		console.log("np.(NumPrinter) OK:", ok2, "Can call GetNum:", np2.GetNum())
 	} else {
@@ -93,18 +85,18 @@ export async function main(): Promise<void> {
 
 	// Assert nil interface to *MyData
 	let nilNp: NumPrinter | null = null;
-	let { ok: okNil } = goscript.typeAssert<goscript.Ptr<MyData>>(nilNp, '*MyData')
+	let { ok: okNil } = goscript.typeAssert<goscript.Ptr<MyData>>(nilNp, goscript.makePointerTypeInfo(MyData.__typeInfo))
 	console.log("nilNp.(*MyData) OK:", okNil) // Should be false
 
 	console.log("\n--- Type Assertions (Panic Form) ---")
 	// Assert interface (holding *MyData) to *MyData
 	console.log("Asserting np.(*MyData)...")
-	let mdPtr2 = goscript.typeAssert<goscript.Ptr<MyData>>(np, '*MyData').value // Should succeed
-	console.log("Success! mdPtr2.num:", (mdPtr2)?.ref?.num)
+	let mdPtr2 = goscript.typeAssert<goscript.Ptr<MyData>>(np, goscript.makePointerTypeInfo(MyData.__typeInfo)).value // Should succeed
+	console.log("Success! mdPtr2.num:", (mdPtr2)?._ptr?.num)
 
 	// Assert interface (holding *MyData) to NumPrinter
 	console.log("Asserting np.(NumPrinter)...")
-	let np3 = goscript.typeAssert<NumPrinter>(np, 'NumPrinter').value // Should succeed
+	let np3 = goscript.typeAssert<NumPrinter>(np, NumPrinter__typeInfo).value // Should succeed
 	np3.PrintNum() // Call method on the result
 
 	// Assert interface (holding *MyData) to MyData (INVALID - should panic if uncommented)
