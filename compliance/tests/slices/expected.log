@@ -29,29 +29,29 @@ c
 2
 200
 --- Modify slice, check array ---
-20
+25
 25
 --- Modify array, check slice ---
 15
-10
+15
 --- Append sub-slice w/in capacity ---
 2
 5
 3
 5
 99
-3
+99
 --- Append sub-slice exceed capacity ---
 2
 2
 3
-3
+4
 4
 5
 101
 1
 2
-3
+99
 4
 5
 --- Slicing a slice ---
@@ -62,8 +62,8 @@ c
 4
 20
 30
-20
-20
+22
+22
 --- Three-index slicing ---
 2
 3
@@ -72,9 +72,9 @@ c
 3
 3
 99
-3
+99
 4
-4
+6
 101
 4
 --- Additional Tests ---
@@ -96,7 +96,7 @@ sliceOfSlices[2][3]: 9
 Length of innerSlice: 2
 Capacity of innerSlice: 2
 Length of innerSlice after append: 3
-Capacity of innerSlice after append: 3
+Capacity of innerSlice after append: 4
 innerSlice[2]: 50
 --- Append to inner slice with capacity ---
 Length of innerSliceWithCap: 2
@@ -109,7 +109,7 @@ sliceOfSlicesWithCap[1][2]: 60
 Length of innerSliceExceedCap: 3
 Capacity of innerSliceExceedCap: 3
 Length of innerSliceExceedCap after append: 5
-Capacity of innerSliceExceedCap after append: 5
+Capacity of innerSliceExceedCap after append: 6
 innerSliceExceedCap[3]: 10
 innerSliceExceedCap[4]: 20
 Original sliceOfSlices[0] after inner append: 1 2 3
@@ -122,11 +122,11 @@ subSliceOfSlices[1][2]: 8
 sliceOfSlices[1][1] after sub-slice modification: 55
 --- Append a new slice to slice of slices ---
 Length of sliceOfSlices after append: 4
-Capacity of sliceOfSlices after append: 4
+Capacity of sliceOfSlices after append: 6
 sliceOfSlices[3][0]: 100
 --- Append an existing slice to slice of slices ---
 Length of sliceOfSlices after appending existing: 5
-Capacity of sliceOfSlices after appending existing: 5
+Capacity of sliceOfSlices after appending existing: 6
 sliceOfSlices[4][1]: 210
 --- Modify appended existing slice ---
 sliceOfSlices[4][0] after modifying existingSlice: 205

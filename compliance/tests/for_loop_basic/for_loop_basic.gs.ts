@@ -1,9 +1,9 @@
 // Generated file based on for_loop_basic.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	console.log("Starting loop")
 	for (let i = 0; i < 3; i++) {
 		console.log("Iteration:", i)

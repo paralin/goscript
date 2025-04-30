@@ -1,4 +1,11 @@
 /**
+ * Represents a Go slice with an underlying TypeScript array and capacity information.
+ * Similar to Go slices, this tracks both the visible length and the underlying capacity.
+ * null represents the nil state.
+ */
+export type Slice<T> = (Array<T> & { __capacity?: number }) | null
+
+/**
  * Creates a new slice (TypeScript array) with the specified length and capacity.
  * @param len The length of the slice.
  * @param cap The capacity of the slice (optional).
@@ -7,9 +14,9 @@
 export const makeSlice = <T>(
   len: number,
   cap?: number,
-): Array<T> & { __capacity?: number } => {
-  const slice = new Array<T>(len) as Array<T> & { __capacity?: number }
-  slice.__capacity = cap !== undefined ? cap : len
+): Slice<T> => {
+  const slice = new Array<T>(len) as Slice<T>
+  slice!.__capacity = cap !== undefined ? cap : len
   return slice
 }
 
@@ -23,21 +30,19 @@ export const makeSlice = <T>(
  * @param max  Capacity limit (defaults to original capacity)
  */
 export const slice = <T>(
-  arr: Array<T> & { __capacity?: number },
+  arr: Slice<T>,
   low?: number,
   high?: number,
   max?: number,
-): Array<T> & { __capacity?: number } => {
+): Slice<T> => {
   const start = low ?? 0
-  const origLen = arr.length
-  const origCap = arr.__capacity !== undefined ? arr.__capacity : origLen
+  const origLen = arr ? arr.length : 0
+  const origCap = arr?.__capacity ?? origLen
   const end = high !== undefined ? high : origLen
   const newCap = max !== undefined ? max - start : origCap - start
 
-  const newArr = arr.slice(start, end) as Array<T> & {
-    __capacity?: number
-  }
-  newArr.__capacity = newCap
+  const newArr = (arr?.slice(start, end) ?? null) as Slice<T>
+  if (newArr?.__capacity !== undefined) newArr.__capacity = newCap
   return newArr
 }
 
@@ -50,13 +55,43 @@ export const makeMap = <K, V>(): Map<K, V> => {
 }
 
 /**
+ * Converts a JavaScript array to a Go slice.
+ * For multi-dimensional arrays, recursively converts nested arrays to slices.
+ * @param arr The JavaScript array to convert
+ * @param depth How many levels of nesting to convert (default: 1, use Infinity for all levels)
+ * @returns A Go slice containing the same elements
+ */
+export const arrayToSlice = <T>(
+  arr: T[] | null | undefined,
+  depth: number = 1
+): Slice<T> => {
+  if (arr == null) return null;
+  
+  const result = [...arr] as Slice<T>;
+  result.__capacity = arr.length;
+  
+  // Recursively convert nested arrays if depth > 1
+  if (depth > 1 && arr.length > 0) {
+    for (let i = 0; i < arr.length; i++) {
+      const item = arr[i];
+      if (Array.isArray(item)) {
+        result[i] = arrayToSlice(item as any[], depth - 1) as any;
+      }
+    }
+  }
+  
+  return result;
+}
+
+/**
  * Returns the length of a collection (string, array, or map).
  * @param collection The collection to get the length of.
  * @returns The length of the collection.
  */
-export const len = <T>(
-  collection: string | Array<T> | Map<unknown, unknown>,
+export const len = <T=unknown, V=unknown>(
+  collection: string | Array<T> | Slice<T> | Map<T, V>,
 ): number => {
+  if (!collection) return 0
   if (typeof collection === 'string' || Array.isArray(collection)) {
     return collection.length
   } else if (collection instanceof Map) {
@@ -70,15 +105,39 @@ export const len = <T>(
  * @param slice The slice (TypeScript array).
  * @returns The capacity of the slice.
  */
-export const cap = <T>(slice: Array<T> & { __capacity?: number }): number => {
-  return slice.__capacity !== undefined ? slice.__capacity : slice.length
+export const cap = <T>(slice: Slice<T>): number => {
+  return slice?.__capacity ?? slice?.length ?? 0
+}
+
+/**
+ * Appends elements to a slice (TypeScript array).
+ * Note: In Go, append can return a new slice if the underlying array is reallocated.
+ * This helper emulates that by returning the modified array.
+ * @param slice The slice (TypeScript array) to append to.
+ * @param elements The elements to append.
+ * @returns The modified slice (TypeScript array).
+ */
+export const append = <T>(
+  slice: Slice<T> | null,
+  ...elements: T[]
+): Slice<T> => {
+  if (slice) {
+    slice.push(...elements)
+  } else {
+    slice = [...elements]
+  }
+  // update capacity
+  if (slice.__capacity !== undefined && slice.length > slice.__capacity) {
+    slice.__capacity = slice.length
+  }
+  return slice
 }
 
 /**
  * Represents the Go error type (interface).
  */
 export type Error = {
-  Error(): string
+	Error(): string
 } | null
 
 /**
@@ -95,9 +154,42 @@ export const stringToRunes = (str: string): number[] => {
  * @param runes The input array of numbers representing Unicode code points.
  * @returns The resulting string.
  */
-export const runesToString = (runes: number[]): string => {
-  return String.fromCharCode(...runes);
-};
+export const runesToString = (runes: Slice<number>): string => {
+  return runes?.length ? String.fromCharCode(...runes) : ""
+}
+
+/**
+ * Converts a number to a byte (uint8) by truncating to the range 0-255.
+ * Equivalent to Go's byte() conversion.
+ * @param n The number to convert to a byte.
+ * @returns The byte value (0-255).
+ */
+export const byte = (n: number): number => {
+  return n & 0xFF; // Bitwise AND with 255 ensures we get a value in the range 0-255
+}
+
+/** Box represents a Go variable which can be referred to by other variables.
+ * 
+ * For example:
+ *   var myVariable int
+ *  
+ */
+export type Box<T> = { value: T }
+
+/** Wrap a non-null T in a pointer‐box. */
+export function box<T>(v: T): Box<T> {
+  // We create a new object wrapper for every box call to ensure
+  // distinct pointer identity, crucial for pointer comparisons (p1 == p2).
+  return { value: v }
+}
+
+/** Dereference a pointer‐box, throws on null → simulates Go panic. */
+export function unbox<T>(b: Box<T>): T {
+  if (b === null) {
+    throw new Error('runtime error: invalid memory address or nil pointer dereference')
+  }
+  return b.value
+}
 
 /**
  * Gets a value from a map, with a default value if the key doesn't exist.
@@ -141,24 +233,6 @@ export const deleteMapEntry = <K, V>(map: Map<K, V>, key: K): void => {
  */
 export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
   return map.has(key)
-}
-/**
- * Appends elements to a slice (TypeScript array).
- * Note: In Go, append can return a new slice if the underlying array is reallocated.
- * This helper emulates that by returning the modified array.
- * @param slice The slice (TypeScript array) to append to.
- * @param elements The elements to append.
- * @returns The modified slice (TypeScript array).
- */
-export const append = <T>(
-  slice: Array<T> & { __capacity?: number },
-  ...elements: T[]
-): Array<T> & { __capacity?: number } => {
-  slice.push(...elements)
-  if (slice.__capacity !== undefined && slice.length > slice.__capacity) {
-    slice.__capacity = slice.length
-  }
-  return slice
 }
 
 /**

@@ -1,0 +1,8 @@
+setting x to 10
+***p3 == 10
+
+setting ***p3 to 12
+***p3 == 12
+
+setting y to 15, p1 to &y
+***p3 == 15

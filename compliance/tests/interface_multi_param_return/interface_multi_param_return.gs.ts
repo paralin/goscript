@@ -1,26 +1,39 @@
 // Generated file based on interface_multi_param_return.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-interface MultiParamReturner {
-	Process(data: number[], count: number, _p2: string): [boolean, goscript.Error];
-}
+type MultiParamReturner = ({
+	Process(data: number[], count: number, _p2: string): [boolean, $.Error];
+}) | null
 
-// Register this interface with the runtime type system
-const MultiParamReturner__typeInfo = goscript.registerType(
+const MultiParamReturner__typeInfo = $.registerType(
   'MultiParamReturner',
-  goscript.TypeKind.Interface,
-  null,
+  $.TypeKind.Interface,
+  null, // Zero value for interface is null
   new Set(['Process']),
   undefined
 );
 
 class MyProcessor {
+	public _fields: {
+	}
 
-	public Process(data: number[], count: number, _: string): [boolean, goscript.Error] {
+	constructor(init?: Partial<{}>) {
+		this._fields = {
+		}
+	}
+
+	public clone(): MyProcessor {
+		const cloned = new MyProcessor()
+		cloned._fields = {
+		}
+		return cloned
+	}
+
+	public Process(data: number[], count: number, _: string): [boolean, $.Error] {
 		const p = this
-		if (count > 0 && goscript.len(data) > 0) {
+		if (count > 0 && $.len(data) > 0) {
 			console.log("Processing successful")
 			return [true, null]
 		}
@@ -28,24 +41,21 @@ class MyProcessor {
 		return [false, null]
 	}
 
-	constructor(init?: Partial<MyProcessor>) { if (init) Object.assign(this, init as any); }
-	public clone(): MyProcessor { return Object.assign(Object.create(MyProcessor.prototype) as MyProcessor, this); }
-
 	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
+	static __typeInfo = $.registerType(
 	  'MyProcessor',
-	  goscript.TypeKind.Struct,
+	  $.TypeKind.Struct,
 	  new MyProcessor(),
 	  new Set(['Process']),
 	  MyProcessor
 	);
 }
 
-export async function main(): Promise<void> {
-	let processor: MultiParamReturner | null = null;
+export function main(): void {
+	let processor: MultiParamReturner = null
 	processor = new MyProcessor({})
 
-	let data = [1, 2, 3]
+	let data = $.arrayToSlice([1, 2, 3])
 	let [success, ] = processor.Process(data, 5, "unused")
 
 	if (success) {

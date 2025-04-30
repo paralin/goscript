@@ -1,15 +1,15 @@
 // Generated file based on select_statement.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	// Test 1: Simple deterministic select with default
 	// Create a buffered channel so sends don't block
-	let ch1 = goscript.makeChannel<string>(1, "")
+	let ch1 = $.makeChannel<string>(1, "")
 
 	// First test: empty channel, should hit default
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -33,7 +33,7 @@ export async function main(): Promise<void> {
 	await ch1.send("hello")
 
 	// Second test: should read from channel
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -54,12 +54,12 @@ export async function main(): Promise<void> {
 	], true)
 
 	// Test 3: Select with channel closing and ok value
-	let ch2 = goscript.makeChannel<number>(1, 0)
+	let ch2 = $.makeChannel<number>(1, 0)
 	await ch2.send(42)
 	ch2.close()
 
 	// First receive gets the buffered value
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -85,7 +85,7 @@ export async function main(): Promise<void> {
 	], true)
 
 	// Second receive gets the zero value with ok==false
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -111,10 +111,10 @@ export async function main(): Promise<void> {
 	], true)
 
 	// Test 5: Send operations
-	let ch3 = goscript.makeChannel<number>(1, 0)
+	let ch3 = $.makeChannel<number>(1, 0)
 
 	// First send should succeed (buffer not full)
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -135,7 +135,7 @@ export async function main(): Promise<void> {
 	], true)
 
 	// Second send should hit default (buffer full)
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -156,13 +156,13 @@ export async function main(): Promise<void> {
 	], true)
 
 	// Test 7: Multiple channel select (with known values)
-	let ch4 = goscript.makeChannel<string>(1, "")
-	let ch5 = goscript.makeChannel<string>(1, "")
+	let ch4 = $.makeChannel<string>(1, "")
+	let ch5 = $.makeChannel<string>(1, "")
 
 	await ch4.send("from ch4")
 
 	// Should select ch4 because it has data, ch5 is empty
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -187,7 +187,7 @@ export async function main(): Promise<void> {
 	await ch5.send("from ch5")
 
 	// Should select ch5 because it has data, ch4 is empty
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -209,7 +209,7 @@ export async function main(): Promise<void> {
 	], false)
 
 	// Test 9: Channel closing test case for a separate test
-	let chClose = goscript.makeChannel<boolean>(0, false)
+	let chClose = $.makeChannel<boolean>(0, false)
 	chClose.close()
 	const { value: val, ok: ok } = await chClose.receiveWithOk()
 	if (!ok) {

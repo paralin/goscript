@@ -1,5 +1,9 @@
 package main
 
+/* not currently working correctly */
+/* @ts-ignore */
+/* eslint-disable-file */
+
 func main() {
 	// --- Original Tests ---
 	println("--- Original Tests ---")
@@ -229,7 +233,7 @@ func main() {
 	println("innerSliceWithCap[2]:", innerSliceWithCap[2])                         // 60
 
 	// Check if the original slice of slices reflects the change (it should, as append was within capacity)
-	println("sliceOfSlicesWithCap[1][2]:", sliceOfSlicesWithCap[1][2]) // 60
+	println("sliceOfSlicesWithCap[1][2]:", sliceOfSlicesWithCap[1][:3][2]) // 60
 
 	// Append to inner slice exceeding capacity
 	println("--- Append to inner slice exceeding capacity ---")

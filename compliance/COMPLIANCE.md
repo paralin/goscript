@@ -39,6 +39,7 @@ The following tests are currently implemented in the `/compliance/tests` directo
 *   **`pointer_deref_multiassign/`**: Tests dereferencing a pointer during a multi-variable assignment (`:=` or `=`), including the use of the blank identifier (`_`).
 *   **`pointer_initialization/`**: Checks the initialization of pointer variables using the address-of operator (`&`) or `new()`.
 *   **`select_receive_on_closed_channel_no_default/`**: Tests `select` behavior when receiving from a closed channel without a default case.
+*   **`pointers/`**: Tests multi-level pointers (`*`, `**`, `***`), pointer comparisons (`==`, `!=`, `nil`), dereferencing, and modification through pointers.
 *   **`select_send_on_full_buffered_channel_with_default/`**: Tests `select` behavior when sending to a full buffered channel with a default case.
 *   **`select_statement/`**: Verifies basic `select` statements for channel communication.
 *   **`simple/`**: A basic test covering simple struct definition, field access, method calls, and `println`.
@@ -54,7 +55,7 @@ Each test should have only three files:
 
 1. test_name.go - the Go code to convert to TypeScript
 2. test_name.gs.ts - the generated TypeScript code, created automatically on test run
-3. expected.log - the expected output from running the .gs.ts
+3. expected.log - the expected output from running the .gs.ts, created automatically on first test run
 
 ## Covered Go Language Constructs
 
@@ -103,7 +104,6 @@ Based on the existing tests, GoScript aims to support the following Go features:
     *   Multi-variable assignment.
     *   Blank identifier (`_`) in assignment.
 *   **Pointers:**
-    *   Pointer types (`*T`).
     *   Address-of operator (`&`).
     *   Dereference operator (`*`).
 *   **Value Semantics:** Emulation of Go's struct copy-on-assignment behavior.
@@ -115,6 +115,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 
 The following Go constructs, present in the "Go By Example" guide, do not appear to have dedicated compliance tests yet. This list is not exhaustive but provides a starting point for future test development.
 
+*   Pointer types (`*T`, `**T`, `***T`, etc.).
 *   **Control Flow:**
     *   `panic` / `recover`
 *   **Data Structures:**

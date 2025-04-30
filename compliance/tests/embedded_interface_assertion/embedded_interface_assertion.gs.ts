@@ -1,77 +1,84 @@
 // Generated file based on embedded_interface_assertion.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-interface Reader {
-	Read(_p0: number[]): [number, goscript.Error];
-}
+type Reader = ({
+	Read(_p0: number[]): [number, $.Error];
+}) | null
 
-// Register this interface with the runtime type system
-const Reader__typeInfo = goscript.registerType(
+const Reader__typeInfo = $.registerType(
   'Reader',
-  goscript.TypeKind.Interface,
-  null,
+  $.TypeKind.Interface,
+  null, // Zero value for interface is null
   new Set(['Read']),
   undefined
 );
 
-interface Closer {
-	Close(): goscript.Error;
-}
+type Closer = ({
+	Close(): $.Error;
+}) | null
 
-// Register this interface with the runtime type system
-const Closer__typeInfo = goscript.registerType(
+const Closer__typeInfo = $.registerType(
   'Closer',
-  goscript.TypeKind.Interface,
-  null,
+  $.TypeKind.Interface,
+  null, // Zero value for interface is null
   new Set(['Close']),
   undefined
 );
 
-interface ReadCloser extends Reader, Closer {
-}
+type ReadCloser = ( & Reader & Closer) | null
 
-// Register this interface with the runtime type system
-const ReadCloser__typeInfo = goscript.registerType(
+const ReadCloser__typeInfo = $.registerType(
   'ReadCloser',
-  goscript.TypeKind.Interface,
-  null,
+  $.TypeKind.Interface,
+  null, // Zero value for interface is null
   new Set(['Close', 'Read']),
   undefined
 );
 
 class MyStruct {
+	public _fields: {
+	}
 
-	public Read(p: number[]): [number, goscript.Error] {
+	constructor(init?: Partial<{}>) {
+		this._fields = {
+		}
+	}
+
+	public clone(): MyStruct {
+		const cloned = new MyStruct()
+		cloned._fields = {
+		}
+		return cloned
+	}
+
+	public Read(p: number[]): [number, $.Error] {
 		const m = this
 		return [0, null]
 	}
 
-	public Close(): goscript.Error {
+	public Close(): $.Error {
 		const m = this
 		return null
 	}
 
-	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
-	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
-
 	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
+	static __typeInfo = $.registerType(
 	  'MyStruct',
-	  goscript.TypeKind.Struct,
+	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set(['Read', 'Close']),
 	  MyStruct
 	);
 }
 
-export async function main(): Promise<void> {
-	let rwc: ReadCloser | null = null;
+export function main(): void {
+	let rwc: ReadCloser = null
 	let s = new MyStruct({})
 	rwc = s.clone()
 
-	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwc, 'ReadCloser')
+	let { ok: ok } = $.typeAssert<ReadCloser>(rwc, 'ReadCloser')
 	if (ok) {
 		console.log("Embedded interface assertion successful")
 	} else {

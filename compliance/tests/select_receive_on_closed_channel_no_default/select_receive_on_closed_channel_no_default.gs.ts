@@ -1,10 +1,10 @@
 // Generated file based on select_receive_on_closed_channel_no_default.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
-	let ch = goscript.makeChannel<number>(0, 0) // Unbuffered
+	let ch = $.makeChannel<number>(0, 0)
 	ch.close()
 
 	//nolint:staticcheck
@@ -12,7 +12,7 @@ export async function main(): Promise<void> {
 	// Should not be reached
 
 	// Should be reached
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,

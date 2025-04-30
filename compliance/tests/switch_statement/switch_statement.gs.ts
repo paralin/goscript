@@ -1,9 +1,9 @@
 // Generated file based on switch_statement.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	let i = 2
 	console.log("Integer switch:")
 	switch (i) {

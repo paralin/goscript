@@ -55,25 +55,25 @@ func TestCompliance(t *testing.T) {
 
 	// Wait for all tests to complete
 	wg.Wait()
-}
 
-// Add a new test function for type checking
-func TestTypeCheck(t *testing.T) {
-	// Get workspace directory (project root)
-	workspaceDir, err := os.Getwd()
-	if err != nil {
-		t.Fatalf("failed to get working directory: %v", err)
-	}
-	workspaceDir = filepath.Join(workspaceDir, "..")
+	// Typecheck
+	failed := t.Failed()
+	t.Run("typecheck", func(t *testing.T) {
+		t.Helper()
+		if failed {
+			t.Log("at least one compliance test failed: skipping typecheck")
+			t.SkipNow()
+		}
 
-	t.Log("running: npm run typecheck")
-	cmd := exec.Command("npm", "run", "typecheck")
-	cmd.Dir = workspaceDir // Run in the workspace directory
-	cmd.Stdout = os.Stderr
-	cmd.Stderr = os.Stderr
+		t.Log("running: npm run typecheck")
+		cmd := exec.Command("npm", "run", "typecheck")
+		cmd.Dir = workspaceDir // Run in the workspace directory
+		cmd.Stdout = os.Stderr
+		cmd.Stderr = os.Stderr
 
-	err = cmd.Run()
-	if err != nil {
-		t.Errorf("npm run typecheck failed: %v", err)
-	}
+		err = cmd.Run()
+		if err != nil {
+			t.Errorf("npm run typecheck failed: %v", err)
+		}
+	})
 }

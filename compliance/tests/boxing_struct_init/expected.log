@@ -1,0 +1,3 @@
+ptr.MyInt: 40
+ptrToVal.MyInt: 20
+myIntVal: 20

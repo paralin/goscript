@@ -6,7 +6,6 @@ type MyStruct struct {
 }
 
 func main() {
-	// Setup from previous steps (simplified for this test)
 	structPointer := &MyStruct{MyInt: 4, MyString: "hello world"}
 	dereferencedStructCopy := *structPointer
 	dereferencedStructCopy.MyString = "original dereferenced copy modified"

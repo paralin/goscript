@@ -1,20 +1,20 @@
 // Generated file based on array_literal.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	// Test basic array literal
 	//nolint:staticcheck
-	let a: number[] = [1, 2, 3];
-	console.log(a[0], a[1], a[2])
+	let a: number[] = $.arrayToSlice([1, 2, 3])
+	console.log(a![0], a![1], a![2])
 
 	// Test array literal with inferred length
-	let b = ["hello", "world"]
-	console.log(b[0], b[1])
+	let b = $.arrayToSlice(["hello", "world"])
+	console.log(b![0], b![1])
 
 	// Test array literal with specific element initialization
-	let c = [0, 10, 0, 30, 0]
-	console.log(c[0], c[1], c[2], c[3], c[4])
+	let c = $.arrayToSlice([0, 10, 0, 30, 0])
+	console.log(c![0], c![1], c![2], c![3], c![4])
 }
 

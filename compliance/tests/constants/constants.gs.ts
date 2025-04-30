@@ -1,18 +1,18 @@
 // Generated file based on constants.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-let Pi = 3.14;
+let Pi: number = 3.14
 
-let Truth = false;
+let Truth: boolean = false
 
 // TODO: Handle large integer constants and bit shifts exceeding JS number limits.
 // Big      = 1 << 60
 // Small    = Big >> 59 // Commented out as it depends on Big
-let Greeting = "Hello, Constants!";
+let Greeting: string = "Hello, Constants!"
 
-export async function main(): Promise<void> {
+export function main(): void {
 	console.log(Pi)
 	console.log(Truth)
 	// println(Big) // Commented out until large integer handling is implemented

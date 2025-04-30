@@ -1,49 +1,80 @@
 // Generated file based on struct_pointer_interface_fields.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-interface MyInterface {
+type MyInterface = ({
 	Method(): void;
-}
+}) | null
 
-// Register this interface with the runtime type system
-const MyInterface__typeInfo = goscript.registerType(
+const MyInterface__typeInfo = $.registerType(
   'MyInterface',
-  goscript.TypeKind.Interface,
-  null,
+  $.TypeKind.Interface,
+  null, // Zero value for interface is null
   new Set(['Method']),
   undefined
 );
 
 class MyStruct {
-	public PointerField: number | null = null;
-	public InterfaceField: MyInterface | null = null;
+	public get PointerField(): $.Box<number> | null {
+		return this._fields.PointerField.value
+	}
+	public set PointerField(value: $.Box<number> | null) {
+		this._fields.PointerField.value = value
+	}
 
-	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
-	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
+	public get interfaceField(): MyInterface {
+		return this._fields.interfaceField.value
+	}
+	public set interfaceField(value: MyInterface) {
+		this._fields.interfaceField.value = value
+	}
+
+	public _fields: {
+		PointerField: $.Box<$.Box<number> | null>;
+		interfaceField: $.Box<MyInterface>;
+	}
+
+	constructor(init?: Partial<{PointerField?: $.Box<number> | null, interfaceField?: MyInterface}>) {
+		this._fields = {
+			PointerField: $.box(init?.PointerField ?? null),
+			interfaceField: $.box(init?.interfaceField ?? null)
+		}
+	}
+
+	public clone(): MyStruct {
+		const cloned = new MyStruct()
+		cloned._fields = {
+			PointerField: $.box(this._fields.PointerField.value),
+			interfaceField: $.box(this._fields.interfaceField.value)
+		}
+		return cloned
+	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
+	static __typeInfo = $.registerType(
 	  'MyStruct',
-	  goscript.TypeKind.Struct,
+	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set([]),
 	  MyStruct
 	);
 }
 
-export async function main(): Promise<void> {
+export function main(): void {
 	let s = new MyStruct({})
-	console.log(s.PointerField)
-	console.log(s.InterfaceField)
+	console.log(s.PointerField == null)
+	console.log(s.interfaceField == null)
 
-	let i = 10
+	let i: $.Box<number> = $.box(10)
 	s.PointerField = i
-	console.log(s.PointerField)
+	console.log(s.PointerField != null)
+	console.log(s.PointerField!.value)
+	i.value = 15
+	console.log(s.PointerField!.value)
 
-	let mi: MyInterface | null = null;
-	s.InterfaceField = mi
-	console.log(s.InterfaceField)
+	let mi: MyInterface = null
+	s.interfaceField = mi
+	console.log(s.interfaceField == null)
 }
 

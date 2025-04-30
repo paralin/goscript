@@ -1,10 +1,10 @@
 // Generated file based on select_send_on_full_buffered_channel_with_default.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
-	let ch = goscript.makeChannel<number>(1, 0)
+	let ch = $.makeChannel<number>(1, 0)
 	await ch.send(1)
 
 	// TODO: The comments on the following cases are written twice in the output.
@@ -12,7 +12,7 @@ export async function main(): Promise<void> {
 	// Should not be reached
 
 	// Should be reached
-	await goscript.selectStatement([
+	await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,

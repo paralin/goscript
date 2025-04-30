@@ -1,10 +1,10 @@
 // Generated file based on channel_basic.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
-	let messages = goscript.makeChannel<string>(0, "")
+	let messages = $.makeChannel<string>(0, "")
 
 	queueMicrotask(async () => {
 		{

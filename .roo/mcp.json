@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "go-ast-mcp": {
+      "url": "http://localhost:8080/sse",
+      "description": "Read and write functions from the Go codebase."
+    }
+  }
+}

@@ -1,9 +1,9 @@
 // Generated file based on if_statement.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	// === If Statement ===
 	let n = 7
 	if (n % 2 == 0) {

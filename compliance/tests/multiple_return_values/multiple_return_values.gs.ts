@@ -1,13 +1,13 @@
 // Generated file based on multiple_return_values.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
 function multipleReturnValues(): [number, string, boolean] {
 	return [42, "hello", true]
 }
 
-export async function main(): Promise<void> {
+export function main(): void {
 	let [a, b, c] = multipleReturnValues()
 	console.log(a)
 	console.log(b)

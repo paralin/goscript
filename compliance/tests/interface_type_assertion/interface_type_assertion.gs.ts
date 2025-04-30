@@ -1,48 +1,67 @@
 // Generated file based on interface_type_assertion.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-interface MyInterface {
+type MyInterface = ({
 	Method1(): number;
-}
+}) | null
 
-// Register this interface with the runtime type system
-const MyInterface__typeInfo = goscript.registerType(
+const MyInterface__typeInfo = $.registerType(
   'MyInterface',
-  goscript.TypeKind.Interface,
-  null,
+  $.TypeKind.Interface,
+  null, // Zero value for interface is null
   new Set(['Method1']),
   undefined
 );
 
 class MyStruct {
-	public Value: number = 0;
+	public get Value(): number {
+		return this._fields.Value.value
+	}
+	public set Value(value: number) {
+		this._fields.Value.value = value
+	}
+
+	public _fields: {
+		Value: $.Box<number>;
+	}
+
+	constructor(init?: Partial<{Value?: number}>) {
+		this._fields = {
+			Value: $.box(init?.Value ?? 0)
+		}
+	}
+
+	public clone(): MyStruct {
+		const cloned = new MyStruct()
+		cloned._fields = {
+			Value: $.box(this._fields.Value.value)
+		}
+		return cloned
+	}
 
 	public Method1(): number {
 		const m = this
 		return m.Value
 	}
 
-	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
-	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
-
 	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
+	static __typeInfo = $.registerType(
 	  'MyStruct',
-	  goscript.TypeKind.Struct,
+	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set(['Method1']),
 	  MyStruct
 	);
 }
 
-export async function main(): Promise<void> {
-	let i: MyInterface | null = null;
+export function main(): void {
+	let i: MyInterface = null
 	let s = new MyStruct({Value: 10})
 	i = s.clone()
 
-	let { ok: ok } = goscript.typeAssert<MyStruct>(i, 'MyStruct')
+	let { ok: ok } = $.typeAssert<MyStruct>(i, 'MyStruct')
 	if (ok) {
 		console.log("Type assertion successful")
 	} else {
@@ -50,7 +69,7 @@ export async function main(): Promise<void> {
 	}
 
 	// try a second time since this generates something different when using = and not :=
-	({ ok: ok } = goscript.typeAssert<MyStruct | null>(i, 'unknown'))
+	({ ok: ok } = $.typeAssert<$.Box<MyStruct> | null>(i, 'unknown'))
 
 	// expected
 	if (ok) {

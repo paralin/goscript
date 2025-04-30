@@ -1,3 +1,19 @@
-valueCopy1: Expected: value copy 1, Actual: value copy 1
-dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: original dereferenced copy modified
-valueCopy2: Expected: value copy 2, Actual: value copy 2
+----------------------------------------------------------
+VALUE TYPE COPY BEHAVIOR TEST
+----------------------------------------------------------
+Value Copy Test:
+  valueCopy1.MyString: value copy 1
+  original.MyString: original modified
+  valueCopy2.MyString: value copy 2
+
+Pointer Behavior Test:
+  Before pointer modification - original.MyString: original modified
+  After pointer modification - original.MyString: modified through pointer
+  After pointer modification - original.MyInt: 100
+
+Nested Struct Test:
+  nestedCopy.Value:  30
+  nestedOriginal.Value:  10
+  nestedCopy.InnerStruct.MyString: inner modified
+  nestedOriginal.InnerStruct.MyString: inner original
+----------------------------------------------------------

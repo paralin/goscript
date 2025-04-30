@@ -6,3 +6,22 @@ Employee Pointer Name: Bob
 Employee Pointer Age: 25
 Employee Pointer ID: 456
 Hello, my name is Bob
+
+--- Multiple Embedding ---
+Manager Name: Charlie
+Manager Age: 40
+Manager Street: 123 Main St
+Manager City: Anytown
+Manager Phone: 555-1234
+Manager Level: 5
+Hello, my name is Charlie
+Manager Full Address: 123 Main St, Anytown
+Calling 555-1234
+
+--- Multiple Embedding (Pointer) ---
+Manager Pointer Name: Charlie
+Hello, my name is Charlie
+Manager Pointer Full Address: 123 Main St, Anytown
+Calling 555-1234
+Modified Manager Age: 41
+Modified Manager City: New City

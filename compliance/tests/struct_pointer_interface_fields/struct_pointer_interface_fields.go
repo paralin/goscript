@@ -6,19 +6,22 @@ type MyInterface interface {
 
 type MyStruct struct {
 	PointerField   *int
-	InterfaceField MyInterface
+	interfaceField MyInterface
 }
 
 func main() {
 	s := MyStruct{}
-	println(s.PointerField)
-	println(s.InterfaceField)
+	println(s.PointerField == nil)
+	println(s.interfaceField == nil)
 
 	i := 10
 	s.PointerField = &i
-	println(s.PointerField)
+	println(s.PointerField != nil)
+	println(*s.PointerField)
+	i = 15
+	println(*s.PointerField)
 
 	var mi MyInterface
-	s.InterfaceField = mi
-	println(s.InterfaceField)
+	s.interfaceField = mi
+	println(s.interfaceField == nil)
 }
