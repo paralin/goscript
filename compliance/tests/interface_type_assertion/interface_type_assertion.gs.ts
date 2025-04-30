@@ -43,7 +43,7 @@ export async function main(): Promise<void> {
 	let s = new MyStruct({Value: 10})
 	i = (goscript.isAssignable(s, MyInterface__typeInfo) ? s : null)
 
-	let { ok: ok } = goscript.typeAssert<MyStruct>(i, MyStruct__typeInfo)
+	let { ok: ok } = goscript.typeAssert<MyStruct>(i, MyStruct.__typeInfo)
 	if (ok) {
 		console.log("Type assertion successful")
 	} else {

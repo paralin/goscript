@@ -253,7 +253,7 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	
+
 	// Get the type info reference for the asserted type
 	// We need to use .__typeInfo for user-defined types instead of the old style
 	typeInfoRef := c.getTypeInfoRef(exp.Type)
@@ -271,10 +271,9 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 
 // getTypeInfoRef returns the TypeScript reference to the type information for a given AST type expression
 func (c *GoToTSCompiler) getTypeInfoRef(typeExpr ast.Expr) string {
-	switch t := typeExpr.(type) {
-	case *ast.Ident:
-		// Check for built-in types
-		switch t.Name {
+	// Check for built-in types first - these are handled the same way regardless
+	if ident, isIdent := typeExpr.(*ast.Ident); isIdent {
+		switch ident.Name {
 		case "int":
 			return "goscript.INT_TYPE"
 		case "string":
@@ -293,34 +292,69 @@ func (c *GoToTSCompiler) getTypeInfoRef(typeExpr ast.Expr) string {
 			return "goscript.ANY_TYPE"
 		case "error":
 			return "goscript.ERROR_TYPE"
-		default:
-			// Named user-defined type
-			return fmt.Sprintf("%s__typeInfo", t.Name)
 		}
+	}
+
+	// For all other types, use type information to determine if it's an interface or struct
+	if c.pkg != nil && c.pkg.TypesInfo != nil {
+		if tv, ok := c.pkg.TypesInfo.Types[typeExpr]; ok && tv.Type != nil {
+			// Check if it's an interface type
+			if _, isInterface := tv.Type.Underlying().(*gtypes.Interface); isInterface {
+				// For interfaces, use the __typeInfo suffix format
+				switch t := typeExpr.(type) {
+				case *ast.Ident:
+					return fmt.Sprintf("%s__typeInfo", t.Name)
+				case *ast.SelectorExpr:
+					if ident, ok := t.X.(*ast.Ident); ok {
+						return fmt.Sprintf("%s.%s__typeInfo", ident.Name, t.Sel.Name)
+					}
+				}
+			} else {
+				// For non-interfaces (structs, etc.), use the .__typeInfo member format
+				switch t := typeExpr.(type) {
+				case *ast.Ident:
+					return fmt.Sprintf("%s.__typeInfo", t.Name)
+				case *ast.SelectorExpr:
+					if ident, ok := t.X.(*ast.Ident); ok {
+						return fmt.Sprintf("%s.%s.__typeInfo", ident.Name, t.Sel.Name)
+					}
+				}
+			}
+		}
+	}
+	
+	// If we reach this point, we couldn't definitely determine the type
+	// Fall back to the basic cases based on syntax
+	switch t := typeExpr.(type) {
+	case *ast.Ident:
+		// Default to struct-style for user-defined types without type info
+		return fmt.Sprintf("%s.__typeInfo", t.Name)
 	case *ast.SelectorExpr:
-		// For imported types like pkg.Type
+		// For imported types like pkg.Type, we've handled this in the type info section above
+		// This is a fallback if the type info approach failed
 		if ident, ok := t.X.(*ast.Ident); ok {
-			return fmt.Sprintf("%s.%s__typeInfo", ident.Name, t.Sel.Name)
+			// Default to struct-style for qualified names without type info
+			return fmt.Sprintf("%s.%s.__typeInfo", ident.Name, t.Sel.Name)
 		}
 	case *ast.StarExpr:
 		// Handle pointer types - create the pointer type info dynamically
 		baseType := c.getTypeExprName(t.X)
 		// Check if it's a basic type
 		if isBasicType(baseType) {
-			return fmt.Sprintf("goscript.makePointerTypeInfo(%s)", 
+			return fmt.Sprintf("goscript.makePointerTypeInfo(%s)",
 				getBasicTypeConstName(baseType))
 		}
 		return fmt.Sprintf("goscript.makePointerTypeInfo(%s.__typeInfo)", baseType)
 	case *ast.ArrayType:
 		// Handle array/slice types - construct an inline SliceTypeInfo
 		elemTypeRef := c.getTypeInfoRef(t.Elt)
-		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Slice, name: '[]%s', zero: [], elem: %s }", 
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Slice, name: '[]%s', zero: [], elem: %s }",
 			c.getTypeExprName(t.Elt), elemTypeRef)
 	case *ast.MapType:
 		// Handle map types - construct an inline MapTypeInfo
 		keyTypeRef := c.getTypeInfoRef(t.Key)
 		valueTypeRef := c.getTypeInfoRef(t.Value)
-		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Map, name: 'map[%s]%s', zero: new Map(), key: %s, value: %s }", 
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Map, name: 'map[%s]%s', zero: new Map(), key: %s, value: %s }",
 			c.getTypeExprName(t.Key), c.getTypeExprName(t.Value), keyTypeRef, valueTypeRef)
 	case *ast.InterfaceType:
 		// Handle interface{} specifically
