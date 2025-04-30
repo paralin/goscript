@@ -81,6 +81,17 @@ func (w *TSCodeWriter) WriteLiterally(literal string) {
 	w.w.Write([]byte(literal)) //nolint:errcheck
 }
 
+// WriteLiterallyf writes something to the output with formatting.
+func (w *TSCodeWriter) WriteLiterallyf(literal string, args ...any) {
+	w.sectionWrittenFlag = true
+	if w.lineWritten {
+		w.WriteLinePreamble()
+	}
+
+	l := fmt.Sprintf(literal, args...)
+	w.w.Write([]byte(l)) //nolint:errcheck
+}
+
 // WriteSectionTail writes the end of a section.
 func (w *TSCodeWriter) WriteSectionTail() {
 	if w.sectionWrittenFlag {

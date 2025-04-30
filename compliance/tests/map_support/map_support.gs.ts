@@ -3,9 +3,9 @@
 
 import * as goscript from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	// Create map using make
-	let scores = goscript.makeMap<string, number>()
+	let scores: Map<string, number> = goscript.makeMap<string, number>()
 	console.log("Empty map created: Expected: true, Actual:", goscript.len(scores) == 0)
 
 	// Add key-value pairs
@@ -26,7 +26,7 @@ export async function main(): Promise<void> {
 
 	// Check if key exists (comma-ok idiom)
 	let value
-	let exists
+	let exists: boolean
 	exists = scores.has("David")
 	value = scores.get("David") ?? 0
 	console.log("Does David exist in map? Expected: false, Actual:", exists)
@@ -38,14 +38,14 @@ export async function main(): Promise<void> {
 	console.log("After delete, does Charlie exist? Expected: false, Actual:", exists)
 
 	// Create map with literal syntax
-	let colors = new Map([["red", "#ff0000"], ["green", "#00ff00"], ["blue", "#0000ff"]])
+	let colors: Map<string, string> = new Map([["red", "#ff0000"], ["green", "#00ff00"], ["blue", "#0000ff"]])
 	console.log("Map literal size: Expected: 3, Actual:", goscript.len(colors))
 	console.log("Color code for red: Expected: #ff0000, Actual:", colors.get("red"))
 
 	// Iterate over a map with range
 	console.log("Iterating over scores map:")
 	// Note: Map iteration is not ordered in Go, so we will collect the results and sort them for consistent test output.
-	let scoreResults: string[] = [];
+	let scoreResults: string[] = null
 
 	// Using string concatenation to build the output string
 	for (const [k, v] of scores.entries()) {
@@ -53,14 +53,14 @@ export async function main(): Promise<void> {
 		const score = v
 		{
 			// Using string concatenation to build the output string
-			let result = "  - Name: " + name + " Score: " + itoa(score)
+			let result: string = "  - Name: " + name + " Score: " + itoa(score)
 			scoreResults = goscript.append(scoreResults, result)
 		}
 	}
 
 	// Inline bubble sort for string slice
 	// (avoid importing sort package yet)
-	let n = goscript.len(scoreResults)
+	let n: number = goscript.len(scoreResults)
 	for (let i = 0; i < n - 1; i++) {
 		for (let j = 0; j < n - i - 1; j++) {
 			if (scoreResults[j] > scoreResults[j + 1]) {
@@ -84,15 +84,15 @@ function itoa(i: number): string {
 	if (i == 0) {
 		return "0"
 	}
-	let s = ""
-	let isNegative = false
+	let s: string = ""
+	let isNegative: boolean = false
 	if (i < 0) {
 		isNegative = true
 		i = -i
 	}
 	for (; i > 0; ) {
 		s = String.fromCharCode(i % 10 + 48) + s
-		i = Math.floor(i / 10)
+		i /= 10
 	}
 	if (isNegative) {
 		s = "-" + s

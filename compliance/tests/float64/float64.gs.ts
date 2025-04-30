@@ -1,13 +1,13 @@
 // Generated file based on float64.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	//nolint:staticcheck
-	let a: number = 1.23;
+	let a: number = 1.23
 	let b = 4.56
-	let c: number;
+	let c: number = 0
 
 	c = a + b
 	console.log("a + b =", c)

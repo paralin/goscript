@@ -246,6 +246,16 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	log.SetLevel(logrus.DebugLevel)
 	le := logrus.NewEntry(log)
 
+	// Check for skip-test file
+	skipTestPath := filepath.Join(testDir, "skip-test")
+	if _, err := os.Stat(skipTestPath); err == nil {
+		t.Skipf("Skipping test %s: skip-test file found", filepath.Base(testDir))
+		return // Skip the test
+	} else if !os.IsNotExist(err) {
+		// If there was an error other than "not exists", fail the test
+		t.Fatalf("failed to check for skip-test file in %s: %v", testDir, err)
+	}
+
 	tempDir := PrepareTempTestDir(t, testDir)
 	defer os.RemoveAll(tempDir) //nolint:errcheck
 
@@ -292,23 +302,48 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	actual := strings.TrimSpace(RunTypeScriptRunner(t, workspaceDir, tempDir, tsRunner)) // Pass workspaceDir
 
 	expectedLogPath := filepath.Join(testDir, "expected.log")
-	expected, err := os.ReadFile(expectedLogPath)
+	expectedBytes, err := os.ReadFile(expectedLogPath)
+
+	// If expected.log doesn't exist, generate it using `go run` on the original source
 	if os.IsNotExist(err) {
-		// If expected.log doesn't exist, write the actual output to it
-		t.Logf("expected.log not found, writing actual output to %s", expectedLogPath)
-		if writeErr := os.WriteFile(expectedLogPath, []byte(actual), 0o644); writeErr != nil {
-			t.Fatalf("failed to write expected.log: %v", writeErr)
+		// Find the Go source file(s) in the original test directory
+		goFiles, globErr := filepath.Glob(filepath.Join(testDir, "*.go"))
+		if globErr != nil || len(goFiles) == 0 {
+			t.Logf("expected.log not found, generating from Go source in %s", testDir)
+			t.Fatalf("could not find Go source file(s) in test dir %s to generate expected.log: %v", testDir, globErr)
 		}
-		// Test passes on the first run if expected.log is generated
-		t.Logf("Generated expected.log for %s", filepath.Base(testDir))
+
+		// Run `go run`
+		goRunCmd := exec.Command("go", "run", "./")
+		goRunCmd.Dir = testDir // Run in the context of the test directory
+		var goRunOut bytes.Buffer
+		goRunCmd.Stdout = &goRunOut
+		goRunCmd.Stderr = &goRunOut
+		if runErr := goRunCmd.Run(); runErr != nil {
+			t.Fatalf("failed to run 'go run ./' in %s to generate expected.log: %v", testDir, runErr)
+		}
+
+		// Write the output of `go run` to expected.log
+		expectedOutputFromGo := strings.TrimSpace(goRunOut.String())
+		if writeErr := os.WriteFile(expectedLogPath, []byte(expectedOutputFromGo), 0o644); writeErr != nil {
+			t.Fatalf("failed to write generated expected.log: %v", writeErr)
+		}
+		expectedBytes = []byte(expectedOutputFromGo) // Use the newly generated content for comparison
 	} else if err != nil {
 		// If there was another error reading expected.log, fail the test
-		t.Fatalf("failed to read expected.log in %s: %v", testDir, err)
+		t.Fatalf("failed to read existing expected.log in %s: %v", testDir, err)
+	}
+
+	// Always compare the TypeScript output (`actual`) against the expected output (from file or generated)
+	exp := strings.TrimSpace(string(expectedBytes))
+	if actual != exp {
+		// If mismatch, write the actual TS output to a .actual.log file for easier debugging
+		actualLogPath := filepath.Join(testDir, "actual.log")
+		os.WriteFile(actualLogPath, []byte(actual), 0o644) //nolint:errcheck
+		t.Fatalf("output mismatch (TS vs Go)\nExpected (from Go):\n%s\nActual (from TS):\n%s", exp, actual)
 	} else {
-		// If expected.log exists, compare actual output to expected
-		exp := strings.TrimSpace(string(expected))
-		if actual != exp {
-			t.Fatalf("output mismatch\nExpected:\n%s\nActual:\n%s", exp, actual)
-		}
+		// If match, remove any stale .actual.log file
+		actualLogPath := filepath.Join(testDir, "actual.log")
+		os.Remove(actualLogPath) //nolint:errcheck
 	}
 }

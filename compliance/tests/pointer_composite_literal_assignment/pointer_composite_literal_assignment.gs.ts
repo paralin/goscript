@@ -1,26 +1,55 @@
 // Generated file based on pointer_composite_literal_assignment.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
 class MyStruct {
-	public MyInt: number = 0;
-	public MyString: string = "";
+	public get MyInt(): number {
+		return this._fields.MyInt.value
+	}
+	public set MyInt(value: number) {
+		this._fields.MyInt.value = value
+	}
 
-	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
-	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
+	public get MyString(): string {
+		return this._fields.MyString.value
+	}
+	public set MyString(value: string) {
+		this._fields.MyString.value = value
+	}
+
+	public _fields: {
+		MyInt: $.Box<number>;
+		MyString: $.Box<string>;
+	}
+
+	constructor(init?: Partial<{MyInt?: number, MyString?: string}>) {
+		this._fields = {
+			MyInt: $.box(init?.MyInt ?? 0),
+			MyString: $.box(init?.MyString ?? "")
+		}
+	}
+
+	public clone(): MyStruct {
+		const cloned = new MyStruct()
+		cloned._fields = {
+			MyInt: $.box(this._fields.MyInt.value),
+			MyString: $.box(this._fields.MyString.value)
+		}
+		return cloned
+	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = goscript.registerType(
+	static __typeInfo = $.registerType(
 	  'MyStruct',
-	  goscript.TypeKind.Struct,
+	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set([]),
 	  MyStruct
 	);
 }
 
-export async function main(): Promise<void> {
+export function main(): void {
 	// === Pointer Composite Literal Assignment ===
 	// Creating a pointer to a struct directly using a composite literal with &
 	let structPointer = new MyStruct({MyInt: 42, MyString: "composite literal pointer"})

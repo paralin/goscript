@@ -4,17 +4,26 @@
 import * as goscript from "@goscript/builtin";
 
 class MyStruct {
-	public MyInt: number = 0;
-	public MyString: string = "";
+	public MyInt: number
+	public MyString: string
+
+	constructor(init?: Partial<{MyInt?: number, MyString?: string}>) {
+		this.MyInt = init?.MyInt ?? 0
+		this.MyString = init?.MyString ?? ""
+	}
+
+	public clone(): MyStruct {
+		return new MyStruct({
+			MyInt: this.MyInt,
+			MyString: this.MyString,
+		})
+	}
 
 	// GetMyString returns the MyString field.
 	public GetMyString(): string {
 		const m = this
 		return m.MyString
 	}
-
-	constructor(init?: Partial<MyStruct>) { if (init) Object.assign(this, init as any); }
-	public clone(): MyStruct { return Object.assign(Object.create(MyStruct.prototype) as MyStruct, this); }
 
 	// Register this type with the runtime type system
 	static __typeInfo = goscript.registerType(
@@ -26,8 +35,8 @@ class MyStruct {
 	);
 }
 
-export async function main(): Promise<void> {
-	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
+export function main(): void {
+	let structPointer: goscript.Box<MyStruct> | null = goscript.box(new MyStruct({MyInt: 4, MyString: "hello world"}))
 	// === Method Call on Pointer Receiver ===
 	// Calling a method with a pointer receiver (*MyStruct) using a pointer variable.
 	console.log("Method call on pointer (structPointer): Expected: hello world, Actual: " + structPointer.GetMyString())

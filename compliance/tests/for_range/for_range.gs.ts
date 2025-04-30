@@ -1,9 +1,9 @@
 // Generated file based on for_range.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	let nums = [2, 3, 4]
 	let sum = 0
 	for (let i = 0; i < nums.length; i++) {
@@ -34,7 +34,7 @@ export async function main(): Promise<void> {
 	let str = "go"
 
 	// Note: c will be a rune (int32)
-	const _runes = goscript.stringToRunes(str)
+	const _runes = $.stringToRunes(str)
 	for (let i = 0; i < _runes.length; i++) {
 		const c = _runes[i]
 		{

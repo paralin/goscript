@@ -1,12 +1,12 @@
 // Generated file based on array_literal.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as goscript from "@goscript/builtin";
+import * as $ from "@goscript/builtin";
 
-export async function main(): Promise<void> {
+export function main(): void {
 	// Test basic array literal
 	//nolint:staticcheck
-	let a: number[] = [1, 2, 3];
+	let a: number[] = [1, 2, 3]
 	console.log(a[0], a[1], a[2])
 
 	// Test array literal with inferred length
