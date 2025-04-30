@@ -53,7 +53,7 @@ const MyOtherInterface__typeInfo: goscript.InterfaceTypeInfo = {
 export async function main(): Promise<void> {
 	let i: MyInterface | null = null;
 	let s = new MyStruct({Value: 10})
-	i = (goscript.isAssignable(s, MyInterface__typeInfo) ? s : null)
+	i = s
 
 	let { ok: ok } = goscript.typeAssert<MyOtherInterface>(i, MyOtherInterface__typeInfo)
 	if (ok) {

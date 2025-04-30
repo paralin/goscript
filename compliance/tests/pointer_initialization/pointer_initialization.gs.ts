@@ -25,8 +25,8 @@ class MyStruct {
 export async function main(): Promise<void> {
 	// === Pointer Initialization ===
 	// Create a pointer to a MyStruct instance using a composite literal.
-	let structPointer = goscript.makePtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
+	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	// Expected: "hello world"
-	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + (structPointer)?._ptr?.MyString)
+	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + structPointer?.MyString)
 }
 

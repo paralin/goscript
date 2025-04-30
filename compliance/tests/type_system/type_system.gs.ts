@@ -49,13 +49,13 @@ class MyData {
 
 export async function main(): Promise<void> {
 	// Create struct pointer
-	let dataPtr = goscript.makePtr(new MyData({num: 20, label: "B"}))
+	let dataPtr = new MyData({num: 20, label: "B"})
 
 	// Assign pointer to interface
 	// MyData does not fully implement NumPrinter (GetNum has pointer receiver)
 	// *MyData implements NumPrinter (PrintNum is promoted, GetNum is defined)
 	let np: NumPrinter | null = null;
-	np = (goscript.isAssignable(dataPtr, NumPrinter__typeInfo) ? dataPtr : null) // OK
+	np = dataPtr // OK
 
 	console.log("--- Interface Method Calls ---")
 	np.PrintNum() // Call value receiver method via interface holding pointer
@@ -64,9 +64,9 @@ export async function main(): Promise<void> {
 
 	console.log("\n--- Type Assertions (Comma-Ok) ---")
 	// Assert interface (holding *MyData) to *MyData
-	let { value: mdPtr1, ok: ok1 } = goscript.typeAssert<goscript.Ptr<MyData>>(np, goscript.makePointerTypeInfo(MyData.__typeInfo))
+	let { value: mdPtr1, ok: ok1 } = goscript.typeAssert<MyData | null>(np, MyData.__typeInfo)
 	if (ok1) {
-		console.log("np.(*MyData) OK:", ok1, "Num:", (mdPtr1)?._ptr?.num)
+		console.log("np.(*MyData) OK:", ok1, "Num:", mdPtr1?.num)
 	} else {
 		console.log("np.(*MyData) FAILED:", ok1)
 	}
@@ -85,14 +85,14 @@ export async function main(): Promise<void> {
 
 	// Assert nil interface to *MyData
 	let nilNp: NumPrinter | null = null;
-	let { ok: okNil } = goscript.typeAssert<goscript.Ptr<MyData>>(nilNp, goscript.makePointerTypeInfo(MyData.__typeInfo))
+	let { ok: okNil } = goscript.typeAssert<MyData | null>(nilNp, MyData.__typeInfo)
 	console.log("nilNp.(*MyData) OK:", okNil) // Should be false
 
 	console.log("\n--- Type Assertions (Panic Form) ---")
 	// Assert interface (holding *MyData) to *MyData
 	console.log("Asserting np.(*MyData)...")
-	let mdPtr2 = goscript.typeAssert<goscript.Ptr<MyData>>(np, goscript.makePointerTypeInfo(MyData.__typeInfo)).value // Should succeed
-	console.log("Success! mdPtr2.num:", (mdPtr2)?._ptr?.num)
+	let mdPtr2 = goscript.typeAssert<MyData | null>(np, MyData.__typeInfo).value // Should succeed
+	console.log("Success! mdPtr2.num:", mdPtr2?.num)
 
 	// Assert interface (holding *MyData) to NumPrinter
 	console.log("Asserting np.(NumPrinter)...")
@@ -112,7 +112,7 @@ export async function main(): Promise<void> {
 	console.log("\n--- Zero Values ---")
 	let zd: MyData = new MyData()
 	;
-	let zpd: goscript.Ptr<MyData> = null;
+	let zpd: MyData | null = null;
 	let znp: NumPrinter | null = null;
 	console.log("Zero MyData num:", zd.num)
 	console.log("Zero *MyData is nil:", zpd == null)

@@ -24,8 +24,8 @@ class MyStruct {
 
 export async function main(): Promise<void> {
 	// Setup from previous steps (simplified for this test)
-	let structPointer = goscript.makePtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
-	let dereferencedStructCopy = (structPointer)?._ptr.clone()
+	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
+	let dereferencedStructCopy = structPointer.clone()
 	dereferencedStructCopy.MyString = "original dereferenced copy modified"
 	let valueCopy1 = dereferencedStructCopy.clone()
 	valueCopy1.MyString = "value copy 1"
@@ -35,7 +35,7 @@ export async function main(): Promise<void> {
 
 	// === Verifying Copy Independence ===
 	// Expected: "hello world"
-	console.log("pointerCopy (points to original structPointer): Expected: hello world, Actual: " + (pointerCopy)?._ptr?.MyString)
+	console.log("pointerCopy (points to original structPointer): Expected: hello world, Actual: " + pointerCopy?.MyString)
 	// Expected: "original dereferenced copy modified"
 	console.log("dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: " + dereferencedStructCopy.MyString)
 	// Expected: "value copy 1"

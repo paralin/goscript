@@ -23,24 +23,24 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let original = goscript.makePtr(new MyStruct({MyInt: 10, MyString: "original"}))
+	let original = new MyStruct({MyInt: 10, MyString: "original"})
 
 	// === Pointer Assignment (No Copy) ===
 	// Assigning a pointer variable to another pointer variable.
 	let pointerCopy = original
 
 	// Modify the struct through the original pointer.
-	(original)?._ptr?.MyString = "modified original"
+	original?.MyString = "modified original"
 
 	// The change should be reflected when accessing through the copied pointer.
 	// Expected: "modified original"
-	console.log("Pointer copy value: Expected: modified original, Actual: " + (pointerCopy)?._ptr?.MyString)
+	console.log("Pointer copy value: Expected: modified original, Actual: " + pointerCopy?.MyString)
 
 	// Modify the struct through the copied pointer.
-	(pointerCopy)?._ptr?.MyInt = 20
+	pointerCopy?.MyInt = 20
 
 	// The change should be reflected when accessing through the original pointer.
 	// Expected: 20
-	console.log("Original value after pointer copy modification: Expected: 20, Actual:", (original)?._ptr?.MyInt)
+	console.log("Original value after pointer copy modification: Expected: 20, Actual:", original?.MyInt)
 }
 

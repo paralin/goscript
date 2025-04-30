@@ -284,6 +284,9 @@ class goPtrProxy<T extends object> {
  * Type alias for a Go pointer, which can be a goPtrProxy instance or null (for nil).
  * The `& T` part is crucial for TypeScript to understand that the pointer
  * should also satisfy the methods and properties of the underlying type T.
+ * 
+ * Note: This type is mainly used for primitive types. For struct and interface types,
+ * we use T | null directly to represent both the value and pointer variants.
  */
 export type Ptr<T extends object> = (goPtrProxy<T> & T) | null
 
@@ -484,31 +487,6 @@ export const ERROR_TYPE: InterfaceTypeInfo = {
 }
 
 /**
- * Checks if a value is assignable to a target type.
- *
- * @param value The value to check
- * @param target The target type
- * @returns true if the value is assignable to the target type
- */
-export function isAssignable(value: any, target: GoTypeInfo): boolean {
-  // Get the source type
-  const sourceType = typeofGo(value)
-
-  // Quick exit if identical reference (same canonical type)
-  if (sourceType === target) {
-    return true
-  }
-
-  // For interface targets, check if source implements the interface
-  if (target.kind === GoTypeKind.Interface) {
-    return implementsInterface(value, sourceType, target as InterfaceTypeInfo)
-  }
-
-  // For other types, require exact type match
-  return false
-}
-
-/**
  * Gets the Go type of a value.
  *
  * @param value The value to get the type of
@@ -520,39 +498,72 @@ export function typeofGo(value: any): GoTypeInfo {
     return NIL_TYPE
   }
 
-  // Check if it's a pointer proxy by structure
+  // Check if it's a pointer proxy
   if (isPointer(value)) {
-    const internalPtr = value._ptr // Access the internal _ptr
-
-    if (internalPtr === null) {
-      // A nil pointer value doesn't have a concrete type, return nil type
+    if (value._ptr === null) {
       return NIL_TYPE
-    } else {
-      // If the pointer is not nil, return the type of the referenced value
-      return typeofGo(internalPtr) // Recursive call
     }
+    // For pointers to structs/interfaces, we want to return the actual type
+    // not the pointer type since we represent those as T | null
+    const ptrType = value._ptr.__typeInfo
+    if (ptrType && (ptrType.kind === GoTypeKind.Struct || ptrType.kind === GoTypeKind.Interface)) {
+      return ptrType
+    }
+    // For other pointer types, return the pointer type info
+    return makePointerTypeInfo(typeofGo(value._ptr))
   }
 
-  // --- Checks for non-pointer types ---
+  // Check for type information on the value itself
+  if (value && value.__typeInfo) {
+    return value.__typeInfo
+  }
 
+  // Handle primitive types
   if (typeof value === 'string') {
     return STRING_TYPE
   }
   if (typeof value === 'number') {
-    // Simplification: return int for all numbers. Could refine based on value if needed.
-    return INT_TYPE // Or FLOAT64_TYPE depending on context
+    if (Number.isInteger(value)) {
+      return INT_TYPE
+    }
+    return FLOAT64_TYPE
   }
   if (typeof value === 'boolean') {
     return BOOL_TYPE
   }
+
+  // Handle arrays/slices
   if (Array.isArray(value)) {
-    // TODO
+    // Try to determine element type from first element
+    const elemType = value.length > 0 ? typeofGo(value[0]) : EMPTY_INTERFACE_TYPE
+    return {
+      kind: GoTypeKind.Slice,
+      name: `[]${elemType.name || 'unknown'}`,
+      zero: [],
+      elem: elemType
+    }
   }
 
-  // TODO Map
-  // TODO struct objects
+  // Handle maps
+  if (value instanceof Map) {
+    // Try to determine key/value types from first entry
+    let keyType = EMPTY_INTERFACE_TYPE
+    let valueType = EMPTY_INTERFACE_TYPE
+    const firstEntry = value.entries().next().value
+    if (firstEntry) {
+      keyType = typeofGo(firstEntry[0])
+      valueType = typeofGo(firstEntry[1])
+    }
+    return {
+      kind: GoTypeKind.Map,
+      name: `map[${keyType.name || 'unknown'}]${valueType.name || 'unknown'}`,
+      zero: new Map(),
+      key: keyType,
+      value: valueType
+    }
+  }
 
-  // Default to interface{} for any other unknown types
+  // Default to interface{} for unknown types
   return EMPTY_INTERFACE_TYPE
 }
 
@@ -693,54 +704,55 @@ export function typeAssert<T, V=unknown>(
   }
   
   // Determine the source type
-  const sourceIsPointer = isPointer(value)
   const sourceType = typeofGo(value)
   
   // CASE 1: Target is an interface
   if (targetTypeInfo.kind === GoTypeKind.Interface) {
-    // Check if the value (or the value pointed to) implements the interface
+    // Check if the value implements the interface
     if (implementsInterface(value, sourceType, targetTypeInfo as InterfaceTypeInfo)) {
       return { value: value as T, ok: true }
-    }
-    // If value is a pointer and we didn't check its element yet
-    if (sourceIsPointer && (value as any)._ptr) {
-      const ptrValue = (value as any)._ptr
-      const ptrType = typeofGo(ptrValue)
-      if (implementsInterface(ptrValue, ptrType, targetTypeInfo as InterfaceTypeInfo)) {
-        return { value: value as T, ok: true }
-      }
     }
     // Interface assertion failed
     return { value: targetTypeInfo.zero as T, ok: false }
   }
   
-  // CASE 2: Target is a pointer type (*T)
+  // CASE 2: Target is a struct
+  if (targetTypeInfo.kind === GoTypeKind.Struct) {
+    // For struct types, check if source matches target type
+    if (sourceType === targetTypeInfo) {
+      return { value: value as T, ok: true }
+    }
+    // If source is a pointer, check if it points to our target type
+    if (isPointer(value)) {
+      const ptrValue = (value as any)._ptr
+      if (ptrValue && typeofGo(ptrValue) === targetTypeInfo) {
+        return { value: ptrValue as T, ok: true }
+      }
+    }
+    return { value: targetTypeInfo.zero as T, ok: false }
+  }
+  
+  // CASE 3: Target is a pointer type
   if (targetTypeInfo.kind === GoTypeKind.Pointer) {
     const targetElemType = (targetTypeInfo as PointerTypeInfo).elem
     
-    // Only pointer values can be asserted to pointer types
-    if (sourceIsPointer) {
-      // Get the element type of the source pointer
+    // If value is already a pointer, check if it points to the right type
+    if (isPointer(value)) {
       const sourceElemType = sourceType === NIL_TYPE 
         ? typeofGo((value as any)._ptr)
         : sourceType
         
-      // Compare element types (or check if target is *interface{})
-      if (sourceElemType === targetElemType || 
-          (targetElemType.kind === GoTypeKind.Interface &&
-           (targetElemType as InterfaceTypeInfo).methods.length === 0)) {
+      if (sourceElemType === targetElemType) {
         return { value: value as T, ok: true }
       }
+    } else {
+      // If value is not a pointer but matches target element type,
+      // we can create a pointer to it (like &value in Go)
+      if (sourceType === targetElemType) {
+        return { value: makePtr(value) as T, ok: true }
+      }
     }
-    // Non-pointer value can't be asserted to pointer type
     return { value: targetTypeInfo.zero as T, ok: false }
-  }
-  
-  // CASE 3: Target is a concrete type (not interface, not pointer)
-  // Go requires the dynamic type to be *exactly* the target type
-  if (sourceType === targetTypeInfo) {
-    // Direct type match
-    return { value: sourceIsPointer ? (value as any)._ptr as T : value as T, ok: true }
   }
   
   // Type assertion failed

@@ -28,7 +28,7 @@ export async function main(): Promise<void> {
 	// Assigning a struct (value type) creates independent copies.
 	let valueCopy1 = dereferencedStructCopy.clone()
 	let valueCopy2 = dereferencedStructCopy.clone()
-	let pointerCopy = goscript.makePtr(dereferencedStructCopy)
+	let pointerCopy = dereferencedStructCopy
 	// Modifications to one copy do not affect others or the original.
 	valueCopy1.MyString = "value copy 1"
 	dereferencedStructCopy.MyString = "original dereferenced copy modified" // Modify the source of the copies

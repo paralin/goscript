@@ -184,40 +184,6 @@ This is the typical package structure of the output TypeScript import path:
                  console.log("Second type assertion failed as expected")
             }
             ```
-        -   **Interface-to-Interface Example:**
-            ```go
-            // Go code (conceptual)
-            var r Reader // Assume Reader interface { Read(...) }
-            var rc ReadCloser // Assume ReadCloser interface { Reader; Closer }
-            s := MyReadCloserStruct{} // Implements ReadCloser
-            rc = s
-            r, ok := rc.(Reader) // Assert interface 'rc' implements 'Reader'
-            ```
-            becomes:
-            ```typescript
-            // TypeScript translation (conceptual)
-            import * as goscript from "@goscript/builtin";
-            // Assume Reader, Closer, ReadCloser interfaces and MyReadCloserStruct class are defined and registered
-
-            let rc: ReadCloser | null = new MyReadCloserStruct().clone();
-
-            // Type assertion checks if the runtime type of 'rc' (MyReadCloserStruct)
-            // implements the 'Reader' interface by comparing required method signatures.
-            let { value: r, ok } = goscript.typeAssert<Reader>(rc, 'Reader')
-            if (ok) { // This will be true if MyReadCloserStruct correctly implements Read
-                console.log("Interface-to-interface assertion successful")
-            }
-            ```
-        -   **Translation Details:** The Go assertion `v, ok := i.(T)` is translated to:
-            1.  A call to `goscript.typeAssert<T>(i, 'TypeName')`.
-                *   `<T>`: The target type (interface or class) is passed as a TypeScript generic parameter.
-                *   `'TypeName'`: The *registered name* of the target type `T` is passed as a string literal. This string is used by the runtime helper (`getType`) to look up the canonical `GoTypeInfo` for the target type.
-            2.  The `typeAssert` helper performs the assignability check using `isAssignable(typeofGo(i), targetTypeInfo)`.
-                *   `isAssignable` checks if the source type (`typeofGo(i)`) and target type (`targetTypeInfo`) are identical *or* if the target is an interface and the source implements it (`implementsInterface`).
-                *   `implementsInterface` iterates through the target interface's required methods and checks if the source type provides methods with matching names and signatures (`sigEqual`).
-                *   `sigEqual` compares parameter/result counts, types (recursively, using `===` on canonical `GoTypeInfo` objects), and variadic status.
-            3.  The helper returns an object `{ value: T | ZeroValue<T>, ok: boolean }`. If `ok` is true, `value` is `i`; otherwise, `value` is the zero value of type `T`.
-            4.  Object destructuring is used to extract the `value` and `ok` properties (e.g., `let { value: v, ok } = ...`).
 
     -   **Panic Assertion (`v := i.(T)`):** This form uses the same `goscript.typeAssert` helper. The generated code checks the `ok` flag after the call. If `ok` is false, it triggers a runtime panic (e.g., throws an error). The `value` is assigned to `v` only if `ok` is true.
 - **Slices:** Go slices (`[]T`) are mapped to standard TypeScript arrays (`T[]`) augmented with a hidden `__capacity` property to emulate Go's slice semantics. Runtime helpers from `@goscript/builtin` are crucial for correct behavior.

@@ -41,7 +41,7 @@ class MyStruct {
 export async function main(): Promise<void> {
 	let i: MyInterface | null = null;
 	let s = new MyStruct({Value: 10})
-	i = (goscript.isAssignable(s, MyInterface__typeInfo) ? s : null)
+	i = s
 
 	let { ok: ok } = goscript.typeAssert<MyStruct>(i, MyStruct.__typeInfo)
 	if (ok) {
@@ -51,7 +51,7 @@ export async function main(): Promise<void> {
 	}
 
 	// try a second time since this generates something different when using = and not :=
-	({ ok: ok } = goscript.typeAssert<goscript.Ptr<MyStruct>>(i, goscript.makePointerTypeInfo(MyStruct.__typeInfo)))
+	({ ok: ok } = goscript.typeAssert<MyStruct | null>(i, MyStruct.__typeInfo))
 
 	// expected
 	if (ok) {

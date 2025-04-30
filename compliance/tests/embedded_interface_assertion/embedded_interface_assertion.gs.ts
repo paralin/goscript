@@ -68,7 +68,7 @@ class MyStruct {
 export async function main(): Promise<void> {
 	let rwc: ReadCloser | null = null;
 	let s = new MyStruct({})
-	rwc = (goscript.isAssignable(s, ReadCloser__typeInfo) ? s : null)
+	rwc = s
 
 	let rwcAny: any | null = rwc;
 	let { ok: ok } = goscript.typeAssert<ReadCloser>(rwcAny, ReadCloser__typeInfo)

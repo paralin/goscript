@@ -25,17 +25,17 @@ class MyStruct {
 export async function main(): Promise<void> {
 	// === Pointer Composite Literal Assignment ===
 	// Creating a pointer to a struct directly using a composite literal with &
-	let structPointer = goscript.makePtr(new MyStruct({MyInt: 42, MyString: "composite literal pointer"}))
+	let structPointer = new MyStruct({MyInt: 42, MyString: "composite literal pointer"})
 
 	// Access fields through the pointer
 	// Expected: 42
-	console.log("MyInt via pointer: Expected: 42, Actual:", (structPointer)?._ptr?.MyInt)
+	console.log("MyInt via pointer: Expected: 42, Actual:", structPointer?.MyInt)
 	// Expected: "composite literal pointer"
-	console.log("MyString via pointer: Expected: composite literal pointer, Actual: " + (structPointer)?._ptr?.MyString)
+	console.log("MyString via pointer: Expected: composite literal pointer, Actual: " + structPointer?.MyString)
 
 	// Modify through the pointer
-	(structPointer)?._ptr?.MyInt = 99
+	structPointer?.MyInt = 99
 	// Expected: 99
-	console.log("MyInt after modification: Expected: 99, Actual:", (structPointer)?._ptr?.MyInt)
+	console.log("MyInt after modification: Expected: 99, Actual:", structPointer?.MyInt)
 }
 

@@ -44,7 +44,7 @@ export async function main(): Promise<void> {
 	console.log(s.PointerField)
 
 	let mi: MyInterface | null = null;
-	s.InterfaceField = (goscript.isAssignable(mi, MyInterface__typeInfo) ? mi : null)
+	s.InterfaceField = mi
 	console.log(s.InterfaceField)
 }
 

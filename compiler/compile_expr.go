@@ -124,7 +124,9 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		isGoPtr := false
 		if c.pkg != nil && c.pkg.TypesInfo != nil {
 			if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
-				_, isPointer = tv.Type.(*gtypes.Pointer)
+				if _, ok := tv.Type.(*gtypes.Pointer); ok {
+					isPointer = true
+				}
 
 				// Check if this might be a GoPtr at runtime (e.g., from an interface variable)
 				if ident, ok := exp.X.(*ast.Ident); ok {
@@ -322,7 +324,7 @@ func (c *GoToTSCompiler) getTypeInfoRef(typeExpr ast.Expr) string {
 			}
 		}
 	}
-	
+
 	// If we reach this point, we couldn't definitely determine the type
 	// Fall back to the basic cases based on syntax
 	switch t := typeExpr.(type) {
@@ -337,14 +339,27 @@ func (c *GoToTSCompiler) getTypeInfoRef(typeExpr ast.Expr) string {
 			return fmt.Sprintf("%s.%s.__typeInfo", ident.Name, t.Sel.Name)
 		}
 	case *ast.StarExpr:
-		// Handle pointer types - create the pointer type info dynamically
+		// Get base type information
 		baseType := c.getTypeExprName(t.X)
-		// Check if it's a basic type
-		if isBasicType(baseType) {
+
+		// Check if it's a struct or interface type
+		isStructOrInterface := false
+		if c.pkg != nil && c.pkg.TypesInfo != nil {
+			if tv, ok := c.pkg.TypesInfo.Types[t.X]; ok && tv.Type != nil {
+				_, isStruct := tv.Type.Underlying().(*gtypes.Struct)
+				_, isInterface := tv.Type.Underlying().(*gtypes.Interface)
+				isStructOrInterface = isStruct || isInterface
+			}
+		}
+
+		// If it's a basic type or not a struct/interface, use makePointerTypeInfo
+		if isBasicType(baseType) || !isStructOrInterface {
 			return fmt.Sprintf("goscript.makePointerTypeInfo(%s)",
 				getBasicTypeConstName(baseType))
 		}
-		return fmt.Sprintf("goscript.makePointerTypeInfo(%s.__typeInfo)", baseType)
+
+		// For struct and interface types, just use the same type info
+		return fmt.Sprintf("%s.__typeInfo", baseType)
 	case *ast.ArrayType:
 		// Handle array/slice types - construct an inline SliceTypeInfo
 		elemTypeRef := c.getTypeInfoRef(t.Elt)
@@ -475,13 +490,19 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 	// Check if the expression X is a pointer type
 	isPointer := false
 	isGoPtr := false
+	isPtrToStructOrInterface := false
 	var tvType gtypes.Type
 	var baseTypeName string
 
 	if c.pkg != nil && c.pkg.TypesInfo != nil {
 		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
 			tvType = tv.Type
-			_, isPointer = tv.Type.(*gtypes.Pointer)
+			if ptr, ok := tv.Type.(*gtypes.Pointer); ok {
+				isPointer = true
+				_, isStruct := ptr.Elem().Underlying().(*gtypes.Struct)
+				_, isInterface := ptr.Elem().Underlying().(*gtypes.Interface)
+				isPtrToStructOrInterface = isStruct || isInterface
+			}
 
 			// Get the base type name (for later checking against pointer receiver methods)
 			if named, ok := tvType.(*gtypes.Named); ok {
@@ -538,13 +559,22 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 	}
 
 	if isPointer {
-		// For pointer types (declared as *T), need to access ._ptr property first
-		c.tsw.WriteLiterally("(")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write selector expression pointer object: %w", err)
+		if isPtrToStructOrInterface {
+			// For struct/interface pointers, we use T | null representation
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write selector expression pointer object: %w", err)
+			}
+			c.tsw.WriteLiterally("?.")
+			c.WriteIdentValue(exp.Sel)
+		} else {
+			// For other pointer types, use ._ptr property
+			c.tsw.WriteLiterally("(")
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write selector expression pointer object: %w", err)
+			}
+			c.tsw.WriteLiterally(")?._ptr?.")
+			c.WriteIdentValue(exp.Sel)
 		}
-		c.tsw.WriteLiterally(")?._ptr?.")
-		c.WriteIdentValue(exp.Sel)
 	} else if isGoPtr {
 		// For values that might be GoPtr instances at runtime (interfaces holding pointers),
 		// the runtime should handle method dispatch correctly. Just write the direct access.
@@ -588,7 +618,24 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 
 // WriteStarExprType writes a pointer type (e.g., *MyStruct).
 func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
-	// Use goscript.Ptr<T> for pointer types
+	// Check if the base type is a struct or interface type
+	if c.pkg != nil && c.pkg.TypesInfo != nil {
+		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
+			// If it's a struct or interface, use T | null representation
+			if _, isStruct := tv.Type.Underlying().(*gtypes.Struct); isStruct {
+				c.WriteTypeExpr(exp.X)
+				c.tsw.WriteLiterally(" | null")
+				return
+			}
+			if _, isInterface := tv.Type.Underlying().(*gtypes.Interface); isInterface {
+				c.WriteTypeExpr(exp.X)
+				c.tsw.WriteLiterally(" | null")
+				return
+			}
+		}
+	}
+
+	// Use goscript.Ptr<T> for primitive types and other cases
 	c.tsw.WriteLiterally("goscript.Ptr<")
 	c.WriteTypeExpr(exp.X)
 	c.tsw.WriteLiterally(">")
@@ -596,14 +643,33 @@ func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 
 // WriteStarExprValue writes a pointer dereference value (e.g., *myVar).
 func (c *GoToTSCompiler) WriteStarExprValue(exp *ast.StarExpr) error {
-	// Dereferencing a pointer in Go (*p) gets the value.
-	// In TS with goPtrProxy, we need to access the ._ptr property with proper null checks.
-	c.tsw.WriteLiterally("(")
-	if err := c.WriteValueExpr(exp.X); err != nil {
-		return fmt.Errorf("failed to write star expression operand: %w", err)
+	// Check if the expression is dereferencing a struct or interface pointer
+	isStructOrInterface := false
+	if c.pkg != nil && c.pkg.TypesInfo != nil {
+		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
+			if ptr, ok := tv.Type.(*gtypes.Pointer); ok {
+				_, isStruct := ptr.Elem().Underlying().(*gtypes.Struct)
+				_, isInterface := ptr.Elem().Underlying().(*gtypes.Interface)
+				isStructOrInterface = isStruct || isInterface
+			}
+		}
 	}
-	c.tsw.WriteLiterally(")?._ptr") // Use optional chaining for null safety
-	return nil
+
+	if isStructOrInterface {
+		// For structs and interfaces, we use T | null representation, so just do null check
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write star expression operand: %w", err)
+		}
+		return nil
+	} else {
+		// For primitive types, we use Ptr type, so dereference with ._ptr
+		c.tsw.WriteLiterally("(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write star expression operand: %w", err)
+		}
+		c.tsw.WriteLiterally(")?._ptr") // Use optional chaining for null safety
+		return nil
+	}
 }
 
 // WriteStructType writes a struct type definition.
@@ -1087,12 +1153,29 @@ func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) error {
 	}
 
 	if exp.Op == token.AND {
-		// Address-of operator (&) creates a new Go pointer proxy wrapping the value
-		c.tsw.WriteLiterally("goscript.makePtr(")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write unary expression operand for address-of: %w", err)
+		// Check if we're taking address of a struct or interface
+		isStructOrInterface := false
+		if c.pkg != nil && c.pkg.TypesInfo != nil {
+			if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok && tv.Type != nil {
+				_, isStruct := tv.Type.Underlying().(*gtypes.Struct)
+				_, isInterface := tv.Type.Underlying().(*gtypes.Interface)
+				isStructOrInterface = isStruct || isInterface
+			}
 		}
-		c.tsw.WriteLiterally(")")
+
+		if isStructOrInterface {
+			// For structs and interfaces, &x is just x (since we use x | null)
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write unary expression operand for struct address-of: %w", err)
+			}
+		} else {
+			// For primitive types, use goscript.makePtr
+			c.tsw.WriteLiterally("goscript.makePtr(")
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write unary expression operand for address-of: %w", err)
+			}
+			c.tsw.WriteLiterally(")")
+		}
 		return nil
 	}
 

@@ -703,13 +703,9 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 	// Check if we're assigning to an interface
 	isInterfaceAssign := false
-	var interfaceLHS ast.Expr
 	if len(lhs) == 1 && c.pkg != nil && c.pkg.TypesInfo != nil {
 		if tv, ok := c.pkg.TypesInfo.Types[lhs[0]]; ok && tv.Type != nil {
 			_, isInterfaceAssign = tv.Type.Underlying().(*gtypes.Interface)
-			if isInterfaceAssign {
-				interfaceLHS = lhs[0]
-			}
 		}
 	}
 
@@ -768,30 +764,10 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		// Check if right-hand side might be a pointer type
 		rhsType := c.pkg.TypesInfo.TypeOf(rhs[0])
 		if rhsType != nil {
-			// For interface assignment, use runtime type check
-			// This handles both value-to-interface and pointer-to-interface assignments
-			c.tsw.WriteLiterally("(goscript.isAssignable(")
-			if err := c.WriteValueExpr(rhs[0]); err != nil {
-				return err
-			}
-			// Pass the interface type itself for type checking
-			lhsType := c.pkg.TypesInfo.TypeOf(interfaceLHS)
-			if lhsType != nil {
-				// Get the TypeInfo reference using getTypeReferenceFromType
-				c.tsw.WriteLiterally(", ")
-				typeRef := c.getTypeReferenceFromType(lhsType)
-				c.tsw.WriteLiterally(typeRef)
-				c.tsw.WriteLiterally(") ? ")
-			} else {
-				c.tsw.WriteLiterally(", goscript.EMPTY_INTERFACE_TYPE) ? ")
-			}
-
 			// Actual value to assign if compatible
 			if err := c.WriteValueExpr(rhs[0]); err != nil {
 				return err
 			}
-
-			c.tsw.WriteLiterally(" : null)")
 			return nil
 		}
 	}
@@ -1682,11 +1658,11 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	
+
 	// Get the type info reference for the asserted type
 	typeInfoRef := c.getTypeInfoRef(assertedType)
 	c.tsw.WriteLiterally(typeInfoRef)
-	
+
 	c.tsw.WriteLiterally(")")
 
 	if tok != token.DEFINE {

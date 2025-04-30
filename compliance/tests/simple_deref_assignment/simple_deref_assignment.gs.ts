@@ -23,13 +23,13 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let structPointer = goscript.makePtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
+	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	// === Simple Dereference Assignment (Value Copy) ===
-	let simpleDereferencedCopy = (structPointer)?._ptr.clone()
+	let simpleDereferencedCopy = structPointer.clone()
 	// Modifying the copy does not affect the original struct pointed to by structPointer.
 	simpleDereferencedCopy.MyString = "modified dereferenced copy"
 	// Expected: "hello world"
-	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + (structPointer)?._ptr?.MyString)
+	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + structPointer?.MyString)
 	// Expected: "modified dereferenced copy"
 	console.log("Simple Dereferenced Copy: Expected: modified dereferenced copy, Actual: " + simpleDereferencedCopy.MyString)
 }

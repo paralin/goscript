@@ -24,11 +24,11 @@ class MyStruct {
 }
 
 export async function main(): Promise<void> {
-	let structPointer = goscript.makePtr(new MyStruct({MyInt: 4, MyString: "hello world"}))
+	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	// === Pointer Dereference and Multi-Assignment ===
 	// Dereference structPointer to get a copy of the struct.
 	// Also demonstrates multi-variable assignment and the use of the blank identifier '_'.
-	let dereferencedStructCopy = (structPointer)?._ptr.clone()
+	let dereferencedStructCopy = structPointer.clone()
 	let unusedString = "hello" // testing _ set
 }
 

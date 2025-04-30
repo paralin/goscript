@@ -45,7 +45,7 @@ class MyProcessor {
 export async function main(): Promise<void> {
 	//nolint:staticcheck
 	let processor: MultiParamReturner | null = null;
-	processor = (goscript.isAssignable(new MyProcessor({}), MultiParamReturner__typeInfo) ? new MyProcessor({}) : null)
+	processor = new MyProcessor({})
 
 	let data = [1, 2, 3]
 	let [success, ] = processor.Process(data, 5, "unused")

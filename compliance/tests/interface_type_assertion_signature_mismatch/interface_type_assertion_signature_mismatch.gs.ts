@@ -54,7 +54,7 @@ class MyStruct {
 export async function main(): Promise<void> {
 	let a: any | null = null;
 	let s = new MyStruct({Name: "TestStruct"})
-	a = (goscript.isAssignable(s, goscript.EMPTY_INTERFACE_TYPE) ? s : null)
+	a = s
 
 	// This assertion should fail at runtime because InterfaceB.DoSomething has a different signature
 	let { ok: ok } = goscript.typeAssert<InterfaceB>(a, InterfaceB__typeInfo)
