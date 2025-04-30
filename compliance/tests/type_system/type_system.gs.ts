@@ -3,159 +3,128 @@
 
 import * as goscript from "@goscript/builtin";
 
-interface Printer {
-	Print(): void;
-	GetValue(): number;
+interface NumPrinter {
+	PrintNum(): void;
+	GetNum(): number;
 }
 
 // Register this interface with the runtime type system
-const Printer__typeInfo = goscript.registerType(
-  'Printer',
+const NumPrinter__typeInfo = goscript.registerType(
+  'NumPrinter',
   goscript.GoTypeKind.Interface,
   null,
-  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
+  [{ name: 'PrintNum', params: [], results: [] }, { name: 'GetNum', params: [], results: [{ type: goscript.getType('int')! }] }],
   undefined
 );
 
-class Data {
-	public value: number = 0;
+class MyData {
+	public num: number = 0;
 	public label: string = "";
-	public tags: string[] = [];
-	public lookup: Map<string, boolean> | null = null;
 
-	// Implement Printer interface with a value receiver
-	public Print(): void {
+	// Implement NumPrinter interface with a value receiver method
+	public PrintNum(): void {
 		const d = this
-		console.log("Data value:", d.value, "Label:", d.label)
+		console.log("MyData num:", d.num, "Label:", d.label)
 	}
 
-	// Implement Printer interface with a pointer receiver
-	public GetValue(): number {
+	// Implement NumPrinter interface with a pointer receiver method
+	public GetNum(): number {
 		const d = this
-		return this.value
+		return this.num
 	}
 
-	constructor(init?: Partial<Data>) { if (init) Object.assign(this, init as any); }
-	public clone(): Data { return Object.assign(Object.create(Data.prototype) as Data, this); }
+	constructor(init?: Partial<MyData>) { if (init) Object.assign(this, init as any); }
+	public clone(): MyData { return Object.assign(Object.create(MyData.prototype) as MyData, this); }
 
 	// Type information for runtime type system
 	static __typeInfo = goscript.registerType(
-	  'Data',
+	  'MyData',
 	  goscript.GoTypeKind.Struct,
-	  new Data(),
-	  [{ name: 'Print', params: [], results: [] }],
-	  Data
+	  new MyData(),
+	  [{ name: 'PrintNum', params: [], results: [] }],
+	  MyData
 	);
 
 }
 
 // Register pointer type
-const Data__ptrTypeInfo = goscript.registerType(
-  '*Data',
+const MyData__ptrTypeInfo = goscript.registerType(
+  '*MyData',
   goscript.GoTypeKind.Pointer,
   null,
-  [{ name: 'Print', params: [], results: [] }, { name: 'GetValue', params: [], results: [{ type: goscript.getType('int')! }] }],
-  Data.__typeInfo
+  [{ name: 'PrintNum', params: [], results: [] }, { name: 'GetNum', params: [], results: [{ type: goscript.getType('int')! }] }],
+  MyData.__typeInfo
 );
 
-type Processor = ((_p0: number) => number) | null;
-
 export async function main(): Promise<void> {
-	// Create struct value
-	let d1 = new Data({value: 10, label: "A", tags: ["tag1"], lookup: new Map([["ok", true]])})
-
 	// Create struct pointer
-	let d2 = new goscript.GoPtr(new Data({value: 20, label: "B"}))
-
-	// Assign value to interface
-	let p1: Printer | null = null;
-	// p1 = d1 // INVALID: Data does not implement Printer (GetValue has pointer receiver)
+	let dataPtr = goscript.createGoPtr(new MyData({num: 20, label: "B"}))
 
 	// Assign pointer to interface
-	let p2: Printer | null = null;
-	// p2 = d1 // Fails: Data does not have GetValue() (pointer receiver)
-	p2 = (goscript.isAssignable(d2, goscript.getType('Printer')!) ? d2 : null) // OK: *Data has both Print() (promoted) and GetValue()
+	// MyData does not fully implement NumPrinter (GetNum has pointer receiver)
+	// *MyData implements NumPrinter (PrintNum is promoted, GetNum is defined)
+	let np: NumPrinter | null = null;
+	np = (goscript.isAssignable(dataPtr, goscript.getType('NumPrinter')!) ? dataPtr : null) // OK
 
-	console.log("Testing pointer receiver assignment:")
-	(p2 instanceof goscript.GoPtr ? p2.ref?.Print : p2.Print)() // Can call value receiver method via pointer
-	let val = (p2 instanceof goscript.GoPtr ? p2.ref?.GetValue : p2.GetValue)() // Can call pointer receiver method
-	console.log("Value from p2:", val)
+	console.log("--- Interface Method Calls ---")
+	np.PrintNum() // Call value receiver method via interface holding pointer
+	let retrievedNum = np.GetNum() // Call pointer receiver method
+	console.log("Retrieved num via interface:", retrievedNum)
 
-	// Assert p1 (interface is nil) to Data (should fail)
-	// data1, ok1 := p1.(Data) // IMPOSSIBLE: Data does not implement Printer
-	// println("p1.(Data):", ok1) // Cannot access data1.value if ok1 is false
-	console.log("Testing type assertions (comma-ok):")
+	console.log("\n--- Type Assertions (Comma-Ok) ---")
+	// Assert interface (holding *MyData) to *MyData
+	let { value: mdPtr1, ok: ok1 } = goscript.typeAssert<goscript.Ptr<MyData>>(np, '*MyData')
+	if (ok1) {
+		console.log("np.(*MyData) OK:", ok1, "Num:", (mdPtr1)?.ref?.num)
+	} else {
+		console.log("np.(*MyData) FAILED:", ok1)
+	}
 
-	// Assert p1 (interface is nil) to *Data (should fail)
-	let { ok: ok2 } = goscript.typeAssert<goscript.Ptr<Data>>(p1, '*Data')
-	console.log("p1.(*Data):", ok2) // p1 is nil, so assertion fails
+	// Assert interface (holding *MyData) to NumPrinter (interface to itself)
+	let { value: np2, ok: ok2 } = goscript.typeAssert<NumPrinter>(np, 'NumPrinter')
+	if (ok2) {
+		console.log("np.(NumPrinter) OK:", ok2, "Can call GetNum:", np2.GetNum())
+	} else {
+		console.log("np.(NumPrinter) FAILED:", ok2)
+	}
 
-	// Assert p2 (holding *Data) to *Data
-	let { value: dataPtr2, ok: ok3 } = goscript.typeAssert<goscript.Ptr<Data>>(p2, '*Data')
-	console.log("p2.(*Data):", ok3, (dataPtr2)?.ref?.value)
+	// Assert interface (holding *MyData) to MyData (INVALID: MyData doesn't implement NumPrinter)
+	// _, okInvalid := np.(MyData)
+	// println("np.(MyData) OK:", okInvalid) // This would be false
 
-	// Assert p2 (holding *Data) to Data (IMPOSSIBLE: Data does not implement Printer)
-	// _, ok4 := p2.(Data)
-	// println("p2.(Data):", ok4)
+	// Assert nil interface to *MyData
+	let nilNp: NumPrinter | null = null;
+	let { ok: okNil } = goscript.typeAssert<goscript.Ptr<MyData>>(nilNp, '*MyData')
+	console.log("nilNp.(*MyData) OK:", okNil) // Should be false
 
-	// Assert p2 (holding *Data) to Printer (should succeed)
-	let { ok: ok5 } = goscript.typeAssert<Printer>(p2, 'Printer')
-	console.log("p2.(Printer):", ok5) // Use ok5
+	console.log("\n--- Type Assertions (Panic Form) ---")
+	// Assert interface (holding *MyData) to *MyData
+	console.log("Asserting np.(*MyData)...")
+	let mdPtr2 = goscript.typeAssert<goscript.Ptr<MyData>>(np, '*MyData').value // Should succeed
+	console.log("Success! mdPtr2.num:", (mdPtr2)?.ref?.num)
 
-	console.log("Testing type assertions (panic form):")
-	// This should succeed
-	let data3 = goscript.typeAssert<Printer>(p2, 'Printer').value
-	(data3 instanceof goscript.GoPtr ? data3.ref?.Print : data3.Print)()
+	// Assert interface (holding *MyData) to NumPrinter
+	console.log("Asserting np.(NumPrinter)...")
+	let np3 = goscript.typeAssert<NumPrinter>(np, 'NumPrinter').value // Should succeed
+	np3.PrintNum() // Call method on the result
 
-	// This should succeed
-	let data4 = goscript.typeAssert<goscript.Ptr<Data>>(p2, '*Data')
-	console.log("Value from data4:", (data4)?.ref?.value)
+	// Assert interface (holding *MyData) to MyData (INVALID - should panic if uncommented)
+	// println("Asserting np.(MyData)... (should panic)")
+	// _ = np.(MyData)
+	// println("This should not be printed")
 
-	// Test zero values implicitly
-	let dZero: Data = new Data()
+	// Assert nil interface to string (should panic if uncommented)
+	// println("Asserting nilNp.(string)... (should panic)")
+	// _ = nilNp.(string)
+	// println("This should not be printed")
+
+	console.log("\n--- Zero Values ---")
+	let zd: MyData = new MyData()
 	;
-	let pZero: goscript.Ptr<Data> = null;
-	let iZero: Printer | null = null;
-	let sZero: number[] = [];
-	let mZero: Map<number, string> | null = null;
-	let fnZero: Processor = null;
-
-	// Cannot easily print zero values without fmt, but their declaration tests compiler handling
-	console.log("Declared zero values (compiler check)")
-	// Avoid printing nil pointers/interfaces directly with println if it causes issues
-	if (dZero.value == 0) {
-		console.log("dZero.value is zero")
-	}
-	if (pZero == null) {
-		console.log("pZero is nil")
-	}
-	if (iZero == null) {
-		console.log("iZero is nil")
-	}
-	if (sZero == null) {
-		console.log("sZero is nil")
-	}
-	if (mZero == null) {
-		console.log("mZero is nil")
-	}
-
-	// Test assertion that should panic (uncomment to test panic)
-	// println("Testing panic assertion:")
-	// _ = p1.(string) // Assert Data to string - should panic
-	if (fnZero == null) {
-
-		// Test assertion that should panic (uncomment to test panic)
-		// println("Testing panic assertion:")
-		// _ = p1.(string) // Assert Data to string - should panic
-		console.log("fnZero is nil")
-
-		// Test assertion that should panic (uncomment to test panic)
-		// println("Testing panic assertion:")
-		// _ = p1.(string) // Assert Data to string - should panic
-	}
-
-	// Test assertion that should panic (uncomment to test panic)
-	// println("Testing panic assertion:")
-	// _ = p1.(string) // Assert Data to string - should panic
+	let zpd: goscript.Ptr<MyData> = null;
+	let znp: NumPrinter | null = null;
+	console.log("Zero MyData num:", zd.num)
+	console.log("Zero *MyData is nil:", zpd == null)
+	console.log("Zero NumPrinter is nil:", znp == null)
 }
 

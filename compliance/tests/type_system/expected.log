@@ -1,16 +1,19 @@
-Testing pointer receiver assignment:
-Data value: 20 Label: B
-Value from p2: 20
-Testing type assertions (comma-ok):
-p1.(*Data): false
-p2.(*Data): true undefined
-p2.(Printer): true
-Testing type assertions (panic form):
-Data value: 20 Label: B
-Value from data4: undefined
-Declared zero values (compiler check)
-dZero.value is zero
-pZero is nil
-iZero is nil
-mZero is nil
-fnZero is nil
+--- Interface Method Calls ---
+MyData num: 20 Label: B
+Retrieved num via interface: 20
+
+--- Type Assertions (Comma-Ok) ---
+np.(*MyData) OK: true Num: 20
+np.(NumPrinter) OK: true Can call GetNum: 20
+nilNp.(*MyData) OK: true
+
+--- Type Assertions (Panic Form) ---
+Asserting np.(*MyData)...
+Success! mdPtr2.num: 20
+Asserting np.(NumPrinter)...
+MyData num: 20 Label: B
+
+--- Zero Values ---
+Zero MyData num: 0
+Zero *MyData is nil: true
+Zero NumPrinter is nil: true

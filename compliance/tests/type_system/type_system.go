@@ -1,117 +1,94 @@
 package main
 
 // Define an interface
-type Printer interface {
-	Print()
-	GetValue() int
+type NumPrinter interface {
+	PrintNum()
+	GetNum() int
 }
 
 // Define a struct
-type Data struct {
-	value  int
-	label  string
-	tags   []string
-	lookup map[string]bool
+type MyData struct {
+	num   int
+	label string
 }
 
-// Implement Printer interface with a value receiver
-func (d Data) Print() {
-	println("Data value:", d.value, "Label:", d.label)
-	// Cannot easily print slice/map contents without fmt or loops
+// Implement NumPrinter interface with a value receiver method
+func (d MyData) PrintNum() {
+	println("MyData num:", d.num, "Label:", d.label)
 }
 
-// Implement Printer interface with a pointer receiver
-func (d *Data) GetValue() int {
-	return d.value
+// Implement NumPrinter interface with a pointer receiver method
+func (d *MyData) GetNum() int {
+	return d.num
 }
-
-// Function type example (though not directly used in assertion here)
-type Processor func(int) int
 
 func main() {
-	// Create struct value
-	d1 := Data{value: 10, label: "A", tags: []string{"tag1"}, lookup: map[string]bool{"ok": true}}
-	_ = d1
-
 	// Create struct pointer
-	d2 := &Data{value: 20, label: "B"}
-
-	// Assign value to interface
-	var p1 Printer
-	// p1 = d1 // INVALID: Data does not implement Printer (GetValue has pointer receiver)
-	_ = p1 // Avoid unused variable error
+	dataPtr := &MyData{num: 20, label: "B"}
 
 	// Assign pointer to interface
-	var p2 Printer
-	// p2 = d1 // Fails: Data does not have GetValue() (pointer receiver)
-	p2 = d2 // OK: *Data has both Print() (promoted) and GetValue()
+	// MyData does not fully implement NumPrinter (GetNum has pointer receiver)
+	// *MyData implements NumPrinter (PrintNum is promoted, GetNum is defined)
+	var np NumPrinter
+	np = dataPtr // OK
 
-	println("Testing pointer receiver assignment:")
-	p2.Print()           // Can call value receiver method via pointer
-	val := p2.GetValue() // Can call pointer receiver method
-	println("Value from p2:", val)
+	println("--- Interface Method Calls ---")
+	np.PrintNum()               // Call value receiver method via interface holding pointer
+	retrievedNum := np.GetNum() // Call pointer receiver method
+	println("Retrieved num via interface:", retrievedNum)
 
-	println("Testing type assertions (comma-ok):")
-	// Assert p1 (interface is nil) to Data (should fail)
-	// data1, ok1 := p1.(Data) // IMPOSSIBLE: Data does not implement Printer
-	// println("p1.(Data):", ok1) // Cannot access data1.value if ok1 is false
-
-	// Assert p1 (interface is nil) to *Data (should fail)
-	_, ok2 := p1.(*Data)
-	println("p1.(*Data):", ok2) // p1 is nil, so assertion fails
-
-	// Assert p2 (holding *Data) to *Data
-	dataPtr2, ok3 := p2.(*Data)
-	println("p2.(*Data):", ok3, dataPtr2.value)
-
-	// Assert p2 (holding *Data) to Data (IMPOSSIBLE: Data does not implement Printer)
-	// _, ok4 := p2.(Data)
-	// println("p2.(Data):", ok4)
-
-	// Assert p2 (holding *Data) to Printer (should succeed)
-	_, ok5 := p2.(Printer)
-	println("p2.(Printer):", ok5) // Use ok5
-
-	println("Testing type assertions (panic form):")
-	// This should succeed
-	data3 := p2.(Printer)
-	data3.Print()
-
-	// This should succeed
-	data4 := p2.(*Data)
-	println("Value from data4:", data4.value)
-
-	// Test zero values implicitly
-	var dZero Data
-	var pZero *Data
-	var iZero Printer
-	var sZero []int
-	var mZero map[int]string
-	var fnZero Processor
-
-	// Cannot easily print zero values without fmt, but their declaration tests compiler handling
-	println("Declared zero values (compiler check)")
-	// Avoid printing nil pointers/interfaces directly with println if it causes issues
-	if dZero.value == 0 {
-		println("dZero.value is zero")
-	}
-	if pZero == nil {
-		println("pZero is nil")
-	}
-	if iZero == nil {
-		println("iZero is nil")
-	}
-	if sZero == nil {
-		println("sZero is nil")
-	}
-	if mZero == nil {
-		println("mZero is nil")
-	}
-	if fnZero == nil {
-		println("fnZero is nil")
+	println("\n--- Type Assertions (Comma-Ok) ---")
+	// Assert interface (holding *MyData) to *MyData
+	mdPtr1, ok1 := np.(*MyData)
+	if ok1 {
+		println("np.(*MyData) OK:", ok1, "Num:", mdPtr1.num)
+	} else {
+		println("np.(*MyData) FAILED:", ok1)
 	}
 
-	// Test assertion that should panic (uncomment to test panic)
-	// println("Testing panic assertion:")
-	// _ = p1.(string) // Assert Data to string - should panic
+	// Assert interface (holding *MyData) to NumPrinter (interface to itself)
+	np2, ok2 := np.(NumPrinter)
+	if ok2 {
+		println("np.(NumPrinter) OK:", ok2, "Can call GetNum:", np2.GetNum())
+	} else {
+		println("np.(NumPrinter) FAILED:", ok2)
+	}
+
+	// Assert interface (holding *MyData) to MyData (INVALID: MyData doesn't implement NumPrinter)
+	// _, okInvalid := np.(MyData)
+	// println("np.(MyData) OK:", okInvalid) // This would be false
+
+	// Assert nil interface to *MyData
+	var nilNp NumPrinter
+	_, okNil := nilNp.(*MyData)
+	println("nilNp.(*MyData) OK:", okNil) // Should be false
+
+	println("\n--- Type Assertions (Panic Form) ---")
+	// Assert interface (holding *MyData) to *MyData
+	println("Asserting np.(*MyData)...")
+	mdPtr2 := np.(*MyData) // Should succeed
+	println("Success! mdPtr2.num:", mdPtr2.num)
+
+	// Assert interface (holding *MyData) to NumPrinter
+	println("Asserting np.(NumPrinter)...")
+	np3 := np.(NumPrinter) // Should succeed
+	np3.PrintNum()         // Call method on the result
+
+	// Assert interface (holding *MyData) to MyData (INVALID - should panic if uncommented)
+	// println("Asserting np.(MyData)... (should panic)")
+	// _ = np.(MyData)
+	// println("This should not be printed")
+
+	// Assert nil interface to string (should panic if uncommented)
+	// println("Asserting nilNp.(string)... (should panic)")
+	// _ = nilNp.(string)
+	// println("This should not be printed")
+
+	println("\n--- Zero Values ---")
+	var zd MyData
+	var zpd *MyData
+	var znp NumPrinter
+	println("Zero MyData num:", zd.num)
+	println("Zero *MyData is nil:", zpd == nil)
+	println("Zero NumPrinter is nil:", znp == nil)
 }

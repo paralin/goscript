@@ -700,7 +700,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 	// --- Original logic for other assignments ---
 	isMapIndexLHS := false // Track if the first LHS is a map index
-	
+
 	// Check if we're assigning to an interface
 	isInterfaceAssign := false
 	var interfaceLHS ast.Expr
@@ -712,7 +712,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			}
 		}
 	}
-	
+
 	for i, l := range lhs {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
@@ -784,12 +784,12 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			} else {
 				c.tsw.WriteLiterally(", goscript.getType('interface{}')!) ? ")
 			}
-			
+
 			// Actual value to assign if compatible
 			if err := c.WriteValueExpr(rhs[0]); err != nil {
 				return err
 			}
-			
+
 			c.tsw.WriteLiterally(" : null)")
 			return nil
 		}
@@ -799,14 +799,14 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		// Check if we should apply clone for value-type semantics
+		// Write the RHS expression, potentially with .clone()
 		if shouldApplyClone(c.pkg, r) {
-			if err := c.WriteValueExpr(r); err != nil { // RHS is a value
+			if err := c.WriteValueExpr(r); err != nil { // Write RHS
 				return err
 			}
-			c.tsw.WriteLiterally(".clone()")
+			c.tsw.WriteLiterally(".clone()") // Append .clone() if needed
 		} else {
-			if err := c.WriteValueExpr(r); err != nil { // RHS is a value
+			if err := c.WriteValueExpr(r); err != nil { // Write RHS
 				return err
 			}
 		}
@@ -1235,7 +1235,7 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 		}
 	}
 
-	// Add semicolon according to design doc (omit semicolons) - REMOVED semicolon
+	// No semicolon according to design doc (omit semicolons)
 	c.tsw.WriteLine("") // Finish with a newline
 	return nil
 }
@@ -1591,7 +1591,7 @@ func (c *GoToTSCompiler) getTypeNameForInterface(typ gtypes.Type) string {
 	if typ == nil {
 		return "interface{}"
 	}
-	
+
 	// If it's a named type, return the qualified name
 	if named, ok := typ.(*gtypes.Named); ok {
 		if named.Obj() != nil {
@@ -1604,14 +1604,14 @@ func (c *GoToTSCompiler) getTypeNameForInterface(typ gtypes.Type) string {
 			return named.Obj().Name()
 		}
 	}
-	
+
 	// For unnamed interface{}, return the special name
 	if iface, ok := typ.Underlying().(*gtypes.Interface); ok {
 		if iface.Empty() {
 			return "interface{}"
 		}
 	}
-	
+
 	// Fallback for other interface types
 	return "interface{}"
 }

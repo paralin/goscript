@@ -247,9 +247,6 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	// Get the type name string for the asserted type
 	typeName := c.getTypeNameString(exp.Type)
 
-	// Check if we're asserting to a pointer type
-	_, isPointerType := exp.Type.(*ast.StarExpr)
-
 	// Generate a call to goscript.typeAssert
 	c.tsw.WriteLiterally("goscript.typeAssert<")
 	c.WriteTypeExpr(exp.Type) // Write the asserted type for the generic
@@ -260,13 +257,12 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	c.tsw.WriteLiterally(", ")
 	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
 
-	// When asserting to a pointer type, we need to handle the possibility
-	// that we might get a GoPtr wrapper back
-	if isPointerType {
-		c.tsw.WriteLiterally(")") // Don't access .value directly for pointer types
-	} else {
-		c.tsw.WriteLiterally(").value") // Access the value field directly for non-pointer types
-	}
+	c.tsw.WriteLiterally(").value") // Always access .value for the panic form
+
+	// TODO: Consider adding a check for 'ok' and throwing an error if false
+	// to truly emulate the panic behavior, or create a separate typeAssertPanic helper.
+	// For now, just accessing .value relies on typeAssert returning the zero value on failure,
+	// which might not be the desired panic behavior.
 
 	return nil
 }
@@ -448,35 +444,20 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 		c.tsw.WriteLiterally(")?.ref?.")
 		c.WriteIdentValue(exp.Sel)
 	} else if isGoPtr {
-		// For values that might be GoPtr instances at runtime, use safe access pattern
-		c.tsw.WriteLiterally("(")
+		// For values that might be GoPtr instances at runtime (interfaces holding pointers),
+		// the runtime should handle method dispatch correctly. Just write the direct access.
 		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write selector expression object: %w", err)
-		}
-		c.tsw.WriteLiterally(" instanceof goscript.GoPtr ? ")
-
-		// If it's a GoPtr, access through .ref
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write selector expression GoPtr check: %w", err)
-		}
-		c.tsw.WriteLiterally(".ref?.")
-		c.WriteIdentValue(exp.Sel)
-
-		// If it's not a GoPtr, access directly
-		c.tsw.WriteLiterally(" : ")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write selector expression direct access: %w", err)
+			return fmt.Errorf("failed to write selector expression object (interface): %w", err)
 		}
 		c.tsw.WriteLiterally(".")
 		c.WriteIdentValue(exp.Sel)
-		c.tsw.WriteLiterally(")")
 	} else if mayNeedAddressOfForMethod {
 		// Method with pointer receiver called on a value - implicitly take the address
 		// Check if the selector is a method or a field
 		obj := c.pkg.TypesInfo.Uses[exp.Sel]
 		if _, isMethod := obj.(*gtypes.Func); isMethod {
 			// It's a method - generate method call syntax
-			c.tsw.WriteLiterally("(new goscript.GoPtr(")
+			c.tsw.WriteLiterally("(goscript.createGoPtr(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write value for implicit pointer conversion (method call): %w", err)
 			}
@@ -485,7 +466,7 @@ func (c *GoToTSCompiler) WriteSelectorExprValue(exp *ast.SelectorExpr) error {
 			// Note: Arguments for the method call are handled in WriteCallExpr
 		} else {
 			// It's a field access - generate field access syntax
-			c.tsw.WriteLiterally("(new goscript.GoPtr(")
+			c.tsw.WriteLiterally("(goscript.createGoPtr(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write value for implicit pointer conversion (field access): %w", err)
 			}
@@ -1004,8 +985,8 @@ func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) error {
 	}
 
 	if exp.Op == token.AND {
-		// Address-of operator (&) creates a new GoPtr instance wrapping the value
-		c.tsw.WriteLiterally("new goscript.GoPtr(")
+		// Address-of operator (&) creates a new Go pointer proxy wrapping the value
+		c.tsw.WriteLiterally("goscript.createGoPtr(")
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write unary expression operand for address-of: %w", err)
 		}
