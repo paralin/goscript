@@ -1,39 +1,44 @@
-# Work in Progress: Method Call on Pointer Receiver Fix
+/*
+# Pointer-handling work plan
 
-**Issue:**
-In Go, a method with a pointer receiver `func (m *MyStruct) GetMyString() string` operates on the underlying `MyStruct` value. The generated TypeScript code currently translates this such that `this` inside the method is treated as `goscript.GoPtr<MyStruct>`, leading to incorrect access like `this.ref!.MyString`. The correct behavior should be to treat `this` as the value type `MyStruct` and access fields/methods directly (`this.MyString`).
+## 1 Status quo
 
-**Analysis:**
-The problem lies in how the compiler handles member access (field or method) when the base expression is the receiver (`this`) within a method with a pointer receiver. The current logic in `compiler/compile_expr.go`, specifically in `WriteSelectorExprValue`, seems to apply the `GoPtr` dereferencing (`.ref!`) too broadly.
+Current generator already:
+• emits pointer **types** as `goscript.Ptr<T>` (`compile_expr.go` → WriteStarExprType)  
+• produces pointers with `goscript.makePtr(...)` for the address-of op (`&`)  
+• dereferences via the `._ptr/.ref` accessors handled by `WriteStarExprValue`
+so most of the newly-designed runtime API is already in use.
 
-When compiling a selector expression `exp.X.Sel`, where `exp.X` is the receiver identifier (`m` in the example `func (m *MyStruct) GetMyString()`), the compiler needs to determine the type of `exp.X` in the context of the method's receiver type. If the method has a pointer receiver (`*MyStruct`), the receiver variable `m` in Go refers to the pointer value. However, in the generated TypeScript, the `this` context within the class method should correspond to the *value* type (`MyStruct`), not the pointer wrapper (`GoPtr<MyStruct>`).
+## 2 Required compiler tweaks
 
-The logic in `WriteSelectorExprValue` needs to be updated to recognize when the base expression `exp.X` is the `this` receiver within a pointer receiver method and generate direct access (`this.Sel`) instead of the `GoPtr` access pattern (`exp.X.ref!.Sel`).
+1. Guarantee we always reference the exported alias
+  `Ptr<T>` that lives in the _goscript_ namespace:
+  • ensure `WriteStarExprType` writes **`goscript.Ptr<…>`**  
+    (existing path is correct – keep).
 
-**Plan:**
+2. Address-of (`&`)  
+  Already compiled to `goscript.makePtr(v)` – no change.
 
-1.  Modify `compiler/compile_expr.go`, specifically the `WriteSelectorExprValue` function.
-2.  Inside `WriteSelectorExprValue`, add a check to see if the expression `exp.X` is the receiver identifier of the current method being compiled.
-3.  If it is the receiver identifier and the method has a pointer receiver, generate direct access to the selector (`this.Sel`).
-4.  Otherwise, keep the existing logic for handling field/method access on potentially `GoPtr` values.
+3. Dereference (`*ptr`)  
+  Current code emits `(<expr>).ref`, which is still valid because
+  `goPtrProxy` exposes `.ref`.  No change required.
 
-**Specific Code Changes (Plan):**
+4. Interface assignability issue  
+  No generator changes needed; it is solved by the new
+  `Ptr<T> = (goPtrProxy<T> & T) | null` intersection type.
 
-I will need to identify the exact lines in `compiler/compile_expr.go` within `WriteSelectorExprValue` where the `.ref!` access is generated and add the conditional logic there. Based on the `search_files` output, lines around 150-151 and 409-410 are likely candidates.
+## 3 Future considerations / design notes
 
-I will need to access information about the current function being compiled (specifically, if it's a method and if it has a pointer receiver) within `WriteSelectorExprValue`. This information might need to be passed down through the compiler's context or retrieved from the `ast.FuncDecl` which should be available during the compilation of the method body.
+* The generator currently peeks at `.ref` directly for field/method access on
+  pointer receivers.  Thanks to the intersection type this is no longer
+  necessary – optional chaining on the pointer itself would suffice.  
+  Keeping the existing emission is harmless but could be simplified later.
 
-Let's look closer at `compiler/compile_spec.go` and `WriteFuncDeclAsMethod` (line 527) to see how the method body is compiled and if the `ast.FuncDecl` is accessible when compiling the body statements in `compiler/compile_expr.go`.
+* To save bundle size we might export `Ptr` directly from the runtime namespace
+  and let the code emit `goscript.Ptr` while re-exporting:
+  `export { Ptr } from "./pointer";` – no compiler impact.
 
-In `compiler/compile_spec.go`, `WriteFuncDeclAsMethod` iterates through the statements in `decl.Body.List` and calls `c.WriteStmt(stmt)`. `WriteStmt` in `compiler/compile_stmt.go` then calls other `Write*` functions, including `WriteValueExpr` and `WriteSelectorExprValue` in `compiler/compile_expr.go`. It seems the `ast.FuncDecl` is not directly available in `WriteSelectorExprValue`.
+* If we later allow multi-level pointers (`**T`) the generator must loop
+  and nest `goscript.Ptr<...>` appropriately.
 
-A better approach might be to modify `WriteFuncDeclAsMethod` to set a flag or pass context indicating that the current compilation is within a pointer receiver method. This context can then be checked in `WriteSelectorExprValue`.
-
-Let's refine the plan:
-
-1.  Add a field to the `GoToTSCompiler` struct (or a new context struct passed around) to indicate if the compiler is currently inside a pointer receiver method.
-2.  In `compiler/compile_spec.go`, within `WriteFuncDeclAsMethod`, set this flag/context before compiling the method body if the method has a pointer receiver. Reset it after the body is compiled.
-3.  In `compiler/compile_expr.go`, within `WriteSelectorExprValue`, check this flag/context. If the flag is set and the base expression `exp.X` is the receiver identifier of the current method, generate direct access (`this.Sel`).
-4.  Otherwise, proceed with the existing logic for handling potential `GoPtr` values.
-
-I will need to read the `compiler/compiler.go` file to see the definition of the `GoToTSCompiler` struct and determine the best way to add this context.
+*/

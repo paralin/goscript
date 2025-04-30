@@ -39,14 +39,14 @@ func (c *GoToTSCompiler) collectMethodSignatures(structName string, valueOnly bo
 			// Check if the receiver type matches the struct name
 			recvField := funcDecl.Recv.List[0]
 			recvType := recvField.Type
-			
+
 			// Check if this is a pointer receiver
 			isPointerRecv := false
 			if starExpr, ok := recvType.(*ast.StarExpr); ok {
 				isPointerRecv = true
 				recvType = starExpr.X // Get the type being pointed to
 			}
-			
+
 			// If valueOnly is true, skip pointer receivers
 			if valueOnly && isPointerRecv {
 				continue
@@ -263,96 +263,165 @@ func (c *GoToTSCompiler) buildInterfaceMethodSignature(methodName string, funcTy
 	return sb.String()
 }
 
-// getTypeReference returns a reference to the type's registered TypeInfo
+// getTypeReference returns a reference to the type's TypeInfo
 func (c *GoToTSCompiler) getTypeReference(expr ast.Expr) string {
 	switch t := expr.(type) {
 	case *ast.Ident:
-		// Add '!' for non-null assertion
-		return fmt.Sprintf("goscript.getType('%s')!", t.Name)
+		switch t.Name {
+		case "int":
+			return "goscript.INT_TYPE"
+		case "string":
+			return "goscript.STRING_TYPE"
+		case "bool":
+			return "goscript.BOOL_TYPE"
+		case "float64":
+			return "goscript.FLOAT64_TYPE"
+		case "byte":
+			return "goscript.BYTE_TYPE"
+		case "rune":
+			return "goscript.RUNE_TYPE"
+		case "interface{}":
+			return "goscript.EMPTY_INTERFACE_TYPE"
+		case "any":
+			return "goscript.ANY_TYPE"
+		case "error":
+			return "goscript.ERROR_TYPE"
+		default:
+			// User-defined type, reference its type info constant
+			return fmt.Sprintf("%s__typeInfo", t.Name)
+		}
 	case *ast.SelectorExpr:
 		// Handle package qualified types
 		if x, ok := t.X.(*ast.Ident); ok {
-			// Add '!' for non-null assertion
-			return fmt.Sprintf("goscript.getType('%s.%s')!", x.Name, t.Sel.Name)
+			return fmt.Sprintf("%s.%s__typeInfo", x.Name, t.Sel.Name)
 		}
 	case *ast.StarExpr:
 		// Handle pointer types
-		// Add '!' for non-null assertion
-		return fmt.Sprintf("goscript.getType('*%s')!", c.getTypeNameString(t.X))
+		// Create a reference to the pointer type info constant
+		baseTypeName := c.getTypeNameString(t.X)
+		// If it's a basic type, construct a pointer to it
+		if isBasicType(baseTypeName) {
+			return fmt.Sprintf("{ kind: goscript.GoTypeKind.Pointer, name: '*%s', zero: null, elem: %s }",
+				baseTypeName, getBasicTypeConstName(baseTypeName))
+		}
+		// Otherwise, use the generated pointer type info
+		return fmt.Sprintf("%s__ptrTypeInfo", baseTypeName)
 	case *ast.ArrayType:
-		// Handle array types (assuming slice for now)
-		// Add '!' for non-null assertion
-		return fmt.Sprintf("goscript.getType('[]%s')!", c.getTypeNameString(t.Elt))
+		// Handle array/slice types
+		elemType := c.getTypeReference(t.Elt)
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Slice, name: '[]%s', zero: [], elem: %s }",
+			c.getTypeNameString(t.Elt), elemType)
 	case *ast.MapType:
 		// Handle map types
-		// Add '!' for non-null assertion
-		return fmt.Sprintf("goscript.getType('map[%s]%s')!",
-			c.getTypeNameString(t.Key), c.getTypeNameString(t.Value))
+		keyType := c.getTypeReference(t.Key)
+		valueType := c.getTypeReference(t.Value)
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Map, name: 'map[%s]%s', zero: new Map(), key: %s, value: %s }",
+			c.getTypeNameString(t.Key), c.getTypeNameString(t.Value), keyType, valueType)
 	}
 
 	// For more complex types, we'd need more sophisticated handling
-	// Add '!' for non-null assertion
-	return "goscript.getType('interface{}')!"
+	return "goscript.EMPTY_INTERFACE_TYPE"
 }
 
-// getTypeReferenceFromType returns a reference to the type's registered TypeInfo from a types.Type
+// getTypeReferenceFromType returns a reference to the type's TypeInfo from a types.Type
 func (c *GoToTSCompiler) getTypeReferenceFromType(typ types.Type) string {
 	switch t := typ.(type) {
 	case *types.Basic:
-		// Map basic Go types to their names
+		// Map basic Go types to their const references
 		name := t.Name()
-		// Handle potential aliases like 'byte' or 'rune' if needed, though basic name should work
-		return fmt.Sprintf("goscript.getType('%s')!", name)
+		return getBasicTypeConstName(name)
 	case *types.Pointer:
 		// Handle pointer types
-		elemRef := c.getTypeReferenceFromType(t.Elem())
-		// Need to strip the '!' from the element type reference before prepending '*'
-		elemName := strings.TrimSuffix(elemRef, "!")
-		// Reconstruct the pointer type name for lookup
-		return fmt.Sprintf("goscript.getType('*%s')!", elemName[len("goscript.getType('"):len(elemName)-len("')")])
+		elemType := c.getTypeReferenceFromType(t.Elem())
+		if isBasicTypeConstRef(elemType) {
+			// For pointers to basic types, create an inline PointerTypeInfo
+			return fmt.Sprintf("{ kind: goscript.GoTypeKind.Pointer, name: '*%s', zero: null, elem: %s }",
+				t.Elem().String(), elemType)
+		}
+
+		// For pointers to named types, use the pointer type info constant
+		if named, ok := t.Elem().(*types.Named); ok {
+			return fmt.Sprintf("%s__ptrTypeInfo", named.Obj().Name())
+		}
 	case *types.Slice:
 		// Handle slice types
-		elemRef := c.getTypeReferenceFromType(t.Elem())
-		// Need to strip the '!' from the element type reference before prepending '[]'
-		elemName := strings.TrimSuffix(elemRef, "!")
-		// Reconstruct the slice type name for lookup
-		return fmt.Sprintf("goscript.getType('[]%s')!", elemName[len("goscript.getType('"):len(elemName)-len("')")])
+		elemType := c.getTypeReferenceFromType(t.Elem())
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Slice, name: '[]%s', zero: [], elem: %s }",
+			t.Elem().String(), elemType)
 	case *types.Map:
 		// Handle map types
-		keyRef := c.getTypeReferenceFromType(t.Key())
-		valueRef := c.getTypeReferenceFromType(t.Elem())
-		// Strip '!' and surrounding getType call
-		keyName := strings.TrimSuffix(keyRef, "!")
-		keyName = keyName[len("goscript.getType('") : len(keyName)-len("')")]
-		valueName := strings.TrimSuffix(valueRef, "!")
-		valueName = valueName[len("goscript.getType('") : len(valueName)-len("')")]
-		// Reconstruct the map type name for lookup
-		return fmt.Sprintf("goscript.getType('map[%s]%s')!", keyName, valueName)
+		keyType := c.getTypeReferenceFromType(t.Key())
+		valueType := c.getTypeReferenceFromType(t.Elem())
+		return fmt.Sprintf("{ kind: goscript.GoTypeKind.Map, name: 'map[%s]%s', zero: new Map(), key: %s, value: %s }",
+			t.Key().String(), t.Elem().String(), keyType, valueType)
 	case *types.Named:
 		// Handle named types (structs, interfaces, type aliases)
 		obj := t.Obj()
 		if pkg := obj.Pkg(); pkg != nil {
 			// Qualify with package name if not in the current package
 			if pkg != c.pkg.Types {
-				return fmt.Sprintf("goscript.getType('%s.%s')!", pkg.Name(), obj.Name())
+				return fmt.Sprintf("%s.%s__typeInfo", pkg.Name(), obj.Name())
 			}
 		}
-		return fmt.Sprintf("goscript.getType('%s')!", obj.Name())
+		return fmt.Sprintf("%s__typeInfo", obj.Name())
 	case *types.Interface:
 		// Handle anonymous interface types (e.g., interface{})
 		if t.Empty() {
-			return "goscript.getType('interface{}')!"
+			return "goscript.EMPTY_INTERFACE_TYPE"
 		}
-		// TODO: Handle non-empty anonymous interfaces if needed by generating a canonical key
-		return "goscript.getType('interface{}')!" // Fallback
+		// TODO: Handle non-empty anonymous interfaces if needed
+		return "goscript.EMPTY_INTERFACE_TYPE" // Fallback
 	case *types.Signature:
 		// Handle function types
 		// TODO: Implement function type signature generation if needed
-		return "goscript.getType('func()')!" // Placeholder
+		return "{ kind: goscript.GoTypeKind.Func, name: 'func()', zero: null, params: [], results: [], variadic: false }" // Placeholder
 	}
 
 	// Fallback for unhandled types
-	return "goscript.getType('interface{}')!"
+	return "goscript.EMPTY_INTERFACE_TYPE"
+}
+
+// isBasicType checks if a type name represents a Go built-in type
+func isBasicType(typeName string) bool {
+	switch typeName {
+	case "int", "string", "bool", "float64", "byte", "rune", "interface{}", "any", "error":
+		return true
+	default:
+		return false
+	}
+}
+
+// getBasicTypeConstName returns the constant name for a basic type
+func getBasicTypeConstName(typeName string) string {
+	switch typeName {
+	case "int":
+		return "goscript.INT_TYPE"
+	case "string":
+		return "goscript.STRING_TYPE"
+	case "bool":
+		return "goscript.BOOL_TYPE"
+	case "float64":
+		return "goscript.FLOAT64_TYPE"
+	case "byte":
+		return "goscript.BYTE_TYPE"
+	case "rune":
+		return "goscript.RUNE_TYPE"
+	case "interface{}":
+		return "goscript.EMPTY_INTERFACE_TYPE"
+	case "any":
+		return "goscript.ANY_TYPE"
+	case "error":
+		return "goscript.ERROR_TYPE"
+	default:
+		return "goscript.EMPTY_INTERFACE_TYPE"
+	}
+}
+
+// isBasicTypeConstRef checks if a string is a reference to a basic type constant
+func isBasicTypeConstRef(ref string) bool {
+	return strings.HasPrefix(ref, "goscript.") &&
+		strings.HasSuffix(ref, "_TYPE") &&
+		!strings.Contains(ref, "{")
 }
 
 // WriteTypeSpec writes the type specification to the output.
@@ -476,13 +545,14 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		// Add type information as static property (inside the class)
 		// Indentation is already correct here (one level inside the class)
 		c.tsw.WriteLine("// Type information for runtime type system")
-		c.tsw.WriteLinef("static __typeInfo = goscript.registerType(")
-		c.tsw.WriteLinef("  '%s',", className)
-		c.tsw.WriteLinef("  goscript.GoTypeKind.Struct,")
-		c.tsw.WriteLinef("  new %s(),", className)
-		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className, true)) // Only value receiver methods
-		c.tsw.WriteLinef("  %s", className)
-		c.tsw.WriteLinef(");")
+		c.tsw.WriteLinef("static __typeInfo: goscript.StructTypeInfo = {")
+		c.tsw.WriteLinef("  kind: goscript.GoTypeKind.Struct,")
+		c.tsw.WriteLinef("  name: '%s',", className)
+		c.tsw.WriteLinef("  zero: new %s(),", className)
+		c.tsw.WriteLinef("  fields: [], // Fields will be added in a future update")
+		c.tsw.WriteLinef("  methods: [%s],", c.collectMethodSignatures(className, true)) // Only value receiver methods
+		c.tsw.WriteLinef("  ctor: %s", className)
+		c.tsw.WriteLinef("};")
 
 		c.tsw.WriteLine("") // Add space after static property
 
@@ -491,14 +561,13 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 		// Add pointer type registration outside the class
 		c.tsw.WriteLine("")
-		c.tsw.WriteLinef("// Register pointer type")
-		c.tsw.WriteLinef("const %s__ptrTypeInfo = goscript.registerType(", className)
-		c.tsw.WriteLinef("  '*%s',", className)
-		c.tsw.WriteLinef("  goscript.GoTypeKind.Pointer,")
-		c.tsw.WriteLinef("  null,") // Zero value for pointers is null
-		c.tsw.WriteLinef("  [%s],", c.collectMethodSignatures(className, false)) // All methods
-		c.tsw.WriteLinef("  %s.__typeInfo", className) // Element type is the struct type
-		c.tsw.WriteLinef(");")
+		c.tsw.WriteLinef("// Define pointer type information")
+		c.tsw.WriteLinef("const %s__ptrTypeInfo: goscript.PointerTypeInfo = {", className)
+		c.tsw.WriteLinef("  kind: goscript.GoTypeKind.Pointer,")
+		c.tsw.WriteLinef("  name: '*%s',", className)
+		c.tsw.WriteLinef("  zero: null,")                    // Zero value for pointers is null
+		c.tsw.WriteLinef("  elem: %s.__typeInfo", className) // Element type is the struct type
+		c.tsw.WriteLinef("};")
 
 		return nil // Prevent fallthrough to InterfaceType case
 	case *ast.InterfaceType:
@@ -509,17 +578,16 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		c.tsw.WriteLiterally(" ") // Changed from WriteLine to WriteLiterally
 		c.WriteTypeExpr(a.Type)   // The interface definition itself is a type
 
-		// Add code to register the interface with the runtime system
+		// Add code to define interface type information
 		interfaceName := a.Name.Name
 		c.tsw.WriteLine("")
-		c.tsw.WriteLinef("// Register this interface with the runtime type system")
-		c.tsw.WriteLinef("const %s__typeInfo = goscript.registerType(", interfaceName)
-		c.tsw.WriteLinef("  '%s',", interfaceName)
-		c.tsw.WriteLinef("  goscript.GoTypeKind.Interface,")
-		c.tsw.WriteLinef("  null,") // Zero value for interface is null
-		c.tsw.WriteLinef("  [%s],", c.collectInterfaceMethodSignatures(t))
-		c.tsw.WriteLinef("  undefined")
-		c.tsw.WriteLinef(");")
+		c.tsw.WriteLinef("// Define interface type information")
+		c.tsw.WriteLinef("const %s__typeInfo: goscript.InterfaceTypeInfo = {", interfaceName)
+		c.tsw.WriteLinef("  kind: goscript.GoTypeKind.Interface,")
+		c.tsw.WriteLinef("  name: '%s',", interfaceName)
+		c.tsw.WriteLinef("  zero: null,") // Zero value for interface is null
+		c.tsw.WriteLinef("  methods: [%s]", c.collectInterfaceMethodSignatures(t))
+		c.tsw.WriteLinef("};")
 	default:
 		// type alias
 		c.tsw.WriteLiterally("type ")

@@ -8,14 +8,13 @@ interface NumPrinter {
 	GetNum(): number;
 }
 
-// Register this interface with the runtime type system
-const NumPrinter__typeInfo = goscript.registerType(
-  'NumPrinter',
-  goscript.GoTypeKind.Interface,
-  null,
-  [{ name: 'PrintNum', params: [], results: [] }, { name: 'GetNum', params: [], results: [{ type: goscript.getType('int')! }] }],
-  undefined
-);
+// Define interface type information
+const NumPrinter__typeInfo: goscript.InterfaceTypeInfo = {
+  kind: goscript.GoTypeKind.Interface,
+  name: 'NumPrinter',
+  zero: null,
+  methods: [{ name: 'PrintNum', params: [], results: [] }, { name: 'GetNum', params: [], results: [{ type: goscript.INT_TYPE }] }]
+};
 
 class MyData {
 	public num: number = 0;
@@ -37,34 +36,34 @@ class MyData {
 	public clone(): MyData { return Object.assign(Object.create(MyData.prototype) as MyData, this); }
 
 	// Type information for runtime type system
-	static __typeInfo = goscript.registerType(
-	  'MyData',
-	  goscript.GoTypeKind.Struct,
-	  new MyData(),
-	  [{ name: 'PrintNum', params: [], results: [] }],
-	  MyData
-	);
+	static __typeInfo: goscript.StructTypeInfo = {
+	  kind: goscript.GoTypeKind.Struct,
+	  name: 'MyData',
+	  zero: new MyData(),
+	  fields: [], // Fields will be added in a future update
+	  methods: [{ name: 'PrintNum', params: [], results: [] }],
+	  ctor: MyData
+	};
 
 }
 
-// Register pointer type
-const MyData__ptrTypeInfo = goscript.registerType(
-  '*MyData',
-  goscript.GoTypeKind.Pointer,
-  null,
-  [{ name: 'PrintNum', params: [], results: [] }, { name: 'GetNum', params: [], results: [{ type: goscript.getType('int')! }] }],
-  MyData.__typeInfo
-);
+// Define pointer type information
+const MyData__ptrTypeInfo: goscript.PointerTypeInfo = {
+  kind: goscript.GoTypeKind.Pointer,
+  name: '*MyData',
+  zero: null,
+  elem: MyData.__typeInfo
+};
 
 export async function main(): Promise<void> {
 	// Create struct pointer
-	let dataPtr = goscript.createGoPtr(new MyData({num: 20, label: "B"}))
+	let dataPtr = goscript.makePtr(new MyData({num: 20, label: "B"}))
 
 	// Assign pointer to interface
 	// MyData does not fully implement NumPrinter (GetNum has pointer receiver)
 	// *MyData implements NumPrinter (PrintNum is promoted, GetNum is defined)
 	let np: NumPrinter | null = null;
-	np = (goscript.isAssignable(dataPtr, goscript.getType('NumPrinter')!) ? dataPtr : null) // OK
+	np = (goscript.isAssignable(dataPtr, NumPrinter__typeInfo) ? dataPtr : null) // OK
 
 	console.log("--- Interface Method Calls ---")
 	np.PrintNum() // Call value receiver method via interface holding pointer

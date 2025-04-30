@@ -86,17 +86,71 @@ export interface MethodSig {
 
 ```ts
 /**
- * Represents a Go pointer in TypeScript.
+ * Represents a Go pointer in TypeScript using a Proxy.
  * A nil pointer is represented by `null`.
+ * The Proxy intercepts property access and method calls,
+ * throwing an error for nil pointers and forwarding to the underlying reference.
  */
-export class GoPtr<T> {
-  constructor(public ref: T | null) {}
+export class GoPtr<T extends object> {
+  public _ptr: T | null; // Store the actual reference
+
+  constructor(ref: T | null) {
+    this._ptr = ref;
+
+    // Return a Proxy to intercept access
+    return new Proxy(this, {
+      get: (target, prop, receiver) => {
+        if (prop === '_ptr') return target._ptr;
+        if (Object.prototype.hasOwnProperty.call(target, prop) || typeof prop === 'symbol') {
+             return Reflect.get(target, prop, receiver);
+        }
+        if (target._ptr === null) throw new Error(`nil pointer dereference accessing '${String(prop)}'`);
+        const value = Reflect.get(target._ptr, prop, target._ptr);
+        return typeof value === 'function' ? value.bind(target._ptr) : value;
+      },
+      set: (target, prop, value, receiver) => {
+         if (prop === '_ptr') { target._ptr = value; return true; }
+        if (target._ptr === null) throw new Error(`nil pointer dereference setting '${String(prop)}'`);
+        return Reflect.set(target._ptr, prop, value, target._ptr);
+      },
+      has: (target, prop) => {
+         if (prop === '_ptr') return true;
+        if (target._ptr === null) return false;
+        return Reflect.has(target._ptr, prop);
+      }
+    }) as GoPtr<T>;
+  }
 }
 
 /**
  * Type alias for a Go pointer, which can be a GoPtr instance or null (for nil).
+ * The `& T` intersection allows TypeScript to treat the pointer like the underlying type.
  */
-export type Ptr<T> = GoPtr<T> | null;
+export type Ptr<T extends object> = (GoPtr<T> & T) | null;
+
+/**
+ * Creates a new Go pointer proxy wrapping the given value.
+ * Returns null for nil pointers.
+ */
+export function makePtr<T extends object>(value: T | null | undefined): Ptr<T> {
+  if (value === null || value === undefined) return null;
+  return new GoPtr(value as T) as Ptr<T>;
+}
+
+/**
+ * Type alias for a Go pointer, which can be a GoPtr instance or null (for nil).
+ * The `& T` intersection allows TypeScript to treat the pointer like the underlying type.
+ */
+export type Ptr<T extends object> = (GoPtr<T> & T) | null;
+
+/**
+ * Creates a new Go pointer proxy wrapping the given value.
+ * Returns null for nil pointers.
+ */
+export function makePtr<T extends object>(value: T | null | undefined): Ptr<T> {
+  if (value === null || value === undefined) return null;
+  return new GoPtr(value as T) as Ptr<T>;
+}
 
 
 export interface GoTypeInfo {

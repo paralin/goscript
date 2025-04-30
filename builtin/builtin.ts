@@ -1,141 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// --- Go Pointer Implementation using Proxy ---
-
-// Internal storage class (not exported)
-class _GoPtrImpl<T> {
-    constructor(public ref: T | null) {}
-}
-
-// Symbol for identifying GoPtr proxies
-export const isGoPtrProxy = Symbol("isGoPtrProxy");
-
-// Proxy handler for Go pointers
-const goPtrHandler: ProxyHandler<_GoPtrImpl<any>> = {
-    get(target: _GoPtrImpl<any>, prop: string | symbol, receiver: any) {
-        // Allow direct access to 'ref' and the identification symbol
-        if (prop === 'ref') return target.ref;
-        if (prop === isGoPtrProxy) return true;
-
-        // Handle nil pointer dereference
-        if (target.ref === null) {
-            // Allow access to standard prototype methods without throwing errors
-             if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'hasOwnProperty' || prop === 'isPrototypeOf' || prop === 'propertyIsEnumerable' || prop === 'toLocaleString' || prop === 'toString' || prop === 'valueOf') {
-                 // Use Reflect.get on the target (_GoPtrImpl instance) itself
-                 return Reflect.get(target, prop, receiver);
-             }
-            // Throw error for other properties on nil pointer
-            throw new Error(`runtime error: invalid memory address or nil pointer dereference accessing property '${String(prop)}'`);
-        }
-
-        // Access property on the referenced object using Reflect
-        // Use target.ref as the receiver for Reflect.get to ensure 'this' context is correct inside methods/getters
-        const value = Reflect.get(target.ref, prop, target.ref);
-
-        // Bind methods explicitly to ensure 'this' is correct, even if Reflect.get receiver helps
-        // This is safer across different JavaScript environments and object structures.
-        if (typeof value === 'function') {
-             return value.bind(target.ref);
-        }
-
-        return value;
-    },
-    set(target: _GoPtrImpl<any>, prop: string | symbol, value: any, receiver: any): boolean {
-        // Allow setting 'ref' directly on the internal implementation
-        if (prop === 'ref') {
-            target.ref = value;
-            return true;
-        }
-        // Handle nil pointer dereference on set
-        if (target.ref === null) {
-            throw new Error(`runtime error: invalid memory address or nil pointer dereference setting property '${String(prop)}'`);
-        }
-        // Set property on the referenced object using Reflect, with target.ref as receiver
-        return Reflect.set(target.ref, prop, value, target.ref);
-    },
-    has(target: _GoPtrImpl<any>, prop: string | symbol): boolean {
-        // Check for 'ref' and the symbol
-        if (prop === 'ref' || prop === isGoPtrProxy) return true;
-        // Handle nil pointer
-        if (target.ref === null) {
-             // Check standard properties on the _GoPtrImpl prototype chain
-             if (typeof prop === 'symbol' || prop === 'constructor' || prop === 'hasOwnProperty' || prop === 'isPrototypeOf' || prop === 'propertyIsEnumerable' || prop === 'toLocaleString' || prop === 'toString' || prop === 'valueOf') {
-                 return Reflect.has(target, prop);
-             }
-            // For other properties, 'in' check on nil pointer property returns false
-            return false;
-        }
-        // Check property existence on the referenced object
-        return Reflect.has(target.ref, prop);
-    },
-    // Needed for Object.keys, for...in loops, etc. to behave as expected over the pointer
-    ownKeys(target: _GoPtrImpl<any>): ArrayLike<string | symbol> {
-        if (target.ref === null) {
-            // Return keys of the internal object ('ref') plus the symbol? Or empty?
-            // Go doesn't allow ranging over nil pointers. Let's return empty for properties.
-            return []; // Reflect.ownKeys(target) would include 'ref'.
-        }
-        // Return keys of the referenced object
-        return Reflect.ownKeys(target.ref);
-    },
-    // Helps with instanceof checks and prototype chain expectations
-    getPrototypeOf(target: _GoPtrImpl<any>) {
-        if (target.ref === null) {
-            // Return prototype of the internal implementation detail
-            return Reflect.getPrototypeOf(target);
-        }
-        // Return prototype of the referenced object
-        return Reflect.getPrototypeOf(target.ref);
-    }
-};
-
-/**
- * Represents a Go pointer type nominally. The actual runtime object is a Proxy.
- * This declaration aids TypeScript type checking.
- */
-export declare class GoPtr<T> {
-    // Private field to ensure nominal typing (cannot be structurally matched)
-    private _nominal: T;
-    // Expose 'ref' in the type definition for internal access (e.g., typeAssert)
-    ref: T | null;
-
-    // Note: This is a declaration; it doesn't define runtime behavior.
-    // Properties and methods of T are accessed via the Proxy at runtime.
-    // TypeScript might not fully check structural compatibility without complex mapped types.
-}
-
-/**
- * Factory function to create a new Go pointer (Proxy object).
- * @param ref The value the pointer refers to, or null for a nil pointer.
- * @returns A Proxy behaving like a Go pointer, or null if ref is null.
- */
-export function createGoPtr<T>(ref: T | null): GoPtr<T> {
-    const internalPtr = new _GoPtrImpl(ref);
-    // Cast the Proxy to the nominal GoPtr<T> type for external use
-    return new Proxy(internalPtr, goPtrHandler) as GoPtr<T>;
-}
-
-/**
- * Type alias for a Go pointer (proxy object) or null (for nil).
- */
-export type Ptr<T> = (GoPtr<T> & T) | null;
-
-/**
- * Creates a new Go pointer (proxy object or null).
- * @param v The value the pointer refers to, or null for a nil pointer.
- * @returns A Go pointer proxy or null.
- */
-export const newPtr = <T>(v: T | null): Ptr<T> => {
-  if (v === null) {
-    return null;
-  }
-  // Use the factory function to create the proxy
-  return createGoPtr(v) as Ptr<T>;
-};
-
-// --- End Go Pointer Implementation ---
-
-
 /**
  * Creates a new slice (TypeScript array) with the specified length and capacity.
  * @param len The length of the slice.
@@ -343,8 +207,96 @@ export interface MethodSig {
 }
 
 /**
- * Base interface for all Go type information.
+ * Represents a Go pointer in TypeScript.
+ * A nil pointer is represented by `null`.
+ * throwing an error for nil pointers and forwarding to the underlying reference.
  */
+class goPtrProxy<T extends object> {
+  public _ptr: T | null; // Store the actual reference
+
+  constructor(ref: T | null) {
+    this._ptr = ref;
+
+    // Return a Proxy to intercept access
+    return new Proxy(this, {
+      get: (target, prop, receiver) => {
+        // Handle access to the internal _ptr property directly
+        if (prop === '_ptr') {
+          return target._ptr;
+        }
+        // Handle access to prototype properties (like constructor)
+        if (Object.prototype.hasOwnProperty.call(target, prop) || typeof prop === 'symbol') {
+             return Reflect.get(target, prop, receiver);
+        }
+
+        // Check for nil pointer
+        if (target._ptr === null) {
+          throw new Error(`runtime error: invalid memory address or nil pointer dereference accessing property '${String(prop)}'`);
+        }
+
+        // Forward access to the underlying referenced object
+        const value = Reflect.get(target._ptr, prop, target._ptr);
+
+        // If the accessed property is a function (method), bind it to the underlying object
+        if (typeof value === 'function') {
+          return value.bind(target._ptr);
+        }
+
+        return value;
+      },
+      set: (target, prop, value, receiver) => {
+         // Handle setting the internal _ptr property directly
+         if (prop === '_ptr') {
+             target._ptr = value;
+             return true;
+         }
+        // Check for nil pointer
+        if (target._ptr === null) {
+          throw new Error(`runtime error: invalid memory address or nil pointer dereference setting property '${String(prop)}'`);
+        }
+
+        // Forward setting to the underlying referenced object
+        return Reflect.set(target._ptr, prop, value, target._ptr);
+      },
+      has: (target, prop) => {
+         // Handle check for the internal _ptr property directly
+         if (prop === '_ptr') {
+             return true;
+         }
+        // Check for nil pointer before checking property existence
+        if (target._ptr === null) {
+           // A nil pointer technically doesn't "have" any properties of the target type
+           return false;
+        }
+        // Forward check to the underlying referenced object
+        return Reflect.has(target._ptr, prop);
+      }
+    }) as goPtrProxy<T>;
+  }
+}
+
+
+/**
+ * Type alias for a Go pointer, which can be a goPtrProxy instance or null (for nil).
+ * The `& T` part is crucial for TypeScript to understand that the pointer
+ * should also satisfy the methods and properties of the underlying type T.
+ */
+export type Ptr<T extends object> = (goPtrProxy<T> & T) | null;
+
+/**
+ * Creates a new Go pointer proxy wrapping the given value.
+ * If the value is null or undefined, it returns null (representing a nil pointer).
+ *
+ * @param value The value to wrap in a pointer.
+ * @returns A Ptr<T> instance or null.
+ */
+export function makePtr<T extends object>(value: T | null | undefined): Ptr<T> {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return new goPtrProxy(value ?? null) as Ptr<T>;
+}
+
 export interface GoTypeInfo {
   readonly kind: GoTypeKind
   readonly name?: string          // present for named types
@@ -365,7 +317,6 @@ export interface BasicTypeInfo extends GoTypeInfo {
 export interface PointerTypeInfo extends GoTypeInfo {
   readonly kind: GoTypeKind.Pointer
   readonly elem: GoTypeInfo
-  readonly methods?: readonly MethodSig[] // Add methods property
 }
 
 /**
@@ -422,164 +373,80 @@ export interface InterfaceTypeInfo extends GoTypeInfo {
   readonly methods: readonly MethodSig[]
 }
 
-// Global registry keyed by fully-qualified name OR synthetic signature.
-const registry = new Map<string, GoTypeInfo>()
+// Define built-in type information constants
+export const INT_TYPE: BasicTypeInfo = {
+  kind: GoTypeKind.Basic,
+  name: 'int',
+  builtinName: 'int',
+  zero: 0
+};
 
-/**
- * Registers a type with the runtime type system and ensures canonicalization.
- * 
- * @param name The name of the type
- * @param kind The kind of the type
- * @param zero The zero value for the type
- * @param methods Optional set of methods (for interfaces/structs)
- * @param ctor Optional constructor (for structs)
- * @returns The canonicalized type information object
- */
-export function registerType(
-  name: string,
-  kind: GoTypeKind,
-  zero: any,
-  methods?: Set<string> | MethodSig[],
-  elemOrCtor?: GoTypeInfo | (new (...a: any[]) => any)
-): GoTypeInfo {
-  // Check if a type with this name (if named) is already registered
-  if (name && registry.has(name)) {
-    return registry.get(name)!;
-  }
+export const STRING_TYPE: BasicTypeInfo = {
+  kind: GoTypeKind.Basic,
+  name: 'string',
+  builtinName: 'string',
+  zero: ""
+};
 
-  let info: GoTypeInfo;
-  const methodSigs = Array.isArray(methods) ? methods : [];
+export const BOOL_TYPE: BasicTypeInfo = {
+  kind: GoTypeKind.Basic,
+  name: 'bool',
+  builtinName: 'bool',
+  zero: false
+};
 
-  // Construct the specific type info object directly
-  switch (kind) {
-    case GoTypeKind.Struct:
-      info = {
-        kind: GoTypeKind.Struct,
-        name,
-        zero,
-        fields: [], // Fields would be populated by the compiler later if needed
-        methods: methodSigs,
-        ctor: elemOrCtor as (new (...a: any[]) => any) | undefined,
-      } as StructTypeInfo;
-      break;
-    case GoTypeKind.Interface:
-      info = {
-        kind: GoTypeKind.Interface,
-        name,
-        zero,
-        methods: methodSigs,
-      } as InterfaceTypeInfo;
-      break;
-    case GoTypeKind.Basic:
-      info = {
-        kind: GoTypeKind.Basic,
-        name,
-        zero,
-        builtinName: name, // For basic types, name and builtinName are the same
-      } as BasicTypeInfo;
-      break;
-    // Add cases for Pointer, Slice, Map, Chan, Func as needed
-    case GoTypeKind.Struct:
-      info = {
-        kind: GoTypeKind.Struct,
-        name,
-        zero,
-        fields: [], // Fields would be populated by the compiler later if needed
-        methods: methodSigs,
-        ctor: elemOrCtor as (new (...a: any[]) => any) | undefined,
-      } as StructTypeInfo;
-      break;
-    case GoTypeKind.Pointer:
-      // For pointer types, the element type must be provided as the 'elemOrCtor' argument
-      const elemType = elemOrCtor as GoTypeInfo;
-      if (!elemType) {
-        throw new Error(`Element type not provided for PointerTypeInfo registration: ${name}`);
-      }
-      info = {
-        kind: GoTypeKind.Pointer,
-        name,
-        zero, // Should be null for pointers
-        elem: elemType,
-        methods: methodSigs, // Assign the methods passed to registerType
-      } as PointerTypeInfo;
-      break;
-    // case GoTypeKind.Slice: // Slice type info handled by computeKey for now
-    // case GoTypeKind.Map: // Map type info handled by computeKey for now
-    // case GoTypeKind.Chan: // Chan type info handled by computeKey for now
-    // case GoTypeKind.Func: // Func type info handled by computeKey for now
-    default:
-      // Fallback for unhandled kinds - might need more specific handling
-      info = { kind, name, zero };
-      break;
-  }
+export const FLOAT64_TYPE: BasicTypeInfo = {
+  kind: GoTypeKind.Basic,
+  name: 'float64',
+  builtinName: 'float64',
+  zero: 0.0
+};
 
-  // Compute the final, canonical key now that the object is constructed
-  const finalKey = computeKey(info);
+export const BYTE_TYPE: BasicTypeInfo = {
+  kind: GoTypeKind.Basic,
+  name: 'byte',
+  builtinName: 'byte',
+  zero: 0
+};
 
-  // Check registry again with the final key for unnamed types
-  if (registry.has(finalKey)) {
-    return registry.get(finalKey)!;
-  }
+export const RUNE_TYPE: BasicTypeInfo = {
+  kind: GoTypeKind.Basic,
+  name: 'rune',
+  builtinName: 'rune',
+  zero: 0
+};
 
-  // Add the newly created type info to the registry
-  registry.set(finalKey, info);
-  // If it was a named type, also register it under its simple name if different
-  if (name && finalKey !== name) {
-      registry.set(name, info);
-  }
+export const NIL_TYPE: BasicTypeInfo = {
+  kind: GoTypeKind.Basic,
+  name: 'nil',
+  builtinName: 'nil',
+  zero: null
+};
 
-  return info;
-}
+export const EMPTY_INTERFACE_TYPE: InterfaceTypeInfo = {
+  kind: GoTypeKind.Interface,
+  name: 'interface{}',
+  zero: null,
+  methods: []
+};
 
-/**
- * Gets a type from the registry by its key.
- * 
- * @param key The type key
- * @returns The type information or undefined if not found
- */
-export function getType(key: string): GoTypeInfo | undefined {
-  return registry.get(key);
-}
+export const ANY_TYPE: InterfaceTypeInfo = {
+  kind: GoTypeKind.Interface,
+  name: 'any',
+  zero: null,
+  methods: []
+};
 
-/**
- * Compute a unique key for a type.
- * - Named types: their package-qualified name
- * - Un-named composite types: textual canonical form
- * 
- * @param info The type information
- * @returns A unique string key
- */
-function computeKey(info: GoTypeInfo): string {
-  // For named types, use the qualified name
-  if (info.name) {
-    return info.name;
-  }
-  
-  // For unnamed types, construct a canonical representation
-  switch (info.kind) {
-    case GoTypeKind.Pointer:
-      return `*${computeKey((info as PointerTypeInfo).elem)}`;
-    case GoTypeKind.Slice:
-      return `[]${computeKey((info as SliceTypeInfo).elem)}`;
-    case GoTypeKind.Map: {
-      const mapInfo = info as MapTypeInfo;
-      return `map[${computeKey(mapInfo.key)}]${computeKey(mapInfo.value)}`;
-    }
-    case GoTypeKind.Chan: {
-      const chanInfo = info as ChanTypeInfo;
-      return `chan ${computeKey(chanInfo.elem)}`;
-    }
-    case GoTypeKind.Func: {
-      const funcInfo = info as FuncTypeInfo;
-      const params = funcInfo.params.map(p => 
-        computeKey(p.type) + (p.isVariadic ? '...' : '')).join(',');
-      const results = funcInfo.results.map(r => computeKey(r.type)).join(',');
-      return `func(${params}) (${results})`;
-    }
-    default:
-      return `unknown-${info.kind}`;
-  }
-}
+export const ERROR_TYPE: InterfaceTypeInfo = {
+  kind: GoTypeKind.Interface,
+  name: 'error',
+  zero: null,
+  methods: [{
+    name: 'Error',
+    params: [],
+    results: [{ type: STRING_TYPE }]
+  }]
+};
 
 /**
  * Checks if a value is assignable to a target type.
@@ -599,7 +466,7 @@ export function isAssignable(value: any, target: GoTypeInfo): boolean {
   
   // For interface targets, check if source implements the interface
   if (target.kind === GoTypeKind.Interface) {
-    return implementsInterface(sourceType, target as InterfaceTypeInfo);
+    return implementsInterface(value, sourceType, target as InterfaceTypeInfo);
   }
   
   // For other types, require exact type match
@@ -608,153 +475,123 @@ export function isAssignable(value: any, target: GoTypeInfo): boolean {
 
 /**
  * Gets the Go type of a value.
- * This is a simplified implementation for now.
  * 
  * @param value The value to get the type of
  * @returns The Go type information
  */
-function typeofGo(value: any): GoTypeInfo {
+export function typeofGo(value: any): GoTypeInfo {
   // Handle null/undefined first
   if (value === null || value === undefined) {
-    const nilType = registry.get('nil');
-    if (!nilType) throw new Error("Internal error: 'nil' type not registered");
-    return nilType;
+    return NIL_TYPE;
   }
 
-  // Check for GoPtr proxy using the symbol *before* other object checks
-  if (value && typeof value === 'object' && (value as any)[isGoPtrProxy]) {
-    const internalRef = (value as any).ref; // Access the internal ref directly
-
-    // Determine the element type info
-    let elemTypeInfo: GoTypeInfo | undefined = undefined;
-    if (internalRef !== null) {
-        // Try to get type info from the referenced value itself
-        // Use the same typeofGo logic recursively on the referenced value
-        elemTypeInfo = typeofGo(internalRef);
+  // Check if it's a pointer proxy by structure
+  if (isPointer(value)) {
+    const internalPtr = value._ptr; // Access the internal _ptr
+ 
+    if (internalPtr === null) {
+        // A nil pointer value doesn't have a concrete type, return nil type
+        return NIL_TYPE;
     } else {
-        // If ref is null (nil pointer), the element type is unknown from the value itself.
-        // We must rely on the compiler having registered the specific pointer type (e.g., '*Data').
-        // This heuristic cannot determine the type of a nil pointer without external info.
-        // Fallback to *interface{} as the most general pointer type.
-         elemTypeInfo = registry.get('interface{}');
-         if (!elemTypeInfo) {
-             throw new Error("Internal error: 'interface{}' type not registered");
-         }
-    }
-
-    // Construct the pointer type key (e.g., "*Data") and look it up
-    const ptrTypeKey = computeKey({ kind: GoTypeKind.Pointer, elem: elemTypeInfo } as PointerTypeInfo);
-    const ptrType = registry.get(ptrTypeKey);
-
-    if (ptrType) {
-      // Found the specific registered pointer type (e.g., *Data)
-      return ptrType;
-    } else {
-      // If the specific pointer type (e.g., '*Data') isn't registered, fallback.
-      // This might happen if only 'Data' was registered.
-      // Registering pointer types dynamically might be complex. Warn and fallback.
-      console.warn(`Pointer type ${ptrTypeKey} not found in registry, falling back to *interface{}. Ensure pointer types are registered by the compiler.`);
-      const genericPtrType = registry.get('*interface{}');
-      if (!genericPtrType) throw new Error("Internal error: '*interface{}' type not registered");
-      return genericPtrType;
+        // If the pointer is not nil, return the type of the referenced value
+        return typeofGo(internalPtr); // Recursive call
     }
   }
 
   // --- Checks for non-pointer types ---
 
   if (typeof value === 'string') {
-    const type = registry.get('string');
-    if (!type) throw new Error("Internal error: 'string' type not registered");
-    return type;
+    return STRING_TYPE;
   }
   if (typeof value === 'number') {
     // Simplification: return int for all numbers. Could refine based on value if needed.
-    const type = registry.get('int'); // Or float64? Assume int for now.
-    if (!type) throw new Error("Internal error: 'int' type not registered");
-    return type;
+    return INT_TYPE; // Or FLOAT64_TYPE depending on context
   }
   if (typeof value === 'boolean') {
-    const type = registry.get('bool');
-    if (!type) throw new Error("Internal error: 'bool' type not registered");
-    return type;
+    return BOOL_TYPE;
   }
   if (Array.isArray(value)) {
-    // Simplified: []interface{}. Needs element type for accuracy.
-    const type = registry.get('[]interface{}');
-    if (!type) throw new Error("Internal error: '[]interface{}' type not registered");
-    return type;
+    // For array/slice, create a dynamic SliceTypeInfo
+    return {
+      kind: GoTypeKind.Slice,
+      name: '[]interface{}',
+      zero: [],
+      elem: EMPTY_INTERFACE_TYPE
+    } as SliceTypeInfo;
   }
   if (value instanceof Map) {
-    // Simplified: map[interface{}]interface{}. Needs key/value types for accuracy.
-    const type = registry.get('map[interface{}]interface{}');
-    if (!type) throw new Error("Internal error: 'map[interface{}]interface{}' type not registered");
-    return type;
+    // For Map, create a dynamic MapTypeInfo
+    return {
+      kind: GoTypeKind.Map,
+      name: 'map[interface{}]interface{}',
+      zero: new Map(),
+      key: EMPTY_INTERFACE_TYPE,
+      value: EMPTY_INTERFACE_TYPE
+    } as MapTypeInfo;
   }
 
   // For struct objects, prefer static __typeInfo attached by the compiler
   if (typeof value === 'object' && value.constructor && (value.constructor as any).__typeInfo) {
       return (value.constructor as any).__typeInfo as GoTypeInfo;
   }
-  // Fallback for struct objects using constructor name (less reliable)
-  if (typeof value === 'object' && value.constructor && value.constructor.name) {
-    const typeName = value.constructor.name;
-    // Ensure we match only registered struct types by name
-    const type = Array.from(registry.values()).find(t => t.name === typeName && t.kind === GoTypeKind.Struct);
-    if (type) {
-      return type;
-    }
-  }
 
   // Default to interface{} for any other unknown types
-  const defaultType = registry.get('interface{}');
-  if (!defaultType) throw new Error("Internal error: 'interface{}' type not registered");
-  return defaultType;
+  return EMPTY_INTERFACE_TYPE;
+}
+
+// Helper function to check if a value is a Go pointer proxy by structure
+function isPointer(value: any): value is Ptr<any> {
+    // Check if it's an object (not null) and has the '_ptr' property
+    return typeof value === 'object' && value !== null && '_ptr' in value;
 }
 
 /**
  * Checks if a concrete type implements an interface.
  * 
- * @param concrete The concrete type
- * @param iface The interface type
- * @returns true if the concrete type implements the interface
+ * @param value The value to check
+ * @param sourceType The source type info
+ * @param iface The interface type information
+ * @returns true if the value implements the interface
  */
-function implementsInterface(concrete: GoTypeInfo, iface: InterfaceTypeInfo): boolean {
-  // For each required method in the interface
-  for (const req of iface.methods) {
-    // Find the method in the concrete type
-    const cand = allMethodsOf(concrete).find(m => m.name === req.name);
-    
-    // If method not found or signatures don't match, return false
-    if (!cand || !sigEqual(cand, req)) {
-      return false;
+function implementsInterface(value: any, sourceType: GoTypeInfo, iface: InterfaceTypeInfo): boolean {
+    if (value === null || value === undefined) {
+        return false; // nil does not implement non-empty interfaces
     }
-  }
-  
-  // All methods are implemented correctly
-  return true;
-}
 
-/**
- * Gets all methods of a type, including methods from embedded types.
- * 
- * @param type The type to get methods for
- * @returns A readonly array of method signatures
- */
-function allMethodsOf(type: GoTypeInfo): readonly MethodSig[] {
-  switch (type.kind) {
-    case GoTypeKind.Struct:
-      return (type as StructTypeInfo).methods;
-    case GoTypeKind.Pointer:
-      // For pointer types, use their methods array if available
-      // This handles the case where we generated pointer type info with all methods
-      if ((type as any).methods) {
-        return (type as any).methods;
-      }
-      // Fallback to element methods if no methods array is available
-      return allMethodsOf((type as PointerTypeInfo).elem);
-    default:
-      return [];
-  }
+    // For empty interfaces, all values are assignable
+    if (iface.methods.length === 0) {
+        return true;
+    }
+
+    // Get the method set from the source type if it's a struct
+    let methods: MethodSig[] = [];
+    if (sourceType.kind === GoTypeKind.Struct) {
+        methods = (sourceType as StructTypeInfo).methods || [];
+    }
+
+    // Check each required method
+    for (const req of iface.methods) {
+        // First try to find the method in the declared methods
+        const cand = methods.find(m => m.name === req.name);
+        
+        // If method found and signatures match, continue
+        if (cand && sigEqual(cand, req)) {
+            continue;
+        }
+        
+        // Otherwise check if the method exists directly on the value
+        if (typeof value === 'object' && value !== null && req.name in value && typeof value[req.name] === 'function') {
+            // Method exists on the value, but we can't easily verify its signature
+            // For now, assume it's compatible (runtime will catch real incompatibilities)
+            continue;
+        }
+        
+        // Method not found or incompatible signature
+        return false;
+    }
+
+    // All methods are properly implemented
+    return true;
 }
 
 /**
@@ -807,6 +644,71 @@ export interface TypeAssertResult<T> {
 }
 
 /**
+ * Finds a type by name.
+ * This is used by typeAssert to look up types.
+ * 
+ * @param typeName The name of the type to find
+ * @returns The type info or undefined if not found
+ */
+function findTypeByName(typeName: string): GoTypeInfo | undefined {
+  // Check built-in types first
+  switch (typeName) {
+    case 'int': return INT_TYPE;
+    case 'string': return STRING_TYPE;
+    case 'bool': return BOOL_TYPE;
+    case 'float64': return FLOAT64_TYPE;
+    case 'byte': return BYTE_TYPE;
+    case 'rune': return RUNE_TYPE;
+    case 'nil': return NIL_TYPE;
+    case 'interface{}': return EMPTY_INTERFACE_TYPE;
+    case 'any': return ANY_TYPE;
+    case 'error': return ERROR_TYPE;
+  }
+
+  // Check if it's a pointer type
+  if (typeName.startsWith('*')) {
+    const elemTypeName = typeName.substring(1);
+    const elemType = findTypeByName(elemTypeName);
+    if (elemType) {
+      return {
+        kind: GoTypeKind.Pointer,
+        name: typeName,
+        zero: null,
+        elem: elemType
+      } as PointerTypeInfo;
+    }
+  }
+
+  // Look up in global scope (this assumes the generated type info variables follow a naming convention)
+  try {
+    // For types with type info stored in a constant, like MyType__typeInfo
+    const typeInfoVarName = `${typeName}__typeInfo`;
+    if (typeof globalThis !== 'undefined' && typeInfoVarName in globalThis) {
+      return (globalThis as any)[typeInfoVarName];
+    }
+    
+    // For classes with static __typeInfo
+    const parts = typeName.split('.');
+    let obj: any = globalThis;
+    for (const part of parts) {
+      if (obj && part in obj) {
+        obj = obj[part];
+      } else {
+        return undefined;
+      }
+    }
+    
+    if (obj && obj.__typeInfo) {
+      return obj.__typeInfo;
+    }
+  } catch (e) {
+    console.warn(`Error finding type ${typeName}:`, e);
+  }
+
+  return undefined;
+}
+
+/**
  * Performs a type assertion at runtime.
  *
  * @param value The value to assert
@@ -815,95 +717,71 @@ export interface TypeAssertResult<T> {
  */
 export function typeAssert<T>(
   value: any,
-  typeName: string,
+  typeName: string, // Can be 'T' or '*T' or 'I'
 ): TypeAssertResult<T> {
-  const typeInfo = getType(typeName);
-  if (!typeInfo) {
-    // Go panics if type name is invalid in assertion.
-    throw new Error(`Type assertion failed: type '${typeName}' not found in registry`);
+  const targetTypeInfo = findTypeByName(typeName);
+  if (!targetTypeInfo) {
+    throw new Error(`Type assertion failed: type '${typeName}' not found`);
   }
 
-  // Handle nil input value based on target type according to Go rules
+  // Handle nil input value
   if (value === null || value === undefined) {
-    // Assertion from nil interface value to concrete type fails (ok=false, value=zero)
-    // Assertion from nil interface value to interface type succeeds (ok=true, value=nil)
-    // Assertion from nil interface value to pointer type succeeds (ok=true, value=nil)
-    if (typeInfo.kind === GoTypeKind.Interface || typeInfo.kind === GoTypeKind.Pointer || typeInfo.kind === GoTypeKind.Slice || typeInfo.kind === GoTypeKind.Map || typeInfo.kind === GoTypeKind.Chan || typeInfo.kind === GoTypeKind.Func) {
-        // Target types whose zero value is nil
-        return { value: null as unknown as T, ok: true }; // Return nil
-    } else {
-        // Target types whose zero value is not nil (Basic, Struct, Array)
-        return { value: typeInfo.zero as T, ok: false }; // Return zero value
+    // Assertion from nil to types whose zero value is nil succeeds (returns nil)
+    if (targetTypeInfo.kind === GoTypeKind.Interface || 
+        targetTypeInfo.kind === GoTypeKind.Pointer || 
+        targetTypeInfo.kind === GoTypeKind.Slice || 
+        targetTypeInfo.kind === GoTypeKind.Map || 
+        targetTypeInfo.kind === GoTypeKind.Chan || 
+        targetTypeInfo.kind === GoTypeKind.Func) {
+        return { value: null as unknown as T, ok: true };
+    } else { // Assertion from nil to other types fails (returns zero value)
+        return { value: targetTypeInfo.zero as T, ok: false };
     }
   }
-
-  // Check if the input value is a GoPtr proxy
-  const isPtrProxy = value && typeof value === 'object' && (value as any)[isGoPtrProxy];
-  // Get the underlying referenced value if it's a proxy, otherwise use the value itself
-  const actualValue = isPtrProxy ? (value as any).ref : value;
-  // Get the type info of the input value (proxy or concrete)
-  const sourceType = typeofGo(value);
+ 
+  const sourceValueIsPointer = isPointer(value); // Check if the value itself is a pointer proxy
+  // Get the type of the underlying value (element type if pointer)
+  const underlyingSourceType = typeofGo(value); // Returns element type if value is proxy
 
   // --- Handle assertion based on TARGET type ---
 
   // Target: Pointer (*T)
-  if (typeInfo.kind === GoTypeKind.Pointer) {
-    const targetElemType = (typeInfo as PointerTypeInfo).elem;
+  if (targetTypeInfo.kind === GoTypeKind.Pointer) {
+    const targetElemType = (targetTypeInfo as PointerTypeInfo).elem;
 
-    // Source must be a pointer type for assertion to *T to succeed
-    if (isPtrProxy) {
-      const ptrValue = value as GoPtr<any>; // The proxy itself
-      if (ptrValue.ref === null) {
-        // A nil pointer value can be asserted to any pointer type (*T)
-        return { value: value as T, ok: true }; // Return the nil proxy
-      }
-
-      // Source is non-nil pointer. Check if its element type is assignable to target element type.
-      // This covers *Data -> *Data and *MyStruct -> *interface{}
-      // We need the source element type. typeofGo(value) gives the pointer type.
-      let sourceElemType: GoTypeInfo | undefined = undefined;
-      if (sourceType.kind === GoTypeKind.Pointer) {
-          sourceElemType = (sourceType as PointerTypeInfo).elem;
-      } else {
-          // Should not happen if isPtrProxy is true and typeofGo is correct
-          console.error("Internal inconsistency: GoPtr proxy type is not PointerTypeInfo");
-          return { value: typeInfo.zero as T, ok: false };
-      }
-
-      // Check assignability using the referenced value and target element type
-      // Note: isAssignable needs to handle interface checks correctly.
-      if (isAssignable(ptrValue.ref, targetElemType)) {
-           return { value: value as T, ok: true }; // Return the original proxy
-      }
-
-    } else {
-      // Asserting a non-pointer value to a pointer type fails (e.g., Data to *Data)
-       return { value: typeInfo.zero as T, ok: false };
+    // Source must be a pointer for assertion to *T to succeed
+    if (sourceValueIsPointer) {
+        // Check if element types are identical OR target is *interface{}
+        // Note: underlyingSourceType is the element type here.
+        if (underlyingSourceType === targetElemType || 
+            (targetElemType.kind === GoTypeKind.Interface && 
+             (targetElemType as InterfaceTypeInfo).methods.length === 0)) {
+            return { value: value as T, ok: true }; // Return the original proxy
+        }
     }
+    // Assertion fails if source is not a pointer or element types don't match
+    return { value: targetTypeInfo.zero as T, ok: false };
   }
   // Target: Interface (I)
-  else if (typeInfo.kind === GoTypeKind.Interface) {
-    // Check if the source type (concrete or pointer) implements the target interface
-    if (implementsInterface(sourceType, typeInfo as InterfaceTypeInfo)) {
-      return { value: value as T, ok: true }; // Return the original value (proxy or concrete)
+  else if (targetTypeInfo.kind === GoTypeKind.Interface) {
+    // Check if the value implements the target interface
+    if (implementsInterface(value, underlyingSourceType, targetTypeInfo as InterfaceTypeInfo)) {
+      return { value: value as T, ok: true }; // Return the original value
     }
   }
   // Target: Concrete types (Struct, Basic, Slice, Map, Chan, Func, Array)
   else {
-    // Go requires the dynamic type of the interface value to be *exactly* the target type T.
-    // It does NOT allow asserting *T to T or T to *T directly via .(T).
-    // If the source value was a pointer proxy, its dynamic type is the pointer type.
-    // If the source value was concrete, its dynamic type is the concrete type.
-    if (sourceType === typeInfo) {
+    // Go requires the dynamic type to be *exactly* the target type T.
+    // If source is a pointer (*T), its underlying type is T. Assertion T -> T succeeds.
+    // If source is concrete (T), its underlying type is T. Assertion T -> T succeeds.
+    // We must ensure the source was NOT a pointer if asserting to a non-pointer type.
+    if (!sourceValueIsPointer && underlyingSourceType === targetTypeInfo) {
        return { value: value as T, ok: true };
     }
-    // Special case: Allow asserting interface containing pointer to the value type?
-    // e.g. var i interface{} = &Data{}; _, ok := i.(Data) // ok is false in Go.
-    // Let's stick to exact match.
   }
 
-  // Assertion failed for all other cases
-  return { value: typeInfo.zero as T, ok: false };
+  // Assertion failed
+  return { value: targetTypeInfo.zero as T, ok: false };
 }
 
 /**
@@ -1387,23 +1265,3 @@ export class AsyncDisposableStack implements AsyncDisposable {
     }
   }
 }
-
-// Initialize the type information: register built-in types.
-registerType('int', GoTypeKind.Basic, 0);
-registerType('string', GoTypeKind.Basic, "");
-registerType('bool', GoTypeKind.Basic, false);
-// Add other basic types as needed (float64, byte, rune, etc.)
-registerType('float64', GoTypeKind.Basic, 0.0);
-registerType('byte', GoTypeKind.Basic, 0); // Assuming byte is alias for uint8 -> number
-registerType('rune', GoTypeKind.Basic, 0); // Assuming rune is alias for int32 -> number
-registerType('error', GoTypeKind.Interface, null, []); // Basic error interface
-registerType('any', GoTypeKind.Interface, null, []); // Alias for interface{}
-registerType('interface{}', GoTypeKind.Interface, null, []); // Empty interface
-
-// Placeholder for nil type if needed for typeofGo
-registerType('nil', GoTypeKind.Basic, null);
-// Placeholder for simplified array/map types used in typeofGo
-registerType('[]interface{}', GoTypeKind.Slice, null); // Simplified slice type
-registerType('map[interface{}]interface{}', GoTypeKind.Map, null); // Simplified map type
-// Placeholder for simplified pointer type used in typeofGo
-registerType('*interface{}', GoTypeKind.Pointer, null, [], registry.get('interface{}')!); // *interface{}

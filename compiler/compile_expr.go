@@ -151,10 +151,11 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		} else if isGoPtr {
 			// For values that might be GoPtr instances at runtime, use safe access
 			c.tsw.WriteLiterally("(")
+			c.tsw.WriteLiterally("goscript.isPointer(") // Start the function call
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
 			}
-			c.tsw.WriteLiterally(" instanceof goscript.GoPtr ? ")
+			c.tsw.WriteLiterally(") ? ") // Close the function call and add ternary operator
 
 			// If it's a GoPtr, access through .ref
 			if err := c.WriteValueExpr(exp.X); err != nil {
@@ -255,6 +256,7 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
+	// Use the type name directly
 	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
 
 	c.tsw.WriteLiterally(").value") // Always access .value for the panic form
@@ -986,7 +988,7 @@ func (c *GoToTSCompiler) WriteUnaryExprValue(exp *ast.UnaryExpr) error {
 
 	if exp.Op == token.AND {
 		// Address-of operator (&) creates a new Go pointer proxy wrapping the value
-		c.tsw.WriteLiterally("goscript.createGoPtr(")
+		c.tsw.WriteLiterally("goscript.makePtr(")
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write unary expression operand for address-of: %w", err)
 		}

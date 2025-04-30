@@ -777,12 +777,13 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			// Pass the interface type itself for type checking
 			lhsType := c.pkg.TypesInfo.TypeOf(interfaceLHS)
 			if lhsType != nil {
-				ifaceTypeName := c.getTypeNameForInterface(lhsType)
-				c.tsw.WriteLiterally(", goscript.getType('")
-				c.tsw.WriteLiterally(ifaceTypeName)
-				c.tsw.WriteLiterally("')!) ? ")
+				// Get the TypeInfo reference using getTypeReferenceFromType
+				c.tsw.WriteLiterally(", ")
+				typeRef := c.getTypeReferenceFromType(lhsType)
+				c.tsw.WriteLiterally(typeRef)
+				c.tsw.WriteLiterally(") ? ")
 			} else {
-				c.tsw.WriteLiterally(", goscript.getType('interface{}')!) ? ")
+				c.tsw.WriteLiterally(", goscript.EMPTY_INTERFACE_TYPE) ? ")
 			}
 
 			// Actual value to assign if compatible
