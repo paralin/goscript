@@ -370,14 +370,14 @@ export function main(): void {
 	// Test with a pointer
 	let mp = m
 	console.log("\n--- Multiple Embedding (Pointer) ---")
-	console.log("Manager Pointer Name:", mp.Name)
-	mp.Greet()
-	console.log("Manager Pointer Full Address:", mp.FullAddress())
-	mp.Call()
+	console.log("Manager Pointer Name:", mp.value.Name)
+	mp.value.Greet()
+	console.log("Manager Pointer Full Address:", mp.value.FullAddress())
+	mp.value.Call()
 
 	// Modify through pointer
-	mp.Age = 41
-	mp.City = "New City"
+	mp.value.Age = 41
+	mp.value.City = "New City"
 	console.log("Modified Manager Age:", m.value.Age)
 	console.log("Modified Manager City:", m.value.City)
 }

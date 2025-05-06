@@ -131,16 +131,40 @@ func (a *Analysis) NeedsBoxed(obj types.Object) bool {
 }
 
 // NeedsBoxedAccess returns whether accessing the given object requires '.value' access in TypeScript.
-// This is true if the variable itself is boxed (its address is taken).
-// For pointers, this only reflects whether the pointer variable itself is boxed, not whether
-// dereferencing it requires .value (all dereferences require .value regardless).
+// This is true if either:
+// 1. The variable itself is boxed (its address is taken), OR
+// 2. For pointer variables: the variable points to a boxed struct variable rather than a direct struct literal
 func (a *Analysis) NeedsBoxedAccess(obj types.Object) bool {
 	if obj == nil {
 		return false
 	}
 
-	// The only condition that matters is whether the variable itself is boxed
-	return a.NeedsBoxed(obj)
+	// First, check if the variable itself is boxed - this always requires .value
+	if a.NeedsBoxed(obj) {
+		return true
+	}
+
+	// Check if this is a pointer variable pointing to a boxed struct value
+	objType := obj.Type()
+	if ptrType, isPointer := objType.Underlying().(*types.Pointer); isPointer {
+		// Check if it's a pointer to a struct
+		if elemType := ptrType.Elem(); elemType != nil {
+			if _, isStructType := elemType.Underlying().(*types.Struct); isStructType {
+				// For struct pointers, check if it points to a boxed struct variable
+				if usageInfo, exists := a.VariableUsage[obj]; exists {
+					for _, src := range usageInfo.Sources {
+						// Check if this pointer was assigned the address of another variable
+						if src.Type == AddressOfAssignment && src.Object != nil {
+							// If the source variable is boxed, we need .value
+							return a.NeedsBoxed(src.Object)
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return false
 }
 
 // NeedsBoxedDeref determines whether a pointer dereference operation (*ptr) needs

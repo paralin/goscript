@@ -284,6 +284,40 @@ These currently should be handled + documented here but are not:
 - if a variable is an exported global variable or const it should be boxed
    - we don't know how that variable will be used in future by callers ahead of time
 
+### Struct Pointer Boxing Logic
+
+A critical distinction exists between these two cases:
+
+1. **Pointer to boxed struct variable**:
+   ```go
+   val := MyStruct{...}  // val needs to be boxed
+   ptrToVal := &val      // ptrToVal points to boxed val
+   ```
+   Which generates:
+   ```typescript
+   let val: $.Box<MyStruct> = $.box(new MyStruct({...}))
+   let ptrToVal = val
+   // Access should be: ptrToVal.value.MyInt
+   ```
+
+2. **Struct pointer from composite literal**:
+   ```go
+   ptr := &MyStruct{...}  // ptr is a direct pointer to a struct
+   ```
+   Which generates:
+   ```typescript
+   let ptr = new MyStruct({...})
+   // Access should be: ptr.MyInt
+   ```
+
+The crucial difference is:
+- In case 1, `ptrToVal` points to a boxed struct variable, requiring `.value` to access the actual struct.
+- In case 2, `ptr` directly holds a struct reference, not requiring `.value`.
+
+The analysis tracks this distinction through the variable's assignment sources and usage patterns.
+When a pointer variable points to a boxed struct variable (a variable whose address is taken elsewhere),
+we need an additional `.value` dereference to access the contained struct value.
+
 ### Struct Boxing
 
 It is possible to take the address of a struct field:

@@ -672,41 +672,11 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		}
 	}
 
-	// Check if we need to add .value for struct field access through a pointer
-	needsValueDereference := false
-	
-	// First, check if we're accessing a field through a pointer to a struct
-	if ptrType, ok := objType.(*types.Pointer); ok {
-		elemType := ptrType.Elem()
-		if _, isStruct := elemType.Underlying().(*types.Struct); isStruct {
-			// We're accessing a struct field through a pointer
-			// Check if the pointer variable itself is boxed (its address is taken)
-			if ident, ok := exp.X.(*ast.Ident); ok {
-				obj := c.pkg.TypesInfo.Uses[ident]
-				if obj == nil {
-					obj = c.pkg.TypesInfo.Defs[ident]
-				}
-				
-				// If the pointer variable itself is boxed, we need .value
-				if obj != nil && c.analysis.NeedsBoxed(obj) {
-					needsValueDereference = true
-				}
-			} else {
-				// For complex expressions that result in a pointer (not a simple variable),
-				// we conservatively add .value
-				needsValueDereference = true
-			}
-		}
-	}
-
-	// Write the base expression
+	// If we're accessing a member through a pointer to a struct, no extra .value needed
+	// The pointer variable's own boxed state will be handled by WriteValueExpr
+	// Write the base expression - WriteValueExpr will add .value if the variable itself is boxed
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
-	}
-
-	// Add .value if needed - only for boxed pointers to structs
-	if needsValueDereference {
-		c.tsw.WriteLiterally(".value")
 	}
 
 	// Add .
@@ -731,7 +701,7 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	//
 	// For pointer dereferencing, we need to generate:
 	// 1. p!.value - when p is not boxed and points to a primitive/pointer
-	// 2. p!       - when p is not boxed and points to a struct 
+	// 2. p!       - when p is not boxed and points to a struct
 	// 3. p.value!.value - when p is boxed and points to a primitive/pointer
 	// 4. p.value! - when p is boxed and points to a struct
 	//
@@ -739,7 +709,7 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 
 	// Get the operand expression and its type information
 	operand := exp.X
-	
+
 	// Get the type of the operand (the pointer being dereferenced)
 	ptrType := c.pkg.TypesInfo.TypeOf(operand)
 

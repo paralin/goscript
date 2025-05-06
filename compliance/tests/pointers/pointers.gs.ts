@@ -48,7 +48,7 @@ export function main(): void {
 	let p3: $.Box<$.Box<MyStruct> | null> = $.box(s2)
 
 	let p4 = s1
-	/* _ = */ p4
+	/* _ = */ p4.value
 
 	let pp1: $.Box<$.Box<$.Box<MyStruct> | null> | null> = $.box(p1)
 	let pp2 = p2
