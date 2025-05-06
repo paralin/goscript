@@ -1,3 +1,0 @@
-MyInt via pointer: Expected: 42, Actual: undefined
-MyString via pointer: Expected: composite literal pointer, Actual: undefined
-MyInt after modification: Expected: 99, Actual: 99

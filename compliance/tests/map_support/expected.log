@@ -9,5 +9,6 @@ After delete, does Charlie exist? Expected: false, Actual: false
 Map literal size: Expected: 3, Actual: 3
 Color code for red: Expected: #ff0000, Actual: #ff0000
 Iterating over scores map:
-  - Name: Alice Score: 90
-  - Name: Bob Score: 88
+  - Name: Alice Grade: A+
+  - Name: Bob Grade: B+
+  - Name: Charlie Grade: A

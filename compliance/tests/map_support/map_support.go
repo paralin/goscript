@@ -42,11 +42,19 @@ func main() {
 
 	// Iterate over a map with range
 	println("Iterating over scores map:")
+
+	// Create a new map with string keys and string values for testing iteration
+	stringMap := map[string]string{
+		"Alice":   "A+",
+		"Bob":     "B+",
+		"Charlie": "A",
+	}
+
 	// Note: Map iteration is not ordered in Go, so we will collect the results and sort them for consistent test output.
 	var scoreResults []string
-	for name, score := range scores {
+	for name, grade := range stringMap {
 		// Using string concatenation to build the output string
-		result := "  - Name: " + name + " Score: " + itoa(score)
+		result := "  - Name: " + name + " Grade: " + grade
 		scoreResults = append(scoreResults, result)
 	}
 
@@ -64,26 +72,4 @@ func main() {
 	for _, result := range scoreResults {
 		println(result)
 	}
-}
-
-// Helper function to convert int to string
-// (avoid importing strings package)
-func itoa(i int) string {
-	if i == 0 {
-		return "0"
-	}
-	s := ""
-	isNegative := false
-	if i < 0 {
-		isNegative = true
-		i = -i
-	}
-	for i > 0 {
-		s = string(rune(i%10+'0')) + s
-		i /= 10
-	}
-	if isNegative {
-		s = "-" + s
-	}
-	return s
 }
