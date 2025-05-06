@@ -11,7 +11,7 @@ export function main(): void {
 	let p1: $.Box<$.Box<number> | null> = $.box(null)
 	// Ensure p1 is boxed
 	let p1_boxer: $.Box<$.Box<number> | null> | null = p1
-	/* _ = */ p1_boxer.value
+	/* _ = */ p1_boxer
 
 	// Expected TS: p1.value = y
 	p1.value = y

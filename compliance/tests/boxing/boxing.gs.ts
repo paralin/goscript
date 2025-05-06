@@ -15,12 +15,12 @@ export function main(): void {
 	// p3 is not boxed as nothing takes its address
 	let p3: $.Box<$.Box<$.Box<number> | null> | null> | null = p2
 
-	console.log("***p3 ==", p3.value!!.value!.value)
+	console.log("***p3 ==", p3!.value!.value!.value)
 	console.log()
 
 	console.log("setting ***p3 to 12")
-	p3.value!!.value!.value = 12
-	console.log("***p3 ==", p3.value!!.value!.value)
+	p3!.value!.value!.value = 12
+	console.log("***p3 ==", p3!.value!.value!.value)
 	console.log()
 
 	console.log("setting y to 15, p1 to &y")
@@ -30,7 +30,7 @@ export function main(): void {
 	// should be: p1.value = y
 	p1.value = y
 
-	console.log("***p3 ==", p3.value!!.value!.value)
+	console.log("***p3 ==", p3!.value!.value!.value)
 	console.log()
 }
 

@@ -130,44 +130,80 @@ func (a *Analysis) NeedsBoxed(obj types.Object) bool {
 	return false
 }
 
-// NeedsBoxedAccess returns whether the given object needs '.value' access in TypeScript.
-// This is true if the variable itself is boxed or if it's a pointer variable
-// assigned a value originating from a variable that NeedsBoxed.
+// NeedsBoxedAccess returns whether accessing the given object requires '.value' access in TypeScript.
+// This is true if the variable itself is boxed (its address is taken).
+// For pointers, this only reflects whether the pointer variable itself is boxed, not whether
+// dereferencing it requires .value (all dereferences require .value regardless).
 func (a *Analysis) NeedsBoxedAccess(obj types.Object) bool {
 	if obj == nil {
 		return false
 	}
 
-	// Condition 1: The variable itself NeedsBoxed (its address is taken)
-	if a.NeedsBoxed(obj) {
+	// The only condition that matters is whether the variable itself is boxed
+	return a.NeedsBoxed(obj)
+}
+
+// NeedsBoxedDeref determines whether a pointer dereference operation (*ptr) needs
+// the .value suffix in TypeScript when used in a direct dereference expression.
+// This is true for primitive types and pointers, but false for pointers to structs
+// since struct instances are already reference types.
+func (a *Analysis) NeedsBoxedDeref(ptrType types.Type) bool {
+	// If we don't have a valid pointer type, default to true (safer)
+	if ptrType == nil {
 		return true
 	}
 
-	// Condition 2: The variable is a pointer and is assigned a value
-	// originating from a variable that NeedsBoxed.
-	// Check if the variable is a pointer type.
-	if _, isPointer := obj.Type().Underlying().(*types.Pointer); isPointer {
-		// Check its sources. If any direct assignment source NeedsBoxed,
-		// then this pointer variable holds a box.
-		if usageInfo, exists := a.VariableUsage[obj]; exists {
-			for _, srcInfo := range usageInfo.Sources {
-				if srcInfo.Type == DirectAssignment {
-					// Check if the source variable NeedsBoxed.
-					if a.NeedsBoxed(srcInfo.Object) {
-						return true
-					}
-				} else if srcInfo.Type == AddressOfAssignment {
-					// address of assignment, require box .value accessor
-					if srcInfo.Object != nil {
-						// ignore composite literals (Object == nil)
-						return true
-					}
-				}
-			}
-		}
+	// Unwrap the pointer to get the element type
+	ptrTypeUnwrapped, ok := ptrType.(*types.Pointer)
+	if !ok {
+		return true // Not a pointer type, default to true
 	}
 
-	return false
+	// Get the underlying element type
+	elemType := ptrTypeUnwrapped.Elem()
+	if elemType == nil {
+		return true
+	}
+
+	// Check if the element is a struct (directly or via a named type)
+	if _, isStruct := elemType.Underlying().(*types.Struct); isStruct {
+		return false // Pointers to structs don't need .value suffix in direct dereference (*p)
+	}
+
+	// For all other cases (primitives, pointers-to-pointers, etc.) need .value
+	return true
+}
+
+// NeedsBoxedFieldAccess determines whether a pointer variable needs the .value
+// suffix when accessing fields (e.g., ptr.field). 
+// For pointers to structs, we only need .value if the pointer itself is boxed.
+func (a *Analysis) NeedsBoxedFieldAccess(ptrType types.Type) bool {
+	// If we don't have a valid pointer type, default to false
+	if ptrType == nil {
+		return false
+	}
+
+	// Unwrap the pointer to get the element type
+	ptrTypeUnwrapped, ok := ptrType.(*types.Pointer)
+	if !ok {
+		return false // Not a pointer type, no dereference needed for field access
+	}
+
+	// Check if the element is a struct (directly or via a named type)
+	elemType := ptrTypeUnwrapped.Elem()
+	if elemType == nil {
+		return false // Not pointing to anything
+	}
+
+	// For pointers to structs, check if it's a struct type first
+	_, isStruct := elemType.Underlying().(*types.Struct)
+	if !isStruct {
+		return false // Not a pointer to a struct
+	}
+
+	// We'll determine if .value is needed in the WriteSelectorExpr function 
+	// by checking if the pointer variable itself is boxed
+	return false 
 }
 
 // analysisVisitor implements ast.Visitor and is used to traverse the AST during analysis.

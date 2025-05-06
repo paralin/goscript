@@ -45,10 +45,10 @@ export function main(): void {
 	let ptrToVal = val
 
 	// Accessing pointer value, should use .value
-	console.log("ptrToVal.MyInt:", ptrToVal.value.MyInt)
+	console.log("ptrToVal.MyInt:", ptrToVal.MyInt)
 
 	// Accessing pointer value, should use .value
-	let myIntVal = ptrToVal.value.MyInt
+	let myIntVal = ptrToVal.MyInt
 	console.log("myIntVal:", myIntVal)
 }
 

@@ -57,9 +57,9 @@ export function main(): void {
 	console.log("ptr.MyInt:", ptr.MyInt) // Expected: 40
 
 	// Accessing pointer value, should use .value
-	console.log("ptrToVal.MyInt:", ptrToVal.value.MyInt)
+	console.log("ptrToVal.MyInt:", ptrToVal.MyInt)
 
-	let myIntVal = ptrToVal.value.MyInt
+	let myIntVal = ptrToVal.MyInt
 	console.log("myIntVal:", myIntVal)
 }
 

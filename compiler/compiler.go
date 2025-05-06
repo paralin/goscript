@@ -672,9 +672,41 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		}
 	}
 
+	// Check if we need to add .value for struct field access through a pointer
+	needsValueDereference := false
+	
+	// First, check if we're accessing a field through a pointer to a struct
+	if ptrType, ok := objType.(*types.Pointer); ok {
+		elemType := ptrType.Elem()
+		if _, isStruct := elemType.Underlying().(*types.Struct); isStruct {
+			// We're accessing a struct field through a pointer
+			// Check if the pointer variable itself is boxed (its address is taken)
+			if ident, ok := exp.X.(*ast.Ident); ok {
+				obj := c.pkg.TypesInfo.Uses[ident]
+				if obj == nil {
+					obj = c.pkg.TypesInfo.Defs[ident]
+				}
+				
+				// If the pointer variable itself is boxed, we need .value
+				if obj != nil && c.analysis.NeedsBoxed(obj) {
+					needsValueDereference = true
+				}
+			} else {
+				// For complex expressions that result in a pointer (not a simple variable),
+				// we conservatively add .value
+				needsValueDereference = true
+			}
+		}
+	}
+
 	// Write the base expression
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
+	}
+
+	// Add .value if needed - only for boxed pointers to structs
+	if needsValueDereference {
+		c.tsw.WriteLiterally(".value")
 	}
 
 	// Add .
@@ -697,81 +729,32 @@ func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	// Generate code for a pointer dereference expression (*p).
 	//
-	// This involves writing the pointer expression 'p' itself, and potentially
-	// appending '.value' if 'p' refers to a boxed pointer variable according
-	// to our boxing analysis.
+	// For pointer dereferencing, we need to generate:
+	// 1. p!.value - when p is not boxed and points to a primitive/pointer
+	// 2. p!       - when p is not boxed and points to a struct 
+	// 3. p.value!.value - when p is boxed and points to a primitive/pointer
+	// 4. p.value! - when p is boxed and points to a struct
 	//
 	// NOTE: This logic aligns with design/BOXES_POINTERS.md.
 
 	// Get the operand expression and its type information
 	operand := exp.X
-	operandType := c.pkg.TypesInfo.TypeOf(operand)
+	
+	// Get the type of the operand (the pointer being dereferenced)
+	ptrType := c.pkg.TypesInfo.TypeOf(operand)
 
-	// Write the pointer expression
+	// Write the pointer expression, which will access .value if the variable is boxed
 	if err := c.WriteValueExpr(operand); err != nil {
 		return fmt.Errorf("failed to write star expression operand: %w", err)
 	}
 
-	// Always add '!' for non-null assertion in TypeScript
+	// Add ! for null assertion
 	c.tsw.WriteLiterally("!")
 
-	// Determine if we need to access .value based on analysis
-	// Get the object if it's an identifier
-	var obj types.Object = nil
-	if ident, ok := operand.(*ast.Ident); ok {
-		// Check both Uses and Defs maps
-		obj = c.pkg.TypesInfo.Uses[ident]
-		if obj == nil {
-			obj = c.pkg.TypesInfo.Defs[ident]
-		}
-	}
-
-	// Get the element type of the pointer
-	var elemType types.Type
-	if ptrType, ok := operandType.Underlying().(*types.Pointer); ok {
-		elemType = ptrType.Elem()
-	}
-
-	// For struct pointers, we only need .value if the variable is boxed
-	isStructPointer := false
-	if elemType != nil {
-		// Check if it's a pointer to a struct type
-		_, isStructUnderlying := elemType.Underlying().(*types.Struct)
-		_, isNamedStruct := elemType.(*types.Named)
-		isStructPointer = isStructUnderlying || isNamedStruct
-	}
-
-	// Default behavior: we need .value for dereferencing
-	needsValueAccess := true
-
-	if isStructPointer {
-		// For struct pointers, check if the variable needs boxed access
-		if obj != nil && !c.analysis.NeedsBoxedAccess(obj) {
-			needsValueAccess = false
-		}
-	} else if elemType != nil {
-		// Check if this is a multi-level pointer
-		if ptrToPtr, ok := elemType.Underlying().(*types.Pointer); ok {
-			// This is a pointer to another pointer
-			// Check if it points to another pointer (multi-level)
-			_, pointsToPointer := ptrToPtr.Elem().Underlying().(*types.Pointer)
-			// For intermediate pointers in a chain, we don't need .value UNLESS the variable itself is boxed
-			if pointsToPointer && obj != nil && !c.analysis.NeedsBoxedAccess(obj) {
-				needsValueAccess = false
-			}
-			// Otherwise, it's the second-to-last level pointing to a primitive
-			// or the variable itself needs boxing
-			// We still need .value for these
-		}
-	}
-
-	// Add .value if needed according to analysis
-	if needsValueAccess {
+	// Add .value only if we need boxed dereferencing for this type of pointer
+	if c.analysis.NeedsBoxedDeref(ptrType) {
 		c.tsw.WriteLiterally(".value")
 	}
-
-	// Cloning is NOT handled here. It's handled by the context (e.g., assignment)
-	// using shouldApplyClone, which checks the type of the *result* of this expression.
 
 	return nil
 }

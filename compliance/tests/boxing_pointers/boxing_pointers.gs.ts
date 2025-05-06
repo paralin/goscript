@@ -13,14 +13,14 @@ export function main(): void {
 	// p3 is not boxed as nothing takes its address
 	let p3: $.Box<$.Box<$.Box<number> | null> | null> | null = p2
 
-	console.log("***p3 before ==", p3.value!!.value!.value)
+	console.log("***p3 before ==", p3!.value!.value!.value)
 
 	// Dereference multiple times, this should be:
 	// Goal: p3!.value!.value!.value = 12
 	// Current: p3!.value = 12
 	// Issue: only the bottom-most level of the WriteStarExpr checks p3 for boxing generating .value
 	// How do we know that *p3 needs .value?
-	p3.value!!.value!.value = 12
-	console.log("***p3 after ==", p3.value!!.value!.value)
+	p3!.value!.value!.value = 12
+	console.log("***p3 after ==", p3!.value!.value!.value)
 }
 

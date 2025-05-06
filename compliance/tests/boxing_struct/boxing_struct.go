@@ -7,7 +7,7 @@ type MyStruct struct {
 func main() {
 	// 'val' is a value type, but its address is taken, so it should be boxed in TS.
 	val := MyStruct{MyInt: 10}
-	ptrToVal := &val // Makes NeedsBoxedAccess(val) true
+	ptrToVal := &val
 
 	// Accessing pointer value, should use .value
 	println("ptrToVal.MyInt:", ptrToVal.MyInt)

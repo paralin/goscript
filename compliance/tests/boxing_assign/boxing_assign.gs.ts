@@ -13,7 +13,7 @@ export function main(): void {
 	let p2: $.Box<$.Box<$.Box<number> | null> | null> = $.box(p1)
 	// p3 is not boxed as nothing takes its address
 	let p3: $.Box<$.Box<$.Box<number> | null> | null> | null = p2
-	/* _ = */ p3.value
+	/* _ = */ p3
 
 	// should be: let y: $.Box<number> = $.box(15)
 	// y is boxed as p1 takes the address
@@ -21,6 +21,6 @@ export function main(): void {
 	// should be: p1.value = y
 	p1.value = y
 
-	console.log("***p3 ==", p3.value!!.value!.value)
+	console.log("***p3 ==", p3!.value!.value!.value)
 }
 
