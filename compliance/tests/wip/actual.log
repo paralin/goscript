@@ -1,0 +1,3 @@
+*p2 == { value: 10 }
+**p3 == 10
+*q1 == undefined

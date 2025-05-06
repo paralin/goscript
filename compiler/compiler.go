@@ -755,11 +755,12 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 			// This is a pointer to another pointer
 			// Check if it points to another pointer (multi-level)
 			_, pointsToPointer := ptrToPtr.Elem().Underlying().(*types.Pointer)
-			if pointsToPointer {
-				// For intermediate pointers in a chain, we don't need .value
+			// For intermediate pointers in a chain, we don't need .value UNLESS the variable itself is boxed
+			if pointsToPointer && obj != nil && !c.analysis.NeedsBoxedAccess(obj) {
 				needsValueAccess = false
 			}
 			// Otherwise, it's the second-to-last level pointing to a primitive
+			// or the variable itself needs boxing
 			// We still need .value for these
 		}
 	}
