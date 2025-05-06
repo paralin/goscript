@@ -702,11 +702,11 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	// to our boxing analysis.
 	//
 	// NOTE: This logic aligns with design/BOXES_POINTERS.md.
-	
+
 	// Get the operand expression and its type information
 	operand := exp.X
 	operandType := c.pkg.TypesInfo.TypeOf(operand)
-	
+
 	// Write the pointer expression
 	if err := c.WriteValueExpr(operand); err != nil {
 		return fmt.Errorf("failed to write star expression operand: %w", err)
@@ -3286,7 +3286,8 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 
 // writeAssignmentCore writes the core LHS, operator, and RHS of an assignment.
 // It handles assignment to map indexes correctly.
-// It does NOT handle blank identifiers, 'let' keyword, or trailing semicolons/comments/newlines.
+// It does NOT handle 'let' keyword, or trailing semicolons/comments/newlines.
+// Handle blank identifiers correctly.
 // It assumes assignments to boxed non-pointers (x.value = ...) are handled by the caller.
 func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token) error {
 	// Special case for multi-variable assignment to handle array element swaps
@@ -3308,7 +3309,12 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			if i != 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			if indexExpr, ok := l.(*ast.IndexExpr); ok && allIndexExprs {
+
+			// Handle blank identifier
+			if ident, ok := l.(*ast.Ident); ok && ident.Name == "_" {
+				// If it's a blank identifier, we write nothing,
+				// leaving an empty slot in the destructuring array.
+			} else if indexExpr, ok := l.(*ast.IndexExpr); ok && allIndexExprs { // MODIFICATION: Added 'else if'
 				// Handle array[index] with non-null assertion after array name
 				if err := c.WriteValueExpr(indexExpr.X); err != nil {
 					return err
