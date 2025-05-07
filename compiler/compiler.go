@@ -18,15 +18,22 @@ import (
 	"golang.org/x/tools/go/packages"
 )
 
-// Compiler is the root compiler for a project.
+// Compiler is the root compiler for a project. It orchestrates the loading
+// and compilation of Go packages into TypeScript. It holds project-wide
+// configuration and uses `golang.org/x/tools/go/packages` to load
+// Go package information.
 type Compiler struct {
 	le     *logrus.Entry
 	config Config
 	opts   packages.Config
 }
 
-// NewCompiler builds a new Compiler
-// opts can be nil
+// NewCompiler builds a new Compiler instance.
+// It takes a compiler configuration, a logger entry, and an optional
+// `packages.Config` for loading Go packages. If `opts` is nil,
+// default options are used, configured for JavaScript/WebAssembly (js/wasm)
+// target and to load comprehensive package information (types, syntax, etc.).
+// It validates the provided configuration before creating the compiler.
 func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compiler, error) {
 	if err := conf.Validate(); err != nil {
 		return nil, err
@@ -67,7 +74,11 @@ func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compil
 	return &Compiler{config: *conf, le: le, opts: *opts}, nil
 }
 
-// CompilePackages attempts to build packages.
+// CompilePackages loads Go packages based on the provided patterns and
+// then compiles each loaded package into TypeScript. It uses the context for
+// cancellation and applies the compiler's configured options during package loading.
+// For each successfully loaded package, it creates a `PackageCompiler` and
+// invokes its `Compile` method.
 func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) error {
 	opts := c.opts
 	opts.Context = ctx
@@ -91,7 +102,9 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 	return nil
 }
 
-// PackageCompiler compiles an entire package.
+// PackageCompiler is responsible for compiling an entire Go package into
+// its TypeScript equivalent. It manages the compilation of individual files
+// within the package and determines the output path for the compiled package.
 type PackageCompiler struct {
 	le           *logrus.Entry
 	compilerConf *Config
@@ -99,7 +112,10 @@ type PackageCompiler struct {
 	pkg          *packages.Package
 }
 
-// NewPackageCompiler builds a new PackageCompiler.
+// NewPackageCompiler creates a new `PackageCompiler` for a given Go package.
+// It initializes the compiler with the necessary configuration, logger, and
+// the `packages.Package` data obtained from `golang.org/x/tools/go/packages`.
+// It also computes the base output path for the compiled TypeScript files of the package.
 func NewPackageCompiler(
 	le *logrus.Entry,
 	compilerConf *Config,
@@ -115,7 +131,11 @@ func NewPackageCompiler(
 	return res, nil
 }
 
-// Compile compiles the package.
+// Compile orchestrates the compilation of all Go files within the package.
+// It iterates through each syntax file (`ast.File`) of the package,
+// determines its relative path for logging, and then invokes `CompileFile`
+// to handle the compilation of that specific file.
+// The working directory (`wd`) is used to make file paths in logs more readable.
 func (c *PackageCompiler) Compile(ctx context.Context) error {
 	wd := c.compilerConf.Dir
 	if wd == "" {
@@ -143,7 +163,12 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 	return nil
 }
 
-// CompileFile compiles a file.
+// CompileFile handles the compilation of a single Go source file to TypeScript.
+// It first performs a pre-compilation analysis of the file using `AnalyzeFile`
+// to gather information necessary for accurate TypeScript generation (e.g.,
+// about boxing, async functions, defer statements).
+// Then, it creates a `FileCompiler` instance for the file and invokes its
+// `Compile` method to generate the TypeScript code.
 func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File) error {
 	// Create a new analysis instance for per-file data
 	analysis := NewAnalysis()
@@ -161,7 +186,10 @@ func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *
 	return fileCompiler.Compile(ctx)
 }
 
-// FileCompiler is the root compiler for a file.
+// FileCompiler is responsible for compiling a single Go source file (`ast.File`)
+// into a corresponding TypeScript file. It manages the output file creation,
+// initializes the `TSCodeWriter` for TypeScript code generation, and uses a
+// `GoToTSCompiler` to translate Go declarations and statements.
 type FileCompiler struct {
 	compilerConfig *Config
 	codeWriter     *TSCodeWriter
@@ -171,7 +199,10 @@ type FileCompiler struct {
 	Analysis       *Analysis
 }
 
-// NewFileCompiler builds a new FileCompiler
+// NewFileCompiler creates a new `FileCompiler` for a specific Go file.
+// It takes the global compiler configuration, the Go package information,
+// the AST of the file, its full path, and the pre-computed analysis results.
+// This setup provides all necessary context for translating the file.
 func NewFileCompiler(
 	compilerConf *Config,
 	pkg *packages.Package,
@@ -188,7 +219,12 @@ func NewFileCompiler(
 	}, nil
 }
 
-// Compile compiles a file.
+// Compile generates the TypeScript code for the Go file.
+// It determines the output TypeScript file path, creates the necessary
+// directories, and opens the output file. It then initializes a `TSCodeWriter`
+// and a `GoToTSCompiler`. A standard import for the `@goscript/builtin`
+// runtime (aliased as `$`) is added, followed by the translation of all
+// top-level declarations in the Go file.
 func (c *FileCompiler) Compile(ctx context.Context) error {
 	f := c.ast
 
@@ -222,7 +258,10 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	return nil
 }
 
-// GoToTSCompiler compiles Go code to TypeScript code.
+// GoToTSCompiler is the core component responsible for translating Go AST nodes
+// and type information into TypeScript code. It uses a `TSCodeWriter` to output
+// the generated TypeScript and relies on `Analysis` data to make informed
+// decisions about code generation (e.g., boxing, async behavior).
 type GoToTSCompiler struct {
 	tsw *TSCodeWriter
 
@@ -231,7 +270,23 @@ type GoToTSCompiler struct {
 	analysis *Analysis // Holds analysis information for code generation decisions
 }
 
-// WriteGoType writes a Go type as a TypeScript type.
+// WriteGoType translates a `go/types.Type` into its corresponding TypeScript
+// type representation and writes it using the `TSCodeWriter`.
+// It handles various Go types:
+//   - Basic types (int, string, bool, etc.) are mapped to TypeScript primitives (number, string, boolean).
+//     Untyped Go constants are mapped to their closest TypeScript equivalents.
+//   - Named types are generally written with their original name. The `error` interface
+//     is specially handled as `$.Error`.
+//   - Pointer types (`*T`) are translated to `$.Box<T_ts> | null`, where `T_ts` is the
+//     recursively translated type of `T`.
+//   - Slice types (`[]T`) become `$.Slice<T_ts>`.
+//   - Array types (`[N]T`) become `T_ts[]`.
+//   - Map types (`map[K]V`) become `Map<K_ts, V_ts>`.
+//   - Channel types (`chan T`) become `$.Channel<T_ts>`.
+//   - Interface types are generally translated to `any`, with `error` being `$.Error`.
+//     (Further refinement for interface translation might be needed).
+//
+// Unsupported or unrecognized types are translated to `any` with a comment.
 func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	switch t := typ.(type) {
 	case *types.Basic:
@@ -320,7 +375,10 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	}
 }
 
-// NewGoToTSCompiler builds a new GoToTSCompiler
+// NewGoToTSCompiler creates a new `GoToTSCompiler`.
+// It initializes the compiler with a `TSCodeWriter` for output,
+// Go package information (`packages.Package`), and pre-computed
+// analysis results (`Analysis`) to guide the translation process.
 func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analysis) *GoToTSCompiler {
 	return &GoToTSCompiler{
 		tsw:      tsw,
@@ -329,8 +387,16 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 	}
 }
 
-// WriteZeroValueForType writes the zero value for a given type.
-// Handles array types recursively.
+// WriteZeroValueForType writes the TypeScript representation of the zero value
+// for a given Go type.
+// It handles `types.Array` and `ast.ArrayType` by recursively writing zero values
+// for each element to form a TypeScript array literal (e.g., `[0, 0, 0]`).
+// For `types.Basic` (like `bool`, `string`, numeric types), it writes the
+// corresponding TypeScript zero value (`false`, `""`, `0`).
+// For `ast.Ident` representing basic Go types, it maps them to their TypeScript
+// zero values.
+// Other types default to `null`. This function is primarily used for initializing
+// arrays and variables where an explicit initializer is absent.
 func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 	switch t := typ.(type) {
 	case *types.Array:
@@ -386,7 +452,19 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 	}
 }
 
-// WriteTypeExpr writes an expression that represents a type.
+// WriteTypeExpr translates a Go abstract syntax tree (AST) expression (`ast.Expr`)
+// that represents a type into its TypeScript type equivalent.
+// It handles various Go type expressions:
+// - Identifiers (`ast.Ident`): Delegates to `WriteIdentType`.
+// - Selector expressions (`ast.SelectorExpr`, e.g., `pkg.Type`): Delegates to `WriteSelectorExprType`.
+// - Pointer types (`ast.StarExpr`, e.g., `*T`): Delegates to `WriteStarExprType`.
+// - Struct types (`ast.StructType`): Delegates to `WriteStructType`.
+// - Interface types (`ast.InterfaceType`): Delegates to `WriteInterfaceType`.
+// - Function types (`ast.FuncType`): Delegates to `WriteFuncType`.
+// - Array types (`ast.ArrayType`, e.g., `[N]T`): Translates to `T_ts[]`.
+// - Map types (`ast.MapType`, e.g., `map[K]V`): Translates to `{ [key: K_ts]: V_ts }`.
+// - Channel types (`ast.ChanType`, e.g., `chan T`): Translates to `$.Channel<T_ts>`.
+// Unhandled type expressions result in a comment indicating the unhandled case.
 func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	switch exp := a.(type) {
 	case *ast.Ident:
@@ -426,7 +504,27 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	}
 }
 
-// WriteValueExpr writes an expression that represents a value.
+// WriteValueExpr translates a Go abstract syntax tree (AST) expression (`ast.Expr`)
+// that represents a value into its TypeScript value equivalent.
+// This is a central dispatch function for various expression types:
+// - Identifiers (`ast.Ident`): Delegates to `WriteIdent`, potentially adding `.value` for boxed variables.
+// - Selector expressions (`ast.SelectorExpr`, e.g., `obj.Field` or `pkg.Var`): Delegates to `WriteSelectorExpr`.
+// - Pointer dereferences (`ast.StarExpr`, e.g., `*ptr`): Delegates to `WriteStarExpr`.
+// - Function calls (`ast.CallExpr`): Delegates to `WriteCallExpr`.
+// - Unary operations (`ast.UnaryExpr`, e.g., `!cond`, `&val`): Delegates to `WriteUnaryExpr`.
+// - Binary operations (`ast.BinaryExpr`, e.g., `a + b`): Delegates to `WriteBinaryExpr`.
+// - Basic literals (`ast.BasicLit`, e.g., `123`, `"hello"`): Delegates to `WriteBasicLit`.
+// - Composite literals (`ast.CompositeLit`, e.g., `MyStruct{}`): Delegates to `WriteCompositeLit`.
+// - Key-value expressions (`ast.KeyValueExpr`): Delegates to `WriteKeyValueExpr`.
+// - Type assertions in expression context (`ast.TypeAssertExpr`, e.g., `val.(Type)`): Delegates to `WriteTypeAssertExpr`.
+// - Index expressions (`ast.IndexExpr`):
+//   - For maps: `myMap[key]` becomes `myMap.get(key) ?? zeroValue`.
+//   - For arrays/slices: `myArray[idx]` becomes `myArray![idx]`.
+//
+// - Slice expressions (`ast.SliceExpr`, e.g., `s[low:high:max]`): Translates to `$.slice(s, low, high, max)`.
+// - Parenthesized expressions (`ast.ParenExpr`): Translates `(X)` to `(X)`.
+// - Function literals (`ast.FuncLit`): Delegates to `WriteFuncLitValue`.
+// Unhandled value expressions result in a comment.
 func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	switch exp := a.(type) {
 	case *ast.Ident:
@@ -538,7 +636,12 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	}
 }
 
-// WriteTypeAssertExpr writes a type assertion expression.
+// WriteTypeAssertExpr translates a Go type assertion expression (e.g., `x.(T)`)
+// into a TypeScript call to `$.typeAssert<T_ts>(x_ts, 'TypeName').value`.
+// The `$.typeAssert` runtime function handles the actual type check and panic
+// if the assertion fails. The `.value` access is used because in an expression
+// context, we expect the asserted value directly. The `TypeName` string is used
+// by the runtime for error messages.
 func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	// Get the type name string for the asserted type
 	typeName := c.getTypeNameString(exp.Type)
@@ -556,7 +659,12 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	return nil
 }
 
-// isPointerComparison checks if both operands are pointer types and ensures correct comparison semantics.
+// isPointerComparison checks if a binary expression `exp` involves comparing
+// two pointer types. It uses `go/types` information to determine the types
+// of the left (X) and right (Y) operands of the binary expression.
+// Returns `true` if both operands are determined to be pointer types,
+// `false` otherwise. This is used to apply specific comparison semantics
+// for pointers (e.g., comparing the box objects directly).
 func (c *GoToTSCompiler) isPointerComparison(exp *ast.BinaryExpr) bool {
 	leftType := c.pkg.TypesInfo.TypeOf(exp.X)
 	rightType := c.pkg.TypesInfo.TypeOf(exp.Y)
@@ -570,7 +678,11 @@ func (c *GoToTSCompiler) isPointerComparison(exp *ast.BinaryExpr) bool {
 	return false
 }
 
-// getTypeNameString returns the string representation of a type name
+// getTypeNameString returns a string representation of a Go type expression (`ast.Expr`).
+// It handles simple identifiers (e.g., `MyType`) and selector expressions
+// (e.g., `pkg.Type`). For more complex or unrecognized type expressions,
+// it returns "unknown". This string is primarily used for runtime error messages,
+// such as in type assertions.
 func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 	switch t := typeExpr.(type) {
 	case *ast.Ident:
@@ -587,7 +699,18 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 
 // --- Exported Node-Specific Writers ---
 
-// WriteIdentType writes an identifier used as a type.
+// WriteIdentType translates a Go identifier (`ast.Ident`) used as a type
+// into its TypeScript type equivalent.
+// Special cases:
+// - `error` becomes `$.Error`.
+// - `nil` becomes `null`.
+// For Go built-in primitive types (e.g., `int`, `string`), it uses the mapping
+// provided by `GoBuiltinToTypescript`.
+// For other identifiers, it uses `go/types` information (`TypesInfo.Uses` or `Defs`)
+// to resolve the identifier. If the resolved object is not a `types.TypeName`,
+// a comment is added indicating a potential misuse. The identifier's name is
+// then written literally, assuming it refers to a type defined elsewhere
+// (e.g., a custom struct or interface type).
 func (c *GoToTSCompiler) WriteIdentType(exp *ast.Ident) {
 	name := exp.Name
 
@@ -628,8 +751,17 @@ func (c *GoToTSCompiler) WriteIdentType(exp *ast.Ident) {
 	c.tsw.WriteLiterally(name)
 }
 
-// WriteIdent writes an identifier used as a value (variable, function name, nil).
-// If the identifier refers to a boxed variable and accessBoxedValue is true, it accesses the '.value' property.
+// WriteIdent translates a Go identifier (`ast.Ident`) used as a value (e.g.,
+// variable, function name) into its TypeScript equivalent.
+//   - If the identifier is `nil`, it writes `null`.
+//   - Otherwise, it writes the identifier's name.
+//   - If `accessBoxedValue` is true and the analysis (`c.analysis.NeedsBoxedAccess`)
+//     indicates that this identifier refers to a variable whose value is stored
+//     in a box (due to its address being taken or other boxing requirements),
+//     it appends `.value` to access the actual value from the box.
+//
+// This function relies on `go/types` (`TypesInfo.Uses` or `Defs`) to resolve
+// the identifier and the `Analysis` data to determine boxing needs.
 func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
 	if exp.Name == "nil" {
 		c.tsw.WriteLiterally("null")
@@ -652,7 +784,12 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
 	}
 }
 
-// WriteSelectorExprType writes a selector expression used as a type (e.g., pkg.Type).
+// WriteSelectorExprType translates a Go selector expression (`ast.SelectorExpr`)
+// used as a type (e.g., `pkg.MyType`) into its TypeScript type equivalent.
+// It assumes `exp.X` (the expression to the left of the dot) is a package
+// identifier, which is written as a value. `exp.Sel` (the identifier to the
+// right of the dot) is then treated as a type name within that package.
+// The output is typically `PackageName.TypeName`.
 func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) error {
 	// Assuming X is a package identifier. Needs refinement with type info.
 	if err := c.WriteValueExpr(exp.X); err != nil { // Package name is treated as a value
@@ -663,7 +800,23 @@ func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) error {
 	return nil
 }
 
-// WriteSelectorExpr writes a selector expression used as a value (e.g., obj.Field).
+// WriteSelectorExpr translates a Go selector expression (`ast.SelectorExpr`)
+// used as a value (e.g., `obj.Field`, `pkg.Variable`, `structVar.Method()`)
+// into its TypeScript equivalent.
+// It distinguishes between package selectors (e.g., `time.Now`) and field/method
+// access on an object or struct.
+//   - For package selectors, it writes `PackageName.IdentifierName`. The `IdentifierName`
+//     is written using `WriteIdent` which handles potential `.value` access if the
+//     package-level variable is boxed.
+//   - For field or method access on an object (`exp.X`), it first writes the base
+//     expression (`exp.X`) using `WriteValueExpr` (which handles its own boxing).
+//     Then, it writes a dot (`.`) followed by the selected identifier (`exp.Sel`)
+//     using `WriteIdent`, which appends `.value` if the field itself is boxed
+//     (e.g., accessing a field of primitive type through a pointer to a struct
+//     where the field's address might have been taken).
+//
+// This function aims to correctly navigate Go's automatic dereferencing and
+// TypeScript's explicit boxing model.
 func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	objType := c.pkg.TypesInfo.TypeOf(exp.X)
 	if objType == nil {
@@ -707,7 +860,12 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	return nil
 }
 
-// WriteStarExprType writes a pointer type (e.g., *MyStruct).
+// WriteStarExprType translates a Go pointer type expression (`ast.StarExpr`, e.g., `*MyType`)
+// into its TypeScript type equivalent.
+// It consistently represents Go pointer type `*T` as `$.Box<T_ts> | null` in TypeScript,
+// where `T_ts` is the TypeScript translation of the Go type `T` (obtained by
+// recursively calling `WriteTypeExpr` on `exp.X`). Pointers are always nullable
+// in the TypeScript representation.
 func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 	// Translate *T to $.Box<T_ts> | null, consistent with WriteGoType
 	c.tsw.WriteLiterally("$.Box<")
@@ -715,7 +873,27 @@ func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 	c.tsw.WriteLiterally("> | null")
 }
 
-// WriteStarExpr writes a pointer dereference value (e.g., *myVar).
+// WriteStarExpr translates a Go pointer dereference expression (`ast.StarExpr`, e.g., `*p`)
+// into its TypeScript equivalent. This involves careful handling of Go's pointers
+// and TypeScript's boxing mechanism for emulating pointer semantics.
+//
+// The translation depends on whether the pointer variable `p` itself is boxed and
+// what type of value it points to:
+//  1. If `p` is not boxed and points to a primitive or another pointer: `*p` -> `p!.value`.
+//     (`p` holds a box, so dereference accesses its `value` field).
+//  2. If `p` is not boxed and points to a struct: `*p` -> `p!`.
+//     (`p` holds the struct instance directly; structs are reference types in TS).
+//  3. If `p` is boxed (i.e., `p` is `$.Box<PointerType>`) and points to a primitive/pointer:
+//     `*p` -> `p.value!.value`.
+//     (First `.value` unboxes `p`, then `!.value` dereferences the inner pointer).
+//  4. If `p` is boxed and points to a struct: `*p` -> `p.value!`.
+//     (First `.value` unboxes `p` to get the struct instance).
+//
+// `WriteValueExpr(operand)` handles the initial unboxing of `p` if `p` itself is a boxed variable.
+// A non-null assertion `!` is always added as pointers can be nil.
+// `c.analysis.NeedsBoxedDeref(ptrType)` determines if an additional `.value` is needed
+// based on whether the dereferenced type is a primitive/pointer (requires `.value`) or
+// a struct (does not require `.value`).
 func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	// Generate code for a pointer dereference expression (*p).
 	//
@@ -763,7 +941,12 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	return nil
 }
 
-// WriteStructType writes a struct type definition.
+// WriteStructType translates a Go struct type definition (`ast.StructType`)
+// into a TypeScript anonymous object type (e.g., `{ Field1: Type1; Field2: Type2 }`).
+// If the struct has no fields, it writes `{}`. Otherwise, it delegates to
+// `WriteFieldList` to generate the list of field definitions.
+// Note: This is for anonymous struct type literals. Named struct types are usually
+// handled by `WriteIdentType` and then defined as classes via `WriteTypeSpec`.
 func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
 	if exp.Fields == nil || exp.Fields.NumFields() == 0 {
 		c.tsw.WriteLiterally("{}")
@@ -772,7 +955,19 @@ func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
 	c.WriteFieldList(exp.Fields, false) // false = not arguments
 }
 
-// WriteInterfaceType writes an interface type definition.
+// WriteInterfaceType translates a Go interface type definition (`ast.InterfaceType`)
+// into its TypeScript equivalent.
+// Go interfaces are translated to TypeScript structural types.
+//   - Named methods (`MethodName(params) results`) are translated to TypeScript
+//     method signatures (`methodName(params_ts): result_ts;`).
+//   - Embedded interfaces are resolved using type information. The methods of the
+//     embedded interface are effectively "mixed in". The generated TypeScript
+//     type will use an intersection type (`&`) to combine explicit methods with
+//     the types of embedded interfaces (e.g., `{ explicitMethod(): void } & EmbeddedType1 & EmbeddedType2`).
+//   - An empty interface (`interface{}`) becomes `{}` in TypeScript.
+//   - All interface types in TypeScript are implicitly nullable, so `| null` is appended.
+//
+// It uses `WriteInterfaceMethodSignature` for individual method translation.
 func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) error {
 	var embeddedInterfaces []string
 	var methods []*ast.Field
@@ -832,7 +1027,17 @@ func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) error {
 	return nil
 }
 
-// WriteFuncType writes a function type signature.
+// WriteFuncType translates a Go function type (`ast.FuncType`) into a TypeScript
+// function signature.
+// The signature is of the form `(param1: type1, param2: type2) => returnType`.
+// - Parameters are written using `WriteFieldList`.
+// - Return types:
+//   - If there are no results, the return type is `void`.
+//   - If there's a single, unnamed result, it's `resultType`.
+//   - If there are multiple or named results, it's a tuple type `[typeA, typeB]`.
+//   - If `isAsync` is true (indicating the function is known to perform async
+//     operations like channel interactions or contains `go` or `defer` with async calls),
+//     the return type is wrapped in `Promise<>` (e.g., `Promise<void>`, `Promise<number>`).
 func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 	c.tsw.WriteLiterally("(")
 	c.WriteFieldList(exp.Params, true) // true = arguments
@@ -870,7 +1075,28 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 	}
 }
 
-// WriteCallExpr writes a function call.
+// WriteCallExpr translates a Go function call expression (`ast.CallExpr`)
+// into its TypeScript equivalent.
+// It handles several Go built-in functions specially:
+// - `println(...)` becomes `console.log(...)`.
+// - `len(arg)` becomes `$.len(arg)`.
+// - `cap(arg)` becomes `$.cap(arg)`.
+// - `delete(m, k)` becomes `$.deleteMapEntry(m, k)`.
+// - `make(chan T, size)` becomes `$.makeChannel<T_ts>(size, zeroValueForT)`.
+// - `make(map[K]V)` becomes `$.makeMap<K_ts, V_ts>()`.
+// - `make([]T, len, cap)` becomes `$.makeSlice<T_ts>(len, cap)`.
+// - `string(runeVal)` becomes `String.fromCharCode(runeVal)`.
+// - `string([]runeVal)` or `string([]byteVal)` becomes `$.runesToString(sliceVal)`.
+// - `[]rune(stringVal)` becomes `$.stringToRunes(stringVal)`.
+// - `close(ch)` becomes `ch.close()`.
+// - `append(slice, elems...)` becomes `$.append(slice, elems...)`.
+// - `byte(val)` becomes `$.byte(val)`.
+// For other function calls:
+//   - If the `Analysis` data indicates the function is asynchronous (e.g., due to
+//     channel operations or `go`/`defer` usage within it), the call is prefixed with `await`.
+//   - Otherwise, it's translated as a standard TypeScript function call: `funcName(arg1, arg2)`.
+//
+// Arguments are recursively translated using `WriteValueExpr`.
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
 
@@ -1174,7 +1400,24 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	return nil
 }
 
-// WriteUnaryExpr writes a unary operation on a value.
+// WriteUnaryExpr translates a Go unary expression (`ast.UnaryExpr`) into its
+// TypeScript equivalent.
+// It handles several unary operations:
+// - Channel receive (`<-ch`): Becomes `await ch.receive()`.
+// - Address-of (`&var`):
+//   - If `var` is a boxed variable (its address was taken), `&var` evaluates
+//     to the box itself (i.e., `varName` in TypeScript, which holds the box).
+//   - Otherwise (e.g., `&unboxedVar`, `&MyStruct{}`, `&FuncCall()`), it evaluates
+//     the operand `var`. The resulting TypeScript value (e.g., a new object instance)
+//     acts as the "pointer". Boxing decisions for such pointers are handled at
+//     the assignment site.
+//   - Other unary operators (`+`, `-`, `!`, `^`): Mapped to their TypeScript
+//     equivalents (e.g., `+`, `-`, `!`, `~` for bitwise NOT). Parentheses are added
+//     around the operand if it's a binary or unary expression to maintain precedence.
+//
+// Unhandled operators result in a comment and an attempt to write the operator
+// token directly. Postfix operators (`++`, `--`) are expected to be handled by
+// their statement contexts (e.g., `IncDecStmt`).
 func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 	if exp.Op == token.ARROW {
 		// Channel receive: <-ch becomes await ch.receive()
@@ -1254,7 +1497,23 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 	return nil
 }
 
-// WriteBinaryExpr writes a binary operation on values.
+// WriteBinaryExpr translates a Go binary expression (`ast.BinaryExpr`) into its
+// TypeScript equivalent.
+// It handles several cases:
+//   - Channel send (`ch <- val`): Becomes `await ch.send(val)`.
+//   - Nil comparison for pointers (`ptr == nil` or `ptr != nil`): Compares the
+//     pointer (which may be a box object or `null`) directly to `null` using
+//     the translated operator (`==` or `!=`).
+//   - Pointer comparison (non-nil, `ptr1 == ptr2` or `ptr1 != ptr2`): Compares
+//     the box objects directly using strict equality (`===` or `!==`).
+//   - Bitwise operations (`&`, `|`, `^`, `<<`, `>>`, `&^`): The expression is wrapped
+//     in parentheses `()` to ensure correct precedence in TypeScript, and operators
+//     are mapped (e.g., `&^` might need special handling or is mapped to a runtime helper).
+//   - Other binary operations (arithmetic, logical, comparison): Operands are
+//     translated using `WriteValueExpr`, and the operator is mapped to its TypeScript
+//     equivalent using `TokenToTs`.
+//
+// Unhandled operators result in a comment and a placeholder.
 func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	// Handle special cases like channel send
 	if exp.Op == token.ARROW {
@@ -1369,7 +1628,14 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	return nil
 }
 
-// WriteBasicLit writes a basic literal value.
+// WriteBasicLit translates a Go basic literal (`ast.BasicLit`) into its
+// TypeScript equivalent.
+//   - Character literals (e.g., `'a'`, `'\n'`) are translated to their numeric
+//     Unicode code point (e.g., `97`, `10`). Escape sequences are handled.
+//   - Integer, float, imaginary, and string literals are written directly as their
+//     `exp.Value` string, which typically corresponds to valid TypeScript syntax
+//     (e.g., `123`, `3.14`, `"hello"`). Imaginary literals might need special
+//     handling if they are to be fully supported beyond direct string output.
 func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 	if exp.Kind == token.CHAR {
 		// Go char literal 'x' is a rune (int32). Translate to its numeric code point.
@@ -1387,10 +1653,37 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 	}
 }
 
-// WriteCompositeLit writes a composite literal value.
-// For array literals, uses type information to determine array length and element type,
-// and fills uninitialized elements with the correct zero value.
-// For map literals, creates a new Map with entries.
+// WriteCompositeLit translates a Go composite literal expression (`ast.CompositeLit`)
+// into its TypeScript equivalent. This is used for initializing structs, arrays,
+// slices, and maps.
+//
+// Behavior varies by type:
+// - Map literals (`map[K]V{k1: v1, ...}`): Translated to `new Map([[k1_ts, v1_ts], ...])`.
+// - Array literals (`[N]T{idx1: v1, v2, ...}`):
+//   - Translated to a TypeScript array literal `[v1_ts, v2_ts, ...]`.
+//   - If the Go array literal has explicit indices or is sparsely initialized,
+//     the TypeScript array is filled up to the required length (determined by
+//     type information or the maximum index used). Uninitialized elements are
+//     filled with the zero value of the element type using `WriteZeroValueForType`.
+//   - Empty slice literals (`[]T{}`) become `([] as ElementType_ts[])`.
+//
+// - Struct literals (`MyStruct{Field1: v1, ...}` or `&MyStruct{...}`):
+//   - Translated to `new MyStruct_ts({ field1: v1_ts, ... })`.
+//   - Handles direct fields, promoted fields from embedded structs, and explicit
+//     initialization of embedded structs.
+//   - For promoted fields (`Outer{InnerField: val}`), it correctly populates
+//     the `InnerStructName: { InnerField: val_ts }` structure in the TypeScript
+//     constructor argument.
+//   - For explicit embedded struct initialization (`Outer{InnerStructName: InnerStructValue}`),
+//     it populates `InnerStructName: InnerStructValue_ts`. If `InnerStructValue` is
+//     itself a composite literal, its fields are expanded directly.
+//   - Untyped composite literals: Guesses based on element structure (key-value pairs
+//     suggest an object `{...}`, otherwise an array `[...]`). A comment indicates
+//     the guessed type.
+//
+// This function relies heavily on `go/types` (`TypesInfo.TypeOf`) to determine
+// the kind of literal being constructed and to handle types correctly, especially
+// for zero values and struct field resolution.
 func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 	// Get the type of the composite literal
 	litType := c.pkg.TypesInfo.TypeOf(exp)
@@ -1817,8 +2110,12 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 	return nil
 }
 
-// WriteKeyValueExpr writes a key-value pair.
-// Returns an error if writing the key or value fails.
+// WriteKeyValueExpr translates a Go key-value pair expression (`ast.KeyValueExpr`),
+// typically found within composite literals (for structs, maps, or arrays with
+// indexed elements), into its TypeScript object property equivalent: `key: value`.
+// Both the key and the value expressions are recursively translated using
+// `WriteValueExpr`. The original Go casing for keys is preserved.
+// For example, `MyField: 123` in Go becomes `MyField: 123` in TypeScript.
 func (c *GoToTSCompiler) WriteKeyValueExpr(exp *ast.KeyValueExpr) error {
 	// Keep original Go casing for keys
 	if err := c.WriteValueExpr(exp.Key); err != nil {
@@ -1831,7 +2128,18 @@ func (c *GoToTSCompiler) WriteKeyValueExpr(exp *ast.KeyValueExpr) error {
 	return nil
 }
 
-// WriteFuncLitValue writes a function literal as a TypeScript arrow function.
+// WriteFuncLitValue translates a Go function literal (`ast.FuncLit`) into a
+// TypeScript arrow function.
+// The translation results in: `[async] (param1: type1, ...) : returnType => { ...body... }`.
+//   - The `async` keyword is prepended if `c.analysis.IsFuncLitAsync(exp)`
+//     indicates the function literal contains asynchronous operations.
+//   - Parameters are translated using `WriteFieldList`.
+//   - The return type is determined similarly to `WriteFuncType`:
+//   - `void` for no results.
+//   - `resultType` for a single unnamed result.
+//   - `[typeA, typeB]` for multiple or named results.
+//   - Wrapped in `Promise<>` if `async`.
+//   - The function body (`exp.Body`) is translated using `WriteStmt`.
 func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	// Determine if the function literal should be async
 	isAsync := c.analysis.IsFuncLitAsync(exp)
@@ -1884,7 +2192,13 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	return nil
 }
 
-// WriteSpec writes a specification to the output.
+// WriteSpec is a dispatcher function that translates a Go specification node
+// (`ast.Spec`) into its TypeScript equivalent. It handles different types of
+// specifications found within `GenDecl` (general declarations):
+// - `ast.ImportSpec` (import declarations): Delegates to `WriteImportSpec`.
+// - `ast.ValueSpec` (variable or constant declarations): Delegates to `WriteValueSpec`.
+// - `ast.TypeSpec` (type definitions like structs, interfaces): Delegates to `WriteTypeSpec`.
+// If an unknown specification type is encountered, it returns an error.
 func (c *GoToTSCompiler) WriteSpec(a ast.Spec) error {
 	switch d := a.(type) {
 	case *ast.ImportSpec:
@@ -1903,7 +2217,12 @@ func (c *GoToTSCompiler) WriteSpec(a ast.Spec) error {
 	return nil
 }
 
-// collectMethodNames returns a comma-separated string of method names for a struct
+// collectMethodNames scans all files in the current package (`c.pkg.Syntax`)
+// to find all method declarations associated with a given `structName`.
+// It identifies methods by checking `ast.FuncDecl` nodes for receivers
+// whose type (or underlying type if it's a pointer receiver) matches `structName`.
+// Returns a comma-separated string of quoted method names (e.g., "'MethodA', 'MethodB'"),
+// suitable for use in generating metadata like the `$.IMetamethods` list for a struct class.
 func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 	var methodNames []string
 
@@ -1933,7 +2252,11 @@ func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 	return strings.Join(methodNames, ", ")
 }
 
-// getTypeString returns a TypeScript type string for a Go type.
+// getTypeString is a utility function that converts a Go `types.Type` into its
+// TypeScript type string representation. It achieves this by creating a temporary
+// `GoToTSCompiler` and `TSCodeWriter` (writing to a `strings.Builder`) and then
+// calling `WriteGoType` on the provided Go type. This allows reusing the main
+// type translation logic to get a string representation of the TypeScript type.
 func (c *GoToTSCompiler) getTypeString(goType types.Type) string {
 	var typeStr strings.Builder
 	writer := NewTSCodeWriter(&typeStr)
@@ -1942,8 +2265,19 @@ func (c *GoToTSCompiler) getTypeString(goType types.Type) string {
 	return typeStr.String()
 }
 
-// generateFlattenedInitTypeString generates the flattened Partial type string for a struct's _init method.
-// It includes all accessible fields (direct and promoted).
+// generateFlattenedInitTypeString generates a TypeScript type string for the
+// initialization object passed to a Go struct's constructor (`_init` method in TypeScript).
+// The generated type is a `Partial`-like structure, `"{ Field1?: Type1, Field2?: Type2, ... }"`,
+// including all direct and promoted fields of the `structType`.
+//   - It iterates through the direct fields of the `structType`. Exported fields
+//     are included with their TypeScript types (obtained via `WriteGoType`).
+//   - For anonymous (embedded) fields, it generates a type like `EmbeddedName?: ConstructorParameters<typeof EmbeddedName>[0]`,
+//     allowing initialization of the embedded struct's fields directly within the outer struct's initializer.
+//   - It then uses `types.NewMethodSet` and checks for `types.Var` objects that are fields
+//     to find promoted fields from embedded structs, adding them to the type string if not already present.
+//
+// The resulting string is sorted by field name for deterministic output and represents
+// the shape of the object expected by the struct's TypeScript constructor.
 func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named) string {
 	if structType == nil {
 		return "{}"
@@ -2041,7 +2375,18 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 	return "{" + strings.Join(fieldDefs, ", ") + "}"
 }
 
-// collectInterfaceMethods returns a comma-separated string of method names for an interface
+// collectInterfaceMethods scans a Go interface type (`ast.InterfaceType`) and
+// its embedded interfaces to gather a unique list of all method names it defines.
+//   - For explicitly named methods in `interfaceType.Methods`, their names are added.
+//   - For embedded interfaces, it resolves the embedded type using `go/types` information
+//     (`c.pkg.TypesInfo.Types`). If resolved to a `types.Interface`, it iterates
+//     through the methods of that underlying interface and adds their names.
+//
+// The collected method names are then sorted and returned as a comma-separated
+// string of quoted names (e.g., "'MethodA', 'MethodB'"). This is used for
+// generating metadata, such as the `$.IMetamethods` list for an interface type helper.
+// If an embedded interface cannot be fully resolved, a comment is written to the
+// output, but the process continues with available information.
 func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceType) string {
 	// Use a map to ensure uniqueness of method names
 	methodNamesMap := make(map[string]struct{})
@@ -2093,8 +2438,24 @@ func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceTyp
 	return strings.Join(methodNames, ", ")
 }
 
-// WriteFuncDeclAsMethod writes a TypeScript method declaration from a Go FuncDecl.
-// Assumes it's called only for functions with receivers.
+// WriteFuncDeclAsMethod translates a Go function declaration (`ast.FuncDecl`)
+// that has a receiver (i.e., it's a method) into a TypeScript class method.
+//   - It preserves Go documentation comments (`decl.Doc`).
+//   - The method is declared as `public`.
+//   - If the `Analysis` data indicates the method is asynchronous, the `async`
+//     keyword is prepended.
+//   - The method name retains its original Go casing.
+//   - Parameters and return types are translated using `WriteFieldList` and
+//     `WriteTypeExpr`, respectively. Async methods have their return types
+//     wrapped in `Promise<>`.
+//   - The method body is translated. If the Go receiver has a name (e.g., `(s *MyStruct)`),
+//     a `const receiverName = this;` binding is generated at the start of the
+//     TypeScript method body to make `this` available via the Go receiver's name.
+//     If the method body requires deferred cleanup (`NeedsDefer`), the appropriate
+//     `using __defer = new $.DisposableStack()` (or `AsyncDisposableStack`)
+//     is also generated.
+//
+// This function assumes it is called only for `FuncDecl` nodes that are methods.
 func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	if decl.Doc != nil {
 		c.WriteDoc(decl.Doc)
@@ -2200,7 +2561,30 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	return nil
 }
 
-// WriteValueSpec writes the value specification to the output.
+// WriteValueSpec translates a Go value specification (`ast.ValueSpec`),
+// which represents `var` or `const` declarations, into TypeScript `let`
+// declarations.
+//
+// For single variable declarations (`var x T = val` or `var x = val` or `var x T`):
+//   - It determines if the variable `x` needs to be boxed (e.g., if its address is taken)
+//     using `c.analysis.NeedsBoxed(obj)`.
+//   - If boxed: `let x: $.Box<T_ts> = $.box(initializer_ts_or_zero_ts);`
+//     The type annotation is `$.Box<T_ts>`, and the initializer is wrapped in `$.box()`.
+//   - If not boxed: `let x: T_ts = initializer_ts_or_zero_ts;`
+//     The type annotation is `T_ts`. If the initializer is `&unboxedVar`, it becomes `$.box(unboxedVar_ts)`.
+//     If the RHS is a struct value, `.clone()` is applied to maintain Go's value semantics.
+//   - If no initializer is provided, the TypeScript zero value (from `WriteZeroValueForType`)
+//     is used.
+//   - Type `T` (or `T_ts`) is obtained from `obj.Type()` and translated via `WriteGoType`.
+//
+// For multiple variable declarations (`var a, b = val1, val2` or `a, b := val1, val2`):
+//   - It uses TypeScript array destructuring: `let [a, b] = [val1_ts, val2_ts];`.
+//   - If initialized from a single multi-return function call (`a, b := func()`),
+//     it becomes `let [a, b] = func_ts();`.
+//   - If no initializers are provided, it defaults to `let [a,b] = []` (with a TODO
+//     to assign correct individual zero values).
+//
+// Documentation comments associated with the `ValueSpec` are preserved.
 func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 	if a.Doc != nil {
 		c.WriteDoc(a.Doc)
@@ -2361,7 +2745,17 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 	return nil
 }
 
-// WriteImportSpec writes an import specification to the output.
+// WriteImportSpec translates a Go import specification (`ast.ImportSpec`)
+// into a TypeScript import statement.
+// It extracts the Go import path (e.g., `"path/to/pkg"`) and determines the
+// import alias/name for TypeScript. If the Go import has an explicit name
+// (e.g., `alias "path/to/pkg"`), that alias is used. Otherwise, the package
+// name is derived from the Go path.
+// The Go path is then translated to a TypeScript module path using
+// `translateGoPathToTypescriptPath`.
+// Finally, it writes a TypeScript import statement like `import * as alias from "typescript/path/to/pkg";`
+// and records the import details in `c.analysis.Imports` for later use (e.g.,
+// resolving qualified identifiers).
 func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 	if a.Doc != nil {
 		c.WriteDoc(a.Doc)
@@ -2385,7 +2779,21 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 	c.tsw.WriteImport(impName, importPath)
 }
 
-// WriteInterfaceMethodSignature writes a TypeScript interface method signature from a Go ast.Field.
+// WriteInterfaceMethodSignature translates a Go method field (`ast.Field`) from
+// an interface definition into a TypeScript interface method signature.
+// It generates a signature like `methodName(param1: type1, ...): returnType;`.
+// - Documentation comments (`field.Doc`, `field.Comment`) are preserved.
+// - The method name is taken from `field.Names[0]`.
+// - Parameters are translated:
+//   - Each parameter is given a name (either its Go name or a placeholder `_p%d`).
+//   - Parameter types are translated using `WriteTypeExpr`.
+//
+// - The return type is translated:
+//   - `void` if no results.
+//   - `resultType_ts` for a single unnamed result.
+//   - `[typeA_ts, typeB_ts]` for multiple or named results.
+//
+// The signature ends with a semicolon. It assumes `field.Type` is an `*ast.FuncType`.
 func (c *GoToTSCompiler) WriteInterfaceMethodSignature(field *ast.Field) error {
 	// Include comments
 	if field.Doc != nil {
@@ -2457,7 +2865,19 @@ func (c *GoToTSCompiler) WriteInterfaceMethodSignature(field *ast.Field) error {
 	return nil
 }
 
-// WriteDecls writes a slice of declarations.
+// WriteDecls iterates through a slice of Go top-level declarations (`ast.Decl`)
+// and translates each one into its TypeScript equivalent.
+// It distinguishes between:
+// - Function declarations (`ast.FuncDecl`):
+//   - If it's a regular function (no receiver), it delegates to `WriteFuncDeclAsFunction`.
+//   - Methods (with receivers) are handled within `WriteTypeSpec` when their
+//     associated struct/type is defined, so they are skipped here.
+//   - General declarations (`ast.GenDecl`), which can contain imports, constants,
+//     variables, or type definitions: It iterates through `d.Specs` and calls
+//     `WriteSpec` for each specification.
+//
+// A newline is added after each processed declaration or spec group for readability.
+// Unknown declaration types result in a printed diagnostic message.
 func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) error {
 	for _, decl := range decls {
 		switch d := decl.(type) {
@@ -2483,9 +2903,20 @@ func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) error {
 	return nil
 }
 
-// WriteFuncDeclAsFunction writes a function declaration
-// NOTE: This function now ONLY handles regular functions, not methods (functions with receivers).
-// Method generation is handled within the type definition writer (e.g., for structs).
+// WriteFuncDeclAsFunction translates a Go function declaration (`ast.FuncDecl`)
+// that does not have a receiver (i.e., it's a regular function, not a method)
+// into a TypeScript function.
+//   - Go documentation comments (`decl.Doc`) are preserved.
+//   - If the Go function is exported (name starts with an uppercase letter) or is
+//     the `main` function, the `export` keyword is added to the TypeScript output.
+//   - If the `Analysis` data indicates the function is asynchronous, the `async`
+//     keyword is prepended.
+//   - The function signature (parameters and return type) is translated using `WriteFuncType`,
+//     passing the `isAsync` status.
+//   - The function body (`decl.Body`) is translated using `WriteStmt`.
+//
+// This function specifically handles top-level functions; methods are generated
+// by `WriteFuncDeclAsMethod` within the context of their type definition.
 func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	if decl.Recv != nil {
 		// This function should not be called for methods.
@@ -2528,7 +2959,19 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	return nil
 }
 
-// WriteFieldList writes a field list.
+// WriteFieldList translates a Go field list (`ast.FieldList`), which can represent
+// function parameters, function results, or struct fields, into its TypeScript equivalent.
+//   - If `isArguments` is true (for function parameters/results):
+//     It iterates through `a.List`, writing each field as `name: type`. Parameter
+//     names and types are written using `WriteField` and `WriteTypeExpr` respectively.
+//     Multiple parameters are comma-separated.
+//   - If `isArguments` is false (for struct fields):
+//     It writes an opening brace `{`, indents, then writes each field definition
+//     using `WriteField`, followed by a closing brace `}`. If the field list is
+//     empty or nil, it simply writes `{}`.
+//
+// This function is a key part of generating TypeScript type signatures for functions
+// and interfaces, as well as struct type definitions.
 func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 	if !isArguments && (a == nil || a.NumFields() == 0) {
 		c.tsw.WriteLiterally("{}")
@@ -2563,7 +3006,22 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 	}
 }
 
-// WriteField writes a field definition.
+// WriteField translates a single Go field (`ast.Field`) from a field list
+// (e.g., in a struct type or function signature) into its TypeScript representation.
+// - If `isArguments` is false (struct field):
+//   - Documentation comments (`field.Doc`, `field.Comment`) are preserved.
+//   - If the field is anonymous (embedded), it's skipped as promotions are handled
+//     elsewhere (e.g., during struct class generation).
+//   - For named fields, it writes `public fieldName: FieldType_ts`. The field name
+//     retains its Go casing. The type is translated using `WriteTypeExpr`.
+//   - Go struct tags (`field.Tag`) are written as a trailing comment.
+//
+// - If `isArguments` is true (function parameter):
+//   - It writes the parameter name (retaining Go casing). The type is handled
+//     by the caller (`WriteFieldList`).
+//
+// This function is used by `WriteFieldList` to process individual items within
+// parameter lists and struct field definitions.
 func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 	if !isArguments {
 		if field.Doc != nil {
@@ -2607,7 +3065,28 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 	}
 }
 
-// WriteStmt writes a statement to the output.
+// WriteStmt is a central dispatcher function that translates a Go statement
+// (`ast.Stmt`) into its TypeScript equivalent by calling the appropriate
+// specialized `WriteStmt*` or `write*` method.
+// It handles a wide variety of Go statements:
+//   - Block statements (`ast.BlockStmt`): `WriteStmtBlock`.
+//   - Assignment statements (`ast.AssignStmt`): `WriteStmtAssign`.
+//   - Return statements (`ast.ReturnStmt`): `WriteStmtReturn`.
+//   - Defer statements (`ast.DeferStmt`): `WriteStmtDefer`.
+//   - If statements (`ast.IfStmt`): `WriteStmtIf`.
+//   - Expression statements (`ast.ExprStmt`): `WriteStmtExpr`.
+//   - Declaration statements (`ast.DeclStmt`, e.g., short var decls): Processes
+//     `ValueSpec`s within.
+//   - For statements (`ast.ForStmt`): `WriteStmtFor`.
+//   - Range statements (`ast.RangeStmt`): `WriteStmtRange`.
+//   - Switch statements (`ast.SwitchStmt`): `WriteStmtSwitch`.
+//   - Increment/decrement statements (`ast.IncDecStmt`): Writes `expr++` or `expr--`.
+//   - Send statements (`ast.SendStmt`, e.g., `ch <- val`): `WriteStmtSend`.
+//   - Go statements (`ast.GoStmt`): Translates `go func(){...}()` to `queueMicrotask(() => {...})`.
+//   - Select statements (`ast.SelectStmt`): `WriteStmtSelect`.
+//   - Branch statements (`ast.BranchStmt`, i.e., `break`, `continue`): Writes them directly.
+//
+// If an unknown statement type is encountered, it returns an error.
 func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 	switch exp := a.(type) {
 	case *ast.BlockStmt:
@@ -2750,7 +3229,21 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 	return nil
 }
 
-// WriteStmtDefer writes a defer statement using TypeScript's DisposableStack.
+// WriteStmtDefer translates a Go `defer` statement into TypeScript code that
+// utilizes a disposable stack (`$.DisposableStack` or `$.AsyncDisposableStack`).
+// The Go `defer` semantics (LIFO execution at function exit) are emulated by
+// registering a cleanup function with this stack.
+//   - `defer funcCall()` becomes `__defer.defer(() => { funcCall_ts(); });`.
+//   - `defer func(){ ...body... }()` (an immediately-invoked function literal, IIFL)
+//     has its body inlined: `__defer.defer(() => { ...body_ts... });`.
+//   - If the deferred call is to an async function or an async function literal
+//     (determined by `c.analysis.IsInAsyncFunctionMap`), the registered callback
+//     is marked `async`: `__defer.defer(async () => { ... });`.
+//
+// The `__defer` variable is assumed to be declared at the beginning of the
+// function scope (see `WriteStmtBlock` or `WriteFuncDeclAsMethod`) using
+// `await using __defer = new $.AsyncDisposableStack();` for async functions/contexts
+// or `using __defer = new $.DisposableStack();` for sync contexts.
 func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 	// Determine if the deferred call is to an async function literal using analysis
 	isAsyncDeferred := false
@@ -2793,7 +3286,29 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 	return nil
 }
 
-// WriteStmtSelect writes a select statement.
+// WriteStmtSelect translates a Go `select` statement into an asynchronous
+// TypeScript operation using the `$.selectStatement` runtime helper.
+// Go's `select` provides non-deterministic choice over channel operations.
+// This is emulated by constructing an array of `SelectCase` objects, one for
+// each `case` in the Go `select`, and passing it to `$.selectStatement`.
+//
+// Each `SelectCase` object includes:
+//   - `id`: A unique identifier for the case.
+//   - `isSend`: `true` for send operations (`case ch <- val:`), `false` for receives.
+//   - `channel`: The TypeScript channel object.
+//   - `value` (for sends): The value being sent.
+//   - `onSelected: async (result) => { ... }`: A callback executed when this case
+//     is chosen. `result` contains `{ value, ok }` for receives.
+//   - Inside `onSelected`, assignments for receive operations (e.g., `v := <-ch`,
+//     `v, ok := <-ch`) are handled by declaring/assigning variables from `result.value`
+//     and `result.ok`.
+//   - The original Go case body is then translated within this callback.
+//
+// A `default` case in Go `select` is translated to a `SelectCase` with `id: -1`
+// and its body in the `onSelected` handler. The `$.selectStatement` helper
+// is informed if a default case exists.
+// The entire `$.selectStatement(...)` call is `await`ed because channel
+// operations are asynchronous in the TypeScript model.
 func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 	// This is our implementation of the select statement, which will use Promise.race
 	// to achieve the same semantics as Go's select statement.
@@ -2973,7 +3488,18 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 	return nil
 }
 
-// WriteStmtSwitch writes a switch statement.
+// WriteStmtSwitch translates a Go `switch` statement into its TypeScript equivalent.
+//   - If the Go switch has an initialization statement (`exp.Init`), it's wrapped
+//     in a TypeScript block `{...}` before the `switch` keyword, and the
+//     initializer is translated within this block. This emulates Go's switch scope.
+//   - The switch condition (`exp.Tag`):
+//   - If `exp.Tag` is present, it's translated using `WriteValueExpr`.
+//   - If `exp.Tag` is nil (a "tagless" switch, like `switch { case cond1: ... }`),
+//     it's translated as `switch (true)` in TypeScript.
+//   - Each case clause (`ast.CaseClause`) in `exp.Body.List` is translated using
+//     `WriteCaseClause`.
+//
+// The overall structure is `[optional_init_block] switch (condition_ts) { ...cases_ts... }`.
 func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error {
 	// Handle optional initialization statement
 	if exp.Init != nil {
@@ -3018,7 +3544,19 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error {
 	return nil
 }
 
-// WriteCaseClause writes a case clause within a switch statement.
+// WriteCaseClause translates a Go `case` clause (`ast.CaseClause`) from within
+// a `switch` statement into its TypeScript `case` or `default` equivalent.
+//   - If `exp.List` is nil, it's a `default` case, written as `default:`.
+//   - If `exp.List` is not nil, it's a `case` with one or more match expressions.
+//     It's written as `case expr1_ts, expr2_ts, ... :`. (Note: Go's `case`
+//     doesn't allow multiple expressions this way, but TypeScript does. This code
+//     implies Go's fallthrough is not directly modeled here but rather by explicit
+//     `break`s, and each Go `case` becomes one or more TS `case` labels if needed,
+//     though current implementation writes them comma-separated which is valid TS syntax).
+//   - The body of the case (`exp.Body`) is translated statement by statement using `WriteStmt`.
+//   - A `break;` statement is automatically added at the end of the TypeScript case
+//     body, because Go `switch` cases have implicit breaks, whereas TypeScript
+//     cases fall through by default.
 func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) error {
 	if exp.List == nil {
 		// Default case
@@ -3052,7 +3590,21 @@ func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) error {
 	return nil
 }
 
-// WriteStmtIf writes an if statement.
+// WriteStmtIf translates a Go `if` statement (`ast.IfStmt`) into its
+// TypeScript equivalent.
+//   - If the Go `if` has an initialization statement (`exp.Init`), it's wrapped
+//     in a TypeScript block `{...}` before the `if` keyword, and the initializer
+//     is translated within this block. This emulates Go's `if` statement scope.
+//   - The condition (`exp.Cond`) is translated using `WriteValueExpr` and placed
+//     within parentheses `(...)`.
+//   - The `if` body (`exp.Body`) is translated as a block statement using
+//     `WriteStmtBlock`. If `exp.Body` is nil, an empty block `{}` is written.
+//   - The `else` branch (`exp.Else`) is handled:
+//   - If `exp.Else` is a block statement (`ast.BlockStmt`), it's written as `else { ...body_ts... }`.
+//   - If `exp.Else` is another `if` statement (`ast.IfStmt`), it's written as `else if (...) ...`,
+//     recursively calling `WriteStmtIf`.
+//
+// The function aims to produce idiomatic TypeScript `if/else if/else` structures.
 func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 	if exp.Init != nil {
 		s.tsw.WriteLiterally("{")
@@ -3104,7 +3656,15 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 	return nil
 }
 
-// WriteStmtReturn writes a return statement.
+// WriteStmtReturn translates a Go `return` statement (`ast.ReturnStmt`) into
+// its TypeScript equivalent.
+//   - It writes the `return` keyword.
+//   - If there are multiple return values (`len(exp.Results) > 1`), the translated
+//     results are wrapped in a TypeScript array literal `[...]`.
+//   - Each result expression in `exp.Results` is translated using `WriteValueExpr`.
+//   - If there are no results, it simply writes `return`.
+//
+// The statement is terminated with a newline.
 func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 	c.tsw.WriteLiterally("return ")
 	if len(exp.Results) > 1 {
@@ -3125,7 +3685,28 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 	return nil
 }
 
-// WriteStmtBlock writes a block statement, preserving comments and blank lines.
+// WriteStmtBlock translates a Go block statement (`ast.BlockStmt`), typically
+// `{ ...stmts... }`, into its TypeScript equivalent, carefully preserving
+// comments and blank lines to maintain code readability and structure.
+//   - It writes an opening brace `{` and indents.
+//   - If the analysis (`c.analysis.NeedsDefer`) indicates that the block (or a
+//     function it's part of) contains `defer` statements, it injects a
+//     `using __defer = new $.DisposableStack();` (or `AsyncDisposableStack` if
+//     the context is async or contains async defers) at the beginning of the block.
+//     This `__defer` stack is used by `WriteStmtDefer` to register cleanup actions.
+//   - It iterates through the statements (`exp.List`) in the block:
+//   - Leading comments associated with each statement are written first, with
+//     blank lines preserved based on original source line numbers.
+//   - The statement itself is then translated using `WriteStmt`.
+//   - Inline comments (comments on the same line after a statement) are expected
+//     to be handled by the individual statement writers (e.g., `WriteStmtExpr`).
+//   - Trailing comments within the block (after the last statement but before the
+//     closing brace) are written.
+//   - Blank lines before the closing brace are preserved.
+//   - Finally, it unindents and writes the closing brace `}`.
+//
+// If `suppressNewline` is true, the final newline after the closing brace is omitted
+// (used, for example, when an `if` block is followed by an `else`).
 func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool) error {
 	if exp == nil {
 		c.tsw.WriteLiterally("{}")
@@ -3272,11 +3853,30 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 	return nil
 }
 
-// writeAssignmentCore writes the core LHS, operator, and RHS of an assignment.
-// It handles assignment to map indexes correctly.
-// It does NOT handle 'let' keyword, or trailing semicolons/comments/newlines.
-// Handle blank identifiers correctly.
-// It assumes assignments to boxed non-pointers (x.value = ...) are handled by the caller.
+// writeAssignmentCore handles the central logic for translating Go assignment
+// operations (LHS op RHS) into TypeScript. It's called by `WriteStmtAssign`
+// and other functions that need to generate assignment code.
+//
+// Key behaviors:
+//   - Multi-variable assignment (e.g., `a, b = b, a`): Translates to TypeScript
+//     array destructuring: `[a_ts, b_ts] = [b_ts, a_ts]`. It correctly handles
+//     non-null assertions for array index expressions on both LHS and RHS if
+//     all expressions involved are index expressions (common in swaps).
+//   - Single-variable assignment to a map index (`myMap[key] = value`): Translates
+//     to `$.mapSet(myMap_ts, key_ts, value_ts)`.
+//   - Other single-variable assignments (`variable = value`):
+//   - The LHS expression is written (caller typically ensures `.value` is appended
+//     if assigning to a boxed variable's content).
+//   - The Go assignment token (`tok`, e.g., `=`, `+=`) is translated to its
+//     TypeScript equivalent using `TokenToTs`.
+//   - The RHS expression(s) are written. If `shouldApplyClone` indicates the RHS
+//     is a struct value, `.clone()` is appended to the translated RHS to emulate
+//     Go's value semantics for struct assignment.
+//   - Blank identifiers (`_`) on the LHS are handled by omitting them in TypeScript
+//     destructuring patterns or by skipping the assignment for single assignments.
+//
+// This function does not handle the `let` keyword for declarations or statement
+// termination (newlines/semicolons).
 func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token) error {
 	// Special case for multi-variable assignment to handle array element swaps
 	if len(lhs) > 1 && len(rhs) > 1 {
@@ -3462,7 +4062,24 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 	return nil
 }
 
-// writeChannelReceiveWithOk handles the val, ok := <-channel assignment pattern.
+// writeChannelReceiveWithOk handles the specific Go assignment pattern
+// `value, ok := <-channel` (or `:=`).
+// It translates this into a TypeScript destructuring assignment/declaration
+// from the result of `await channel_ts.receiveWithOk()`.
+// The `receiveWithOk()` runtime method is expected to return an object like
+// `{ value: receivedValue, ok: boolean }`.
+//
+// - If `tok` is `token.DEFINE` (for `:=`), it generates `const { value: valueName, ok: okName } = ...`.
+// - Otherwise (for `=`), it generates `{ value: valueName, ok: okName } = ...` (if not a declaration).
+// - Blank identifiers (`_`) on the LHS are handled:
+//   - If `value` is blank: `const { ok: okName } = ...` or `{ ok: okName } = ...`.
+//   - If `ok` is blank: `const { value: valueName } = ...` or `{ value: valueName } = ...`.
+//   - If both are blank, it simply writes `await channel_ts.receiveWithOk()` to
+//     execute the receive for its potential side effects (though `receiveWithOk`
+//     is primarily for its return values) and discards the result.
+//
+// This ensures that the Go channel receive with existence check is correctly
+// mapped to the asynchronous TypeScript channel helper.
 func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *ast.UnaryExpr, tok token.Token) error {
 	// Ensure LHS has exactly two expressions
 	if len(lhs) != 2 {
@@ -3541,6 +4158,42 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 	return nil
 }
 
+// WriteStmtAssign translates a Go assignment statement (`ast.AssignStmt`) into
+// its TypeScript equivalent. It handles various forms of Go assignments:
+//
+// 1.  **Multi-variable assignment from a single function call** (e.g., `a, b := fn()`):
+//   - Uses `writeMultiVarAssignFromCall` to generate `let [a, b] = fn_ts();`.
+//
+// 2.  **Type assertion with comma-ok** (e.g., `val, ok := expr.(Type)`):
+//   - Uses `writeTypeAssertion` to generate `let { value: val, ok: ok } = $.typeAssert<Type_ts>(expr_ts, 'TypeName');`.
+//
+// 3.  **Map lookup with comma-ok** (e.g., `val, ok := myMap[key]`):
+//   - Uses `writeMapLookupWithExists` to generate separate assignments for `val`
+//     (using `myMap_ts.get(key_ts) ?? zeroValue`) and `ok` (using `myMap_ts.has(key_ts)`).
+//
+// 4.  **Channel receive with comma-ok** (e.g., `val, ok := <-ch`):
+//   - Uses `writeChannelReceiveWithOk` to generate `let { value: val, ok: ok } = await ch_ts.receiveWithOk();`.
+//
+// 5.  **Discarded channel receive** (e.g., `<-ch` on RHS, no LHS vars):
+//   - Translates to `await ch_ts.receive();`.
+//
+// 6.  **Single assignment** (e.g., `x = y`, `x := y`, `*p = y`, `x[i] = y`):
+//   - Uses `writeSingleAssign` which handles:
+//   - Blank identifier `_` on LHS (evaluates RHS for side effects).
+//   - Assignment to dereferenced pointer `*p = val` -> `p_ts!.value = val_ts`.
+//   - Short declaration `x := y`: `let x = y_ts;`. If `x` is boxed, `let x: $.Box<T> = $.box(y_ts);`.
+//   - Regular assignment `x = y`, including compound assignments like `x += y`.
+//   - Assignment to map index `m[k] = v` is delegated to `writeAssignmentCore` for `$.mapSet`.
+//   - Struct value assignment `s1 = s2` becomes `s1 = s2.clone()` if `s2` is a struct.
+//
+// 7.  **Multi-variable assignment with multiple RHS values** (e.g., `a, b = x, y`):
+//   - Uses `writeAssignmentCore` to generate `[a,b] = [x_ts, y_ts];` (or `let [a,b] = ...` for `:=`).
+//
+// The function ensures that the number of LHS and RHS expressions matches for
+// most cases, erroring if they don't, except for specifically handled patterns
+// like multi-assign from single call or discarded channel receive.
+// It correctly applies `let` for `:=` (define) tokens and handles boxing and
+// cloning semantics based on type information and analysis.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// writeMultiVarAssignFromCall handles multi-variable assignment from a single function call.
 	writeMultiVarAssignFromCall := func(lhs []ast.Expr, callExpr *ast.CallExpr, tok token.Token) error {
@@ -3907,9 +4560,23 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	return fmt.Errorf("unhandled assignment case")
 }
 
-// shouldApplyClone determines if .clone() should be applied to the RHS of an assignment
-// to emulate Go's value semantics for structs.
-// This requires type information.
+// shouldApplyClone determines whether a `.clone()` method call should be appended
+// to the TypeScript translation of a Go expression `rhs` when it appears on the
+// right-hand side of an assignment. This is primarily to emulate Go's value
+// semantics for struct assignments, where assigning one struct variable to another
+// creates a copy of the struct.
+//
+// It uses `go/types` information (`pkg.TypesInfo`) to determine the type of `rhs`.
+//   - If `rhs` is identified as a struct type (either directly, as a named type
+//     whose underlying type is a struct, or an unnamed type whose underlying type
+//     is a struct), it returns `true`.
+//   - An optimization: if `rhs` is a composite literal (`*ast.CompositeLit`),
+//     it returns `false` because a composite literal already produces a new value,
+//     so cloning is unnecessary.
+//   - If type information is unavailable or `rhs` is not a struct type, it returns `false`.
+//
+// This function is crucial for ensuring that assignments of struct values in
+// TypeScript behave like copies, as they do in Go, rather than reference assignments.
 func shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool {
 	if pkg == nil || pkg.TypesInfo == nil {
 		// Cannot determine type without type info, default to no clone
@@ -3964,7 +4631,17 @@ func shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool {
 	return false // Not a struct, do not apply clone
 }
 
-// WriteStmtExpr writes an expr statement.
+// WriteStmtExpr translates a Go expression statement (`ast.ExprStmt`) into
+// its TypeScript equivalent. An expression statement in Go is an expression
+// evaluated for its side effects (e.g., a function call).
+//   - A special case is a simple channel receive used as a statement (`<-ch`). This
+//     is translated to `await ch_ts.receive();` (the value is discarded).
+//   - For other expression statements, the underlying expression `exp.X` is translated
+//     using `WriteValueExpr`.
+//   - It attempts to preserve inline comments associated with the expression statement
+//     or its underlying expression `exp.X`.
+//
+// The translated statement is terminated with a newline.
 func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 	// Handle simple channel receive used as a statement (<-ch)
 	if unaryExpr, ok := exp.X.(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
@@ -4017,7 +4694,18 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 	return nil
 }
 
-// WriteStmtFor writes a for statement.
+// WriteStmtFor translates a Go `for` statement (`ast.ForStmt`) into a
+// TypeScript `for` loop.
+// The structure is `for (init_ts; cond_ts; post_ts) { body_ts }`.
+//   - The initialization part (`exp.Init`) is translated using `WriteForInit`.
+//   - The condition part (`exp.Cond`) is translated using `WriteValueExpr`. If nil,
+//     the condition part in TypeScript is empty (resulting in an infinite loop
+//     unless broken out of).
+//   - The post-iteration part (`exp.Post`) is translated using `WriteForPost`.
+//   - The loop body (`exp.Body`) is translated as a block statement using `WriteStmtBlock`.
+//
+// This function covers standard Go `for` loops (three-part loops, condition-only
+// loops, and infinite loops). `for...range` loops are handled by `WriteStmtRange`.
 func (c *GoToTSCompiler) WriteStmtFor(exp *ast.ForStmt) error {
 	c.tsw.WriteLiterally("for (")
 	if exp.Init != nil {
@@ -4044,7 +4732,19 @@ func (c *GoToTSCompiler) WriteStmtFor(exp *ast.ForStmt) error {
 	return nil
 }
 
-// WriteForInit writes the initialization part of a for loop header.
+// WriteForInit translates the initialization part of a Go `for` loop header
+// (e.g., `i := 0` or `i = 0` in `for i := 0; ...`) into its TypeScript equivalent.
+// - If `stmt` is an `ast.AssignStmt`:
+//   - For short variable declarations (`:=`) with multiple variables (e.g., `i, j := 0, 10`),
+//     it generates `let i = 0, j = 10`. Each LHS variable is paired with its
+//     corresponding RHS value; if RHS values are insufficient, remaining LHS
+//     variables are initialized with their zero value using `WriteZeroValue`.
+//   - For other assignments (single variable `:=`, or regular `=`), it uses
+//     `writeAssignmentCore`. If it's `:=`, `let` is prepended.
+//   - If `stmt` is an `ast.ExprStmt` (less common in `for` inits), it translates
+//     the expression using `WriteValueExpr`.
+//
+// Unhandled statement types in the init part result in a comment.
 func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.AssignStmt:
@@ -4098,7 +4798,18 @@ func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) error {
 	return nil
 }
 
-// WriteForPost writes the post part of a for loop header.
+// WriteForPost translates the post-iteration part of a Go `for` loop header
+// (e.g., `i++` or `i, j = i+1, j-1` in `for ...; i++`) into its TypeScript
+// equivalent.
+// - If `stmt` is an `ast.IncDecStmt` (e.g., `i++`), it writes `i_ts++`.
+// - If `stmt` is an `ast.AssignStmt`:
+//   - For multiple variable assignments (e.g., `i, j = i+1, j-1`), it generates
+//     TypeScript array destructuring: `[i_ts, j_ts] = [i_ts+1, j_ts-1]`.
+//   - For single variable assignments, it uses `writeAssignmentCore`.
+//   - If `stmt` is an `ast.ExprStmt` (less common), it translates the expression
+//     using `WriteValueExpr`.
+//
+// Unhandled statement types in the post part result in a comment.
 func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 	switch s := stmt.(type) {
 	case *ast.IncDecStmt:
@@ -4155,7 +4866,27 @@ func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 	return nil
 }
 
-// WriteZeroValue writes the TypeScript zero‐value for a Go type.
+// WriteZeroValue writes the TypeScript zero-value for a Go type represented
+// by the AST expression `expr`. This is primarily used for initializing variables
+// in `for` loop headers or when a default value is needed and full type
+// information might be less direct than inferring from an `ast.Expr`.
+//
+// It attempts to determine the type from `expr`:
+// - If `expr` is an `ast.Ident` (identifier):
+//   - It tries to resolve the type using `c.pkg.TypesInfo.Types`.
+//   - If resolved to a `types.Basic` (numeric, string, bool), it writes the
+//     corresponding TS zero (`0`, `""`, `false`).
+//   - If resolved to a `types.Struct`, it writes `new TypeName()`.
+//   - If resolved to a pointer, interface, slice, map, channel, or signature,
+//     it writes `null`.
+//   - As a fallback for unresolved identifiers, it guesses based on common Go
+//     primitive names (e.g., "int" -> `0`, "string" -> `""`).
+//   - For AST nodes like `*ast.StarExpr` (pointer type), `*ast.InterfaceType`,
+//     `*ast.ArrayType`, etc., it directly writes `null` as these Go types generally
+//     have `nil` as their zero value, which translates to `null` in TypeScript.
+//   - For `*ast.StructType` (anonymous struct type), it defaults to `null`.
+//
+// Other expression types also default to `null`.
 func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 	switch t := expr.(type) {
 	case *ast.Ident:
@@ -4210,7 +4941,35 @@ func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 	}
 }
 
-// WriteStmtRange writes a for…range loop by generating equivalent TypeScript code.
+// WriteStmtRange translates a Go `for...range` statement (`ast.RangeStmt`)
+// into an equivalent TypeScript loop. The translation depends on the type of
+// the expression being ranged over (`exp.X`), determined using `go/types` info.
+//
+//   - **Maps (`*types.Map`):**
+//     `for k, v := range myMap` becomes `for (const [k_ts, v_ts] of myMap_ts.entries()) { const k = k_ts; const v = v_ts; ...body... }`.
+//     If only `k` or `v` (or neither) is used, the corresponding TypeScript const declaration is adjusted.
+//
+//   - **Strings (`*types.Basic` with `IsString` info):**
+//     `for i, r := range myString` becomes:
+//     `const _runes = $.stringToRunes(myString_ts);`
+//     `for (let i_ts = 0; i_ts < _runes.length; i_ts++) { const r_ts = _runes[i_ts]; ...body... }`.
+//     The index variable `i_ts` uses the Go key variable name if provided (and not `_`).
+//     The rune variable `r_ts` uses the Go value variable name.
+//
+// - **Arrays (`*types.Array`) and Slices (`*types.Slice`):**
+//   - If both key (index) and value are used (`for i, val := range arr`):
+//     `for (let i_ts = 0; i_ts < arr_ts.length; i_ts++) { const val_ts = arr_ts[i_ts]; ...body... }`.
+//   - If only the key (index) is used (`for i := range arr`):
+//     `for (let i_ts = 0; i_ts < arr_ts.length; i_ts++) { ...body... }`.
+//   - If only the value is used (`for _, val := range arr`):
+//     `for (const v_ts of arr_ts) { const val_ts = v_ts; ...body... }`.
+//   - If neither is used (e.g., `for range arr`), a simple index loop `for (let _i = 0; ...)` is generated.
+//     The index variable `i_ts` uses the Go key variable name if provided.
+//
+// Loop variables (`exp.Key`, `exp.Value`) are declared as `const` inside the loop
+// body if they are not blank identifiers (`_`). The loop body (`exp.Body`) is
+// translated using `WriteStmtBlock` (or `WriteStmt` for array/slice with key and value).
+// If the ranged type is not supported, a comment is written, and an error is returned.
 func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	// Get the type of the iterable expression
 	iterType := c.pkg.TypesInfo.TypeOf(exp.X)
@@ -4385,7 +5144,13 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	return fmt.Errorf("unsupported range loop type: %T", underlying)
 }
 
-// WriteStmtSend writes a channel send statement (ch <- value).
+// WriteStmtSend translates a Go channel send statement (`ast.SendStmt`),
+// which has the form `ch <- value`, into its asynchronous TypeScript equivalent.
+// The translation is `await ch_ts.send(value_ts)`.
+// Both the channel expression (`exp.Chan`) and the value expression (`exp.Value`)
+// are translated using `WriteValueExpr`. The `await` keyword is used because
+// channel send operations are asynchronous in the TypeScript model.
+// The statement is terminated with a newline.
 func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 	// Translate ch <- value to await ch.send(value)
 	c.tsw.WriteLiterally("await ")
@@ -4401,7 +5166,26 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 	return nil
 }
 
-// writeTypeAssertion handles multi-variable assignment from a type assertion.
+// writeTypeAssertion handles the Go type assertion with comma-ok idiom in an
+// assignment context: `value, ok := interfaceExpr.(AssertedType)` (or with `=`).
+// It translates this to a TypeScript destructuring assignment (or declaration if `tok`
+// is `token.DEFINE` for `:=`) using the `$.typeAssert` runtime helper.
+//
+// The generated TypeScript is:
+// `[let] { value: valueName, ok: okName } = $.typeAssert<AssertedType_ts>(interfaceExpr_ts, 'AssertedTypeName');`
+//
+//   - `AssertedType_ts` is the TypeScript translation of `AssertedType`.
+//   - `interfaceExpr_ts` is the TypeScript translation of `interfaceExpr`.
+//   - `'AssertedTypeName'` is a string representation of the asserted type name,
+//     obtained via `getTypeNameString`, used for runtime error messages.
+//   - `valueName` and `okName` are the Go variable names from the LHS.
+//   - Blank identifiers (`_`) on the LHS are handled by omitting the corresponding
+//     property in the destructuring pattern (e.g., `{ ok: okName } = ...` if `value` is blank).
+//   - If `tok` is not `token.DEFINE` (i.e., for regular assignment `=`), the entire
+//     destructuring assignment is wrapped in parentheses `(...)` to make it a valid
+//     expression if needed, though typically assignments are statements.
+//
+// The statement is terminated with a newline.
 func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.TypeAssertExpr, tok token.Token) error {
 	interfaceExpr := typeAssertExpr.X
 	assertedType := typeAssertExpr.Type
@@ -4481,7 +5265,18 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	return nil
 }
 
-// WriteDoc writes a comment group, preserving // and /* */ styles.
+// WriteDoc translates a Go comment group (`ast.CommentGroup`) into TypeScript comments,
+// preserving the original style (line `//` or block `/* ... */`).
+// - If `doc` is nil, it does nothing.
+// - It iterates through each `ast.Comment` in the group.
+// - If a comment starts with `//`, it's written as a TypeScript line comment.
+// - If a comment starts with `/*`, it's written as a TypeScript block comment:
+//   - Single-line block comments (`/* comment */`) are kept on one line.
+//   - Multi-line block comments are formatted with `/*` on its own line,
+//     each content line prefixed with ` * `, and ` */` on its own line.
+//
+// This function helps maintain documentation and explanatory comments from the
+// Go source in the generated TypeScript code.
 func (c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup) {
 	if doc == nil {
 		return
@@ -4516,14 +5311,20 @@ func (c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup) {
 	}
 }
 
-// goToTypescriptPrimitives maps Go primitive types to their TypeScript equivalents.
+// goToTypescriptPrimitives maps Go built-in primitive type names (as strings)
+// to their corresponding TypeScript type names. This map is used by
+// `GoBuiltinToTypescript` for direct type name translation.
 //
-// Assumptions:
-//   - Target environment is similar to GOOS=js GOARCH=wasm, where `int` and `uint` are 32 bits.
-//   - 32-bit Go integers fit safely within the JS/TypeScript `number` type.
-//   - 64-bit integers (`int64`, `uint64`) require TypeScript `bigint` (ES2020+).
-//   - Only primitive types are handled here. Composite types (pointers, slices, maps, structs, etc.)
-//     are not handled by this mapping.
+// Key mappings include:
+// - `bool` -> `boolean`
+// - `string` -> `string`
+// - `int`, `int8`, `int16`, `int32`, `rune` (alias for int32) -> `number`
+// - `uint`, `uint8` (`byte`), `uint16`, `uint32` -> `number`
+// - `int64`, `uint64` -> `bigint` (requires ES2020+ TypeScript target)
+// - `float32`, `float64` -> `number`
+//
+// This mapping assumes a target environment similar to GOOS=js, GOARCH=wasm,
+// where Go's `int` and `uint` are 32-bit and fit within TypeScript's `number`.
 var goToTypescriptPrimitives = map[string]string{
 	// Boolean
 	"bool": "boolean",
@@ -4552,15 +5353,32 @@ var goToTypescriptPrimitives = map[string]string{
 	"float64": "number",
 }
 
-// GoBuiltinToTypescript returns the TypeScript equivalent of a Go primitive type name.
-// Returns the TypeScript type and true if found, or an empty string and false otherwise.
-//
-// Only primitive types listed in goToTypescriptPrimitives are handled.
+// GoBuiltinToTypescript translates a Go built-in primitive type name (string)
+// to its TypeScript equivalent. It uses the `goToTypescriptPrimitives` map
+// for the conversion.
+// It returns the TypeScript type name and `true` if the Go type name is found
+// in the map. Otherwise, it returns an empty string and `false`.
+// This function only handles primitive types listed in the map; composite types
+// or custom types are not processed here.
 func GoBuiltinToTypescript(typeName string) (string, bool) {
 	val, ok := goToTypescriptPrimitives[typeName]
 	return val, ok
 }
 
+// tokenMap provides a mapping from Go `token.Token` types (representing operators
+// and punctuation) to their corresponding string representations in TypeScript.
+// This map is used by `TokenToTs` to translate Go operators during expression
+// and statement compilation.
+//
+// Examples:
+// - `token.ADD` (Go `+`) -> `"+"` (TypeScript `+`)
+// - `token.LAND` (Go `&&`) -> `"&&"` (TypeScript `&&`)
+// - `token.ASSIGN` (Go `=`) -> `"="` (TypeScript `=`)
+// - `token.DEFINE` (Go `:=`) -> `"="` (TypeScript `=`, as `let` is handled separately)
+//
+// Some tokens like `token.ARROW` (channel send/receive) are handled specially
+// in their respective expression/statement writers and might not be directly mapped here.
+// Bitwise AND NOT (`&^=`) is also mapped but may require specific runtime support if not directly translatable.
 var tokenMap = map[token.Token]string{
 	token.ADD: "+",
 	token.SUB: "-",
@@ -4616,7 +5434,12 @@ var tokenMap = map[token.Token]string{
 	token.COLON:     ":",
 }
 
-// TokenToTs looks up the typescript version of a token.
+// TokenToTs converts a Go `token.Token` (representing an operator or punctuation)
+// into its corresponding TypeScript string representation using the `tokenMap`.
+// It returns the TypeScript string and `true` if the token is found in the map.
+// Otherwise, it returns an empty string and `false`. This function is essential
+// for translating expressions involving operators (e.g., arithmetic, logical,
+// assignment operators).
 func TokenToTs(tok token.Token) (string, bool) {
 	t, ok := tokenMap[tok]
 	return t, ok
