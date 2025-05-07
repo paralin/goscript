@@ -603,13 +603,25 @@ func (c *GoToTSCompiler) WriteIdentType(exp *ast.Ident) {
 	}
 
 	if tsname, ok := GoBuiltinToTypescript(name); ok {
+		// It's a Go builtin type, use its TypeScript equivalent
 		name = tsname
 	} else {
-		// Not a Go builtin. Could be a custom type in the current package,
-		// an imported type, or potentially an error.
-		// Robust checking requires type information.
-		if obj := exp.Obj; obj != nil && obj.Kind != ast.Typ {
-			c.tsw.WriteCommentInline(fmt.Sprintf("ident %q used as type? kind=%s", name, obj.Kind))
+		// Not a Go builtin. Use TypesInfo to validate and resolve the type
+		obj := c.pkg.TypesInfo.Uses[exp]
+		if obj == nil {
+			obj = c.pkg.TypesInfo.Defs[exp]
+		}
+
+		if obj != nil {
+			// Check if this identifier actually refers to a type
+			if _, isType := obj.(*types.TypeName); !isType {
+				// This identifier doesn't refer to a type, which is likely a mistake
+				c.tsw.WriteCommentInline(fmt.Sprintf("ident %q used as type but is %T", name, obj))
+			}
+
+			// if pkg := obj.Pkg(); pkg != nil && pkg != c.pkg.Types
+			//   This is an imported type - in generated TS this should already be handled
+			//   by proper import statements and scope resolution.
 		}
 	}
 
@@ -631,10 +643,11 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
 		obj = c.pkg.TypesInfo.Defs[exp]
 	}
 
-	// Determine if we need to access .value
-	needsValueAccess := obj != nil && accessBoxedValue && c.analysis.NeedsBoxedAccess(obj)
+	// Write the identifier name first
 	c.tsw.WriteLiterally(exp.Name)
-	if needsValueAccess {
+
+	// Determine if we need to access .value based on analysis data
+	if obj != nil && accessBoxedValue && c.analysis.NeedsBoxedAccess(obj) {
 		c.tsw.WriteLiterally(".value")
 	}
 }
@@ -1416,15 +1429,23 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 		if arrType, isArrayType := exp.Type.(*ast.ArrayType); isArrayType {
 			// Special case: empty slice literal
 			if len(exp.Elts) == 0 {
-				// Generate: ([] as ElementType[])
-				c.tsw.WriteLiterally("([] as ")
+				// Generate: $.arrayToSlice([], 1)
+				c.tsw.WriteLiterally("$.arrayToSlice([] as ")
 				// Write the element type using the existing function
 				c.WriteTypeExpr(arrType.Elt)
-				c.tsw.WriteLiterally("[])") // Close the type assertion
-				return nil                  // Handled empty slice literal
+				c.tsw.WriteLiterally("[], 1)") // Close the type assertion and arrayToSlice call
+				return nil                     // Handled empty slice literal
 			}
 
-			c.tsw.WriteLiterally("[")
+			// Check if this is a slice of slices (multi-dimensional array)
+			isMultiDimensional := false
+			if _, ok := arrType.Elt.(*ast.ArrayType); ok {
+				// It's a slice of slices (multi-dimensional array)
+				isMultiDimensional = true
+				// We'll handle this with depth parameter to arrayToSlice
+			}
+
+			c.tsw.WriteLiterally("$.arrayToSlice([")
 			// Use type info to get array length and element type
 			var arrayLen int
 			var elemType ast.Expr
@@ -1506,6 +1527,13 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 				}
 			}
 			c.tsw.WriteLiterally("]")
+
+			// If it's a multi-dimensional array/slice, use depth=2 to convert nested arrays
+			if isMultiDimensional {
+				c.tsw.WriteLiterally(", 2") // Depth of 2 for one level of nesting
+			}
+
+			c.tsw.WriteLiterally(")")
 			return nil
 		} else {
 			// Typed literal, likely a struct: new Type({...})
