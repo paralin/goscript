@@ -263,17 +263,32 @@ var p: Box<number> | null = x;
 p!.value = 20; // assert non-null during assignment
 ```
 
-- **Assigning address to pointer**: When taking the address of a variable and assigning it to a pointer.
-
-```typescript
-// Go: var x, y int = 10, 20
-// Go: var p *int = &x
-// Go: p = &y
-var x: Box<number> = box(10);
-var y: Box<number> = box(20);
-var p: Box<number> | null = x;
-p = y;  // Now points to y instead of x
-```
+- **Assigning address to pointer**:
+    - If the pointer variable `p` is *not* boxed:
+      ```typescript
+      // Go: var x, y int = 10, 20 // x, y will be boxed
+      // Go: var p *int = &x       // p is not boxed
+      // Go: p = &y
+      let x: $.Box<number> = $.box(10);
+      let y: $.Box<number> = $.box(20);
+      let p: $.Box<number> | null = x; // p holds reference to x's box
+      p = y;                          // p now holds reference to y's box
+      ```
+    - If the pointer variable `p1` *is itself* boxed (because `&p1` was taken):
+      ```go
+      // Go (from compliance/tests/boxing/boxing.go)
+      // var x int = 10 // (defined earlier, x is Box<number>)
+      // var p1 *int = &x // (p1 is Box<Box<number>|null> because &p1 is taken later)
+      var y int = 15   // y is Box<number>
+      p1 = &y          // Assign address of y to p1
+      ```
+      ```typescript
+      // TypeScript
+      // let x: $.Box<number> = $.box(10);
+      // let p1: $.Box<$.Box<number> | null> = $.box(x);
+      let y: $.Box<number> = $.box(15);
+      p1.value = y; // Update the inner value of p1's box to point to y's box
+      ```
 
 ## Cavets and Edge Cases
 

@@ -187,20 +187,24 @@ After reviewing the code and tests, some important implementation considerations
      ```
    * **Addressability:** Only variables that have been boxed (because their address was taken) are addressable.
    * **Pointer Types:** Go pointer types are mapped to potentially nullable `Box` types in TypeScript. See the "Type Mapping" section for details.
-   * **Multi-level Pointers:** Multi-level pointers (`**T`, `***T`, etc.) are handled by nesting `Box` types.
+   * **Multi-level Pointers:** A variable (which can itself be a pointer) is boxed if its own address is taken.
      ```go
-     // Go
-     var x int = 10
-     p1 := &x // Address of x is taken, x must be boxed
-     p2 := &p1 // Address of p1 is not taken, p1 must be boxed
+     // Go (Example from compliance/tests/boxing/boxing.go)
+     var x int = 10      // x is boxed because p1 takes its address
+     var p1 *int = &x    // p1 is boxed because p2 takes its address
+     var p2 **int = &p1  // p2 is boxed because p3 takes its address
+     var p3 ***int = &p2 // p3 is NOT boxed because its address is not taken
      ```
+     This translates to:
      ```typescript
      // TypeScript
      import * as $ from "@goscript/builtin"
-     let x: $.Box<number> = $.box(10) // x is boxed
-     let p1: $.Box<$.Box<number> | null> | null = $.box(x)
-     let p2: $.Box<$.Box<number> | null> | null = p1 // p2 is not boxed
+     let x: $.Box<number> = $.box(10);
+     let p1: $.Box<$.Box<number> | null> = $.box(x); // p1's box holds a reference to x's box
+     let p2: $.Box<$.Box<$.Box<number> | null> | null> = $.box(p1); // p2's box holds a reference to p1's box
+     let p3: $.Box<$.Box<$.Box<number> | null> | null> | null = p2; // p3 is not boxed; it directly holds the reference to p2's box
      ```
+     Dereferencing `***p3` then becomes `p3!.value!.value!.value`.
 
 3. **Value Semantics for Structs**:
    * Go's value semantics for structs (copying on assignment) need to be properly implemented in TypeScript.
@@ -248,9 +252,9 @@ After reviewing the code and tests, some important implementation considerations
         ```
     *Note: Direct conversion between `string` and `[]byte` would involve different runtime helpers focusing on byte representations.*
 
-- **Structs:** Converted to TypeScript `class`es. Both exported and unexported Go fields become `public` members in the TypeScript class. A `clone()` method is added to support Go's value semantics on assignment/read.
+- **Structs:** Converted to TypeScript `class`es. Both exported and unexported Go fields become `public` members in the TypeScript class. A `clone()` method is added to support Go's value semantics on assignment/read. This `clone()` method performs a deep copy of the struct's fields, including recursively cloning any nested struct fields, to ensure true value semantics.
     -   **Constructor Initialization:** The generated class constructor accepts an optional `init` object. Fields are initialized using this object. Crucially, for fields that are themselves struct *values* (not pointers):
-        - If the corresponding value in `init` is provided, it is **cloned** using `.clone()` before assignment to maintain Go's value semantics.
+        - If the corresponding value in `init` is provided, it is **cloned** using its `.clone()` method before assignment to maintain Go's value semantics (e.g., `this._fields.InnerStruct = $.box(init?.InnerStruct?.clone() ?? new InnerStruct())`).
         - If the corresponding value in `init` is nullish (`null` or `undefined`), the field is initialized with a *new instance* of the struct's zero value (`new FieldType()`) to maintain parity with Go's non-nullable struct semantics.
         - Pointer fields are initialized to `null` if the `init` value is nullish (no cloning needed).
         ```typescript
@@ -547,11 +551,47 @@ After reviewing the code and tests, some important implementation considerations
 ## Value Semantics
 
 Go's value semantics (where assigning a struct copies it) are emulated in TypeScript by:
-1. Adding a `clone()` method to generated classes representing structs.
-2. Automatically calling `.clone()` during assignment statements (`=`, `:=`) whenever a struct *value* is being copied.
-3. Pointer assignments preserve Go's reference semantics.
+1.  Adding a `clone()` method to generated classes representing structs. This method performs a deep copy.
+    -   The `clone()` method creates a new instance of the struct and then copies the values from the original struct's `_fields` to the new instance's `_fields`. For each field, the value is retrieved from the source box (e.g., `this._fields.MyInt.value`) and then re-boxed in the destination (e.g., `cloned._fields.MyInt = $.box(...)`).
+    -   For nested struct fields, the `clone()` method of the nested struct is called recursively (e.g., `cloned._fields.InnerStruct = $.box(this._fields.InnerStruct.value?.clone() ?? null)`).
+    ```typescript
+    // Example: MyStruct.clone()
+    public clone(): MyStruct {
+        const cloned = new MyStruct()
+        cloned._fields = {
+            MyInt: $.box(this._fields.MyInt.value),
+            MyString: $.box(this._fields.MyString.value)
+        }
+        return cloned
+    }
 
-The specific implementation details of these value semantics need to be documented after implementation changes. Pointer assignments are handled as described under Operators (`&`, `*`) and Pointer Representation/Boxing.
+    // Example: NestedStruct.clone() with nested MyStruct
+    public clone(): NestedStruct {
+        const cloned = new NestedStruct()
+        cloned._fields = {
+            Value: $.box(this._fields.Value.value),
+            InnerStruct: $.box(this._fields.InnerStruct.value?.clone() ?? new MyStruct()) // Recursive clone
+        }
+        return cloned
+    }
+    ```
+2.  Automatically calling `.clone()` during assignment statements (`=`, `:=`) whenever a struct *value* is being copied.
+    -   If the source variable is a direct struct instance (not boxed), it's `let valueCopy = original.clone()`.
+    -   If the source variable is a `$.Box<StructType>` (because its address was taken), the assignment becomes `let valueCopy = original.value.clone()`.
+    ```go
+    // Go
+    original := MyStruct{MyInt: 42}
+    valueCopy := original
+    // (later &original might be used, causing 'original' to be boxed in TS)
+    ```
+    ```typescript
+    // TypeScript (assuming 'original' is boxed)
+    let original: $.Box<MyStruct> = $.box(new MyStruct({MyInt: 42}));
+    let valueCopy = original.value.clone();
+    ```
+3.  Pointer assignments preserve Go's reference semantics by copying the reference to the `$.Box` or the direct object reference (for unboxed struct pointers).
+
+Pointer assignments are handled as described under Operators (`&`, `*`) and Pointer Representation/Boxing.
 
 ## Multi-Assignment Statements
 
@@ -585,42 +625,53 @@ Go operators are generally mapped directly to their TypeScript equivalents:
     ```
 - **Dereference Operator (`*`):**
     - Dereferencing a pointer (`*p`) translates to accessing the `.value` property of the corresponding `Box`.
-    - Dereferencing a pointer to a struct depends on the context.
-    - Multi-level dereferencing (`***p`) involves chaining `.value` accesses. Non-null assertions (`!`) may be needed if the intermediate pointer types are nullable.
-    ```go
-    ***p3 = 12
-    y := ***p3
-    ```
-    ```typescript
-    p3!.value!.value!.value = 12
-    let y: number = p3!.value!.value!.value
-    ```
+    - Dereferencing a pointer to a struct depends on the context (see `design/BOXES_POINTERS.md`).
+    - **Multi-level Dereferencing:** Involves chaining `.value` accesses, corresponding to each level of boxing for the intermediate pointers.
+      ```go
+      // Go (from compliance/tests/boxing/boxing.go)
+      // var x int = 10; var p1 *int = &x; var p2 **int = &p1; var p3 ***int = &p2;
+      // x is $.Box<number>
+      // p1 is $.Box<$.Box<number> | null>
+      // p2 is $.Box<$.Box<$.Box<number> | null> | null>
+      // p3 is $.Box<$.Box<$.Box<number> | null> | null> | null (refers to p2's box)
+      ***p3 = 12
+      y := ***p3
+      ```
+      ```typescript
+      // TypeScript
+      // ... (declarations as above)
+      p3!.value!.value!.value = 12
+      let y: number = p3!.value!.value!.value
+      ```
 - **Pointer Assignment:**
-    - Assigning an address to a pointer (`p = &v`) translates to assigning the target variable's `Box` to the pointer variable (if the pointer itself is not boxed) or updating the pointer's `Box.value` (if the pointer *is* boxed).
+    - **Assigning an address to a pointer (`p = &v`):**
+        - If the pointer variable `p` on the left-hand side is *not* boxed, it's assigned the reference to `v`'s `$.Box`.
+          ```go
+          // Case 1: Pointer p is not boxed
+          var x int = 10 // x will be boxed
+          var p *int     // p is not boxed
+          p = &x         // Assign address of x to p
+          ```
+          ```typescript
+          let x: $.Box<number> = $.box(10)
+          let p: $.Box<number> | null // p is not a Box itself
+          p = x // p now holds the reference to x's Box
+          ```
+        - If the pointer variable `p1` on the left-hand side *is* boxed (because `&p1` was taken elsewhere), its `.value` is updated to point to `v`'s `$.Box`.
+          ```go
+          // Case 2: Pointer p1 IS boxed
+          // Assume: var p1 $.Box<$.Box<number> | null> (p1 was boxed)
+          var y int = 15 // y will be boxed
+          p1 = &y
+          ```
+          ```typescript
+          // Assume: let p1: $.Box<$.Box<number> | null> = ...;
+          let y: $.Box<number> = $.box(15)
+          p1.value = y // Update the inner value of p1's Box to point to y's Box
+          ```
+    - **Assigning to a dereferenced pointer (`*p = val`):** Translates to assigning to the `.value` property of the `Box` that `p` (or the final pointer in a chain) refers to.
       ```go
-      // Case 1: Pointer p is not boxed
-      var x int = 10
-      var p *int // p is not boxed
-      p = &x     // Assign address of x (which is boxed) to p
-      ```
-      ```typescript
-      let x: $.Box<number> = $.Box(10)
-      let p: $.Box<number> | null // p is not a Box
-      p = x // p now holds the reference to x's Box
-      ```
-      ```go
-      // Case 2: Pointer p1 IS boxed (from boxing.go example)
-      var y int = 15 // y is boxed
-      // p1 is *int, but its address was taken by p2, so p1 is Box<Box<number>|null>
-      p1 = &y
-      ```
-      ```typescript
-      let y: $.Box<number> = $.Box(15)
-      // p1 is Box<Box<number>|null>
-      p1!.value = y // Update the inner value of p1's Box to point to y's Box
-      ```
-    - Assigning to a dereferenced pointer (`*p = val`) translates to assigning to the `.value` property of the `Box` the pointer refers to.
-      ```go
+      // Assume p points to x's box: p: $.Box<number> | null = x_box
       *p = 100
       ```
       ```typescript
