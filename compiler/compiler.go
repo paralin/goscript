@@ -14,7 +14,6 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/sanity-io/litter"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/tools/go/packages"
 )
@@ -431,7 +430,7 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	switch exp := a.(type) {
 	case *ast.Ident:
-		c.WriteIdent(exp, true) // add .value accessor here
+		c.WriteIdent(exp, true) // adds .value accessor
 		return nil
 	case *ast.SelectorExpr:
 		return c.WriteSelectorExpr(exp)
@@ -676,7 +675,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	// not to add extra .value when not needed.
 	//
 	// Two critical cases to consider:
-	// 1. p.field for a direct struct pointer - no .value needed 
+	// 1. p.field for a direct struct pointer - no .value needed
 	//    Example: let p = new MyStruct() => p.field
 	//
 	// 2. p.value.field for a boxed pointer to a boxed struct
@@ -713,14 +712,14 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	// 1. p!.value - when p is not boxed and points to a primitive/pointer
 	//    Example: let p = x (where x is a box) => p!.value
 	//
-	// 2. p!       - when p is not boxed and points to a struct 
+	// 2. p!       - when p is not boxed and points to a struct
 	//    Example: let p = new MyStruct() => p! (structs are reference types)
 	//
 	// 3. p.value!.value - when p is boxed and points to a primitive/pointer
 	//    Example: let p = $.box(x) (where x is another box) => p.value!.value
 	//
 	// 4. p.value! - when p is boxed and points to a struct
-	//    Example: let p = $.box(new MyStruct()) => p.value! 
+	//    Example: let p = $.box(new MyStruct()) => p.value!
 	//
 	// Critical bug fix: We must handle each case correctly to avoid over-dereferencing
 	// (adding too many .value) or under-dereferencing (missing .value where needed)
@@ -729,7 +728,7 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 
 	// Get the operand expression and its type information
 	operand := exp.X
-	
+
 	// Get the type of the operand (the pointer being dereferenced)
 	ptrType := c.pkg.TypesInfo.TypeOf(operand)
 
@@ -743,7 +742,7 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	c.tsw.WriteLiterally("!")
 
 	// Add .value only if we need boxed dereferencing for this type of pointer
-	// This depends on whether we're dereferencing to a primitive (needs .value) 
+	// This depends on whether we're dereferencing to a primitive (needs .value)
 	// or to a struct (no .value needed)
 	if c.analysis.NeedsBoxedDeref(ptrType) {
 		c.tsw.WriteLiterally(".value")
@@ -2509,11 +2508,10 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	c.WriteFuncType(decl.Type, isAsync) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
 
-	// Analysis phase should have already set NextBlockNeedsDefer as needed
-
 	if err := c.WriteStmt(decl.Body); err != nil {
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
+
 	return nil
 }
 
@@ -2650,7 +2648,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 				}
 			}
 		} else {
-			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled declaration type in DeclStmt: %T", exp.Decl))
+			return errors.Errorf("unhandled declaration type in DeclStmt: %T", exp.Decl)
 		}
 	case *ast.ForStmt:
 		// WriteStmtFor does not currently return an error, assuming it's safe for now.
@@ -2734,7 +2732,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled branch statement token: %s", exp.Tok.String()))
 		}
 	default:
-		c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement: %s\n", litter.Sdump(a)))
+		return errors.Errorf("unknown statement: %s\n", a)
 	}
 	return nil
 }
@@ -3397,14 +3395,48 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		// Check if we should apply clone for value-type semantics (structs)
+		// Check if we need to access a boxed source value and apply clone
+		// For struct value assignments, we need to handle:
+		// 1. Unboxed source, unboxed target: source.clone()
+		// 2. Boxed source, unboxed target: source.value.clone()
+		// 3. Unboxed source, boxed target: $.box(source)
+		// 4. Boxed source, boxed target: source (straight assignment of the box)
+
+		// Determine if RHS is a boxed variable (could be a struct or other variable)
+		needsBoxedAccessRHS := false
+		var rhsObj types.Object
+
+		// Check if RHS is an identifier (variable name)
+		rhsIdent, rhsIsIdent := r.(*ast.Ident)
+		if rhsIsIdent {
+			rhsObj = c.pkg.TypesInfo.Uses[rhsIdent]
+			if rhsObj == nil {
+				rhsObj = c.pkg.TypesInfo.Defs[rhsIdent]
+			}
+
+			// Important: For struct copying, we need to check if the variable itself is boxed
+			// Not just if it needs boxed access (which is more specific to pointers)
+			if rhsObj != nil {
+				needsBoxedAccessRHS = c.analysis.NeedsBoxed(rhsObj)
+			}
+		}
+
+		// Handle different cases for struct cloning
 		if shouldApplyClone(c.pkg, r) {
-			if err := c.WriteValueExpr(r); err != nil { // RHS is a value
+			if err := c.WriteValueExpr(r); err != nil { // Write the RHS expression
 				return err
 			}
-			c.tsw.WriteLiterally(".clone()")
+
+			// For a boxed struct source, we need to add .value before .clone()
+			// Critical: For case like original.clone() when original is boxed,
+			// we need to generate original.value.clone() instead
+			if needsBoxedAccessRHS {
+				c.tsw.WriteLiterally(".value") // Access the boxed value
+			}
+
+			c.tsw.WriteLiterally(".clone()") // Always add clone for struct values
 		} else {
-			if err := c.WriteValueExpr(r); err != nil { // RHS is a value
+			if err := c.WriteValueExpr(r); err != nil { // RHS is a non-struct value
 				return err
 			}
 		}
@@ -3661,17 +3693,10 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		c.tsw.WriteLiterally(tokStr) // Write the correct operator (e.g., =, +=, -=)
 		c.tsw.WriteLiterally(" ")
 
-		// TODO: what if we are taking the address of a value
-		// TOOD: if we are boxing the value we need box(value)
-		// TODO: if we are taking the address of a variable, we need to NOT emit .value here
-		rhsExprIdent, rhsExprIsIdent := rhsExpr.(*ast.Ident)
-		if rhsExprIsIdent {
-			c.WriteIdent(rhsExprIdent, false)
-		} else {
-			if err := c.WriteValueExpr(rhsExpr); err != nil {
-				return err
-			}
+		if err := c.WriteValueExpr(rhsExpr); err != nil {
+			return err
 		}
+
 		if shouldApplyClone(c.pkg, rhsExpr) {
 			c.tsw.WriteLiterally(".clone()")
 		}

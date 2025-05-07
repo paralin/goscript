@@ -108,8 +108,8 @@ export function main(): void {
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.
 	// valueCopy1 and valueCopy2 get their own copies of 'original's data.
-	let valueCopy1 = original.clone()
-	let valueCopy2 = original.clone()
+	let valueCopy1 = original.value.clone()
+	let valueCopy2 = original.value.clone()
 	// pointerCopy holds the memory address of 'original'.
 	let pointerCopy = original
 
