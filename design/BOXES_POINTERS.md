@@ -318,6 +318,48 @@ The analysis tracks this distinction through the variable's assignment sources a
 When a pointer variable points to a boxed struct variable (a variable whose address is taken elsewhere),
 we need an additional `.value` dereference to access the contained struct value.
 
+### Pointer Dereferencing Edge Cases
+
+Dereferencing pointers correctly in TypeScript requires differentiating between several scenarios:
+
+1. **Dereferencing unboxed pointer to primitive**:
+   ```go
+   q1 := &x  // q1 is not boxed, x is boxed
+   *q1       // Dereference
+   ```
+   TypeScript: `q1!.value` (single .value needed)
+
+2. **Dereferencing boxed pointer to primitive**:
+   ```go
+   p1 := &x  // p1 is boxed (its address is taken)
+   *p1       // Dereference
+   ```
+   TypeScript: `p1.value!.value` (two .value needed - one for p1 box, one for dereferencing)
+
+3. **Dereferencing multi-level pointers**:
+   ```go
+   p2 := &p1  // p2 points to p1 (which is boxed)
+   **p2       // Double dereference
+   ```
+   TypeScript: `p2!.value!.value!.value` (three .value needed - first to access p1, others for dereference chain)
+
+4. **Dereferencing pointers to structs**:
+   ```go
+   ps := &myStruct  // ps points to a struct
+   *ps              // Dereference - rarely needed explicitly in Go
+   ```
+   TypeScript: `ps!` (no .value needed, structs are reference types)
+
+5. **Field access through pointer**:
+   ```go
+   ps.field  // Field access through pointer (Go implicitly dereferences)
+   ```
+   TypeScript: 
+   - If ps is unboxed: `ps.field`
+   - If ps points to a boxed struct var: `ps.value.field`
+
+These distinctions are essential for generating correct TypeScript code that correctly mimics Go's pointer semantics.
+
 ### Struct Boxing
 
 It is possible to take the address of a struct field:

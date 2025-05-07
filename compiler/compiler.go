@@ -672,9 +672,18 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		}
 	}
 
-	// If we're accessing a member through a pointer to a struct, no extra .value needed
-	// The pointer variable's own boxed state will be handled by WriteValueExpr
-	// Write the base expression - WriteValueExpr will add .value if the variable itself is boxed
+	// When accessing members through a pointer to a struct, we need to be careful
+	// not to add extra .value when not needed.
+	//
+	// Two critical cases to consider:
+	// 1. p.field for a direct struct pointer - no .value needed 
+	//    Example: let p = new MyStruct() => p.field
+	//
+	// 2. p.value.field for a boxed pointer to a boxed struct
+	//    Example: let p = $.box(s) (where s is a box) => p.value.field
+	//
+	// WriteValueExpr will handle adding .value for the variable itself if boxed
+	// This was a source of bugs where we incorrectly added multiple .value accessors
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
 	}
@@ -699,29 +708,43 @@ func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
 func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	// Generate code for a pointer dereference expression (*p).
 	//
-	// For pointer dereferencing, we need to generate:
+	// IMPORTANT: Pointer dereferencing in TypeScript requires careful handling of the box/unbox state:
+	//
 	// 1. p!.value - when p is not boxed and points to a primitive/pointer
-	// 2. p!       - when p is not boxed and points to a struct
+	//    Example: let p = x (where x is a box) => p!.value
+	//
+	// 2. p!       - when p is not boxed and points to a struct 
+	//    Example: let p = new MyStruct() => p! (structs are reference types)
+	//
 	// 3. p.value!.value - when p is boxed and points to a primitive/pointer
+	//    Example: let p = $.box(x) (where x is another box) => p.value!.value
+	//
 	// 4. p.value! - when p is boxed and points to a struct
+	//    Example: let p = $.box(new MyStruct()) => p.value! 
+	//
+	// Critical bug fix: We must handle each case correctly to avoid over-dereferencing
+	// (adding too many .value) or under-dereferencing (missing .value where needed)
 	//
 	// NOTE: This logic aligns with design/BOXES_POINTERS.md.
 
 	// Get the operand expression and its type information
 	operand := exp.X
-
+	
 	// Get the type of the operand (the pointer being dereferenced)
 	ptrType := c.pkg.TypesInfo.TypeOf(operand)
 
 	// Write the pointer expression, which will access .value if the variable is boxed
+	// WriteValueExpr will add .value if the variable itself is boxed (p.value)
 	if err := c.WriteValueExpr(operand); err != nil {
 		return fmt.Errorf("failed to write star expression operand: %w", err)
 	}
 
-	// Add ! for null assertion
+	// Add ! for null assertion - all pointers can be null in TypeScript
 	c.tsw.WriteLiterally("!")
 
 	// Add .value only if we need boxed dereferencing for this type of pointer
+	// This depends on whether we're dereferencing to a primitive (needs .value) 
+	// or to a struct (no .value needed)
 	if c.analysis.NeedsBoxedDeref(ptrType) {
 		c.tsw.WriteLiterally(".value")
 	}
