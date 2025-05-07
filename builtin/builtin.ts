@@ -1,49 +1,163 @@
 /**
- * Represents a Go slice with an underlying TypeScript array and capacity information.
- * Similar to Go slices, this tracks both the visible length and the underlying capacity.
- * null represents the nil state.
+ * SliceData represents a Go slice with explicit tracking of the backing array,
+ * offset, length and capacity to correctly emulate Go's slice semantics.
  */
-export type Slice<T> = (Array<T> & { __capacity?: number }) | null
+export class SliceData<T> {
+  private backing: T[];
+  private offset: number;
+  private len: number;
+  private cap: number;
 
-/**
- * Creates a new slice (TypeScript array) with the specified length and capacity.
- * @param len The length of the slice.
- * @param cap The capacity of the slice (optional).
- * @returns A new TypeScript array representing the slice.
- */
-export const makeSlice = <T>(
-  len: number,
-  cap?: number,
-): Slice<T> => {
-  const slice = new Array<T>(len) as Slice<T>
-  slice!.__capacity = cap !== undefined ? cap : len
-  return slice
+  constructor(backing: T[], offset: number, length: number, capacity: number) {
+    this.backing = backing;
+    this.offset = offset;
+    this.len = length;
+    this.cap = capacity;
+  }
+
+  get(index: number): T {
+    if (index < 0 || index >= this.len) {
+      throw new Error(`runtime error: index out of range [${index}] with length ${this.len}`);
+    }
+    return this.backing[this.offset + index];
+  }
+
+  set(index: number, value: T): void {
+    if (index < 0 || index >= this.len) {
+      throw new Error(`runtime error: index out of range [${index}] with length ${this.len}`);
+    }
+    this.backing[this.offset + index] = value;
+  }
+
+  length(): number {
+    return this.len;
+  }
+
+  capacity(): number {
+    return this.cap;
+  }
+
+  slice(low?: number, high?: number, max?: number): SliceData<T> {
+    const start = low ?? 0;
+    const end = high ?? this.len;
+    
+    if (start < 0 || start > this.len) {
+      throw new Error(`runtime error: slice bounds out of range [${start}:${end}] with length ${this.len}`);
+    }
+    if (end < start || end > this.len) {
+      throw new Error(`runtime error: slice bounds out of range [${start}:${end}] with length ${this.len}`);
+    }
+    
+    const newOffset = this.offset + start;
+    const newLength = end - start;
+    let newCapacity = this.cap - start;
+    
+    if (max !== undefined) {
+      if (max < end || max > this.offset + this.cap) {
+        throw new Error(`runtime error: slice bounds out of range [${start}:${end}:${max}]`);
+      }
+      newCapacity = max - start;
+    }
+    
+    return new SliceData<T>(this.backing, newOffset, newLength, newCapacity);
+  }
+
+  append(...elements: T[]): SliceData<T> {
+    if (elements.length === 0) {
+      return this;
+    }
+    
+    if (this.len + elements.length <= this.cap) {
+      for (let i = 0; i < elements.length; i++) {
+        this.backing[this.offset + this.len + i] = elements[i];
+      }
+      
+      return new SliceData<T>(
+        this.backing,
+        this.offset,
+        this.len + elements.length,
+        this.cap
+      );
+    } else {
+      const newCap = calculateGrowth(this.cap, this.len + elements.length);
+      const newBacking = new Array<T>(newCap);
+      
+      for (let i = 0; i < this.len; i++) {
+        newBacking[i] = this.backing[this.offset + i];
+      }
+      
+      for (let i = 0; i < elements.length; i++) {
+        newBacking[this.len + i] = elements[i];
+      }
+      
+      return new SliceData<T>(
+        newBacking,
+        0,
+        this.len + elements.length,
+        newCap
+      );
+    }
+  }
+
+  toArray(): T[] {
+    const result = new Array<T>(this.len);
+    for (let i = 0; i < this.len; i++) {
+      result[i] = this.backing[this.offset + i];
+    }
+    return result;
+  }
+
+  *[Symbol.iterator](): Iterator<T> {
+    for (let i = 0; i < this.len; i++) {
+      yield this.backing[this.offset + i];
+    }
+  }
 }
 
-/**
- * Creates a new slice header that shares the backing array.
- * Arguments mirror Go semantics; omitted indices are undefined.
- *
- * @param arr  The original slice/array produced by makeSlice or another slice
- * @param low  Starting index (defaults to 0)
- * @param high Ending index (defaults to arr.length)
- * @param max  Capacity limit (defaults to original capacity)
- */
-export const slice = <T>(
-  arr: Slice<T>,
-  low?: number,
-  high?: number,
-  max?: number,
-): Slice<T> => {
-  const start = low ?? 0
-  const origLen = arr ? arr.length : 0
-  const origCap = arr?.__capacity ?? origLen
-  const end = high !== undefined ? high : origLen
-  const newCap = max !== undefined ? max - start : origCap - start
+function calculateGrowth(oldCap: number, minCap: number): number {
+  if (minCap <= oldCap) {
+    return oldCap;
+  }
+  
+  if (oldCap === 0) {
+    return minCap;
+  }
+  
+  let newCap = oldCap * 2;
+  
+  if (newCap < minCap) {
+    newCap = minCap;
+  }
+  
+  return newCap;
+}
 
-  const newArr = (arr?.slice(start, end) ?? null) as Slice<T>
-  if (newArr?.__capacity !== undefined) newArr.__capacity = newCap
-  return newArr
+export const nilSlice = null;
+
+export type Slice<T> = SliceData<T> | null;
+
+export function makeSlice<T>(len: number, cap?: number): Slice<T> {
+  const capacity = cap !== undefined ? cap : len;
+  if (capacity < len) {
+    throw new Error("makeslice: capacity less than length");
+  }
+  
+  const backing = new Array<T>(capacity);
+  
+  return new SliceData<T>(backing, 0, len, capacity);
+}
+
+export function slice<T>(arr: Slice<T> | T[], low?: number, high?: number, max?: number): Slice<T> {
+  if (arr === null) {
+    return null;
+  }
+  
+  if (arr instanceof SliceData) {
+    return arr.slice(low, high, max);
+  }
+  
+  const sliceData = new SliceData<T>(arr, 0, arr.length, arr.length);
+  return sliceData.slice(low, high, max);
 }
 
 /**
