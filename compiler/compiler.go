@@ -456,7 +456,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		// Handle map access: use Map.get() instead of brackets for reading values
 		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
 			// Check if it's a map type
-			if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
+			if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
 				if err := c.WriteValueExpr(exp.X); err != nil {
 					return err
 				}
@@ -464,12 +464,12 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 				if err := c.WriteValueExpr(exp.Index); err != nil {
 					return err
 				}
-				// Note: For map access (reading), Go returns the zero value if the key doesn't exist.
-				// We need to handle this in TS. For now, default to 0 or null based on type.
-				// A more robust solution would involve checking the expected type of the context.
-				// For simplicity, let's add a comment indicating this might need refinement.
-				c.tsw.WriteLiterally(")") // No ?? 0 here, get() returns undefined if not found
-				// c.tsw.WriteCommentInline("map access might need zero value handling")
+				// Map.get() returns undefined when key not found, but Go returns zero value
+				// Add nullish coalescing with the appropriate zero value for the map's value type
+				c.tsw.WriteLiterally(") ?? ")
+
+				// Generate the zero value based on the map's value type
+				c.WriteZeroValueForType(mapType.Elem())
 				return nil
 			}
 		}
@@ -478,7 +478,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return err
 		}
-		c.tsw.WriteLiterally("[")
+		c.tsw.WriteLiterally("![") // non-null assertion
 		if err := c.WriteValueExpr(exp.Index); err != nil {
 			return err
 		}
@@ -532,7 +532,6 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		return nil
 	case *ast.FuncLit:
 		return c.WriteFuncLitValue(exp)
-	// Add cases for SliceExpr etc.
 	default:
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled value expr: %T", exp))
 		return nil
@@ -1904,20 +1903,6 @@ func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 	}
 
 	return strings.Join(methodNames, ", ")
-}
-
-// getTypeExprName returns a string representation of a type expression.
-func (c *GoToTSCompiler) getTypeExprName(expr ast.Expr) string {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		return t.Name
-	case *ast.SelectorExpr:
-		return fmt.Sprintf("%s.%s", c.getTypeExprName(t.X), t.Sel.Name)
-	case *ast.StarExpr:
-		return c.getTypeExprName(t.X) // Unwrap pointer type
-	default:
-		return "embedded" // Fallback for complex type expressions
-	}
 }
 
 // getTypeString returns a TypeScript type string for a Go type.
@@ -3294,7 +3279,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				if err := c.WriteValueExpr(indexExpr.X); err != nil {
 					return err
 				}
-				c.tsw.WriteLiterally("!")
+				c.tsw.WriteLiterally("!") // non-null assertion
 				c.tsw.WriteLiterally("[")
 				if err := c.WriteValueExpr(indexExpr.Index); err != nil {
 					return err
@@ -3675,8 +3660,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 
 		lhsExprIdent, lhsExprIsIdent := lhsExpr.(*ast.Ident)
 		if lhsExprIsIdent {
-			// TODO when do we specify true here?
-			// TODO the false avoids "let ptrToVal.value = val" for "assign but not boxed"
+			// prevent writing .value unless lhs is boxed
 			c.WriteIdent(lhsExprIdent, isLHSBoxed)
 		} else {
 			if err := c.WriteValueExpr(lhsExpr); err != nil {
@@ -4278,7 +4262,9 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	}
 
 	// Handle array and slice types
-	if _, isArray := underlying.(*types.Array); isArray || isSlice(underlying) {
+	_, isSlice := underlying.(*types.Slice)
+	_, isArray := underlying.(*types.Array)
+	if isArray || isSlice {
 		// Determine the index variable name for the generated loop
 		indexVarName := "i" // Default name
 		if exp.Key != nil {
@@ -4385,12 +4371,6 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 	c.tsw.WriteLiterally(")")
 	c.tsw.WriteLine("") // Add newline after the statement
 	return nil
-}
-
-// isSlice returns true if the underlying type is a slice.
-func isSlice(typ types.Type) bool {
-	_, ok := typ.(*types.Slice)
-	return ok
 }
 
 // writeTypeAssertion handles multi-variable assignment from a type assertion.

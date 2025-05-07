@@ -42,8 +42,8 @@ export function main(): void {
 
 	// === Modify []rune and convert back to string ===
 	let mutableRunes = $.stringToRunes("Mutable String")
-	mutableRunes[0] = 109
-	mutableRunes[8] = 115
+	mutableRunes![0] = 109
+	mutableRunes![8] = 115
 	let modifiedString = $.runesToString(mutableRunes)
 	console.log(modifiedString)
 }

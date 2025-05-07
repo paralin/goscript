@@ -17,12 +17,12 @@ export function main(): void {
 	console.log("Map size after adding 3 items: Expected: 3, Actual:", $.len(scores))
 
 	// Access values
-	console.log("Alice's score: Expected: 90, Actual:", scores.get("Alice"))
-	console.log("Bob's score: Expected: 85, Actual:", scores.get("Bob"))
+	console.log("Alice's score: Expected: 90, Actual:", scores.get("Alice") ?? 0)
+	console.log("Bob's score: Expected: 85, Actual:", scores.get("Bob") ?? 0)
 
 	// Modify a value
 	$.mapSet(scores, "Bob", 88)
-	console.log("Bob's updated score: Expected: 88, Actual:", scores.get("Bob"))
+	console.log("Bob's updated score: Expected: 88, Actual:", scores.get("Bob") ?? 0)
 
 	// Check if key exists (comma-ok idiom)
 	let value
@@ -40,7 +40,7 @@ export function main(): void {
 	// Create map with literal syntax
 	let colors = new Map([["red", "#ff0000"], ["green", "#00ff00"], ["blue", "#0000ff"]])
 	console.log("Map literal size: Expected: 3, Actual:", $.len(colors))
-	console.log("Color code for red: Expected: #ff0000, Actual:", colors.get("red"))
+	console.log("Color code for red: Expected: #ff0000, Actual:", colors.get("red") ?? "")
 
 	// Iterate over a map with range
 	console.log("Iterating over scores map:")
@@ -67,7 +67,7 @@ export function main(): void {
 	let n = $.len(scoreResults)
 	for (let i = 0; i < n - 1; i++) {
 		for (let j = 0; j < n - i - 1; j++) {
-			if (scoreResults[j] > scoreResults[j + 1]) {
+			if (scoreResults![j] > scoreResults![j + 1]) {
 				[scoreResults![j], scoreResults![j + 1]] = [scoreResults![j + 1], scoreResults![j]]
 			}
 		}
