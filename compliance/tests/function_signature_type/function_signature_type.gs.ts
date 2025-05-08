@@ -64,7 +64,7 @@ export function NewMyError(text: string): $.Box<MyError> | null {
 	return new MyError({s: text})
 }
 
-export async function main() {
+export function main(): void {
 	fn1 = (a: number, b: string): [boolean, $.Error] => {
 		console.log("fn1 called with:", a, b)
 		if (a > 0) {
@@ -120,9 +120,9 @@ export async function main() {
 	let res2_2 = (fn2!)(3, "hey")
 	console.log("fn2 result 2:", res2_2)
 
-	// await (fn3!)()
+	(fn3!)()
 
-	fn4(1)
+	(fn4!)(1)
 	(fn4!)(2, "one")
 	(fn4!)(3, "two", "three")
 }
