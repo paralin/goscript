@@ -70,7 +70,7 @@ export function main(): void {
 		if (a > 0) {
 			return [true, null]
 		}
-		return [false, (NewMyError!)("a was not positive")]
+		return [false, (NewMyError)("a was not positive")]
 	}
 
 
