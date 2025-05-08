@@ -70,7 +70,7 @@ export function main(): void {
 		if (a > 0) {
 			return [true, null]
 		}
-		return [false, (NewMyError!)("a was not positive")]
+		return [false, (NewMyError)("a was not positive")]
 	}
 
 
@@ -86,7 +86,7 @@ export function main(): void {
 
 
 	// Newline after all strings
-	fn4 = (a: number, b: $.Slice<string>): void => {
+	fn4 = (a, ...b: string[]): void => {
 		console.log("fn4 called with: ", a)
 		for (let i = 0; i < b.length; i++) {
 			const s = b[i]
