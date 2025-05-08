@@ -7,3 +7,14 @@ index: 1 value: b
 index: 2 value: c
 index: 0 value: 103
 index: 1 value: 111
+Ranging over slice (no key/value):
+Iterating slice
+Iterating slice
+Iterating slice
+Ranging over array (no key/value):
+Iterating array
+Iterating array
+Iterating array
+Ranging over string (no key/value):
+Iterating string
+Iterating string

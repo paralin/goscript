@@ -3,7 +3,9 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	// types provides type information for Go types.
 	"go/types"
+	"github.com/pkg/errors"
 	"strings"
 )
 
@@ -489,9 +491,19 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 		return err
 	}
 	c.tsw.WriteLiterally(" = ")
-	if err := c.WriteInterfaceType(t); err != nil {
-		return err
+	// Get the types.Interface from the ast.InterfaceType.
+	// For an interface definition like `type MyInterface interface { M() }`,
+	// 't' is the *ast.InterfaceType representing `interface { M() }`.
+	// TypesInfo.TypeOf(t) will give the *types.Interface.
+	goType := c.pkg.TypesInfo.TypeOf(t)
+	if goType == nil {
+		return errors.Errorf("could not get type for interface AST node for %s", a.Name.Name)
 	}
+	ifaceType, ok := goType.(*types.Interface)
+	if !ok {
+		return errors.Errorf("expected *types.Interface, got %T for %s when processing interface literal", goType, a.Name.Name)
+	}
+	c.WriteInterfaceType(ifaceType, t) // Pass the *ast.InterfaceType for comment fetching
 	c.tsw.WriteLine("")
 
 	// Add code to register the interface with the runtime system

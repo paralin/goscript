@@ -1,0 +1,4 @@
+looping, i: 0 x_before_post: 0
+looping, i: 1 x_before_post: 1
+looping, i: 2 x_before_post: 2
+final x: 3

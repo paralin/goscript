@@ -1,6 +1,7 @@
 package main
 
 type Reader interface {
+	// Read reads data from the reader.
 	Read([]byte) (int, error)
 }
 

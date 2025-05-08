@@ -3,7 +3,10 @@
 
 import * as $ from "@goscript/builtin";
 
-type Reader = any/* interface: interface{Read([]byte) (int, error)} */
+type Reader = null | {
+	// Read reads data from the reader.
+	Read(_p0: $.Slice<number>): [number, $.Error]
+}
 
 const Reader__typeInfo = $.registerType(
   'Reader',
@@ -13,7 +16,9 @@ const Reader__typeInfo = $.registerType(
   undefined
 );
 
-type Closer = any/* interface: interface{Close() error} */
+type Closer = null | {
+	Close(): $.Error
+}
 
 const Closer__typeInfo = $.registerType(
   'Closer',
@@ -23,7 +28,7 @@ const Closer__typeInfo = $.registerType(
   undefined
 );
 
-type ReadCloser = any/* interface: interface{tempmod.Reader; tempmod.Closer} */
+type ReadCloser = null | Reader & Closer
 
 const ReadCloser__typeInfo = $.registerType(
   'ReadCloser',

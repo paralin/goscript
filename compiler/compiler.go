@@ -270,23 +270,12 @@ type GoToTSCompiler struct {
 	analysis *Analysis // Holds analysis information for code generation decisions
 }
 
-// WriteGoType writes the type representation using the `TSCodeWriter`.
-// This is the primary method for translating Go types to TypeScript types.
-// It handles various Go types:
-//   - Basic types (int, string, bool, etc.) are mapped to TypeScript primitives (number, string, boolean).
-//     Untyped Go constants are mapped to their closest TypeScript equivalents.
-//   - Named types are generally written with their original name. The `error` interface
-//     is specially handled as `$.Error`.
-//   - Pointer types (`*T`) are translated to `$.Box<T_ts> | null`, where `T_ts` is the
-//     recursively translated type of `T`.
-//   - Slice types (`[]T`) become `$.Slice<T_ts>`.
-//   - Array types (`[N]T`) become `T_ts[]`.
-//   - Map types (`map[K]V`) become `Map<K_ts, V_ts>`.
-//   - Channel types (`chan T`) become `$.Channel<T_ts>`.
-//   - Interface types are generally translated to `any`, with `error` being `$.Error`.
-//     (Further refinement for interface translation might be needed).
+// WriteGoType is the main dispatcher for translating Go types to their TypeScript
+// equivalents. It examines the type and delegates to more specialized type writer
+// functions based on the specific Go type encountered.
 //
-// Unsupported or unrecognized types are translated to `any` with a comment.
+// It handles nil types as 'any' with a comment, and dispatches to appropriate
+// type-specific writers for all other recognized Go types.
 func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	if typ == nil {
 		c.tsw.WriteLiterally("any")
@@ -296,115 +285,23 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 
 	switch t := typ.(type) {
 	case *types.Basic:
-		// Handle basic types (int, string, etc.)
-		name := t.Name()
-
-		// Handle untyped constants by mapping them to appropriate TypeScript types
-		if t.Info()&types.IsUntyped != 0 {
-			switch t.Kind() {
-			case types.UntypedBool:
-				c.tsw.WriteLiterally("boolean")
-				return
-			case types.UntypedInt, types.UntypedFloat, types.UntypedComplex, types.UntypedRune:
-				c.tsw.WriteLiterally("number")
-				return
-			case types.UntypedString:
-				c.tsw.WriteLiterally("string")
-				return
-			case types.UntypedNil:
-				c.tsw.WriteLiterally("null")
-				return
-			}
-		}
-
-		// For typed basic types, use the existing mapping
-		if tsType, ok := GoBuiltinToTypescript(name); ok {
-			c.tsw.WriteLiterally(tsType)
-		} else {
-			c.tsw.WriteLiterally(name)
-		}
+		c.WriteBasicType(t)
 	case *types.Named:
-		// Handle named types (custom types)
-		// Check if the named type is the error interface
-		if iface, ok := t.Underlying().(*types.Interface); ok && iface.String() == "interface{Error() string}" {
-			c.tsw.WriteLiterally("$.Error")
-		} else {
-			// Use Obj().Name() for the original defined name
-			c.tsw.WriteLiterally(t.Obj().Name())
-		}
+		c.WriteNamedType(t)
 	case *types.Pointer:
-		// Write pointer type *T as $.Box<T_ts> | null
-		c.tsw.WriteLiterally("$.Box<")
-		c.WriteGoType(t.Elem())
-		c.tsw.WriteLiterally("> | null") // Pointers are always nullable
+		c.WritePointerType(t)
 	case *types.Slice:
-		// Handle slice types: []T becomes $.Slice<T>
-		c.tsw.WriteLiterally("$.Slice<")
-		c.WriteGoType(t.Elem())
-		c.tsw.WriteLiterally(">")
+		c.WriteSliceType(t)
 	case *types.Array:
-		// Handle array types: [N]T becomes T[]
-		c.WriteGoType(t.Elem())
-		c.tsw.WriteLiterally("[]") // Arrays cannot be nil
+		c.WriteArrayType(t)
 	case *types.Map:
-		// Handle map types (map[K]V becomes Map<K_ts, V_ts>)
-		c.tsw.WriteLiterally("Map<")
-		c.WriteGoType(t.Key())
-		c.tsw.WriteLiterally(", ")
-		c.WriteGoType(t.Elem())
-		c.tsw.WriteLiterally(">")
+		c.WriteMapType(t)
 	case *types.Chan:
-		// Handle channel types (chan T becomes $.Channel<T_ts>)
-		c.tsw.WriteLiterally("$.Channel<")
-		c.WriteGoType(t.Elem())
-		c.tsw.WriteLiterally(">")
+		c.WriteChannelType(t)
 	case *types.Interface:
-		// Handle the built-in error interface specifically
-		if t.String() == "interface{Error() string}" {
-			c.tsw.WriteLiterally("$.Error")
-		} else {
-			// For other interfaces, write "any" or a more specific representation if available
-			c.tsw.WriteLiterally("any")
-			c.tsw.WriteCommentInline(fmt.Sprintf("interface: %s", t.String()))
-		}
+		c.WriteInterfaceType(t, nil) // No ast.InterfaceType available here
 	case *types.Signature:
-		// Handle function types
-		c.tsw.WriteLiterally("(")
-		params := t.Params()
-		for i := 0; i < params.Len(); i++ {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-			param := params.At(i)
-			// Use parameter name if available, otherwise use p0, p1, etc.
-			if param.Name() != "" {
-				c.tsw.WriteLiterally(param.Name())
-			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("p%d", i))
-			}
-			c.tsw.WriteLiterally(": ")
-			c.WriteGoType(param.Type())
-		}
-		c.tsw.WriteLiterally(")")
-
-		// Handle return types
-		c.tsw.WriteLiterally(": ")
-		results := t.Results()
-		if results.Len() == 0 {
-			c.tsw.WriteLiterally("void")
-		} else if results.Len() == 1 {
-			c.WriteGoType(results.At(0).Type())
-		} else {
-			// Multiple return values -> tuple
-			c.tsw.WriteLiterally("[")
-			for i := 0; i < results.Len(); i++ {
-				if i > 0 {
-					c.tsw.WriteLiterally(", ")
-				}
-				c.WriteGoType(results.At(i).Type())
-			}
-			c.tsw.WriteLiterally("]")
-		}
+		c.WriteSignatureType(t)
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
@@ -412,7 +309,259 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	}
 }
 
-// NewGoToTSCompiler creates a new `GoToTSCompiler`.
+// WriteBasicType translates a Go basic type (primitives like int, string, bool)
+// to its TypeScript equivalent.
+// It handles untyped constants by mapping them to appropriate TypeScript types
+// (boolean, number, string, null) and uses GoBuiltinToTypescript for typed primitives.
+func (c *GoToTSCompiler) WriteBasicType(t *types.Basic) {
+	name := t.Name()
+
+	// Handle untyped constants by mapping them to appropriate TypeScript types
+	if t.Info()&types.IsUntyped != 0 {
+		switch t.Kind() {
+		case types.UntypedBool:
+			c.tsw.WriteLiterally("boolean")
+			return
+		case types.UntypedInt, types.UntypedFloat, types.UntypedComplex, types.UntypedRune:
+			c.tsw.WriteLiterally("number")
+			return
+		case types.UntypedString:
+			c.tsw.WriteLiterally("string")
+			return
+		case types.UntypedNil:
+			c.tsw.WriteLiterally("null")
+			return
+		}
+	}
+
+	// For typed basic types, use the existing mapping
+	if tsType, ok := GoBuiltinToTypescript(name); ok {
+		c.tsw.WriteLiterally(tsType)
+	} else {
+		c.tsw.WriteLiterally(name)
+	}
+}
+
+// WriteNamedType translates a Go named type to its TypeScript equivalent.
+// It specially handles the error interface as $.Error, and uses the original
+// type name for other named types.
+func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
+	// Check if the named type is the error interface
+	if iface, ok := t.Underlying().(*types.Interface); ok && iface.String() == "interface{Error() string}" {
+		c.tsw.WriteLiterally("$.Error")
+	} else {
+		// Use Obj().Name() for the original defined name
+		c.tsw.WriteLiterally(t.Obj().Name())
+	}
+}
+
+// WritePointerType translates a Go pointer type (*T) to its TypeScript equivalent.
+// It generates $.Box<T_ts> | null, where T_ts is the translated element type.
+func (c *GoToTSCompiler) WritePointerType(t *types.Pointer) {
+	c.tsw.WriteLiterally("$.Box<")
+	c.WriteGoType(t.Elem())
+	c.tsw.WriteLiterally("> | null") // Pointers are always nullable
+}
+
+// WriteSliceType translates a Go slice type ([]T) to its TypeScript equivalent.
+// It generates $.Slice<T_ts>, where T_ts is the translated element type.
+func (c *GoToTSCompiler) WriteSliceType(t *types.Slice) {
+	c.tsw.WriteLiterally("$.Slice<")
+	c.WriteGoType(t.Elem())
+	c.tsw.WriteLiterally(">")
+}
+
+// WriteArrayType translates a Go array type ([N]T) to its TypeScript equivalent.
+// It generates T_ts[], where T_ts is the translated element type.
+func (c *GoToTSCompiler) WriteArrayType(t *types.Array) {
+	c.WriteGoType(t.Elem())
+	c.tsw.WriteLiterally("[]") // Arrays cannot be nil
+}
+
+// WriteMapType translates a Go map type (map[K]V) to its TypeScript equivalent.
+// It generates Map<K_ts, V_ts>, where K_ts and V_ts are the translated key
+// and element types respectively.
+func (c *GoToTSCompiler) WriteMapType(t *types.Map) {
+	c.tsw.WriteLiterally("Map<")
+	c.WriteGoType(t.Key())
+	c.tsw.WriteLiterally(", ")
+	c.WriteGoType(t.Elem())
+	c.tsw.WriteLiterally(">")
+}
+
+// WriteChannelType translates a Go channel type (chan T) to its TypeScript equivalent.
+// It generates $.Channel<T_ts>, where T_ts is the translated element type.
+func (c *GoToTSCompiler) WriteChannelType(t *types.Chan) {
+	c.tsw.WriteLiterally("$.Channel<")
+	c.WriteGoType(t.Elem())
+	c.tsw.WriteLiterally(">")
+}
+
+// WriteInterfaceType translates a Go interface type to its TypeScript equivalent.
+// It specially handles the error interface as $.Error, and delegates to
+// writeInterfaceStructure for other interface types, prepending "null | ".
+// If astNode is provided (e.g., from a type spec), comments for methods will be included.
+func (c *GoToTSCompiler) WriteInterfaceType(t *types.Interface, astNode *ast.InterfaceType) {
+	// Handle the built-in error interface specifically
+	if t.String() == "interface{Error() string}" {
+		c.tsw.WriteLiterally("$.Error")
+		return
+	}
+
+	// Prepend "null | " for all other interfaces.
+	// writeInterfaceStructure will handle the actual structure like "{...}" or "any".
+	c.tsw.WriteLiterally("null | ")
+	c.writeInterfaceStructure(t, astNode)
+}
+
+// WriteSignatureType translates a Go function signature to its TypeScript equivalent.
+// It generates (param1: type1, param2: type2, ...): returnType for function types.
+func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
+	c.tsw.WriteLiterally("(")
+	params := t.Params()
+	for i := 0; i < params.Len(); i++ {
+		if i > 0 {
+			c.tsw.WriteLiterally(", ")
+		}
+		param := params.At(i)
+		// Use parameter name if available, otherwise use p0, p1, etc.
+		if param.Name() != "" {
+			c.tsw.WriteLiterally(param.Name())
+		} else {
+			c.tsw.WriteLiterally(fmt.Sprintf("p%d", i))
+		}
+		c.tsw.WriteLiterally(": ")
+		c.WriteGoType(param.Type())
+	}
+	c.tsw.WriteLiterally(")")
+
+	// Handle return types
+	c.tsw.WriteLiterally(": ")
+	results := t.Results()
+	if results.Len() == 0 {
+		c.tsw.WriteLiterally("void")
+	} else if results.Len() == 1 {
+		c.WriteGoType(results.At(0).Type())
+	} else {
+		// Multiple return values -> tuple
+		c.tsw.WriteLiterally("[")
+		for i := 0; i < results.Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteGoType(results.At(i).Type())
+		}
+		c.tsw.WriteLiterally("]")
+	}
+}
+
+// writeInterfaceStructure translates a Go `types.Interface` into its TypeScript structural representation.
+// If astNode is provided, it's used to fetch comments for methods.
+// For example, an interface `interface { MethodA(x int) string; EmbeddedB }` might become
+// `{ MethodA(_p0: number): string; } & B_ts`.
+func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode *ast.InterfaceType) {
+	// Handle empty interface interface{}
+	if iface.NumExplicitMethods() == 0 && iface.NumEmbeddeds() == 0 {
+		c.tsw.WriteLiterally("any") // Matches current behavior for interface{}
+		return
+	}
+
+	// Keep track if we've written any part (methods or first embedded type)
+	// to correctly place " & " separators.
+	firstPartWritten := false
+
+	// Handle explicit methods
+	if iface.NumExplicitMethods() > 0 {
+		c.tsw.WriteLiterally("{") // Opening brace for the object type
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("") // Newline after opening brace, before the first method
+
+		for i := 0; i < iface.NumExplicitMethods(); i++ {
+			method := iface.ExplicitMethod(i)
+			sig := method.Type().(*types.Signature)
+
+			// Find corresponding ast.Field for comments if astNode is available
+			var astField *ast.Field
+			if astNode != nil && astNode.Methods != nil {
+				for _, f := range astNode.Methods.List {
+					// Ensure the field is a named method (not an embedded interface)
+					if len(f.Names) > 0 && f.Names[0].Name == method.Name() {
+						astField = f
+						break
+					}
+				}
+			}
+
+			// Write comments if astField is found
+			if astField != nil {
+				if astField.Doc != nil {
+					c.WriteDoc(astField.Doc) // WriteDoc handles newlines
+				}
+				if astField.Comment != nil { // For trailing comments on the same line in Go AST
+					c.WriteDoc(astField.Comment)
+				}
+			}
+
+			c.tsw.WriteLiterally(method.Name())
+			c.tsw.WriteLiterally("(") // Start params
+			params := sig.Params()
+			for j := 0; j < params.Len(); j++ {
+				if j > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				paramVar := params.At(j)
+				paramName := paramVar.Name()
+				if paramName == "" || paramName == "_" {
+					paramName = fmt.Sprintf("_p%d", j)
+				}
+				c.tsw.WriteLiterally(paramName)
+				c.tsw.WriteLiterally(": ")
+				c.WriteGoType(paramVar.Type()) // Recursive call for param type
+			}
+			c.tsw.WriteLiterally(")") // End params
+
+			// Return type
+			c.tsw.WriteLiterally(": ")
+			results := sig.Results()
+			if results.Len() == 0 {
+				c.tsw.WriteLiterally("void")
+			} else if results.Len() == 1 {
+				c.WriteGoType(results.At(0).Type()) // Recursive call for result type
+			} else {
+				c.tsw.WriteLiterally("[")
+				for j := 0; j < results.Len(); j++ {
+					if j > 0 {
+						c.tsw.WriteLiterally(", ")
+					}
+					c.WriteGoType(results.At(j).Type()) // Recursive call for result type
+				}
+				c.tsw.WriteLiterally("]")
+			}
+			c.tsw.WriteLine("") // newline for each method
+		}
+		c.tsw.Indent(-1)
+		c.tsw.WriteLiterally("}") // Closing brace for the object type
+		firstPartWritten = true
+	}
+
+	// Handle embedded types
+	if iface.NumEmbeddeds() > 0 {
+		for i := 0; i < iface.NumEmbeddeds(); i++ {
+			if firstPartWritten {
+				c.tsw.WriteLiterally(" & ")
+			} else {
+				// This is the first part being written (no explicit methods, only embedded)
+				firstPartWritten = true
+			}
+			embeddedType := iface.EmbeddedType(i)
+			// When WriteGoType encounters an interface, it will call WriteInterfaceType
+			// which will pass nil for astNode, so comments for deeply embedded interface literals
+			// might not be available unless they are named types.
+			c.WriteGoType(embeddedType)
+		}
+	}
+}
+
 // It initializes the compiler with a `TSCodeWriter` for output,
 // Go package information (`packages.Package`), and pre-computed
 // analysis results (`Analysis`) to guide the translation process.
@@ -913,78 +1062,6 @@ func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
 		return
 	}
 	c.WriteFieldList(exp.Fields, false) // false = not arguments
-}
-
-// WriteInterfaceType translates a Go interface type definition (`ast.InterfaceType`)
-// into its TypeScript equivalent using type information when possible.
-// If type information is available, it uses WriteGoType to handle the translation.
-// Otherwise, it falls back to a structured approach:
-//   - Named methods are translated to TypeScript method signatures.
-//   - Embedded interfaces are combined using intersection types.
-//   - All interface types in TypeScript are implicitly nullable.
-func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) error {
-	// First try to use type information
-	if typ := c.pkg.TypesInfo.TypeOf(exp); typ != nil {
-		c.WriteGoType(typ)
-		return nil
-	}
-
-	var embeddedInterfaces []string
-	var methods []*ast.Field
-
-	if exp.Methods != nil {
-		for _, method := range exp.Methods.List {
-			if len(method.Names) > 0 {
-				// Named method
-				methods = append(methods, method)
-			} else {
-				// Embedded interface - collect the type name using type info
-				if tv, ok := c.pkg.TypesInfo.Types[method.Type]; ok && tv.Type != nil {
-					if namedType, ok := tv.Type.(*types.Named); ok {
-						embeddedInterfaces = append(embeddedInterfaces, namedType.Obj().Name())
-					} else {
-						c.tsw.WriteCommentLine(fmt.Sprintf("// Unhandled embedded interface type: %T", tv.Type))
-					}
-				} else {
-					return errors.Errorf("could not resolve embedded interface type: %v", method.Type)
-				}
-			}
-		}
-	}
-
-	// Write the opening (
-	c.tsw.WriteLiterally("(")
-
-	// Write the explicit methods if any
-	if len(methods) > 0 {
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLine("") // Newline after opening brace
-		c.tsw.Indent(1)
-
-		// Write named methods
-		for _, method := range methods {
-			if err := c.WriteInterfaceMethodSignature(method); err != nil {
-				// Log error as comment, but continue
-				c.tsw.WriteCommentLine(fmt.Sprintf("error writing interface method signature: %v", err))
-			}
-		}
-
-		c.tsw.Indent(-1)
-		c.tsw.WriteLiterally("}")
-	} else if len(embeddedInterfaces) == 0 {
-		// Handle empty interface {} case
-		c.tsw.WriteLiterally("{}")
-	}
-
-	// If there are embedded interfaces, write them as an intersection type
-	if len(embeddedInterfaces) > 0 {
-		c.tsw.WriteLiterally(" & ")
-		c.tsw.WriteLiterally(strings.Join(embeddedInterfaces, " & "))
-	}
-
-	// Always add | null for interfaces
-	c.tsw.WriteLiterally(") | null")
-	return nil
 }
 
 // WriteFuncType translates a Go function type (`ast.FuncType`) into a TypeScript
@@ -2001,7 +2078,6 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 			return fmt.Errorf("unhandled composite literal type: %T", underlying)
 		}
 	} else {
-		// Fall back to the heuristic if type information is unavailable
 		return fmt.Errorf("could not determine composite literal type from type information")
 	}
 
@@ -2516,20 +2592,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		name := a.Names[0]
 		obj := c.pkg.TypesInfo.Defs[name]
 		if obj == nil {
-			// Fallback if type info is missing (shouldn't happen for valid code)
-			c.tsw.WriteLiterally("let ")
-			c.tsw.WriteLiterally(name.Name)
-			c.tsw.WriteLiterally(": any")
-			if len(a.Values) > 0 {
-				c.tsw.WriteLiterally(" = ")
-				if err := c.WriteValueExpr(a.Values[0]); err != nil {
-					return err
-				}
-			} else {
-				c.tsw.WriteLiterally(" = null") // Default zero value fallback
-			}
-			c.tsw.WriteLine("")
-			return nil
+			return errors.Errorf("could not resolve type: %v", name)
 		}
 
 		goType := obj.Type()
@@ -3124,12 +3187,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			c.tsw.WriteLine("})") // Close the queueMicrotask callback and the statement
 
 		} else {
-			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled goroutine function type: %T", callExpr.Fun))
-			// Fallback: try to compile the call expression directly, though it might not work
-			if err := c.WriteValueExpr(exp.Call); err != nil {
-				return fmt.Errorf("failed to write fallback goroutine call expression: %w", err)
-			}
-			c.tsw.WriteLine("") // Ensure a newline even on fallback
+			return errors.Errorf("unhandled goroutine function type: %T", callExpr.Fun)
 		}
 	case *ast.SelectStmt:
 		// Handle select statement
@@ -3195,9 +3253,8 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 				return fmt.Errorf("failed to write statement in deferred function body: %w", err)
 			}
 		}
-
 	} else {
-		// Fallback: write the call expression as-is.
+		// Write the call expression as-is.
 		if err := c.WriteValueExpr(exp.Call); err != nil {
 			return fmt.Errorf("failed to write deferred call: %w", err)
 		}
@@ -4383,7 +4440,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			c.tsw.WriteLine("")
 		} else if existsIsBlank {
 			// If both are blank, still evaluate for side effects (though .has/.get are usually pure)
-			c.tsw.WriteLiterally("(")                             // Wrap in parens to make it an expression statement
+			// We add a ; otherwise TypeScript thinks we are invoking a function.
+			c.tsw.WriteLiterally(";(")                            // Wrap in parens to make it an expression statement
 			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
 				return err
 			}
@@ -4437,24 +4495,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		// If none of the specific multi-assign patterns match, fall through to the error check below
 	}
 
-	// Handle all other assignment cases (one-to-one, multiple RHS expressions, etc.)
 	// Ensure LHS and RHS have the same length for valid Go code in these cases
 	if len(exp.Lhs) != len(exp.Rhs) {
-		// Allow single RHS channel receive to be discarded (case <-ch:)
-		if len(exp.Lhs) == 0 && len(exp.Rhs) == 1 {
-			if unaryExpr, ok := exp.Rhs[0].(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
-				// Translate <-ch to await ch.receive() and discard result
-				c.tsw.WriteLiterally("await ")
-				if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
-					return fmt.Errorf("failed to write channel expression in discarded receive: %w", err)
-				}
-				c.tsw.WriteLiterally(".receive()") // Use receive() as receiveWithOk() result isn't needed
-				c.tsw.WriteLine("")
-				return nil
-			}
-		}
-
-		c.tsw.WriteCommentLine(fmt.Sprintf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs)))
 		return fmt.Errorf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs))
 	}
 
@@ -4696,8 +4738,8 @@ func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) error {
 						return err
 					}
 				} else {
-					// No corresponding RHS, use a default value
-					c.WriteZeroValue(lhs) // Write a zero value based on the type
+					// No corresponding RHS
+					return errors.Errorf("no corresponding rhs to lhs: %v", s)
 				}
 			}
 		} else {
@@ -4710,15 +4752,13 @@ func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) error {
 				return err
 			}
 		}
+		return nil
 	case *ast.ExprStmt:
-		// Handle expression statement in init (less common, but possible)
-		if err := c.WriteValueExpr(s.X); err != nil {
-			return err
-		}
+		// Handle expression statement in init
+		return c.WriteValueExpr(s.X)
 	default:
-		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled for loop init statement: %T", stmt))
+		return errors.Errorf("unhandled for loop init statement: %T", stmt)
 	}
-	return nil
 }
 
 // WriteForPost translates the post-iteration part of a Go `for` loop header
@@ -4742,10 +4782,10 @@ func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 		}
 		tokStr, ok := TokenToTs(s.Tok)
 		if !ok {
-			c.tsw.WriteLiterally("/* unknown incdec token */")
-		} else {
-			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++)
+			return errors.Errorf("unknown incdec token: %v", s.Tok)
 		}
+		c.tsw.WriteLiterally(tokStr) // The token (e.g., ++)
+		return nil
 	case *ast.AssignStmt:
 		// For multiple variable assignment in post like i, j = i+1, j-1
 		// we need to use destructuring in TypeScript like [i, j] = [i+1, j-1]
@@ -4778,89 +4818,12 @@ func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 				return err
 			}
 		}
+		return nil
 	case *ast.ExprStmt:
-		// Handle expression statement in post (less common)
-		if err := c.WriteValueExpr(s.X); err != nil {
-			return err
-		}
+		// Handle expression statement in post
+		return c.WriteValueExpr(s.X)
 	default:
-		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled for loop post statement: %T", stmt))
-	}
-	return nil
-}
-
-// WriteZeroValue writes the TypeScript zero-value for a Go type represented
-// by the AST expression `expr`. This is primarily used for initializing variables
-// in `for` loop headers or when a default value is needed and full type
-// information might be less direct than inferring from an `ast.Expr`.
-//
-// It attempts to determine the type from `expr`:
-// - If `expr` is an `ast.Ident` (identifier):
-//   - It tries to resolve the type using `c.pkg.TypesInfo.Types`.
-//   - If resolved to a `types.Basic` (numeric, string, bool), it writes the
-//     corresponding TS zero (`0`, `""`, `false`).
-//   - If resolved to a `types.Struct`, it writes `new TypeName()`.
-//   - If resolved to a pointer, interface, slice, map, channel, or signature,
-//     it writes `null`.
-//   - As a fallback for unresolved identifiers, it guesses based on common Go
-//     primitive names (e.g., "int" -> `0`, "string" -> `""`).
-//   - For AST nodes like `*ast.StarExpr` (pointer type), `*ast.InterfaceType`,
-//     `*ast.ArrayType`, etc., it directly writes `null` as these Go types generally
-//     have `nil` as their zero value, which translates to `null` in TypeScript.
-//   - For `*ast.StructType` (anonymous struct type), it defaults to `null`.
-//
-// Other expression types also default to `null`.
-func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
-	switch t := expr.(type) {
-	case *ast.Ident:
-		// Try to resolve identifier type
-		if tv, found := c.pkg.TypesInfo.Types[t]; found {
-			underlying := tv.Type.Underlying()
-			switch u := underlying.(type) {
-			case *types.Basic: // Use gotypes alias
-				if u.Info()&types.IsNumeric != 0 { // Use gotypes alias
-					c.tsw.WriteLiterally("0")
-				} else if u.Info()&types.IsString != 0 { // Use gotypes alias
-					c.tsw.WriteLiterally(`""`)
-				} else if u.Info()&types.IsBoolean != 0 { // Use gotypes alias
-					c.tsw.WriteLiterally("false")
-				} else {
-					c.tsw.WriteLiterally("null // unknown basic type")
-				}
-			case *types.Struct: // Use gotypes alias
-				// Zero value for struct is new instance
-				c.tsw.WriteLiterally("new ")
-				c.WriteTypeExpr(t) // Write the type name
-				c.tsw.WriteLiterally("()")
-			case *types.Pointer, *types.Interface, *types.Slice, *types.Map, *types.Chan, *types.Signature: // Use gotypes alias
-				// Pointers, interfaces, slices, maps, channels, functions zero value is null/undefined
-				c.tsw.WriteLiterally("null")
-			default:
-				c.tsw.WriteLiterally("null // unknown underlying type")
-			}
-		} else {
-			// Fallback for unresolved identifiers (basic types)
-			switch t.Name {
-			case "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64", "uintptr", "float32", "float64", "complex64", "complex128":
-				c.tsw.WriteLiterally("0")
-			case "string":
-				c.tsw.WriteLiterally(`""`)
-			case "bool":
-				c.tsw.WriteLiterally("false")
-			default:
-				// Assume custom type, might be struct or interface -> null
-				c.tsw.WriteLiterally("null // unresolved identifier")
-			}
-		}
-	case *ast.StarExpr, *ast.InterfaceType, *ast.ArrayType, *ast.MapType, *ast.ChanType, *ast.FuncType:
-		// Pointers, interfaces, arrays, maps, channels, functions zero value is null/undefined
-		c.tsw.WriteLiterally("null")
-	case *ast.StructType:
-		// Anonymous struct zero value is complex, default to null for now
-		c.tsw.WriteLiterally("null")
-	default:
-		// everything else defaults to null in TS
-		c.tsw.WriteLiterally("null")
+		return errors.Errorf("unhandled for loop post statement: %T", stmt)
 	}
 }
 
@@ -4878,6 +4841,10 @@ func (c *GoToTSCompiler) WriteZeroValue(expr ast.Expr) {
 //     `for (let i_ts = 0; i_ts < _runes.length; i_ts++) { const r_ts = _runes[i_ts]; ...body... }`.
 //     The index variable `i_ts` uses the Go key variable name if provided (and not `_`).
 //     The rune variable `r_ts` uses the Go value variable name.
+//
+//   - **Integers (`*types.Basic` with `IsInteger` info, Go 1.22+):**
+//     `for i := range N` becomes `for (let i_ts = 0; i_ts < N_ts; i_ts++) { ...body... }`.
+//     `for i, v := range N` becomes `for (let i_ts = 0; i_ts < N_ts; i_ts++) { const v_ts = i_ts; ...body... }`.
 //
 // - **Arrays (`*types.Array`) and Slices (`*types.Slice`):**
 //   - If both key (index) and value are used (`for i, val := range arr`):
@@ -4935,40 +4902,80 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		return nil
 	}
 
-	// Handle string type by converting the string to a rune array
-	if basic, ok := underlying.(*types.Basic); ok && (basic.Info()&types.IsString != 0) {
-		// Convert the string to runes using $.stringToRunes
-		c.tsw.WriteLiterally("const _runes = $.stringToRunes(")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write range loop string conversion expression: %w", err)
-		}
-		c.tsw.WriteLiterally(")")
-		c.tsw.WriteLine("")
-		// Determine the index variable name for the generated loop
-		indexVarName := "i" // Default name
-		if exp.Key != nil {
-			if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
-				indexVarName = keyIdent.Name
+	// Handle basic types (string, integer)
+	if basic, ok := underlying.(*types.Basic); ok {
+		if basic.Info()&types.IsString != 0 {
+			// Add a scope to avoid collision of _runes variable
+			c.tsw.WriteLine("{")
+			c.tsw.Indent(1)
+
+			// Convert the string to runes using $.stringToRunes
+			c.tsw.WriteLiterally("const _runes = $.stringToRunes(")
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return fmt.Errorf("failed to write range loop string conversion expression: %w", err)
 			}
-		}
-		c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < _runes.length; %s++) {", indexVarName, indexVarName, indexVarName))
-		c.tsw.Indent(1)
-		c.tsw.WriteLine("")
-		// Declare value if provided and not blank
-		if exp.Value != nil {
-			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-				c.tsw.WriteLiterally("const ")
-				c.WriteIdent(ident, false)
-				c.tsw.WriteLiterally(" = _runes[i]")
-				c.tsw.WriteLine("")
+			c.tsw.WriteLiterally(")")
+			c.tsw.WriteLine("")
+
+			// Determine the index variable name for the generated loop
+			indexVarName := "i" // Default name
+			if exp.Key != nil {
+				if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
+					indexVarName = keyIdent.Name
+				}
 			}
+			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < _runes.length; %s++) {", indexVarName, indexVarName, indexVarName))
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+			// Declare value if provided and not blank
+			if exp.Value != nil {
+				if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+					c.tsw.WriteLiterally("const ")
+					c.WriteIdent(ident, false)
+					c.tsw.WriteLiterally(" = _runes[i]") // TODO: should be indexVarName?
+					c.tsw.WriteLine("")
+				}
+			}
+			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+				return fmt.Errorf("failed to write range loop string body: %w", err)
+			}
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+
+			// outer }
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+			return nil
+		} else if basic.Info()&types.IsInteger != 0 {
+			// Handle ranging over an integer (Go 1.22+)
+			// Determine the index variable name for the generated loop
+			indexVarName := "_i" // Default name
+			if exp.Key != nil {
+				if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
+					indexVarName = keyIdent.Name
+				}
+			}
+
+			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
+			if err := c.WriteValueExpr(exp.X); err != nil { // This is N
+				return fmt.Errorf("failed to write range loop integer expression: %w", err)
+			}
+			c.tsw.WriteLiterally(fmt.Sprintf("; %s++) {", indexVarName))
+			c.tsw.Indent(1)
+			c.tsw.WriteLine("")
+
+			// The value variable is not allowed ranging over an integer.
+			if exp.Value != nil {
+				return errors.Errorf("ranging over an integer supports key variable only (not value variable): %v", exp)
+			}
+
+			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+				return fmt.Errorf("failed to write range loop integer body: %w", err)
+			}
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+			return nil
 		}
-		if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-			return fmt.Errorf("failed to write range loop string body: %w", err)
-		}
-		c.tsw.Indent(-1)
-		c.tsw.WriteLine("}")
-		return nil
 	}
 
 	// Handle array and slice types
@@ -5023,26 +5030,9 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("}")
 			return nil
-		} else if exp.Key == nil && exp.Value != nil { // Only value provided; use for-of loop
-			c.tsw.WriteLiterally("for (const v of ")
-			if err := c.WriteValueExpr(exp.X); err != nil {
-				return fmt.Errorf("failed to write range loop array/slice expression (only value): %w", err)
-			}
-			c.tsw.WriteLiterally(") {")
-			c.tsw.Indent(1)
-			c.tsw.WriteLine("")
-			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-				c.tsw.WriteLiterally("const ")
-				c.WriteIdent(ident, false)
-				c.tsw.WriteLiterally(" = v")
-				c.tsw.WriteLine("")
-			}
-			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-				return fmt.Errorf("failed to write range loop array/slice body (only value): %w", err)
-			}
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			return nil
+		} else if exp.Key == nil && exp.Value != nil { // Only value provided
+			// I think this is impossible. See for_range_value_only test.
+			return errors.Errorf("unexpected value without key in for range expression: %v", exp)
 		} else {
 			// Fallback: simple index loop without declaring range variables, use _i
 			indexVarName := "_i"
@@ -5062,9 +5052,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		}
 	}
 
-	// Fallback case if the ranged type is not supported.
-	c.tsw.WriteCommentLine("unsupported range loop")
-	return fmt.Errorf("unsupported range loop type: %T", underlying)
+	return errors.Errorf("unsupported range loop type: %T for expression %v", underlying, exp)
 }
 
 // WriteStmtSend translates a Go channel send statement (`ast.SendStmt`),

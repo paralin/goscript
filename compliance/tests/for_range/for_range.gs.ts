@@ -34,12 +34,42 @@ export function main(): void {
 	let str = "go"
 
 	// Note: c will be a rune (int32)
-	const _runes = $.stringToRunes(str)
-	for (let i = 0; i < _runes.length; i++) {
-		const c = _runes[i]
-		{
-			console.log("index:", i, "value:", c) // Note: c will be a rune (int32)
+	{
+		const _runes = $.stringToRunes(str)
+		for (let i = 0; i < _runes.length; i++) {
+			const c = _runes[i]
+			{
+				console.log("index:", i, "value:", c) // Note: c will be a rune (int32)
+			}
 		}
 	}
+
+	// Test ranging over a slice without key or value
+	console.log("Ranging over slice (no key/value):")
+	for (let _i = 0; _i < nums.length; _i++) {
+		{
+			console.log("Iterating slice")
+		}
+	}
+
+	// Test ranging over an array without key or value
+	console.log("Ranging over array (no key/value):")
+	for (let _i = 0; _i < arr.length; _i++) {
+		{
+			console.log("Iterating array")
+		}
+	}
+
+	// Test ranging over a string without key or value
+	console.log("Ranging over string (no key/value):")
+	{
+		const _runes = $.stringToRunes(str)
+		for (let i = 0; i < _runes.length; i++) {
+			{
+				console.log("Iterating string")
+			}
+		}
+	}
+
 }
 

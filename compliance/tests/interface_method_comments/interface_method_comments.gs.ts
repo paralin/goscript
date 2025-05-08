@@ -3,7 +3,10 @@
 
 import * as $ from "@goscript/builtin";
 
-type MyInterface = any/* interface: interface{MyMethod()} */
+type MyInterface = null | {
+	// MyMethod is a method with a comment
+	MyMethod(): void
+}
 
 const MyInterface__typeInfo = $.registerType(
   'MyInterface',

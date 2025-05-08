@@ -9,5 +9,15 @@ export function main(): void {
 		console.log("Iteration:", i)
 	}
 	console.log("Loop finished")
+
+	console.log("Starting loop")
+	let x = 0
+	for (let _i = 0; _i < 5; _i++) {
+		{
+			console.log("Iteration:", x)
+			x++
+		}
+	}
+	console.log("Loop finished")
 }
 

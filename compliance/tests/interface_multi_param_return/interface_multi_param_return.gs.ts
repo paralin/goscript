@@ -3,7 +3,9 @@
 
 import * as $ from "@goscript/builtin";
 
-type MultiParamReturner = any/* interface: interface{Process(data []byte, count int, _ string) (bool, error)} */
+type MultiParamReturner = null | {
+	Process(data: $.Slice<number>, count: number, _p2: string): [boolean, $.Error]
+}
 
 const MultiParamReturner__typeInfo = $.registerType(
   'MultiParamReturner',

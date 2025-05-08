@@ -3,7 +3,9 @@
 
 import * as $ from "@goscript/builtin";
 
-type MyInterface = any/* interface: interface{Method1() int} */
+type MyInterface = null | {
+	Method1(): number
+}
 
 const MyInterface__typeInfo = $.registerType(
   'MyInterface',
@@ -54,7 +56,9 @@ class MyStruct {
 	);
 }
 
-type MyOtherInterface = any/* interface: interface{Method1() int} */
+type MyOtherInterface = null | {
+	Method1(): number
+}
 
 const MyOtherInterface__typeInfo = $.registerType(
   'MyOtherInterface',

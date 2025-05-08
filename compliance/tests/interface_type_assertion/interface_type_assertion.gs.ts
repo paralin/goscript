@@ -3,7 +3,9 @@
 
 import * as $ from "@goscript/builtin";
 
-type MyInterface = any/* interface: interface{Method1() int} */
+type MyInterface = null | {
+	Method1(): number
+}
 
 const MyInterface__typeInfo = $.registerType(
   'MyInterface',
@@ -75,6 +77,14 @@ export function main(): void {
 	} else {
 		// expected
 		console.log("Type assertion failed")
+	}
+
+	// assign result to a variable
+	let { value: val, ok: ok2 } = $.typeAssert<MyStruct>(i, 'MyStruct')
+	if (!ok2) {
+		console.log("type assertion failed")
+	} else {
+		console.log("type assertion success", val.Value)
 	}
 }
 

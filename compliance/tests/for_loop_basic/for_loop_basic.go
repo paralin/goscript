@@ -6,4 +6,12 @@ func main() {
 		println("Iteration:", i)
 	}
 	println("Loop finished")
+
+	println("Starting loop")
+	x := 0
+	for range 5 {
+		println("Iteration:", x)
+		x++
+	}
+	println("Loop finished")
 }
