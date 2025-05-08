@@ -1470,12 +1470,27 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				}
 			}
 
-			// Non-null assertion
-			c.tsw.WriteLiterally("(")
+			// Check if the function expression is a variable (nullable function)
+			needsNonNullAssertion := false
+			if tv, ok := c.pkg.TypesInfo.Types[expFun]; ok {
+				// Check if the type is a function type that could be null
+				if _, ok := tv.Type.Underlying().(*types.Signature); ok {
+					// Function types in TypeScript are nullable
+					needsNonNullAssertion = true
+				}
+			}
+
+			if needsNonNullAssertion {
+				c.tsw.WriteLiterally("(")
+			}
+
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
-			c.tsw.WriteLiterally("!)")
+
+			if needsNonNullAssertion {
+				c.tsw.WriteLiterally("!)")
+			}
 
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
