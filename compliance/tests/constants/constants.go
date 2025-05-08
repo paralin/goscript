@@ -18,4 +18,5 @@ func main() {
 	// println(Big) // Commented out until large integer handling is implemented
 	// println(Small) // Commented out as it depends on Big
 	println(Greeting)
+	println(byte(4))
 }

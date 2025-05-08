@@ -43,5 +43,11 @@ export function main(): void {
 	// We need to make sure we don't add .value for this
 	let myStruct = new MyStruct({})
 	;myStruct!.MyInt = 5
+	console.log(myStruct!.MyInt)
+
+	let myOtherStruct = new MyStruct({MyInt: 1})
+	if ((myOtherStruct !== myStruct)) {
+		console.log("expected not equal")
+	}
 }
 

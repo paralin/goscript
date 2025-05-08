@@ -21,5 +21,6 @@ export function main(): void {
 	// println(Big) // Commented out until large integer handling is implemented
 	// println(Small) // Commented out as it depends on Big
 	console.log(Greeting)
+	console.log($.byte(4))
 }
 
