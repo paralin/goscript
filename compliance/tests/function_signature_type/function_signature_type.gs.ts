@@ -15,7 +15,7 @@ type Func3 = (() => void) | null;
 
 let fn3: Func3 = null
 
-type Func4 = ((a: number, b: $.Slice<string>) => void) | null;
+type Func4 = ((a: number, ...b: string[]) => void) | null;
 
 let fn4: Func4 = null
 
