@@ -418,6 +418,7 @@ func (c *GoToTSCompiler) WriteInterfaceType(t *types.Interface, astNode *ast.Int
 // It generates (param1: type1, param2: type2, ...): returnType for function types.
 func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 	c.tsw.WriteLiterally("(")
+	c.tsw.WriteLiterally("(")
 	params := t.Params()
 	for i := 0; i < params.Len(); i++ {
 		if i > 0 {
@@ -436,7 +437,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 	c.tsw.WriteLiterally(")")
 
 	// Handle return types
-	c.tsw.WriteLiterally(": ")
+	c.tsw.WriteLiterally(" => ")
 	results := t.Results()
 	if results.Len() == 0 {
 		c.tsw.WriteLiterally("void")
@@ -453,6 +454,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 		}
 		c.tsw.WriteLiterally("]")
 	}
+	c.tsw.WriteLiterally(") | null")
 }
 
 // writeInterfaceStructure translates a Go `types.Interface` into its TypeScript structural representation.
