@@ -441,6 +441,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 		}
 		c.tsw.WriteLiterally(": ")
 		
+		// we don't want (and can't use) a $.Slice here. write type[]
 		if paramVariadic && paramIsSlice {
 			c.WriteGoType(paramSlice.Elem())
 			c.tsw.WriteLiterally("[]")
@@ -1093,7 +1094,52 @@ func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
 //     the return type is wrapped in `Promise<>` (e.g., `Promise<void>`, `Promise<number>`).
 func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 	c.tsw.WriteLiterally("(")
-	c.WriteFieldList(exp.Params, true) // true = arguments
+
+	// Check if this is a variadic function
+	isVariadic := false
+	if exp.Params != nil && len(exp.Params.List) > 0 {
+		lastParam := exp.Params.List[len(exp.Params.List)-1]
+		if _, ok := lastParam.Type.(*ast.Ellipsis); ok {
+			isVariadic = true
+		}
+	}
+
+	// Write parameters with special handling for variadic
+	if isVariadic {
+		// Write non-variadic parameters
+		for i, field := range exp.Params.List[:len(exp.Params.List)-1] {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteField(field, true)
+		}
+
+		// Write variadic parameter as rest parameter
+		lastParam := exp.Params.List[len(exp.Params.List)-1]
+		if len(exp.Params.List) > 1 {
+			c.tsw.WriteLiterally(", ")
+		}
+
+		// Write parameter name with rest syntax
+		for i, name := range lastParam.Names {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.tsw.WriteLiterally("...")
+			c.tsw.WriteLiterally(name.Name)
+		}
+
+		// Write parameter type as array
+		c.tsw.WriteLiterally(": ")
+		if ellipsis, ok := lastParam.Type.(*ast.Ellipsis); ok {
+			c.WriteTypeExpr(ellipsis.Elt)
+			c.tsw.WriteLiterally("[]")
+		}
+	} else {
+		// Normal parameters
+		c.WriteFieldList(exp.Params, true) // true = arguments
+	}
+
 	c.tsw.WriteLiterally(")")
 	if exp.Results != nil && len(exp.Results.List) > 0 {
 		// Use colon for return type annotation
@@ -1152,6 +1198,7 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 //   - Otherwise, it's translated as a standard TypeScript function call: `funcName(arg1, arg2)`.
 //
 // Arguments are recursively translated using `WriteValueExpr`.
+// Variadic parameters are handled by passing the arguments as an array.
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
 
@@ -1442,16 +1489,20 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			return fmt.Errorf("failed to write method expression in call: %w", err)
 		}
 	}
+
+	// Write arguments
 	c.tsw.WriteLiterally("(")
 	for i, arg := range exp.Args {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
+
 		if err := c.WriteValueExpr(arg); err != nil {
 			return fmt.Errorf("failed to write argument %d in call: %w", i, err)
 		}
 	}
 	c.tsw.WriteLiterally(")")
+
 	return nil
 }
 
