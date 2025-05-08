@@ -64,13 +64,13 @@ export function NewMyError(text: string): $.Box<MyError> | null {
 	return new MyError({s: text})
 }
 
-export function main(): void {
+export async function main() {
 	fn1 = (a: number, b: string): [boolean, $.Error] => {
 		console.log("fn1 called with:", a, b)
 		if (a > 0) {
 			return [true, null]
 		}
-		return [false, NewMyError("a was not positive")]
+		return [false, (NewMyError!)("a was not positive")]
 	}
 
 
@@ -98,7 +98,7 @@ export function main(): void {
 	}
 
 
-	let [res1, err1] = fn1(10, "hello")
+	let [res1, err1] = (fn1!)(10, "hello")
 	console.log("fn1 result 1: ", res1, " ")
 	if (err1 != null) {
 		console.log(err1.Error())
@@ -106,7 +106,7 @@ export function main(): void {
 		console.log("nil")
 	}
 
-	let [res1_2, err1_2] = fn1(-5, "world")
+	let [res1_2, err1_2] = (fn1!)(-5, "world")
 	console.log("fn1 result 2: ", res1_2, " ")
 	if (err1_2 != null) {
 		console.log(err1_2.Error())
@@ -114,16 +114,16 @@ export function main(): void {
 		console.log("nil")
 	}
 
-	let res2 = fn2(5, "hello")
+	let res2 = (fn2!)(5, "hello")
 	console.log("fn2 result 1:", res2)
 
-	let res2_2 = fn2(3, "hey")
+	let res2_2 = (fn2!)(3, "hey")
 	console.log("fn2 result 2:", res2_2)
 
-	fn3()
+	// await (fn3!)()
 
 	fn4(1)
-	fn4(2, "one")
-	fn4(3, "two", "three")
+	(fn4!)(2, "one")
+	(fn4!)(3, "two", "three")
 }
 
