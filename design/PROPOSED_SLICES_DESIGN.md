@@ -1,240 +1,256 @@
-Below is a polished, self-contained TypeScript “slice” library that closely mirrors Go’s slice semantics—underlying array, slice header (pointer+len+cap), low:high[:max] slicing, make, append-with‐possible‐reallocation, bounds‐checking—and a brief outline of the key design decisions, trade-offs, and usage patterns.
+────────────────────────────────────────
+**Go-Slice Emulation in TypeScript**
+────────────────────────────────────────
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-I. High-Level Breakdown
+**1. Overview**
 
-    Go Semantics to Reproduce
-    • Slice header = (data pointer, len, cap)
-    • make([]T, len, cap) ⇒ new backing array, filled with zero/undefined
-    • s[i]—bounds-checked indexing
-    • s[low:high[:max]] ⇒ new header, same backing, len=high−low, cap=max−low or old.cap−low
-    • append(s, elems…) ⇒ if len+elems ≤ cap, write in place; else allocate new backing of larger cap (≈2×), copy, then write; return new slice header
+This document outlines the design for emulating Go's slice behavior in TypeScript. The primary goal is to provide a `Slice<T>` type that closely mimics Go's `[]T`, including its dynamic resizing, capacity management, and sub-slicing semantics. This is achieved through a combination of a core public type, an internal proxy representation for complex slice views, and a set of helper functions.
 
-    TypeScript Representation
-    • Class Slice<T> with private: data: T[], offset: number, len: number, cap: number
-    • Public API:
-    – static make<T>(len: number, cap?: number): Slice<T>
-    – length, capacity getters
-    – get(i), set(i, v) (both bounds-checked)
-    – slice(low, high, max?)
-    – append(...items)
-    – toArray(), Symbol.iterator
+**Key Design Principles:**
+*   **Performance for Simple Cases:** Operations on slices that map directly to a full underlying JavaScript array (offset 0, length equals capacity equals backing array length) should incur minimal overhead.
+*   **Go Semantics Preservation:** Slice operations like sub-slicing (`s[lo:hi]`, `s[lo:hi:max]`), `append`, and `copy` should behave as they do in Go, particularly concerning shared backing arrays and capacity.
+*   **User Transparency:** The distinction between a simple array view and a proxied view should be largely opaque to the end-user programming against `Slice<T>`.
+*   **No Prototype Pollution:** `Array.prototype` will not be modified.
+*   **Tree-Shakeable:** Helper functions will be structured to allow bundlers to remove unused slice functionality.
 
-    Developer UX Considerations
-    – Direct arr[i] syntax is not natively overloadable; for maximum clarity and performance we expose get/set methods.
-    – Optionally, a Proxy factory can wrap a Slice<T> to allow arr[i] and arr[i]=v at the cost of a small runtime penalty.
-    – Familiar Go-style names and behaviors.
+**2. Core Public Type**
 
-    Performance & Safety
-    – Backing array = plain JS Array<T>, no Promise of contiguous memory but near‐equivalent.
-    – Preallocate capacity via new Array(cap) so that array.length=cap; holes are undefined (TS default).
-    – Bounds‐checking throws RangeError.
-    – Amortized O(1) append, O(n) when growing backing.
+```typescript
+/**
+ * Represents a Go-like slice.
+ * It can be a simple JavaScript array or a proxy for more complex views.
+ * This is the 1:1 equivalent of Go’s `[]T`.
+ */
+export type Slice<T> = T[] | SliceProxy<T>;
+```
+*   When the slice view is "simple" (i.e., offset 0, `len === cap === backingArray.length`), a plain JavaScript `T[]` is used for optimal performance.
+*   Any divergence from this simple view (e.g., due to sub-slicing with `goSlice`, manual capacity setting with `makeSlice`, or `append` operations that re-allocate or extend within capacity) results in the use of a `SliceProxy<T>`.
 
-    Testing & Pitfalls
-    – Fully bounds‐checked, so no hidden off‐by‐one.
-    – Uses max parameter to enforce Go’s full slice expression.
-    – Default “zero value” = undefined (cannot emulate Go’s numeric zero generically).
-    – Proxy index‐overload is optional/opt-in.
+**3. Internal Representation**
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-II. The Code
+Two key internal structures define how slices are managed:
 
-// slice.ts
-
-export class Slice<T> {
-  // Underlying array, full capacity
-  private data: T[];
-  // Offset within data
-  private offset: number;
-  // Visible length
-  private len: number;
-  // Capacity from offset
-  private cap: number;
-
-  private constructor(data: T[], offset: number, len: number, cap: number) {
-    this.data = data;
-    this.offset = offset;
-    this.len = len;
-    this.cap = cap;
-  }
-
-  // Create a new slice with given length and optional capacity
-  static make<T>(length: number, capacity?: number): Slice<T> {
-    if (length < 0) throw new RangeError("make: negative length");
-    const cap = capacity === undefined ? length : capacity;
-    if (cap < length) throw new RangeError("make: capacity < length");
-    // Pre-allocate backing array; holes = undefined
-    const arr = new Array<T>(cap);
-    return new Slice(arr, 0, length, cap);
-  }
-
-  // Number of accessible elements
-  get length(): number {
-    return this.len;
-  }
-
-  // Maximum number of elements before reallocation
-  get capacity(): number {
-    return this.cap;
-  }
-
-  // Bounds-checked read
-  get(index: number): T {
-    if (index < 0 || index >= this.len) {
-      throw new RangeError(`index ${index} out of range [0, ${this.len})`);
-    }
-    return this.data[this.offset + index];
-  }
-
-  // Bounds-checked write
-  set(index: number, value: T): void {
-    if (index < 0 || index >= this.len) {
-      throw new RangeError(`index ${index} out of range [0, ${this.len})`);
-    }
-    this.data[this.offset + index] = value;
-  }
-
-  // low:high[:max] slicing
-  slice(low: number = 0, high?: number, max?: number): Slice<T> {
-    if (low < 0 || low > this.len) {
-      throw new RangeError("slice: low out of range");
-    }
-    const h = high === undefined ? this.len : high;
-    if (h < low || h > this.len) {
-      throw new RangeError("slice: high out of range");
-    }
-    const newLen = h - low;
-
-    let newCap: number;
-    if (max !== undefined) {
-      if (max < h || max > this.cap) {
-        throw new RangeError("slice: max out of range");
-      }
-      newCap = max - low;
-    } else {
-      newCap = this.cap - low;
-    }
-
-    return new Slice(
-      this.data,
-      this.offset + low,
-      newLen,
-      newCap
-    );
-  }
-
-  // Append items; returns a new slice header (which may share or reallocate)
-  append(...items: T[]): Slice<T> {
-    const totalNewLen = this.len + items.length;
-    if (items.length === 0) {
-      // No change
-      return new Slice(this.data, this.offset, this.len, this.cap);
-    }
-    if (totalNewLen <= this.cap) {
-      // In-place: write into backing
-      for (let i = 0; i < items.length; i++) {
-        this.data[this.offset + this.len + i] = items[i];
-      }
-      return new Slice(this.data, this.offset, totalNewLen, this.cap);
-    }
-
-    // Need to grow: newCap ≈ max(oldCap*2, totalNewLen)
-    let newCap = Math.max(this.cap * 2, totalNewLen);
-    if (newCap < 1) newCap = 1;
-    const newData = new Array<T>(newCap);
-    // Copy existing elements
-    for (let i = 0; i < this.len; i++) {
-      newData[i] = this.data[this.offset + i];
-    }
-    // Append new
-    for (let i = 0; i < items.length; i++) {
-      newData[this.len + i] = items[i];
-    }
-    return new Slice(newData, 0, totalNewLen, newCap);
-  }
-
-  // Convert to a plain TS array of length `len`
-  toArray(): T[] {
-    return this.data.slice(this.offset, this.offset + this.len);
-  }
-
-  // Make it iterable (for...of)
-  *[Symbol.iterator](): IterableIterator<T> {
-    for (let i = 0; i < this.len; i++) {
-      yield this.data[this.offset + i];
-    }
-  }
+```typescript
+/**
+ * Hidden metadata object that stores the Go-specific properties of a slice.
+ * This object is held by SliceProxy instances.
+ */
+interface GoSliceObject<T> {
+  readonly backing: T[];   // The shared JavaScript array storing the actual data.
+  readonly offset: number; // The starting index of this slice within the 'backing' array.
+  readonly len:    number; // The visible length of the slice (number of elements).
+  readonly cap:    number; // The available capacity of the slice (len <= cap).
+                           // (offset + cap <= backing.length)
 }
 
-// Optional helper to get Proxy-based indexing (arr[0], arr[0] = v)
-export function proxySlice<T>(s: Slice<T>): Slice<T> & { [i: number]: T } {
-  return new Proxy(s as any, {
-    get(target, prop: string | symbol) {
-      if (typeof prop === "string" && /^\d+$/.test(prop)) {
-        return target.get(Number(prop));
-      }
-      // @ts-ignore
-      return target[prop];
-    },
-    set(target, prop: string | symbol, value) {
-      if (typeof prop === "string" && /^\d+$/.test(prop)) {
-        target.set(Number(prop), value);
-        return true;
-      }
-      // @ts-ignore
-      target[prop] = value;
-      return true;
-    },
-  });
+/**
+ * The proxy type that user code interacts with when a slice isn't a simple T[].
+ * It provides Go-like indexed access, length, and selected array methods.
+ */
+export type SliceProxy<T> = {
+  /**
+   * Indexed access for reading and writing elements.
+   * Enforces Go-style bounds checking (panic on out-of-bounds for read,
+   * specific behavior for write at 'len' if 'len < cap').
+   */
+  [k: number]: T;
+
+  /**
+   * Read-only property mirroring Go’s `len()` function.
+   * Reflects the current number of accessible elements in the slice.
+   */
+  readonly length: number;
+
+  /** Standard array helper methods, operating on the visible slice view. */
+  map<U>(callbackfn: (value: T, index: number, slice: SliceProxy<T>) => U): U[];
+  filter(predicate: (value: T, index: number, slice: SliceProxy<T>) => boolean): T[];
+  reduce<U>(
+    callbackfn: (previousValue: U, currentValue: T, currentIndex: number, slice: SliceProxy<T>) => U,
+    initialValue: U
+  ): U;
+  forEach(callbackfn: (value: T, index: number, slice: SliceProxy<T>) => void): void;
+  [Symbol.iterator](): IterableIterator<T>;
+
+  /**
+   * Standard JavaScript `slice` method.
+   * Returns a *new, plain JavaScript array* containing a shallow copy of the
+   * elements within the specified range of the Go slice's visible part.
+   * This does NOT return a Go `Slice<T>`.
+   */
+  slice(start?: number, end?: number): T[];
+
+  /**
+   * Internal property holding the GoSliceObject metadata.
+   * This is not intended for direct user access and will not be exposed in .d.ts files
+   * shipped to users, but is crucial for the proxy's and helper functions' operations.
+   */
+  readonly __meta__: GoSliceObject<T>;
+};
+```
+
+**Implementation Note on `SliceProxy<T>`:**
+`SliceProxy<T>` instances are created using `new Proxy(target, handler)`.
+*   The `target` is a lightweight object, often just containing the `__meta__` data or being the conceptual slice itself.
+*   The `handler` (see Section 6: Proxy Behaviour) intercepts property access:
+    *   Numeric indices are mapped to `__meta__.backing` using `__meta__.offset`, with bounds checking.
+    *   `"length"` reads return `__meta__.len`.
+    *   Recognized array helper methods are bound to operate on the logical view `__meta__.backing.slice(__meta__.offset, __meta__.offset + __meta__.len)`.
+    *   Access to `__meta__` is provided directly.
+
+**4. Helper Runtime (`builtin.ts`)**
+
+All Go slice operations are implemented as helper functions, typically within a dedicated namespace (e.g., `$` or `builtin`).
+
+```typescript
+export namespace $ { // Or other suitable namespace like 'builtin'
+  /**
+   * Creates a new slice, analogous to Go’s `make([]T, len, cap)`.
+   * @param len The desired length of the slice.
+   * @param cap Optional. The desired capacity. Defaults to `len`.
+   * @param zeroCtor Optional. A factory function to produce the zero-value for
+   *                 non-primitive element types.
+   * @returns A new Slice<T>.
+   */
+  function makeSlice<T>(
+      len: number,
+      cap?: number,
+      zeroCtor?: () => T
+  ): Slice<T>;
+
+  /**
+   * Returns the length of a slice or string, analogous to Go’s `len(x)`.
+   * Aliases to `.length` for arrays or proxies.
+   * @param x The slice or string.
+   * @returns The length.
+   */
+  function len(x: Slice<unknown> | string): number;
+
+  /**
+   * Returns the capacity of a slice, analogous to Go’s `cap(x)`.
+   * @param x The slice.
+   * @returns The capacity.
+   */
+  function cap<T>(x: Slice<T>): number;
+
+  /**
+   * Creates a new slice from an existing slice, analogous to Go’s
+   * `s = s[lo:hi]` (2-index form) or `s = s[lo:hi:max]` (3-index form).
+   * @param src The source slice.
+   * @param lo The low bound (inclusive).
+   * @param hi The high bound (exclusive).
+   * @param max Optional. The new capacity relative to the start of the source slice's
+   *            backing array (for 3-index form). `newCap = max - lo`.
+   * @returns A new Slice<T> viewing a portion of the source's backing array.
+   */
+  function goSlice<T>(
+      src: Slice<T>,
+      lo: number,
+      hi: number,
+      max?: number
+  ): Slice<T>;
+
+  /**
+   * Appends elements to a slice, analogous to Go’s `append(dst, ...src)`.
+   * Handles capacity and potential reallocation.
+   * @param dst The destination slice.
+   * @param srcElements Elements or other slices/arrays to append.
+   * @returns The potentially new Slice<T> (if reallocation occurred or length changed).
+   */
+  function append<T>(
+      dst: Slice<T>,
+      ...srcElements: (T | T[] | Slice<T>)[]
+  ): Slice<T>;
+
+  /**
+   * Copies elements from a source slice to a destination slice,
+   * analogous to Go’s `copy(dst, src)`.
+   * @param dst The destination slice.
+   * @param src The source slice.
+   * @returns The number of elements copied (the minimum of `len(dst)` and `len(src)`).
+   */
+  function copy<T>(dst: Slice<T>, src: Slice<T>): number;
 }
+```
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-III. Usage Examples
+**4.1. Conversion Rules Implemented by Helpers**
 
-import { Slice, proxySlice } from "./slice";
+*   **Simplicity Preference:** Helper functions (`makeSlice`, `goSlice`, `append`) will return a plain `T[]` if the resulting slice's properties (`offset`, `len`, `cap`) perfectly align with a "simple view" of its backing array (offset 0, `len === cap === backing.length`). Otherwise, a `SliceProxy<T>` is returned, with its `__meta__` property correctly configured.
+*   **`append` Reallocation:**
+    *   `append` extends the slice in-place if the current `cap()` is sufficient for the new elements. The `len` is updated.
+    *   If `cap()` is insufficient, a *new* backing array is allocated (typically with doubled capacity or as needed). Elements are copied from the old backing to the new one.
+    *   Crucially, if a new backing array is allocated, any other existing slices that previously shared the *old* backing array continue to reference it, unaffected by the `append` operation on the specific `dst` slice. This mirrors Go's behavior.
+    *   The `append` function always returns the (potentially new) slice reference, which must be reassigned (e.g., `s = $.append(s, ...)`).
+*   **`goSlice` Optimization:** If `goSlice` is called on a simple `T[]` with `lo === 0`, `hi === originalArray.length`, and `max` is omitted (or `max === originalArray.length`), the function will return the *same `T[]` instance* to avoid unnecessary proxy creation.
 
-// 1) make
-const s0 = Slice.make<number>(3, 5);
-// len=3, cap=5, contents=[undefined,undefined,undefined]
-s0.set(0, 10); s0.set(1, 20); s0.set(2, 30);
+**5. Compiler Translation Strategy (Go → TypeScript Transpiler)**
 
-// 2) basic indexing
-console.log(s0.get(1)); // 20
+The transpiler will perform syntactic rewrites. It will not emit `Proxy` instances directly; these are created dynamically within the helper functions.
 
-// 3) slicing
-const s1 = s0.slice(1, 3);  // length=2, capacity=4
-console.log(s1.toArray()); // [20, 30]
+*   **a) Type Lowering:**
+    *   Go `[]T` ➜ TypeScript `Slice<T>` (imported from the `builtin` module).
+    *   Go `[N]T` (fixed-size array) ➜ TypeScript `T[]` (plain JavaScript array, with length `N`).
+*   **b) Literals:**
+    *   Go: `[]int{1, 2, 3}` ➜ TS: `[1, 2, 3]` (A plain `number[]`, assignable to `Slice<number>`).
+*   **c) Standard Slice Operations:**
+    *   Go: `s := make([]int, 0, 4)` ➜ TS: `let s: Slice<number> = $.makeSlice<number>(0, 4);`
+    *   Go: `s = append(s, v)` ➜ TS: `s = $.append(s, v);`
+    *   Go: `l := len(s)` ➜ TS: `const l = $.len(s);` (or `s.length` if type is narrowed)
+    *   Go: `c := cap(s)` ➜ TS: `const c = $.cap(s);`
+    *   Go: `n := copy(dst, src)` ➜ TS: `const n = $.copy(dst, src);`
+*   **d) Element Access:**
+    *   Go: `x = s[i]` ➜ TS: `x = s[i];`
+    *   Go: `s[i] = y` ➜ TS: `s[i] = y;`
+    *   Bounds checking:
+        *   If `s` is a `SliceProxy<T>`, the proxy's `get`/`set` traps provide Go-style bounds checking.
+        *   If `s` is a plain `T[]` (simple view or result of Go fixed-size array), indexing relies on JavaScript's behavior (returns `undefined` for out-of-bounds read, extends array for out-of-bounds write if not sparse). The transpiler should ensure that for code translated from Go's fixed-size arrays, indices are statically known to be in range. For `Slice<T>` that happens to be `T[]`, runtime behavior differs from Go's panic unless explicitly handled by proxy or wrapper functions.
+*   **e) Three-Index Slicing:**
+    *   Go: `t := s[lo:hi:max]` ➜ TS: `let t = $.goSlice(s, lo, hi, max);`
+*   **f) Iteration (Range Loops):**
+    *   Go: `for i, v := range s` ➜ TS: `for (const [i, v] of $.iterable(s).entries())` or similar, leveraging `Symbol.iterator` (the proxy must supply `Symbol.iterator` for `for...of` directly, or a helper can adapt it). A simple `for (const v of s)` would also work if only values are needed. For index and value, `s.entries()` (if available on proxy) or a custom iterator from helpers. A common approach is to ensure `SliceProxy` implements `[Symbol.iterator]()` yielding `T` and helper functions provide `entries(Slice<T>)` yielding `[number, T]`.
+    *   To ensure correct iteration over the *logical view* of the slice, the `SliceProxy` will implement `Symbol.iterator`. Plain arrays iterate naturally.
 
-// 4) append within cap
-const s2 = s1.append(40, 50); 
-console.log(s2.toArray()); // [20,30,40,50], cap still ≥4
+**6. Zero Value Handling**
 
-// 5) append overflow ⇒ reallocate
-const s3 = s2.append(60, 70, 80); 
-console.log(s3.length, s3.capacity); 
-console.log(s3.toArray()); // [20,30,40,50,60,70,80]
+`$.makeSlice(len, cap, zeroCtor)` must initialize the `backing` array elements from index `0` to `cap - 1`.
+*   **Primitive Types (`number`, `boolean`, `string`, `bigint`):** The backing array elements can be left as JavaScript's `undefined`. When accessed via a `SliceProxy<T>`, the `get` trap will convert `undefined` to the corresponding Go zero value (e.g., `0` for `number`, `false` for `boolean`, `""` for `string`) lazily upon read if needed.
+*   **Non-Primitive Types (e.g., objects/structs):**
+    *   If the transpiler can statically determine a zero-value constructor for `T` (e.g., for a struct type like `{ field: 0 }`), it will pass this `zeroCtor` to `$.makeSlice`. `$.makeSlice` will then populate the backing array up to `cap` with instances created by `zeroCtor()`.
+    *   If no `zeroCtor` is provided, elements will be `undefined`. User code must then assign or append values before reading them, mirroring Go's behavior where uninitialized struct fields within a slice hold their respective zero values. Accessing an `undefined` non-primitive element via proxy might result in an error or a default empty object, depending on desired strictness.
 
-// 6) for-of iteration
-for (const v of s3) {
-  console.log(v);
-}
+**7. Proxy Behaviour – Detailed Notes (`SliceProxy<T>` Handler)**
 
-// 7) Proxy‐based indexing (opt-in)
-let p = proxySlice(Slice.make<string>(2,4));
-p[0] = "hello";
-p[1] = "world";
-console.log(p[0], p[1]);  // ok!
+The `Proxy` handler for `SliceProxy<T>` implements the following:
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-IV. Trade-offs & Pitfalls
+*   **`get(target, property, receiver)` trap:**
+    *   If `property` is a numeric string:
+        *   Convert `property` to `index = Number(property)`.
+        *   Check if `index >= 0 && index < target.__meta__.len`.
+        *   If in bounds: return `target.__meta__.backing[target.__meta__.offset + index]` (with potential lazy zero-value conversion for primitives if element is `undefined`).
+        *   If out of bounds: throw a runtime error ("panic: runtime error: index out of range").
+    *   If `property` is `"length"`: return `target.__meta__.len`.
+    *   If `property` is `"__meta__"`: return `target.__meta__`.
+    *   If `property` is one of the recognized array helper method names (e.g., `map`, `filter`, `reduce`, `forEach`, `slice`, `Symbol.iterator`):
+        *   Return a function that, when called, applies the corresponding JavaScript array method to a *materialized temporary array* representing the current slice view: `target.__meta__.backing.slice(target.__meta__.offset, target.__meta__.offset + target.__meta__.len)`.
+        *   The `this` context for these helper methods should be the proxy itself.
+    *   Otherwise: `Reflect.get(target, property, receiver)`.
 
-• Default values are undefined—cannot generically produce Go’s type-specific zeros.
-• You must use get/set (or opt into the Proxy wrapper) rather than raw [] indexing.
-• No built-in .map/.filter—you can always do slice.toArray().map(...).
-• Runtime bounds-checking adds minimal overhead but prevents silent bugs.
-• Append growth factor is 2× for amortized performance, matching Go’s typical strategy.
-• Slicing with a max argument enforces “full slice expression” capacity limits.
+*   **`set(target, property, value, receiver)` trap:**
+    *   If `property` is a numeric string:
+        *   Convert `property` to `index = Number(property)`.
+        *   Check if `index >= 0 && index < target.__meta__.len`.
+        *   If in bounds: `target.__meta__.backing[target.__meta__.offset + index] = value; return true;`.
+        *   **Design Choice for `s[len] = x`:** If `index === target.__meta__.len` AND `target.__meta__.len < target.__meta__.cap`:
+            *   This specific case will effectively perform a single-element append. The element `value` is assigned to `target.__meta__.backing[target.__meta__.offset + index]`, and `target.__meta__.len` is incremented. This behavior is chosen for convenience, emulating the *result* of an append that fits within capacity. `return true;`.
+            *   *(Alternative stricter Go behavior: `s[len] = x` would always be an out-of-bounds error. The chosen design makes assignment at `len` a growth operation if capacity permits.)*
+        *   If out of bounds (and not the special `len < cap` case): throw a runtime error ("panic: runtime error: index out of range").
+    *   If `property` is `"length"` or `"__meta__"` (or other `readonly` properties): `return false;` (assignment fails, or throw error for stricter behavior).
+    *   Otherwise: `Reflect.set(target, property, value, receiver)`.
 
-––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––––
-This library gives you almost drop-in Go slice behavior in TypeScript—static typing on T, explicit capacity and length tracking, efficient append, safe slicing, and clear error reporting.
+*   **Other traps (e.g., `has`, `ownKeys`):** Can be implemented as needed to fully emulate array-like behavior for operations like `in` operator or `Object.keys()`. `ownKeys` should typically report numeric indices from `0` to `len-1`, plus `length` and other defined properties.
+
+**8. Goals**
+
+*   **No Mutation of `Array.prototype`:** The global `Array.prototype` will remain untouched.
+*   **Opaque Transitions:** The transition between a `T[]` representation and a `SliceProxy<T>` representation for a `Slice<T>` variable will be transparent to user code. The type `Slice<T>` abstracts this away.
+*   **Minimized Overhead:** For "simple view" slices, operations will be close to raw JavaScript array performance. Proxies are only introduced when Go's more complex semantics (offset, distinct len/cap) are required.
+*   **Tree-Shakeable Helpers:** All helper functions (`$.makeSlice`, `$.append`, etc.) will be exported from ES modules, allowing unused functions to be eliminated by modern bundlers if a program does not utilize them.

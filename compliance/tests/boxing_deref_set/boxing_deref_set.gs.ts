@@ -14,15 +14,15 @@ export function main(): void {
 	/* _ = */ p1_boxer
 
 	// Expected TS: p1.value = y
-	p1.value = y
+	p1!.value = y
 
 	// Dereferencing p1 (boxed variable) to access y (boxed variable)
 	// Go: println(*p1)
 	// Expected TS for same behavior: console.log(p1.value.value)
 	// We access p1 which should be p1.value. Then we dereference that, which should be p1.value.value.
-	console.log(p1.value!.value)
+	console.log(p1!.value!.value)
 
 	// Set the value
-	p1.value!.value = 20
+	p1!.value!.value = 20
 }
 

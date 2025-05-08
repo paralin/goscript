@@ -270,8 +270,8 @@ type GoToTSCompiler struct {
 	analysis *Analysis // Holds analysis information for code generation decisions
 }
 
-// WriteGoType translates a `go/types.Type` into its corresponding TypeScript
-// type representation and writes it using the `TSCodeWriter`.
+// WriteGoType writes the type representation using the `TSCodeWriter`.
+// This is the primary method for translating Go types to TypeScript types.
 // It handles various Go types:
 //   - Basic types (int, string, bool, etc.) are mapped to TypeScript primitives (number, string, boolean).
 //     Untyped Go constants are mapped to their closest TypeScript equivalents.
@@ -288,26 +288,33 @@ type GoToTSCompiler struct {
 //
 // Unsupported or unrecognized types are translated to `any` with a comment.
 func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
+	if typ == nil {
+		c.tsw.WriteLiterally("any")
+		c.tsw.WriteCommentInline("nil type")
+		return
+	}
+
 	switch t := typ.(type) {
 	case *types.Basic:
 		// Handle basic types (int, string, etc.)
 		name := t.Name()
 
 		// Handle untyped constants by mapping them to appropriate TypeScript types
-		// if t.Info()&types.IsUntyped != 0
-		switch t.Kind() {
-		case types.UntypedBool:
-			c.tsw.WriteLiterally("boolean")
-			return
-		case types.UntypedInt, types.UntypedFloat, types.UntypedComplex, types.UntypedRune:
-			c.tsw.WriteLiterally("number")
-			return
-		case types.UntypedString:
-			c.tsw.WriteLiterally("string")
-			return
-		case types.UntypedNil:
-			c.tsw.WriteLiterally("null")
-			return
+		if t.Info()&types.IsUntyped != 0 {
+			switch t.Kind() {
+			case types.UntypedBool:
+				c.tsw.WriteLiterally("boolean")
+				return
+			case types.UntypedInt, types.UntypedFloat, types.UntypedComplex, types.UntypedRune:
+				c.tsw.WriteLiterally("number")
+				return
+			case types.UntypedString:
+				c.tsw.WriteLiterally("string")
+				return
+			case types.UntypedNil:
+				c.tsw.WriteLiterally("null")
+				return
+			}
 		}
 
 		// For typed basic types, use the existing mapping
@@ -319,7 +326,6 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	case *types.Named:
 		// Handle named types (custom types)
 		// Check if the named type is the error interface
-		// Use Underlying() to handle type aliases correctly.
 		if iface, ok := t.Underlying().(*types.Interface); ok && iface.String() == "interface{Error() string}" {
 			c.tsw.WriteLiterally("$.Error")
 		} else {
@@ -328,24 +334,18 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 		}
 	case *types.Pointer:
 		// Write pointer type *T as $.Box<T_ts> | null
-		// T_ts is the result of recursively calling WriteGoType on the element type.
 		c.tsw.WriteLiterally("$.Box<")
 		c.WriteGoType(t.Elem())
 		c.tsw.WriteLiterally("> | null") // Pointers are always nullable
-	case *types.Slice, *types.Array:
-		// Handle array/slice types: []T becomes $.Slice<T>, [N]T becomes T[]
-		var elemType types.Type
-		if slice, ok := t.(*types.Slice); ok {
-			elemType = slice.Elem()
-			c.tsw.WriteLiterally("$.Slice<") // Use $.Slice<T> for Go slices
-			c.WriteGoType(elemType)
-			c.tsw.WriteLiterally(">")
-		} else if array, ok := t.(*types.Array); ok {
-			elemType = array.Elem()
-			c.WriteGoType(elemType)
-			// Arrays remain as regular TS arrays
-			c.tsw.WriteLiterally("[]") // Arrays cannot be nil
-		}
+	case *types.Slice:
+		// Handle slice types: []T becomes $.Slice<T>
+		c.tsw.WriteLiterally("$.Slice<")
+		c.WriteGoType(t.Elem())
+		c.tsw.WriteLiterally(">")
+	case *types.Array:
+		// Handle array types: [N]T becomes T[]
+		c.WriteGoType(t.Elem())
+		c.tsw.WriteLiterally("[]") // Arrays cannot be nil
 	case *types.Map:
 		// Handle map types (map[K]V becomes Map<K_ts, V_ts>)
 		c.tsw.WriteLiterally("Map<")
@@ -364,14 +364,51 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 			c.tsw.WriteLiterally("$.Error")
 		} else {
 			// For other interfaces, write "any" or a more specific representation if available
-			// TODO: Improve interface representation (e.g., structural typing)
 			c.tsw.WriteLiterally("any")
-			c.tsw.WriteCommentInline(fmt.Sprintf("unhandled interface type: %s", t.String()))
+			c.tsw.WriteCommentInline(fmt.Sprintf("interface: %s", t.String()))
+		}
+	case *types.Signature:
+		// Handle function types
+		c.tsw.WriteLiterally("(")
+		params := t.Params()
+		for i := 0; i < params.Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			param := params.At(i)
+			// Use parameter name if available, otherwise use p0, p1, etc.
+			if param.Name() != "" {
+				c.tsw.WriteLiterally(param.Name())
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("p%d", i))
+			}
+			c.tsw.WriteLiterally(": ")
+			c.WriteGoType(param.Type())
+		}
+		c.tsw.WriteLiterally(")")
+
+		// Handle return types
+		c.tsw.WriteLiterally(": ")
+		results := t.Results()
+		if results.Len() == 0 {
+			c.tsw.WriteLiterally("void")
+		} else if results.Len() == 1 {
+			c.WriteGoType(results.At(0).Type())
+		} else {
+			// Multiple return values -> tuple
+			c.tsw.WriteLiterally("[")
+			for i := 0; i < results.Len(); i++ {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteGoType(results.At(i).Type())
+			}
+			c.tsw.WriteLiterally("]")
 		}
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
-		c.tsw.WriteCommentInline(fmt.Sprintf("unhandled type: %T (%s)", typ, typ.String()))
+		c.tsw.WriteCommentInline(fmt.Sprintf("unhandled type: %T", typ))
 	}
 }
 
@@ -389,12 +426,10 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 
 // WriteZeroValueForType writes the TypeScript representation of the zero value
 // for a given Go type.
-// It handles `types.Array` and `ast.ArrayType` by recursively writing zero values
-// for each element to form a TypeScript array literal (e.g., `[0, 0, 0]`).
+// It handles `types.Array` by recursively writing zero values for each element
+// to form a TypeScript array literal (e.g., `[0, 0, 0]`).
 // For `types.Basic` (like `bool`, `string`, numeric types), it writes the
 // corresponding TypeScript zero value (`false`, `""`, `0`).
-// For `ast.Ident` representing basic Go types, it maps them to their TypeScript
-// zero values.
 // Other types default to `null`. This function is primarily used for initializing
 // arrays and variables where an explicit initializer is absent.
 func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
@@ -408,22 +443,15 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 			c.WriteZeroValueForType(t.Elem())
 		}
 		c.tsw.WriteLiterally("]")
-	case *ast.ArrayType:
-		// Try to get length from AST
-		length := 0
-		if bl, ok := t.Len.(*ast.BasicLit); ok && bl.Kind == token.INT {
-			if _, err := fmt.Sscan(bl.Value, &length); err != nil {
-				c.tsw.WriteCommentInline(fmt.Sprintf("error parsing array length for zero value: %v", err))
+	case *ast.Expr:
+		// For AST expressions, get the type and handle that instead
+		if expr := *t; expr != nil {
+			if typ := c.pkg.TypesInfo.TypeOf(expr); typ != nil {
+				c.WriteZeroValueForType(typ)
+				return
 			}
 		}
-		c.tsw.WriteLiterally("[")
-		for i := 0; i < length; i++ {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-			c.WriteZeroValueForType(t.Elt)
-		}
-		c.tsw.WriteLiterally("]")
+		c.tsw.WriteLiterally("null")
 	case *types.Basic:
 		switch t.Kind() {
 		case types.Bool:
@@ -433,75 +461,29 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 		default:
 			c.tsw.WriteLiterally("0")
 		}
-	case *ast.Ident:
-		// Try to map Go builtins
-		if tsname, ok := GoBuiltinToTypescript(t.Name); ok {
-			switch tsname {
-			case "boolean":
-				c.tsw.WriteLiterally("false")
-			case "string":
-				c.tsw.WriteLiterally(`""`)
-			default:
-				c.tsw.WriteLiterally("0")
-			}
-		} else {
-			c.tsw.WriteLiterally("null")
-		}
 	default:
 		c.tsw.WriteLiterally("null")
 	}
 }
 
 // WriteTypeExpr translates a Go abstract syntax tree (AST) expression (`ast.Expr`)
-// that represents a type into its TypeScript type equivalent.
+// that represents a type into its TypeScript type equivalent using type information.
+//
 // It handles various Go type expressions:
-// - Identifiers (`ast.Ident`): Delegates to `WriteIdentType`.
-// - Selector expressions (`ast.SelectorExpr`, e.g., `pkg.Type`): Delegates to `WriteSelectorExprType`.
-// - Pointer types (`ast.StarExpr`, e.g., `*T`): Delegates to `WriteStarExprType`.
-// - Struct types (`ast.StructType`): Delegates to `WriteStructType`.
-// - Interface types (`ast.InterfaceType`): Delegates to `WriteInterfaceType`.
-// - Function types (`ast.FuncType`): Delegates to `WriteFuncType`.
-// - Array types (`ast.ArrayType`, e.g., `[N]T`): Translates to `T_ts[]`.
-// - Map types (`ast.MapType`, e.g., `map[K]V`): Translates to `{ [key: K_ts]: V_ts }`.
-// - Channel types (`ast.ChanType`, e.g., `chan T`): Translates to `$.Channel<T_ts>`.
-// Unhandled type expressions result in a comment indicating the unhandled case.
+// - Basic types (e.g., int, string, bool) -> TypeScript primitives (number, string, boolean)
+// - Named types -> TypeScript class/interface names
+// - Pointer types (`*T`) -> `$.Box<T_ts> | null`
+// - Slice types (`[]T`) -> `$.Slice<T_ts>`
+// - Array types (`[N]T`) -> `T_ts[]`
+// - Map types (`map[K]V`) -> `Map<K_ts, V_ts>`
+// - Channel types (`chan T`) -> `$.Channel<T_ts>`
+// - Struct types -> TypeScript object types or class names
+// - Interface types -> TypeScript interface types or "any"
+// - Function types -> TypeScript function signatures
 func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
-	switch exp := a.(type) {
-	case *ast.Ident:
-		c.WriteIdentType(exp)
-	case *ast.SelectorExpr:
-		if err := c.WriteSelectorExprType(exp); err != nil {
-			c.tsw.WriteCommentInline(fmt.Sprintf("error writing selector expr type: %v", err))
-		}
-	case *ast.StarExpr:
-		c.WriteStarExprType(exp)
-	case *ast.StructType:
-		c.WriteStructType(exp)
-	case *ast.InterfaceType:
-		if err := c.WriteInterfaceType(exp); err != nil {
-			c.tsw.WriteCommentInline(fmt.Sprintf("error writing interface type: %v", err))
-		}
-	case *ast.FuncType:
-		c.WriteFuncType(exp, false) // Function types are not async
-	case *ast.ArrayType:
-		// Translate [N]T to T[]
-		c.WriteTypeExpr(exp.Elt)
-		c.tsw.WriteLiterally("[]")
-	case *ast.MapType:
-		// Map<K,V> → TS object type { [key: K]: V }
-		c.tsw.WriteLiterally("{ [key: ")
-		c.WriteTypeExpr(exp.Key)
-		c.tsw.WriteLiterally("]: ")
-		c.WriteTypeExpr(exp.Value)
-		c.tsw.WriteLiterally(" }")
-	case *ast.ChanType:
-		// Translate channel types to $.Channel<T>
-		c.tsw.WriteLiterally("$.Channel<")
-		c.WriteTypeExpr(exp.Value) // Write the element type
-		c.tsw.WriteLiterally(">")
-	default:
-		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled type expr: %T (map/chan support pending)", exp))
-	}
+	// Get type information for the expression and use WriteGoType
+	typ := c.pkg.TypesInfo.TypeOf(a)
+	c.WriteGoType(typ)
 }
 
 // WriteValueExpr translates a Go abstract syntax tree (AST) expression (`ast.Expr`)
@@ -699,58 +681,6 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 
 // --- Exported Node-Specific Writers ---
 
-// WriteIdentType translates a Go identifier (`ast.Ident`) used as a type
-// into its TypeScript type equivalent.
-// Special cases:
-// - `error` becomes `$.Error`.
-// - `nil` becomes `null`.
-// For Go built-in primitive types (e.g., `int`, `string`), it uses the mapping
-// provided by `GoBuiltinToTypescript`.
-// For other identifiers, it uses `go/types` information (`TypesInfo.Uses` or `Defs`)
-// to resolve the identifier. If the resolved object is not a `types.TypeName`,
-// a comment is added indicating a potential misuse. The identifier's name is
-// then written literally, assuming it refers to a type defined elsewhere
-// (e.g., a custom struct or interface type).
-func (c *GoToTSCompiler) WriteIdentType(exp *ast.Ident) {
-	name := exp.Name
-
-	// Special case for the built-in error interface
-	// Handle built-in types and error interface
-	switch name {
-	case "error":
-		c.tsw.WriteLiterally("$.Error")
-		return
-	case "nil":
-		c.tsw.WriteLiterally("null")
-		return
-	}
-
-	if tsname, ok := GoBuiltinToTypescript(name); ok {
-		// It's a Go builtin type, use its TypeScript equivalent
-		name = tsname
-	} else {
-		// Not a Go builtin. Use TypesInfo to validate and resolve the type
-		obj := c.pkg.TypesInfo.Uses[exp]
-		if obj == nil {
-			obj = c.pkg.TypesInfo.Defs[exp]
-		}
-
-		if obj != nil {
-			// Check if this identifier actually refers to a type
-			if _, isType := obj.(*types.TypeName); !isType {
-				// This identifier doesn't refer to a type, which is likely a mistake
-				c.tsw.WriteCommentInline(fmt.Sprintf("ident %q used as type but is %T", name, obj))
-			}
-
-			// if pkg := obj.Pkg(); pkg != nil && pkg != c.pkg.Types
-			//   This is an imported type - in generated TS this should already be handled
-			//   by proper import statements and scope resolution.
-		}
-	}
-
-	c.tsw.WriteLiterally(name)
-}
-
 // WriteIdent translates a Go identifier (`ast.Ident`) used as a value (e.g.,
 // variable, function name) into its TypeScript equivalent.
 //   - If the identifier is `nil`, it writes `null`.
@@ -780,24 +710,8 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
 
 	// Determine if we need to access .value based on analysis data
 	if obj != nil && accessBoxedValue && c.analysis.NeedsBoxedAccess(obj) {
-		c.tsw.WriteLiterally(".value")
+		c.tsw.WriteLiterally("!.value")
 	}
-}
-
-// WriteSelectorExprType translates a Go selector expression (`ast.SelectorExpr`)
-// used as a type (e.g., `pkg.MyType`) into its TypeScript type equivalent.
-// It assumes `exp.X` (the expression to the left of the dot) is a package
-// identifier, which is written as a value. `exp.Sel` (the identifier to the
-// right of the dot) is then treated as a type name within that package.
-// The output is typically `PackageName.TypeName`.
-func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) error {
-	// Assuming X is a package identifier. Needs refinement with type info.
-	if err := c.WriteValueExpr(exp.X); err != nil { // Package name is treated as a value
-		return fmt.Errorf("failed to write selector expression package identifier: %w", err)
-	}
-	c.tsw.WriteLiterally(".")
-	c.WriteTypeExpr(exp.Sel) // The selected identifier is treated as a type
-	return nil
 }
 
 // WriteSelectorExpr translates a Go selector expression (`ast.SelectorExpr`)
@@ -818,36 +732,69 @@ func (c *GoToTSCompiler) WriteSelectorExprType(exp *ast.SelectorExpr) error {
 // This function aims to correctly navigate Go's automatic dereferencing and
 // TypeScript's explicit boxing model.
 func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
-	objType := c.pkg.TypesInfo.TypeOf(exp.X)
-	if objType == nil {
-		return fmt.Errorf("internal error: type information missing for exp: %v", exp.X)
-	}
-
 	// Check if this is a package selector (e.g., time.Now)
 	if pkgIdent, isPkgIdent := exp.X.(*ast.Ident); isPkgIdent {
-		if _, isPkg := c.analysis.Imports[pkgIdent.Name]; isPkg {
-			// Package selectors should never use .value
-			if err := c.WriteValueExpr(exp.X); err != nil {
-				return fmt.Errorf("failed to write package selector: %w", err)
+		if obj := c.pkg.TypesInfo.ObjectOf(pkgIdent); obj != nil {
+			if _, isPkg := obj.(*types.PkgName); isPkg {
+				// Package selectors should never use .value on the package name
+				c.tsw.WriteLiterally(pkgIdent.Name)
+				c.tsw.WriteLiterally(".")
+				// Write the selected identifier, allowing .value if it's a boxed package variable
+				c.WriteIdent(exp.Sel, true)
+				return nil
 			}
-			c.tsw.WriteLiterally(".")
-			c.WriteIdent(exp.Sel, true)
-			return nil
 		}
 	}
 
-	// When accessing members through a pointer to a struct, we need to be careful
-	// not to add extra .value when not needed.
-	//
-	// Two critical cases to consider:
-	// 1. p.field for a direct struct pointer - no .value needed
-	//    Example: let p = new MyStruct() => p.field
-	//
-	// 2. p.value.field for a boxed pointer to a boxed struct
-	//    Example: let p = $.box(s) (where s is a box) => p.value.field
-	//
-	// WriteValueExpr will handle adding .value for the variable itself if boxed
-	// This was a source of bugs where we incorrectly added multiple .value accessors
+	// --- Special case for dereferenced pointer to struct with field access: (*p).field ---
+	var baseExpr ast.Expr = exp.X
+	// Look inside parentheses if present
+	if parenExpr, isParen := exp.X.(*ast.ParenExpr); isParen {
+		baseExpr = parenExpr.X
+	}
+
+	if starExpr, isStarExpr := baseExpr.(*ast.StarExpr); isStarExpr {
+		// Get the type of the pointer being dereferenced (e.g., type of 'p' in *p)
+		ptrType := c.pkg.TypesInfo.TypeOf(starExpr.X)
+		if ptrType != nil {
+			if ptrTypeUnwrapped, ok := ptrType.(*types.Pointer); ok {
+				elemType := ptrTypeUnwrapped.Elem()
+				if elemType != nil {
+					// If it's a pointer to a struct, handle field access specially
+					if _, isStruct := elemType.Underlying().(*types.Struct); isStruct {
+						// Get the object for the pointer variable itself (e.g., 'p')
+						var ptrObj types.Object
+						if ptrIdent, isIdent := starExpr.X.(*ast.Ident); isIdent {
+							ptrObj = c.pkg.TypesInfo.ObjectOf(ptrIdent)
+						}
+
+						// Write the pointer expression (e.g., p or p.value if p is boxed)
+						if err := c.WriteValueExpr(starExpr.X); err != nil {
+							return fmt.Errorf("failed to write pointer expression for (*p).field: %w", err)
+						}
+
+						// Add ! for non-null assertion
+						c.tsw.WriteLiterally("!")
+
+						// Add .value ONLY if the pointer variable itself needs boxed access
+						// This handles the case where 'p' points to a boxed struct (e.g., p = s where s is Box<MyStruct>)
+						if ptrObj != nil && c.analysis.NeedsBoxedAccess(ptrObj) {
+							c.tsw.WriteLiterally(".value")
+						}
+
+						// Add .field
+						c.tsw.WriteLiterally(".")
+						c.WriteIdent(exp.Sel, false) // Don't add .value to the field itself
+						return nil
+					}
+				}
+			}
+		}
+	}
+	// --- End Special Case ---
+
+	// Fallback / Normal Case (e.g., obj.Field, pkg.Var, method calls)
+	// WriteValueExpr handles adding .value for the base variable itself if it's boxed.
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
 	}
@@ -855,22 +802,14 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	// Add .
 	c.tsw.WriteLiterally(".")
 
-	// Write the field/method name
+	// Write the field/method name.
+	// Pass 'true' to WriteIdent to potentially add '.value' if the field itself
+	// needs boxed access (e.g., accessing a primitive field via pointer where
+	// the field's address might have been taken elsewhere - less common but possible).
+	// For simple struct field access like p.Val or (*p).Val, WriteIdent(..., true)
+	// relies on NeedsBoxedAccess for the field 'Val', which should typically be false.
 	c.WriteIdent(exp.Sel, true)
 	return nil
-}
-
-// WriteStarExprType translates a Go pointer type expression (`ast.StarExpr`, e.g., `*MyType`)
-// into its TypeScript type equivalent.
-// It consistently represents Go pointer type `*T` as `$.Box<T_ts> | null` in TypeScript,
-// where `T_ts` is the TypeScript translation of the Go type `T` (obtained by
-// recursively calling `WriteTypeExpr` on `exp.X`). Pointers are always nullable
-// in the TypeScript representation.
-func (c *GoToTSCompiler) WriteStarExprType(exp *ast.StarExpr) {
-	// Translate *T to $.Box<T_ts> | null, consistent with WriteGoType
-	c.tsw.WriteLiterally("$.Box<")
-	c.WriteTypeExpr(exp.X) // Write the element type T
-	c.tsw.WriteLiterally("> | null")
 }
 
 // WriteStarExpr translates a Go pointer dereference expression (`ast.StarExpr`, e.g., `*p`)
@@ -922,6 +861,22 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	// Get the type of the operand (the pointer being dereferenced)
 	ptrType := c.pkg.TypesInfo.TypeOf(operand)
 
+	// Special case for handling multi-level dereferencing:
+	// Check if the operand is itself a StarExpr (e.g., **p or ***p)
+	// We need to handle these specially to correctly generate nested .value accesses
+	if starExpr, isStarExpr := operand.(*ast.StarExpr); isStarExpr {
+		// First, write the inner star expression
+		if err := c.WriteStarExpr(starExpr); err != nil {
+			return fmt.Errorf("failed to write inner star expression: %w", err)
+		}
+
+		// Always add .value for multi-level dereferences
+		// For expressions like **p, each * adds a .value
+		c.tsw.WriteLiterally("!.value")
+		return nil
+	}
+
+	// Standard case: single-level dereference
 	// Write the pointer expression, which will access .value if the variable is boxed
 	// WriteValueExpr will add .value if the variable itself is boxed (p.value)
 	if err := c.WriteValueExpr(operand); err != nil {
@@ -946,8 +901,13 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 // If the struct has no fields, it writes `{}`. Otherwise, it delegates to
 // `WriteFieldList` to generate the list of field definitions.
 // Note: This is for anonymous struct type literals. Named struct types are usually
-// handled by `WriteIdentType` and then defined as classes via `WriteTypeSpec`.
+// handled as classes via `WriteTypeSpec`.
 func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
+	if typ := c.pkg.TypesInfo.TypeOf(exp); typ != nil {
+		c.WriteGoType(typ)
+		return
+	}
+
 	if exp.Fields == nil || exp.Fields.NumFields() == 0 {
 		c.tsw.WriteLiterally("{}")
 		return
@@ -956,19 +916,19 @@ func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
 }
 
 // WriteInterfaceType translates a Go interface type definition (`ast.InterfaceType`)
-// into its TypeScript equivalent.
-// Go interfaces are translated to TypeScript structural types.
-//   - Named methods (`MethodName(params) results`) are translated to TypeScript
-//     method signatures (`methodName(params_ts): result_ts;`).
-//   - Embedded interfaces are resolved using type information. The methods of the
-//     embedded interface are effectively "mixed in". The generated TypeScript
-//     type will use an intersection type (`&`) to combine explicit methods with
-//     the types of embedded interfaces (e.g., `{ explicitMethod(): void } & EmbeddedType1 & EmbeddedType2`).
-//   - An empty interface (`interface{}`) becomes `{}` in TypeScript.
-//   - All interface types in TypeScript are implicitly nullable, so `| null` is appended.
-//
-// It uses `WriteInterfaceMethodSignature` for individual method translation.
+// into its TypeScript equivalent using type information when possible.
+// If type information is available, it uses WriteGoType to handle the translation.
+// Otherwise, it falls back to a structured approach:
+//   - Named methods are translated to TypeScript method signatures.
+//   - Embedded interfaces are combined using intersection types.
+//   - All interface types in TypeScript are implicitly nullable.
 func (c *GoToTSCompiler) WriteInterfaceType(exp *ast.InterfaceType) error {
+	// First try to use type information
+	if typ := c.pkg.TypesInfo.TypeOf(exp); typ != nil {
+		c.WriteGoType(typ)
+		return nil
+	}
+
 	var embeddedInterfaces []string
 	var methods []*ast.Field
 
@@ -1050,7 +1010,8 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 		}
 		if len(exp.Results.List) == 1 && len(exp.Results.List[0].Names) == 0 {
 			// Single unnamed return type
-			c.WriteTypeExpr(exp.Results.List[0].Type)
+			typ := c.pkg.TypesInfo.TypeOf(exp.Results.List[0].Type)
+			c.WriteGoType(typ)
 		} else {
 			// Multiple or named return types -> tuple
 			c.tsw.WriteLiterally("[")
@@ -1058,7 +1019,8 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 				if i > 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				c.WriteTypeExpr(field.Type)
+				typ := c.pkg.TypesInfo.TypeOf(field.Type)
+				c.WriteGoType(typ)
 			}
 			c.tsw.WriteLiterally("]")
 		}
@@ -1460,12 +1422,9 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 	// Handle other unary operators (+, -, !, ^)
 	tokStr, ok := TokenToTs(exp.Op)
 	if !ok {
-		c.tsw.WriteCommentInline(fmt.Sprintf("unhandled unary op: %s", exp.Op.String()))
-		// Write the operator token as is, hoping it's valid TS or close enough
-		c.tsw.WriteLiterally(exp.Op.String())
-	} else {
-		c.tsw.WriteLiterally(tokStr)
+		return errors.Errorf("unhandled unary op: %s", exp.Op.String())
 	}
+	c.tsw.WriteLiterally(tokStr)
 
 	// Add space if operator is not postfix (e.g., !)
 	if exp.Op != token.INC && exp.Op != token.DEC {
@@ -1557,11 +1516,9 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 		c.tsw.WriteLiterally(" ")
 		tokStr, ok := TokenToTs(exp.Op)
 		if !ok {
-			c.tsw.WriteCommentInline(fmt.Sprintf("unhandled binary op: %s", exp.Op.String()))
-			c.tsw.WriteLiterally(" /* op */ ")
-		} else {
-			c.tsw.WriteLiterally(tokStr)
+			return errors.Errorf("unhandled binary op: %s", exp.Op.String())
 		}
+		c.tsw.WriteLiterally(tokStr)
 		c.tsw.WriteLiterally(" null")
 		return nil
 	}
@@ -1582,8 +1539,7 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 		case token.NEQ:
 			tokStr = "!=="
 		default:
-			c.tsw.WriteCommentInline(fmt.Sprintf("unhandled pointer comparison op: %s", exp.Op.String()))
-			tokStr = "/* unsupported pointer op */"
+			return errors.Errorf("unhandled pointer comparison op: %s", exp.Op.String())
 		}
 		c.tsw.WriteLiterally(tokStr)
 		c.tsw.WriteLiterally(" ")
@@ -1611,11 +1567,9 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	c.tsw.WriteLiterally(" ")
 	tokStr, ok := TokenToTs(exp.Op)
 	if !ok {
-		c.tsw.WriteCommentInline(fmt.Sprintf("unhandled binary op: %s", exp.Op.String()))
-		c.tsw.WriteLiterally(" /* op */ ")
-	} else {
-		c.tsw.WriteLiterally(tokStr)
+		return errors.Errorf("unhandled binary op: %s", exp.Op.String())
 	}
+	c.tsw.WriteLiterally(tokStr)
 	c.tsw.WriteLiterally(" ")
 	if err := c.WriteValueExpr(exp.Y); err != nil {
 		return fmt.Errorf("failed to write binary expression right operand: %w", err)
@@ -1851,7 +1805,6 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 			} else if _, ok := litType.Underlying().(*types.Struct); ok {
 				// Handle anonymous struct literals if needed, though less common with embedding
 				isStructLiteral = true
-				// structType might remain nil if not named/pointer-to-named
 			}
 
 			if isStructLiteral && structType != nil {
@@ -1896,7 +1849,6 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						continue
 					}
 
-					// First try to see if this is a direct field by simply checking the struct's fields
 					isDirectField := false
 					for i := range structType.NumFields() {
 						field := structType.Field(i)
@@ -1907,52 +1859,11 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						}
 					}
 
-					// If not a direct field, try LookupFieldOrMethod with the correct package scope, but don't fail if it can't find it
+					// If not a direct field, return an error
 					if !isDirectField {
-						var lookupPkg *types.Package
-						// Use the type's package for lookup, falling back to current package if unavailable
-						if named, ok := litType.(*types.Named); ok && named.Obj().Pkg() != nil {
-							lookupPkg = named.Obj().Pkg()
-						} else {
-							lookupPkg = c.pkg.Types
-						}
-
-						_, index, isExact := types.LookupFieldOrMethod(litType, false, lookupPkg, keyName)
-
-						if isExact && len(index) > 1 {
-							// Promoted field from an embedded struct (index path has length > 1)
-							// Find the corresponding embedded field definition in the outer struct
-							outerFieldIndex := index[0]
-							if outerFieldIndex >= 0 && outerFieldIndex < structType.NumFields() {
-								outerField := structType.Field(outerFieldIndex)
-								if outerField.Anonymous() {
-									embeddedType := outerField.Type()
-									if ptr, ok := embeddedType.(*types.Pointer); ok {
-										embeddedType = ptr.Elem()
-									}
-									if named, ok := embeddedType.(*types.Named); ok {
-										embeddedPropName := named.Obj().Name()
-										if _, exists := embeddedFields[embeddedPropName]; !exists {
-											embeddedFields[embeddedPropName] = make(map[string]ast.Expr)
-										}
-										embeddedFields[embeddedPropName][keyName] = kv.Value
-									} else {
-										// Fallback: Add as a direct field
-										directFields[keyName] = kv.Value
-									}
-								} else {
-									// Not an anonymous field, add as direct
-									directFields[keyName] = kv.Value
-								}
-							} else {
-								// Invalid index, add as direct
-								directFields[keyName] = kv.Value
-							}
-						} else {
-							// Not found through lookup or direct field check - return error
-							return fmt.Errorf("field %s not found or ambiguous in type %s for composite literal",
-								keyName, litType.String())
-						}
+						// This field was not found as a direct field in the struct
+						return fmt.Errorf("field %s not found in type %s for composite literal",
+							keyName, litType.String())
 					}
 				}
 
@@ -2793,7 +2704,7 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 // - The method name is taken from `field.Names[0]`.
 // - Parameters are translated:
 //   - Each parameter is given a name (either its Go name or a placeholder `_p%d`).
-//   - Parameter types are translated using `WriteTypeExpr`.
+//   - Parameter types are translated using `WriteGoType`.
 //
 // - The return type is translated:
 //   - `void` if no results.
@@ -2840,18 +2751,21 @@ func (c *GoToTSCompiler) WriteInterfaceMethodSignature(field *ast.Field) error {
 			}
 			c.tsw.WriteLiterally(paramName)
 			c.tsw.WriteLiterally(": ")
-			c.WriteTypeExpr(param.Type)
+
+			// Use WriteGoType for parameter type
+			typ := c.pkg.TypesInfo.TypeOf(param.Type)
+			c.WriteGoType(typ)
 		}
 	}
 	c.tsw.WriteLiterally(")")
 
 	// Write return type
-	// Use WriteFuncType's logic for return types, but without the async handling
 	if funcType.Results != nil && len(funcType.Results.List) > 0 {
 		c.tsw.WriteLiterally(": ")
 		if len(funcType.Results.List) == 1 && len(funcType.Results.List[0].Names) == 0 {
 			// Single unnamed return type
-			c.WriteTypeExpr(funcType.Results.List[0].Type)
+			typ := c.pkg.TypesInfo.TypeOf(funcType.Results.List[0].Type)
+			c.WriteGoType(typ)
 		} else {
 			// Multiple or named return types -> tuple
 			c.tsw.WriteLiterally("[")
@@ -2859,7 +2773,8 @@ func (c *GoToTSCompiler) WriteInterfaceMethodSignature(field *ast.Field) error {
 				if i > 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				c.WriteTypeExpr(result.Type)
+				typ := c.pkg.TypesInfo.TypeOf(result.Type)
+				c.WriteGoType(typ)
 			}
 			c.tsw.WriteLiterally("]")
 		}
@@ -2970,7 +2885,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 // function parameters, function results, or struct fields, into its TypeScript equivalent.
 //   - If `isArguments` is true (for function parameters/results):
 //     It iterates through `a.List`, writing each field as `name: type`. Parameter
-//     names and types are written using `WriteField` and `WriteTypeExpr` respectively.
+//     names and types are written using `WriteField` and `WriteGoType` respectively.
 //     Multiple parameters are comma-separated.
 //   - If `isArguments` is false (for struct fields):
 //     It writes an opening brace `{`, indents, then writes each field definition
@@ -3000,7 +2915,8 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 			// For function parameters, write "name: type"
 			c.WriteField(field, true)
 			c.tsw.WriteLiterally(": ")
-			c.WriteTypeExpr(field.Type) // Use WriteTypeExpr for parameter type
+			typ := c.pkg.TypesInfo.TypeOf(field.Type)
+			c.WriteGoType(typ) // Use WriteGoType for parameter type
 		} else {
 			// For struct fields and other non-argument fields
 			c.WriteField(field, false)
@@ -3020,7 +2936,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 //   - If the field is anonymous (embedded), it's skipped as promotions are handled
 //     elsewhere (e.g., during struct class generation).
 //   - For named fields, it writes `public fieldName: FieldType_ts`. The field name
-//     retains its Go casing. The type is translated using `WriteTypeExpr`.
+//     retains its Go casing. The type is translated using `WriteGoType`.
 //   - Go struct tags (`field.Tag`) are written as a trailing comment.
 //
 // - If `isArguments` is true (function parameter):
@@ -3059,7 +2975,8 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 
 		// write type for struct fields (not arguments)
 		c.tsw.WriteLiterally(": ")
-		c.WriteTypeExpr(field.Type) // Use WriteTypeExpr for field type
+		typ := c.pkg.TypesInfo.TypeOf(field.Type)
+		c.WriteGoType(typ) // Use WriteGoType for field type
 
 		if !isArguments {
 			// write tag comment if any for struct fields
@@ -3171,10 +3088,9 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		}
 		tokStr, ok := TokenToTs(exp.Tok)
 		if !ok {
-			c.tsw.WriteCommentLine(fmt.Sprintf("unknown incdec token: %s", exp.Tok.String()))
-		} else {
-			c.tsw.WriteLiterally(tokStr) // The token (e.g., ++)
+			return errors.Errorf("unknown incdec token: %s", exp.Tok.String())
 		}
+		c.tsw.WriteLiterally(tokStr) // The token (e.g., ++)
 		c.tsw.WriteLine("")
 	case *ast.SendStmt:
 		if err := c.WriteStmtSend(exp); err != nil {

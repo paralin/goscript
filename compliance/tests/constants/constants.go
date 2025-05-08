@@ -9,6 +9,9 @@ const (
 	Greeting = "Hello, Constants!"
 )
 
+// Nothing has untyped null
+var Nothing = interface{}(nil)
+
 func main() {
 	println(Pi)
 	println(Truth)

@@ -12,6 +12,9 @@ let Truth: boolean = false
 // Small    = Big >> 59 // Commented out as it depends on Big
 let Greeting: string = "Hello, Constants!"
 
+let Nothing: any/* interface: interface{} */ = // unhandled value expr: *ast.InterfaceType
+(null)
+
 export function main(): void {
 	console.log(Pi)
 	console.log(Truth)

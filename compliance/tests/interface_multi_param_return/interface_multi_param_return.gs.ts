@@ -3,9 +3,7 @@
 
 import * as $ from "@goscript/builtin";
 
-type MultiParamReturner = ({
-	Process(data: number[], count: number, _p2: string): [boolean, $.Error];
-}) | null
+type MultiParamReturner = any/* interface: interface{Process(data []byte, count int, _ string) (bool, error)} */
 
 const MultiParamReturner__typeInfo = $.registerType(
   'MultiParamReturner',
@@ -31,7 +29,7 @@ class MyProcessor {
 		return cloned
 	}
 
-	public Process(data: number[], count: number, _: string): [boolean, $.Error] {
+	public Process(data: $.Slice<number>, count: number, _: string): [boolean, $.Error] {
 		const p = this
 		if (count > 0 && $.len(data) > 0) {
 			console.log("Processing successful")

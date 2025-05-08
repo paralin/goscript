@@ -136,12 +136,12 @@ func (a *Analysis) NeedsBoxed(obj types.Object) bool {
 //
 // Two distinct cases determine when a variable needs .value access:
 //
-// 1. The variable itself is boxed (its address is taken)
-//    Example: let x = $.box(10) => x.value
+//  1. The variable itself is boxed (its address is taken)
+//     Example: let x = $.box(10) => x.value
 //
-// 2. For pointer variables: it points to a boxed struct variable rather than a direct struct literal
-//    Example: let ptrToVal = val (where val is boxed) => ptrToVal.value
-//    vs.     let ptr = new MyStruct() => ptr (no .value needed)
+//  2. For pointer variables: it points to a boxed struct variable rather than a direct struct literal
+//     Example: let ptrToVal = val (where val is boxed) => ptrToVal.value
+//     vs.     let ptr = new MyStruct() => ptr (no .value needed)
 //
 // This distinction is crucial for avoiding over-dereferencing or under-dereferencing,
 // which was the root cause of several bugs in our pointer handling.
@@ -187,13 +187,14 @@ func (a *Analysis) NeedsBoxedAccess(obj types.Object) bool {
 // the .value suffix in TypeScript when used in a direct dereference expression.
 //
 // Critical distinction (source of bugs):
-// 1. For primitive types and pointers-to-primitive: Need .value
-//    *p => p!.value
-//    **p => p!.value!.value 
 //
-// 2. For pointers to structs: No .value needed because structs are references
-//    *p => p!
-//    Where p is a pointer to a struct
+//  1. For primitive types and pointers-to-primitive: Need .value
+//     *p => p!.value
+//     **p => p!.value!.value
+//
+//  2. For pointers to structs: No .value needed because structs are references
+//     *p => p!
+//     Where p is a pointer to a struct
 //
 // This distinction is essential because in TypeScript:
 // - Primitives are stored inside $.Box with a .value property
@@ -216,6 +217,12 @@ func (a *Analysis) NeedsBoxedDeref(ptrType types.Type) bool {
 		return true
 	}
 
+	// Check if the element is another pointer - if so, we always need .value
+	// This fixes the bug with multi-level pointer dereferencing like **p
+	if _, isPointer := elemType.(*types.Pointer); isPointer {
+		return true
+	}
+
 	// Check if the element is a struct (directly or via a named type)
 	// Bug fix: Struct pointers in TS don't need .value when dereferenced
 	// because structs are already references in JavaScript/TypeScript
@@ -235,14 +242,14 @@ func (a *Analysis) NeedsBoxedDeref(ptrType types.Type) bool {
 // The critical discovery was that field access through a pointer depends not on the
 // field itself, but on whether the pointer variable is boxed:
 //
-// 1. For normal struct pointers (unboxed): No .value needed
-//    Example: let ptr = new MyStruct() => ptr.field 
-//    (Common case from &MyStruct{} literals)
+//  1. For normal struct pointers (unboxed): No .value needed
+//     Example: let ptr = new MyStruct() => ptr.field
+//     (Common case from &MyStruct{} literals)
 //
-// 2. For boxed struct pointers: Need .value to access the pointed-to struct
-//    Example: let ptrToVal = val (where val is boxed) => ptrToVal.value.field
-// 
-// We ultimately delegated this decision to WriteSelectorExpr which examines 
+//  2. For boxed struct pointers: Need .value to access the pointed-to struct
+//     Example: let ptrToVal = val (where val is boxed) => ptrToVal.value.field
+//
+// We ultimately delegated this decision to WriteSelectorExpr which examines
 // the actual variable to determine if it's boxed, rather than just the type.
 func (a *Analysis) NeedsBoxedFieldAccess(ptrType types.Type) bool {
 	// If we don't have a valid pointer type, default to false
@@ -268,12 +275,12 @@ func (a *Analysis) NeedsBoxedFieldAccess(ptrType types.Type) bool {
 		return false // Not a pointer to a struct
 	}
 
-	// The critical decision: We'll determine if .value is needed in the WriteSelectorExpr function 
+	// The critical decision: We'll determine if .value is needed in the WriteSelectorExpr function
 	// by checking if the pointer variable itself is boxed.
 	// This allows us to handle both:
 	// - ptr := &MyStruct{} (unboxed, direct access)
 	// - ptrToVal := &val (boxed, needs .value)
-	return false 
+	return false
 }
 
 // analysisVisitor implements ast.Visitor and is used to traverse the AST during analysis.

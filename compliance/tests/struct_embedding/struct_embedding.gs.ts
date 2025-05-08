@@ -355,30 +355,30 @@ export function main(): void {
 	let m: $.Box<Manager> = $.box(new Manager({Level: 5, Address: {Street: "123 Main St", City: "Anytown"}, Contact: {Phone: "555-1234"}, Person: {Name: "Charlie", Age: 40}}))
 
 	// Accessing fields from all embedded structs and the outer struct
-	console.log("Manager Name:", m.value.Name) // From Person
-	console.log("Manager Age:", m.value.Age) // From Person
-	console.log("Manager Street:", m.value.Street) // From Address
-	console.log("Manager City:", m.value.City) // From Address
-	console.log("Manager Phone:", m.value.Phone) // From Contact
-	console.log("Manager Level:", m.value.Level) // From Manager
+	console.log("Manager Name:", m!.value.Name) // From Person
+	console.log("Manager Age:", m!.value.Age) // From Person
+	console.log("Manager Street:", m!.value.Street) // From Address
+	console.log("Manager City:", m!.value.City) // From Address
+	console.log("Manager Phone:", m!.value.Phone) // From Contact
+	console.log("Manager Level:", m!.value.Level) // From Manager
 
 	// Calling methods from embedded structs
-	m.value.Greet() // From Person
-	console.log("Manager Full Address:", m.value.FullAddress()) // From Address
-	m.value.Call() // From Contact
+	m!.value.Greet() // From Person
+	console.log("Manager Full Address:", m!.value.FullAddress()) // From Address
+	m!.value.Call() // From Contact
 
 	// Test with a pointer
 	let mp = m
 	console.log("\n--- Multiple Embedding (Pointer) ---")
-	console.log("Manager Pointer Name:", mp.value.Name)
-	mp.value.Greet()
-	console.log("Manager Pointer Full Address:", mp.value.FullAddress())
-	mp.value.Call()
+	console.log("Manager Pointer Name:", mp!.value.Name)
+	mp!.value.Greet()
+	console.log("Manager Pointer Full Address:", mp!.value.FullAddress())
+	mp!.value.Call()
 
 	// Modify through pointer
-	mp.value.Age = 41
-	mp.value.City = "New City"
-	console.log("Modified Manager Age:", m.value.Age)
-	console.log("Modified Manager City:", m.value.City)
+	mp!.value.Age = 41
+	mp!.value.City = "New City"
+	console.log("Modified Manager Age:", m!.value.Age)
+	console.log("Modified Manager City:", m!.value.City)
 }
 

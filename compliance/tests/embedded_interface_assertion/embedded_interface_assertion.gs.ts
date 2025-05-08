@@ -3,9 +3,7 @@
 
 import * as $ from "@goscript/builtin";
 
-type Reader = ({
-	Read(_p0: number[]): [number, $.Error];
-}) | null
+type Reader = any/* interface: interface{Read([]byte) (int, error)} */
 
 const Reader__typeInfo = $.registerType(
   'Reader',
@@ -15,9 +13,7 @@ const Reader__typeInfo = $.registerType(
   undefined
 );
 
-type Closer = ({
-	Close(): $.Error;
-}) | null
+type Closer = any/* interface: interface{Close() error} */
 
 const Closer__typeInfo = $.registerType(
   'Closer',
@@ -27,7 +23,7 @@ const Closer__typeInfo = $.registerType(
   undefined
 );
 
-type ReadCloser = ( & Reader & Closer) | null
+type ReadCloser = any/* interface: interface{tempmod.Reader; tempmod.Closer} */
 
 const ReadCloser__typeInfo = $.registerType(
   'ReadCloser',
@@ -53,7 +49,7 @@ class MyStruct {
 		return cloned
 	}
 
-	public Read(p: number[]): [number, $.Error] {
+	public Read(p: $.Slice<number>): [number, $.Error] {
 		const m = this
 		return [0, null]
 	}

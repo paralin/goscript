@@ -3,9 +3,7 @@
 
 import * as $ from "@goscript/builtin";
 
-type MyInterface = ({
-	Method(): void;
-}) | null
+type MyInterface = any/* interface: interface{Method()} */
 
 const MyInterface__typeInfo = $.registerType(
   'MyInterface',
@@ -70,7 +68,7 @@ export function main(): void {
 	s.PointerField = i
 	console.log(s.PointerField != null)
 	console.log(s.PointerField!.value)
-	i.value = 15
+	i!.value = 15
 	console.log(s.PointerField!.value)
 
 	let mi: MyInterface = null

@@ -19,13 +19,13 @@ ppp1==ppp1: true
 --- Modifications ---
 After *p1 = {Val: 10}:
   s1.Val: 10
-  (*p2).Val: undefined
+  (*p2).Val: 10
   (**pp1).Val: undefined
   (***ppp1).Val: undefined
   s2.Val: 2
 After **pp3 = {Val: 20}:
   s2.Val: 20
-  (*p3).Val: undefined
+  (*p3).Val: 20
   s1.Val: 10
 
 --- Nil Pointers ---

@@ -46,7 +46,7 @@ export function main(): void {
 	let ptrToVal = val
 
 	// Accessing field on boxed value type: Should generate val.value.MyInt
-	val.value.MyInt = 20
+	val!.value.MyInt = 20
 
 	// Scenario 2: Pointer type
 	// We never take the address of ptr so it should not be boxed.
@@ -57,9 +57,9 @@ export function main(): void {
 	console.log("ptr.MyInt:", ptr.MyInt) // Expected: 40
 
 	// Accessing pointer value, should use .value
-	console.log("ptrToVal.MyInt:", ptrToVal.value.MyInt)
+	console.log("ptrToVal.MyInt:", ptrToVal!.value.MyInt)
 
-	let myIntVal = ptrToVal.value.MyInt
+	let myIntVal = ptrToVal!.value.MyInt
 	console.log("myIntVal:", myIntVal)
 }
 

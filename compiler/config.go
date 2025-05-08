@@ -21,11 +21,11 @@ type Config struct {
 
 // Validate checks the config.
 func (c *Config) Validate() error {
-	if c.fset == nil {
-		c.fset = token.NewFileSet()
-	}
 	if c == nil {
 		return errors.New("config cannot be nil")
+	}
+	if c.fset == nil {
+		c.fset = token.NewFileSet()
 	}
 	if c.OutputPathRoot == "" {
 		return errors.New("output path root must be specified")

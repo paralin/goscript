@@ -3,10 +3,6 @@
 
 import * as $ from "@goscript/builtin";
 
-/* not currently working correctly */
-/* @ts-ignore */
-/* eslint-disable-file */
-
 export function main(): void {
 	// --- Original Tests ---
 	console.log("--- Original Tests ---")

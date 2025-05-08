@@ -28,7 +28,7 @@ export function main(): void {
 	// y is boxed as p1 takes the address
 	let y: $.Box<number> = $.box(15)
 	// should be: p1.value = y
-	p1.value = y
+	p1!.value = y
 
 	console.log("***p3 ==", p3!.value!.value!.value)
 	console.log()

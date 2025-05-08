@@ -108,22 +108,22 @@ export function main(): void {
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.
 	// valueCopy1 and valueCopy2 get their own copies of 'original's data.
-	let valueCopy1 = original.value.clone()
-	let valueCopy2 = original.value.clone()
+	let valueCopy1 = original!.value.clone()
+	let valueCopy2 = original!.value.clone()
 	// pointerCopy holds the memory address of 'original'.
 	let pointerCopy = original
 
 	// Modifications to value copies do not affect the original or other copies.
 	valueCopy1.MyString = "value copy 1"
 	// Modify the original struct *after* the value copies were made.
-	original.value.MyString = "original modified"
+	original!.value.MyString = "original modified"
 	valueCopy2.MyString = "value copy 2"
 
 	console.log("Value Copy Test:")
 	// valueCopy1 was modified independently.
 	console.log("  valueCopy1.MyString: " + valueCopy1.MyString) // Expected: "value copy 1"
 	// original was modified after copies, showing its current state.
-	console.log("  original.MyString: " + original.value.MyString) // Expected: "original modified"
+	console.log("  original.MyString: " + original!.value.MyString) // Expected: "original modified"
 	// valueCopy2 was modified independently.
 	console.log("  valueCopy2.MyString: " + valueCopy2.MyString) // Expected: "value copy 2"
 
@@ -131,16 +131,16 @@ export function main(): void {
 	// Demonstrate how modifications via a pointer affect the original struct.
 	console.log("\nPointer Behavior Test:")
 	// Show the state of 'original' before modification via the pointer.
-	console.log("  Before pointer modification - original.MyString: " + original.value.MyString)
+	console.log("  Before pointer modification - original.MyString: " + original!.value.MyString)
 
 	// Modify the struct 'original' *through* the pointerCopy.
-	pointerCopy.value.MyString = "modified through pointer"
-	pointerCopy.value.MyInt = 100
+	pointerCopy!.value.MyString = "modified through pointer"
+	pointerCopy!.value.MyInt = 100
 
 	// Show the state of 'original' *after* modification via the pointer.
 	// Both fields reflect the changes made through pointerCopy.
-	console.log("  After pointer modification - original.MyString:", original.value.MyString)
-	console.log("  After pointer modification - original.MyInt:", original.value.MyInt)
+	console.log("  After pointer modification - original.MyString:", original!.value.MyString)
+	console.log("  After pointer modification - original.MyInt:", original!.value.MyInt)
 
 	// === Nested Struct Behavior ===
 	// Demonstrate copy behavior with structs containing other structs.
