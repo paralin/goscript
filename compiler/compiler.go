@@ -1458,6 +1458,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled byte call with incorrect number of arguments")
 		default:
+			// Not a special built-in, treat as a regular function call
 			// Check if this is an async function call
 			if funIdent != nil {
 				// Get the object for this function identifier
@@ -1467,10 +1468,13 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				}
 			}
 
-			// Not a special built-in, treat as a regular function call
+			// Non-null assertion
+			c.tsw.WriteLiterally("(")
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
+			c.tsw.WriteLiterally("!)")
+
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
@@ -1481,6 +1485,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				}
 			}
 			c.tsw.WriteLiterally(")")
+
 			return nil // Handled regular function call
 		}
 	} else {

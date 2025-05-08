@@ -13,7 +13,7 @@ export function main(): void {
 
 	// i already exists from the var declaration above.
 	// err is a new variable being declared.
-	let [i, err] = returnsOneIntOneBool()
+	let [i, err] = returnsOneIntOneBool!.()
 
 	console.log("after assign i:", i) // Use i
 	// Use err

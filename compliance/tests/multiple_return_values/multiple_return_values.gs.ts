@@ -8,16 +8,16 @@ function multipleReturnValues(): [number, string, boolean] {
 }
 
 export function main(): void {
-	let [a, b, c] = multipleReturnValues()
+	let [a, b, c] = multipleReturnValues!.()
 	console.log(a)
 	console.log(b)
 	console.log(c)
 
-	let [x, , z] = multipleReturnValues()
+	let [x, , z] = multipleReturnValues!.()
 	console.log(x)
 	console.log(z)
 
-	let [, y, ] = multipleReturnValues()
+	let [, y, ] = multipleReturnValues!.()
 	console.log(y)
 }
 
