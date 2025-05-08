@@ -60,7 +60,7 @@ function accessPrivateField(s: MyStruct): void {
 }
 
 export function main(): void {
-	let s = NewMyStruct("hello", 123).clone()
-	accessPrivateField(s)
+	let s = (NewMyStruct)("hello", 123).clone()
+	(accessPrivateField)(s)
 }
 

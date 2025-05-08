@@ -15,7 +15,7 @@ export function main(): void {
 	// We need to manually increment i or change the condition
 	// to ensure the loop terminates as increment_counter() in post
 	// does not affect 'i'.
-	for (let i = 0; i < 2; increment_counter()) {
+	for (let i = 0; i < 2; (increment_counter)()) {
 		console.log("loop iteration:", i)
 		// We need to manually increment i or change the condition
 		// to ensure the loop terminates as increment_counter() in post

@@ -1130,6 +1130,121 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 	}
 }
 
+// isFunctionNillable determines whether a function expression can be nil in Go.
+// It returns two booleans:
+// - isFunc: whether the expression is a function type
+// - isNillable: whether the function can be nil in Go
+//
+// In Go, only variables of function type or results of expressions that yield
+// function values can be nil. Declared functions (func MyFunc(){}) are not nillable.
+func isFunctionNillable(pkgInfo *types.Info, expFun ast.Expr) (bool, bool) {
+	// First, check if the expression's type is indeed a function signature
+	tv, ok := pkgInfo.Types[expFun]
+	if !ok || tv.Type == nil {
+		return false, false // Not a typed expression or type info missing
+	}
+
+	underlyingType := tv.Type.Underlying()
+	if _, isSignature := underlyingType.(*types.Signature); !isSignature {
+		return false, false // Not a function type
+	}
+
+	// Now, determine if this function type *value* can be nil.
+	// This depends on how expFun is defined or obtained.
+
+	switch node := expFun.(type) {
+	case *ast.Ident:
+		// It's an identifier, like 'myFunc' or 'pkg.MyTopLevelFunc'
+		// We need to see what this identifier refers to.
+		obj := pkgInfo.ObjectOf(node) // or pkgInfo.Uses[node]
+		if obj == nil {
+			// This should ideally not happen if Types[expFun] gave a type.
+			// But if it does, and it's a function type, assume it could be from an
+			// untraceable source that might be nil (e.g. complex assignment).
+			return true, true // Is function type, is nillable (safer default)
+		}
+
+		switch obj.(type) {
+		case *types.Var:
+			// The identifier refers to a variable (e.g., var myVar func(); f := func(){})
+			// Variables of function type ARE nillable.
+			return true, true // Is function type, is nillable
+		case *types.Func:
+			// The identifier refers to a declared function (func MyFunc(){}) or a method.
+			// These are NOT nillable themselves.
+			return true, false // Is function type, but not nillable
+		default:
+			// It's some other kind of object (e.g., types.Const, types.TypeName)
+			// but we already know its type is *types.Signature.
+			// This scenario is less common for a direct function call.
+			// If it somehow evaluates to a function value, that value can be nil.
+			// For example, a const of function type (not directly possible in Go, but hypothetically).
+			// Or a type conversion that results in a function value.
+			// Default to nillable for safety if it's a value.
+			return true, true // Is function type, is nillable
+		}
+
+	case *ast.SelectorExpr:
+		// It's a qualified identifier, like 'p.MyFunc' or 's.MyMethod'
+		// We need to check what node.Sel refers to.
+		// For methods, TypesInfo.Selections[node] is also useful.
+		// For package-level functions/vars, TypesInfo.Uses[node.Sel] or ObjectOf(node.Sel)
+
+		// Try ObjectOf on the selector's name first (covers pkg.Func and pkg.Var)
+		obj := pkgInfo.ObjectOf(node.Sel)
+		if obj != nil {
+			switch obj.(type) {
+			case *types.Var:
+				// e.g., pkg.MyVarOfFuncType
+				return true, true // Is function type, is nillable
+			case *types.Func:
+				// e.g., pkg.MyExportedFunc or s.MyMethod (if ObjectOf gives the method's *types.Func)
+				return true, false // Is function type, not nillable
+			default:
+				// If it's a function type but not a var/func object, assume nillable value
+				return true, true
+			}
+		}
+
+		// If ObjectOf(node.Sel) didn't give a clear var/func,
+		// and it's a function type, it's likely a value resulting from some expression.
+		// Example: `(someStruct.FuncReturningField)()` where FuncReturningField is a field of function type.
+		// These are effectively like variables.
+		return true, true // Is function type, is nillable
+
+	case *ast.FuncLit:
+		// A function literal itself, e.g., (func(){})()
+		// The literal expression produces a non-nil function value.
+		return true, false // Is function type, not nillable
+
+	case *ast.CallExpr:
+		// A call that returns a function, e.g., getFunc()()
+		// The result of getFunc() is a function value, which CAN be nil.
+		return true, true // Is function type, is nillable
+
+	case *ast.IndexExpr, *ast.SliceExpr:
+		// Accessing a function from a slice or map, e.g., funcList[i]()
+		// The element retrieved is a function value, which CAN be nil.
+		return true, true // Is function type, is nillable
+
+	case *ast.TypeAssertExpr:
+		// e.g., x.(func()) ()
+		// The result of type assertion is a function value, which CAN be nil.
+		return true, true // Is function type, is nillable
+
+	case *ast.ParenExpr:
+		// Parenthesized expression, recurse on the inner expression
+		return isFunctionNillable(pkgInfo, node.X)
+
+	default:
+		// For any other kind of expression that evaluates to a function type,
+		// it means it's producing a function *value*.
+		// Function values in Go are nillable.
+		// This could be a complex expression, a channel receive, etc.
+		return true, true // Is function type, is nillable
+	}
+}
+
 // WriteCallExpr translates a Go function call expression (`ast.CallExpr`)
 // into its TypeScript equivalent.
 // It handles several Go built-in functions specially:
@@ -1152,6 +1267,7 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 //   - Otherwise, it's translated as a standard TypeScript function call: `funcName(arg1, arg2)`.
 //
 // Arguments are recursively translated using `WriteValueExpr`.
+// Variadic parameters are handled by passing the arguments as an array.
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
 
@@ -1411,6 +1527,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled byte call with incorrect number of arguments")
 		default:
+			// Not a special built-in, treat as a regular function call
 			// Check if this is an async function call
 			if funIdent != nil {
 				// Get the object for this function identifier
@@ -1420,10 +1537,24 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				}
 			}
 
-			// Not a special built-in, treat as a regular function call
+			// Check if the function expression is a variable (nullable function)
+			needsNonNullAssertion := false
+			isFunc, isNillable := isFunctionNillable(c.pkg.TypesInfo, expFun)
+			if isFunc && isNillable {
+				needsNonNullAssertion = true
+			}
+
+			c.tsw.WriteLiterally("(")
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
+
+			// Only add non-null assertion if needed
+			if needsNonNullAssertion {
+				c.tsw.WriteLiterally("!")
+			}
+			c.tsw.WriteLiterally(")")
+
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
@@ -1434,6 +1565,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				}
 			}
 			c.tsw.WriteLiterally(")")
+
 			return nil // Handled regular function call
 		}
 	} else {
@@ -1442,16 +1574,20 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			return fmt.Errorf("failed to write method expression in call: %w", err)
 		}
 	}
+
+	// Write arguments
 	c.tsw.WriteLiterally("(")
 	for i, arg := range exp.Args {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
+
 		if err := c.WriteValueExpr(arg); err != nil {
 			return fmt.Errorf("failed to write argument %d in call: %w", i, err)
 		}
 	}
 	c.tsw.WriteLiterally(")")
+
 	return nil
 }
 
@@ -1736,7 +1872,7 @@ func (c *GoToTSCompiler) writeBoxedValue(expr ast.Expr) error {
 	if expr == nil {
 		return fmt.Errorf("nil expression passed to writeBoxedValue")
 	}
-	
+
 	// Handle different expression types
 	switch e := expr.(type) {
 	case *ast.Ident:
@@ -1760,14 +1896,14 @@ func (c *GoToTSCompiler) writeBoxedValueWithMethods(expr ast.Expr, typ types.Typ
 	if expr == nil {
 		return fmt.Errorf("nil expression passed to writeBoxedValueWithMethods")
 	}
-	
+
 	// First, write the expression using writeBoxedValue
 	if err := c.writeBoxedValue(expr); err != nil {
 		return err
 	}
-	
+
 	// to handle special cases for types with methods if needed in the future
-	
+
 	return nil
 }
 
@@ -2199,10 +2335,10 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 
 	// Write arrow function: (params) => { body }
 	c.tsw.WriteLiterally("(")
-	
+
 	// Use WriteFieldList which now handles variadic parameters
 	c.WriteFieldList(exp.Type.Params, true) // true = arguments
-	
+
 	c.tsw.WriteLiterally(")")
 
 	// Handle return type for function literals
