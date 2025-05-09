@@ -1731,6 +1731,46 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 // This function relies heavily on `go/types` (`TypesInfo.TypeOf`) to determine
 // the kind of literal being constructed and to handle types correctly, especially
 // for zero values and struct field resolution.
+// It takes a value expression and writes it to the TypeScript output, handling boxing and method access.
+func (c *GoToTSCompiler) writeBoxedValue(expr ast.Expr) error {
+	if expr == nil {
+		return fmt.Errorf("nil expression passed to writeBoxedValue")
+	}
+	
+	// Handle different expression types
+	switch e := expr.(type) {
+	case *ast.Ident:
+		c.WriteIdent(e, true)
+		return nil
+	case *ast.SelectorExpr:
+		return c.WriteSelectorExpr(e)
+	case *ast.StarExpr:
+		// For star expressions, delegate to WriteStarExpr which handles dereferencing
+		return c.WriteStarExpr(e)
+	case *ast.BasicLit:
+		c.WriteBasicLit(e)
+		return nil
+	default:
+		// For other expression types, use WriteValueExpr
+		return c.WriteValueExpr(expr)
+	}
+}
+
+func (c *GoToTSCompiler) writeBoxedValueWithMethods(expr ast.Expr, typ types.Type) error {
+	if expr == nil {
+		return fmt.Errorf("nil expression passed to writeBoxedValueWithMethods")
+	}
+	
+	// First, write the expression using writeBoxedValue
+	if err := c.writeBoxedValue(expr); err != nil {
+		return err
+	}
+	
+	// to handle special cases for types with methods if needed in the future
+	
+	return nil
+}
+
 func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 	// Get the type of the composite literal
 	litType := c.pkg.TypesInfo.TypeOf(exp)
@@ -1748,11 +1788,11 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 				if kv, ok := elm.(*ast.KeyValueExpr); ok {
 					c.tsw.WriteLiterally("[")
-					if err := c.WriteValueExpr(kv.Key); err != nil {
+					if err := c.writeBoxedValue(kv.Key); err != nil {
 						return fmt.Errorf("failed to write map literal key: %w", err)
 					}
 					c.tsw.WriteLiterally(", ")
-					if err := c.WriteValueExpr(kv.Value); err != nil {
+					if err := c.writeBoxedValue(kv.Value); err != nil {
 						return fmt.Errorf("failed to write map literal value: %w", err)
 					}
 					c.tsw.WriteLiterally("]")
@@ -1826,7 +1866,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						hasKeyedElements = true
 					} else {
 						c.tsw.WriteCommentInline("unhandled keyed array literal key type")
-						if err := c.WriteValueExpr(elm); err != nil {
+						if err := c.writeBoxedValue(elm); err != nil {
 							return fmt.Errorf("failed to write keyed array literal element with unhandled key type: %w", err)
 						}
 					}
@@ -1854,7 +1894,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					c.tsw.WriteLiterally(", ")
 				}
 				if elm, ok := elements[i]; ok && elm != nil {
-					if err := c.WriteValueExpr(elm); err != nil {
+					if err := c.writeBoxedValue(elm); err != nil {
 						return fmt.Errorf("failed to write array literal element: %w", err)
 					}
 				} else {
@@ -1979,7 +2019,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					}
 					c.tsw.WriteLiterally(keyName)
 					c.tsw.WriteLiterally(": ")
-					if err := c.WriteValueExpr(directFields[keyName]); err != nil {
+					if err := c.writeBoxedValue(directFields[keyName]); err != nil {
 						return err
 					}
 					firstFieldWritten = true
@@ -2007,14 +2047,14 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 							if i > 0 {
 								c.tsw.WriteLiterally(", ")
 							}
-							if err := c.WriteValueExpr(elem); err != nil {
+							if err := c.writeBoxedValue(elem); err != nil {
 								return err
 							}
 						}
 						c.tsw.WriteLiterally("}")
 					} else {
 						// Not a composite literal, write it normally
-						if err := c.WriteValueExpr(explicitEmbedded[embeddedName]); err != nil {
+						if err := c.writeBoxedValue(explicitEmbedded[embeddedName]); err != nil {
 							return err
 						}
 					}
@@ -2053,7 +2093,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						}
 						c.tsw.WriteLiterally(keyName) // Field name within the embedded struct
 						c.tsw.WriteLiterally(": ")
-						if err := c.WriteValueExpr(fieldsMap[keyName]); err != nil {
+						if err := c.writeBoxedValue(fieldsMap[keyName]); err != nil {
 							return err
 						}
 					}
@@ -2070,7 +2110,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					if i != 0 {
 						c.tsw.WriteLiterally(", ")
 					}
-					if err := c.WriteValueExpr(elm); err != nil {
+					if err := c.writeBoxedValue(elm); err != nil {
 						return fmt.Errorf("failed to write literal field: %w", err)
 					}
 				}
@@ -2107,7 +2147,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		if err := c.WriteValueExpr(elm); err != nil {
+		if err := c.writeBoxedValue(elm); err != nil {
 			return fmt.Errorf("failed to write untyped composite literal element: %w", err)
 		}
 	}
@@ -2116,7 +2156,6 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 	} else {
 		c.tsw.WriteLiterally(" ]")
 	}
-	// c.tsw.WriteCommentInline("untyped composite literal, type guessed")
 	return nil
 }
 
