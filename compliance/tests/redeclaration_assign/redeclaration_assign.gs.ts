@@ -9,19 +9,19 @@ function returnsOneIntOneBool(): [number, boolean] {
 
 export function main(): void {
 	let i: number = 0
-	;console.log("initial i:", i) // Use i to avoid unused error before :=
+	console.log("initial i:", i) // Use i to avoid unused error before :=
 
 	// i already exists from the var declaration above.
 	// err is a new variable being declared.
 	let [i, err] = returnsOneIntOneBool()
 
-	;console.log("after assign i:", i) // Use i
+	console.log("after assign i:", i) // Use i
 	// Use err
 	if (err) {
 		// Use err
-		;console.log("err is true")
+		console.log("err is true")
 	} else {
-		;console.log("err is false")
+		console.log("err is false")
 	}
 }
 

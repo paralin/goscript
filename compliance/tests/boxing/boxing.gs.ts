@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	;console.log("setting x to 10")
+	console.log("setting x to 10")
 	// x is boxed as p1 takes the address
 	let x: $.Box<number> = $.box(10)
 
@@ -15,22 +15,22 @@ export function main(): void {
 	// p3 is not boxed as nothing takes its address
 	let p3: $.Box<$.Box<$.Box<number> | null> | null> | null = p2
 
-	;console.log("***p3 ==", p3!.value!.value!.value)
-	;console.log()
+	console.log("***p3 ==", p3!.value!.value!.value)
+	console.log()
 
-	;console.log("setting ***p3 to 12")
+	console.log("setting ***p3 to 12")
 	p3!.value!.value!.value = 12
-	;console.log("***p3 ==", p3!.value!.value!.value)
-	;console.log()
+	console.log("***p3 ==", p3!.value!.value!.value)
+	console.log()
 
-	;console.log("setting y to 15, p1 to &y")
+	console.log("setting y to 15, p1 to &y")
 	// should be: let y: $.Box<number> = $.box(15)
 	// y is boxed as p1 takes the address
 	let y: $.Box<number> = $.box(15)
 	// should be: p1.value = y
 	p1!.value = y
 
-	;console.log("***p3 ==", p3!.value!.value!.value)
-	;console.log()
+	console.log("***p3 ==", p3!.value!.value!.value)
+	console.log()
 }
 

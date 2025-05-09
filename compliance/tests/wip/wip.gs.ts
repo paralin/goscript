@@ -13,10 +13,10 @@ export function main(): void {
 	// p3 is not boxed as nothing takes its address
 	let p3: $.Box<$.Box<$.Box<number> | null> | null> | null = p2
 
-	;console.log("**p3 ==", p3!.value!.value!.value)
+	console.log("**p3 ==", p3!.value!.value!.value)
 
 	// q1 is not boxed as nothing takes its address
 	let q1: $.Box<number> | null = x
-	;console.log("*q1 ==", q1!.value) // Should translate to q1!.value
+	console.log("*q1 ==", q1!.value) // Should translate to q1!.value
 }
 

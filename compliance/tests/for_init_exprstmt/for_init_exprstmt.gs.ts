@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 function init_func(): void {
-	;console.log("init_func called")
+	console.log("init_func called")
 }
 
 export function main(): void {
@@ -12,8 +12,8 @@ export function main(): void {
 	// The condition is false to prevent the loop body from executing during the test,
 	// focusing only on the init part's translation and execution.
 	for (init_func(); false; ) {
-		;console.log("loop body (should not be printed)")
+		console.log("loop body (should not be printed)")
 	}
-	;console.log("done")
+	console.log("done")
 }
 

@@ -6,9 +6,9 @@ import * as $ from "@goscript/builtin";
 export function main(): void {
 	let i = 0
 	for (; i < 3; ) {
-		;console.log("Current value:", i)
+		console.log("Current value:", i)
 		i = i + 1
 	}
-	;console.log("Loop finished")
+	console.log("Loop finished")
 }
 

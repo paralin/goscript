@@ -1156,6 +1156,18 @@ func isFunctionNillable(pkgInfo *types.Info, expFun ast.Expr) (bool, bool) {
 	case *ast.Ident:
 		// It's an identifier, like 'myFunc' or 'pkg.MyTopLevelFunc'
 		// We need to see what this identifier refers to.
+
+		// Check for built-in functions like println, len, cap, etc.
+		// These are not nillable.
+		builtinFuncs := map[string]bool{
+			"println": true, "print": true, "len": true, "cap": true, "make": true,
+			"new": true, "append": true, "copy": true, "delete": true, "close": true,
+			"complex": true, "real": true, "imag": true, "panic": true, "recover": true,
+		}
+		if builtinFuncs[node.Name] {
+			return true, false // Is function type, not nillable (built-in function)
+		}
+
 		obj := pkgInfo.ObjectOf(node) // or pkgInfo.Uses[node]
 		if obj == nil {
 			// This should ideally not happen if Types[expFun] gave a type.
