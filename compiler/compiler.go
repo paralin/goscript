@@ -3254,6 +3254,24 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			return fmt.Errorf("failed to write if statement: %w", err)
 		}
 	case *ast.ExprStmt:
+		// special case: if the function call is wrapped in () for non-null assertion:
+		// ;(fn!)()
+		// then we must add a semicolon, otherwise typescript assumes we are calling the previous line
+		if callExpr, ok := exp.X.(*ast.CallExpr); ok {
+			funAsync := false
+			if funIdent, ok := callExpr.Fun.(*ast.Ident); ok {
+				// if the call is async we can skip this.
+				obj := c.pkg.TypesInfo.Uses[funIdent]
+				funAsync = obj != nil && c.analysis.IsAsyncFunc(obj)
+			}
+			isFunc, isNillable := isFunctionNillable(c.pkg.TypesInfo, callExpr.Fun)
+			needsNonNullAssertion := isFunc && isNillable
+			needsSemicolonPrefix := !funAsync && needsNonNullAssertion
+			if needsSemicolonPrefix {
+				c.tsw.WriteLiterally(";")
+			}
+		}
+
 		if err := c.WriteStmtExpr(exp); err != nil {
 			return fmt.Errorf("failed to write expression statement: %w", err)
 		}

@@ -28,8 +28,8 @@ type MyError struct {
 	s string
 }
 
-func NewMyError(text string) MyError {
-	return MyError{s: text}
+func NewMyError(text string) *MyError {
+	return &MyError{s: text}
 }
 
 func (e *MyError) Error() string {
