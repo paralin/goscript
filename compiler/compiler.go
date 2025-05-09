@@ -1544,16 +1544,29 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				needsNonNullAssertion = true
 			}
 
-			c.tsw.WriteLiterally("(")
-			if err := c.WriteValueExpr(expFun); err != nil {
-				return fmt.Errorf("failed to write function expression in call: %w", err)
+			// Only wrap complex function expressions in parentheses
+			if _, isIdent := expFun.(*ast.Ident); !isIdent {
+				c.tsw.WriteLiterally("(")
+				if err := c.WriteValueExpr(expFun); err != nil {
+					return fmt.Errorf("failed to write function expression in call: %w", err)
+				}
+				
+				// Only add non-null assertion if needed
+				if needsNonNullAssertion {
+					c.tsw.WriteLiterally("!")
+				}
+				c.tsw.WriteLiterally(")")
+			} else {
+				// For simple identifiers, just write them directly
+				if err := c.WriteValueExpr(expFun); err != nil {
+					return fmt.Errorf("failed to write function expression in call: %w", err)
+				}
+				
+				// Only add non-null assertion if needed
+				if needsNonNullAssertion {
+					c.tsw.WriteLiterally("!")
+				}
 			}
-
-			// Only add non-null assertion if needed
-			if needsNonNullAssertion {
-				c.tsw.WriteLiterally("!")
-			}
-			c.tsw.WriteLiterally(")")
 
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {

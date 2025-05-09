@@ -99,3 +99,8 @@ func (w *TSCodeWriter) WriteSectionTail() {
 		w.sectionWrittenFlag = false
 	}
 }
+
+// WriteSemicolon writes a semicolon if necessary to prevent ambiguity
+func (w *TSCodeWriter) WriteSemicolon() {
+	w.WriteLiterally(";")
+}
