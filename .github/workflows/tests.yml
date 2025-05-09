@@ -44,8 +44,12 @@ jobs:
 
       # WIP not passing yet
       - name: Test Js
-        run: yarn test:js || true
+        run: yarn test:js
 
       # WIP not passing yet
       - name: Lint Js
-        run: yarn lint:js || true
+        run: yarn lint:js
+
+      # TypeScript type checking
+      - name: TypeScript Check
+        run: yarn typecheck
