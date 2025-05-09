@@ -1190,7 +1190,28 @@ func isFunctionNillable(pkgInfo *types.Info, expFun ast.Expr) (bool, bool) {
 		// For methods, TypesInfo.Selections[node] is also useful.
 		// For package-level functions/vars, TypesInfo.Uses[node.Sel] or ObjectOf(node.Sel)
 
-		// Try ObjectOf on the selector's name first (covers pkg.Func and pkg.Var)
+		// First, check if this is a method value (obj.Method) or method expression (Type.Method)
+		if selection := pkgInfo.Selections[node]; selection != nil {
+			// This is a method value (obj.Method) or method expression (Type.Method)
+			switch selection.Kind() {
+			case types.MethodVal:
+				// This is a method value (obj.Method)
+				// Check if the receiver can be nil (is a pointer, interface, function, map, channel, or slice)
+				recvType := selection.Recv()
+				switch recvType.Underlying().(type) {
+				case *types.Pointer, *types.Interface, *types.Signature, *types.Map, *types.Chan, *types.Slice:
+					return true, true // Is function type, is nillable
+				default:
+					// Other types (basic types, structs) can't be nil, so the method value can't be nil
+					return true, false // Is function type, not nillable
+				}
+			case types.MethodExpr:
+				// This is a method expression (Type.Method)
+				return true, false // Is function type, not nillable
+			}
+		}
+
+		// If not a method, try ObjectOf on the selector's name (covers pkg.Func and pkg.Var)
 		obj := pkgInfo.ObjectOf(node.Sel)
 		if obj != nil {
 			switch obj.(type) {
@@ -1198,7 +1219,7 @@ func isFunctionNillable(pkgInfo *types.Info, expFun ast.Expr) (bool, bool) {
 				// e.g., pkg.MyVarOfFuncType
 				return true, true // Is function type, is nillable
 			case *types.Func:
-				// e.g., pkg.MyExportedFunc or s.MyMethod (if ObjectOf gives the method's *types.Func)
+				// e.g., pkg.MyExportedFunc
 				return true, false // Is function type, not nillable
 			default:
 				// If it's a function type but not a var/func object, assume nillable value
