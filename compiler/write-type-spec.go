@@ -9,6 +9,115 @@ import (
 	"strings"
 )
 
+func (c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string {
+	trueType := fieldType
+	if ptr, isPtr := trueType.(*types.Pointer); isPtr {
+		trueType = ptr.Elem()
+	}
+	
+	if named, isNamed := trueType.(*types.Named); isNamed {
+		return named.Obj().Name()
+	} else {
+		// Fallback for unnamed embedded types, though less common for structs
+		fieldKeyName := strings.Title(trueType.String()) // Simple heuristic
+		if dotIndex := strings.LastIndex(fieldKeyName, "."); dotIndex != -1 {
+			fieldKeyName = fieldKeyName[dotIndex+1:]
+		}
+		return fieldKeyName
+	}
+}
+
+func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Type) {
+	fieldTypeStr := c.getTypeString(fieldType)
+	
+	// Generate getter
+	c.tsw.WriteLinef("public get %s(): %s {", fieldName, fieldTypeStr)
+	c.tsw.Indent(1)
+	c.tsw.WriteLinef("return this._fields.%s.value", fieldName)
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	
+	// Generate setter
+	c.tsw.WriteLinef("public set %s(value: %s) {", fieldName, fieldTypeStr)
+	c.tsw.Indent(1)
+	c.tsw.WriteLinef("this._fields.%s.value = value", fieldName)
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	c.tsw.WriteLine("")
+}
+
+func (c *GoToTSCompiler) writeBoxedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
+	c.tsw.WriteLiterally(fieldName)
+	c.tsw.WriteLiterally(": $.box(")
+	
+	if isEmbedded {
+		if _, isPtr := fieldType.(*types.Pointer); isPtr {
+			c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
+		} else {
+			typeForNew := fieldName
+			c.tsw.WriteLiterallyf("new %s(init?.%s)", typeForNew, fieldName)
+		}
+	} else {
+		isStructValueType := false
+		var structTypeNameForClone string
+		if named, ok := fieldType.(*types.Named); ok {
+			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+				isStructValueType = true
+				structTypeNameForClone = named.Obj().Name()
+			}
+		}
+		
+		if isStructValueType {
+			c.tsw.WriteLiterallyf("init?.%s?.clone() ?? new %s()", fieldName, structTypeNameForClone)
+		} else {
+			c.tsw.WriteLiterallyf("init?.%s ?? ", fieldName)
+			c.WriteZeroValueForType(fieldType)
+		}
+	}
+	
+	c.tsw.WriteLiterally(")")
+}
+func (c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
+	c.tsw.WriteLiterally(fieldName)
+	c.tsw.WriteLiterally(": $.box(")
+	
+	if isEmbedded {
+		isPointerToStruct := false
+		trueType := fieldType
+		if ptr, isPtr := trueType.(*types.Pointer); isPtr {
+			trueType = ptr.Elem()
+			isPointerToStruct = true
+		}
+		
+		if named, isNamed := trueType.(*types.Named); isNamed {
+			_, isUnderlyingStruct := named.Underlying().(*types.Struct)
+			if isUnderlyingStruct && !isPointerToStruct { // Is a value struct
+				c.tsw.WriteLiterallyf("this._fields.%s.value.clone()", fieldName)
+			} else { // Is a pointer to a struct, or not a struct
+				c.tsw.WriteLiterallyf("this._fields.%s.value", fieldName)
+			}
+		} else {
+			c.tsw.WriteLiterallyf("this._fields.%s.value", fieldName)
+		}
+	} else {
+		isValueTypeStruct := false
+		if named, ok := fieldType.(*types.Named); ok {
+			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+				isValueTypeStruct = true
+			}
+		}
+		
+		if isValueTypeStruct {
+			c.tsw.WriteLiterallyf("this._fields.%s.value?.clone() ?? null", fieldName)
+		} else {
+			c.tsw.WriteLiterallyf("this._fields.%s.value", fieldName)
+		}
+	}
+	
+	c.tsw.WriteLiterally(")")
+}
+
+
 // WriteTypeSpec writes the type specification to the output.
 func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 	if a.Doc != nil {
@@ -67,20 +176,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			if fieldType == nil {
 				fieldType = types.Typ[types.Invalid]
 			}
-			fieldTypeStr := c.getTypeString(fieldType)
-
-			c.tsw.WriteLinef("public get %s(): %s {", fieldName, fieldTypeStr)
-			c.tsw.Indent(1)
-			c.tsw.WriteLinef("return this._fields.%s.value", fieldName)
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-
-			c.tsw.WriteLinef("public set %s(value: %s) {", fieldName, fieldTypeStr)
-			c.tsw.Indent(1)
-			c.tsw.WriteLinef("this._fields.%s.value = value", fieldName)
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			c.tsw.WriteLine("")
+			c.writeGetterSetter(fieldName, fieldType)
 		}
 	}
 
@@ -88,37 +184,8 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	for i := 0; i < underlyingStruct.NumFields(); i++ {
 		field := underlyingStruct.Field(i)
 		if field.Anonymous() {
-			var fieldKeyName string
-			tsTypeName := c.getTypeString(field.Type())
-
-			trueType := field.Type()
-			if ptr, isPtr := trueType.(*types.Pointer); isPtr {
-				trueType = ptr.Elem()
-			}
-
-			if named, isNamed := trueType.(*types.Named); isNamed {
-				fieldKeyName = named.Obj().Name()
-			} else {
-				// Fallback for unnamed embedded types, though less common for structs
-				fieldKeyName = strings.Title(trueType.String()) // Simple heuristic
-				if dotIndex := strings.LastIndex(fieldKeyName, "."); dotIndex != -1 {
-					fieldKeyName = fieldKeyName[dotIndex+1:]
-				}
-			}
-
-			c.tsw.WriteLinef("public get %s(): %s {", fieldKeyName, tsTypeName)
-			c.tsw.Indent(1)
-			c.tsw.WriteLinef("return this._fields.%s.value", fieldKeyName)
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			c.tsw.WriteLine("")
-
-			c.tsw.WriteLinef("public set %s(value: %s) {", fieldKeyName, tsTypeName)
-			c.tsw.Indent(1)
-			c.tsw.WriteLinef("this._fields.%s.value = value", fieldKeyName)
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			c.tsw.WriteLine("")
+			fieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
+			c.writeGetterSetter(fieldKeyName, field.Type())
 		}
 	}
 
@@ -130,24 +197,12 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	for i := 0; i < underlyingStruct.NumFields(); i++ {
 		field := underlyingStruct.Field(i)
 		var fieldKeyName string
-		fieldTsType := c.getTypeString(field.Type())
-
 		if field.Anonymous() {
-			trueType := field.Type()
-			if ptr, isPtr := trueType.(*types.Pointer); isPtr {
-				trueType = ptr.Elem()
-			}
-			if named, isNamed := trueType.(*types.Named); isNamed {
-				fieldKeyName = named.Obj().Name()
-			} else {
-				fieldKeyName = strings.Title(trueType.String()) // Fallback
-				if dotIndex := strings.LastIndex(fieldKeyName, "."); dotIndex != -1 {
-					fieldKeyName = fieldKeyName[dotIndex+1:]
-				}
-			}
+			fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
 		} else {
 			fieldKeyName = field.Name()
 		}
+		fieldTsType := c.getTypeString(field.Type())
 		c.tsw.WriteLinef("%s: $.Box<%s>;", fieldKeyName, fieldTsType)
 	}
 	c.tsw.Indent(-1)
@@ -167,56 +222,13 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		field := underlyingStruct.Field(i)
 		fieldType := field.Type()
 		var fieldKeyName string
-		var typeForNew string // Used for 'new TypeForNew(...)'
-
 		if field.Anonymous() {
-			trueType := fieldType
-			if ptr, isPtr := trueType.(*types.Pointer); isPtr {
-				trueType = ptr.Elem()
-			}
-			if named, isNamed := trueType.(*types.Named); isNamed {
-				fieldKeyName = named.Obj().Name()
-				typeForNew = named.Obj().Name()
-			} else {
-				fieldKeyName = strings.Title(trueType.String()) // Fallback
-				if dotIndex := strings.LastIndex(fieldKeyName, "."); dotIndex != -1 {
-					fieldKeyName = fieldKeyName[dotIndex+1:]
-				}
-				typeForNew = fieldKeyName
-			}
-
-			c.tsw.WriteLiterally(fieldKeyName)
-			c.tsw.WriteLiterally(": $.box(")
-			// Corrected initialization for embedded structs (value types)
-			// Check if it's a pointer type. If so, init?.%s ?? null, otherwise new %s(init?.%s)
-			if _, isPtr := fieldType.(*types.Pointer); isPtr {
-				c.tsw.WriteLiterallyf("init?.%s ?? null", fieldKeyName)
-			} else {
-				c.tsw.WriteLiterallyf("new %s(init?.%s)", typeForNew, fieldKeyName)
-			}
-			c.tsw.WriteLiterally(")")
+			fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
 		} else {
 			fieldKeyName = field.Name()
-			c.tsw.WriteLiterally(fieldKeyName)
-			c.tsw.WriteLiterally(": $.box(")
-
-			isStructValueType := false
-			var structTypeNameForClone string
-			if named, ok := fieldType.(*types.Named); ok {
-				if _, isStruct := named.Underlying().(*types.Struct); isStruct {
-					isStructValueType = true
-					structTypeNameForClone = named.Obj().Name()
-				}
-			}
-
-			if isStructValueType {
-				c.tsw.WriteLiterallyf("init?.%s?.clone() ?? new %s()", fieldKeyName, structTypeNameForClone)
-			} else {
-				c.tsw.WriteLiterallyf("init?.%s ?? ", fieldKeyName)
-				c.WriteZeroValueForType(fieldType)
-			}
-			c.tsw.WriteLiterally(")")
 		}
+		
+		c.writeBoxedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
 
 		if i < numFields-1 {
 			c.tsw.WriteLine(",")
@@ -242,44 +254,13 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		field := underlyingStruct.Field(i)
 		fieldType := field.Type()
 		var fieldKeyName string
-
 		if field.Anonymous() {
-			trueType := fieldType
-			isPointerToStruct := false
-			if ptr, isPtr := trueType.(*types.Pointer); isPtr {
-				trueType = ptr.Elem()
-				isPointerToStruct = true
-			}
-			if named, isNamed := trueType.(*types.Named); isNamed {
-				fieldKeyName = named.Obj().Name()
-				_, isUnderlyingStruct := named.Underlying().(*types.Struct)
-				if isUnderlyingStruct && !isPointerToStruct { // Is a value struct
-					c.tsw.WriteLiterallyf("%s: $.box(this._fields.%s.value.clone())", fieldKeyName, fieldKeyName)
-				} else { // Is a pointer to a struct, or not a struct
-					c.tsw.WriteLiterallyf("%s: $.box(this._fields.%s.value)", fieldKeyName, fieldKeyName)
-				}
-			} else {
-				// Fallback for unnamed embedded types (e.g. embedded basic type)
-				fieldKeyName = strings.Title(trueType.String()) // Simple heuristic
-				if dotIndex := strings.LastIndex(fieldKeyName, "."); dotIndex != -1 {
-					fieldKeyName = fieldKeyName[dotIndex+1:]
-				}
-				c.tsw.WriteLiterallyf("%s: $.box(this._fields.%s.value)", fieldKeyName, fieldKeyName)
-			}
+			fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
 		} else {
 			fieldKeyName = field.Name()
-			isValueTypeStruct := false
-			if named, ok := fieldType.(*types.Named); ok {
-				if _, isStruct := named.Underlying().(*types.Struct); isStruct {
-					isValueTypeStruct = true
-				}
-			}
-			if isValueTypeStruct {
-				c.tsw.WriteLiterallyf("%s: $.box(this._fields.%s.value?.clone() ?? null)", fieldKeyName, fieldKeyName)
-			} else {
-				c.tsw.WriteLiterallyf("%s: $.box(this._fields.%s.value)", fieldKeyName, fieldKeyName)
-			}
 		}
+		
+		c.writeClonedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
 
 		if i < numFields-1 {
 			c.tsw.WriteLine(",")
@@ -341,15 +322,15 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		}
 
 		embeddedFieldType := field.Type()
-		embeddedFieldKeyName := ""
+		embeddedFieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
+		
+		// Skip if not a named type (required for proper embedding promotion)
 		trueEmbeddedType := embeddedFieldType
 		if ptr, isPtr := trueEmbeddedType.(*types.Pointer); isPtr {
 			trueEmbeddedType = ptr.Elem()
 		}
-		if named, isNamed := trueEmbeddedType.(*types.Named); isNamed {
-			embeddedFieldKeyName = named.Obj().Name()
-		} else {
-			continue // Should be a named type for proper embedding promotion
+		if _, isNamed := trueEmbeddedType.(*types.Named); !isNamed {
+			continue
 		}
 
 		// Promoted fields

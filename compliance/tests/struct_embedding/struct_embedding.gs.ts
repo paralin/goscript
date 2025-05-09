@@ -65,7 +65,6 @@ class Employee {
 	public get Person(): Person {
 		return this._fields.Person.value
 	}
-
 	public set Person(value: Person) {
 		this._fields.Person.value = value
 	}
@@ -222,7 +221,6 @@ class Manager {
 	public get Person(): Person {
 		return this._fields.Person.value
 	}
-
 	public set Person(value: Person) {
 		this._fields.Person.value = value
 	}
@@ -230,7 +228,6 @@ class Manager {
 	public get Address(): Address {
 		return this._fields.Address.value
 	}
-
 	public set Address(value: Address) {
 		this._fields.Address.value = value
 	}
@@ -238,7 +235,6 @@ class Manager {
 	public get Contact(): Contact {
 		return this._fields.Contact.value
 	}
-
 	public set Contact(value: Contact) {
 		this._fields.Contact.value = value
 	}
