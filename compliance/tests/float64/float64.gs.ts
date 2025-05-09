@@ -10,24 +10,24 @@ export function main(): void {
 	let c: number = 0
 
 	c = a + b
-	console.log("a + b =", c)
+	;console.log("a + b =", c)
 
 	c = a - b
-	console.log("a - b =", c)
+	;console.log("a - b =", c)
 
 	c = a * b
-	console.log("a * b =", c)
+	;console.log("a * b =", c)
 
 	c = a / b
-	console.log("a / b =", c)
+	;console.log("a / b =", c)
 
 	// Assignment
 	let d = 7.89
 	c = d
-	console.log("c =", c)
+	;console.log("c =", c)
 
 	// More complex expression
 	let e = (a + b) * (c - d) / a
-	console.log("(a + b) * (c - d) / a =", e)
+	;console.log("(a + b) * (c - d) / a =", e)
 }
 

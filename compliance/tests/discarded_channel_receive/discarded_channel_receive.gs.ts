@@ -10,10 +10,10 @@ export async function main(): Promise<void> {
 	queueMicrotask(async () => {
 		{
 			await ch.send(1)
-			ch.close() // Close the channel to allow the main goroutine to exit
+			;ch.close() // Close the channel to allow the main goroutine to exit
 		}
 	})
 	await ch.receive()
-	console.log("done") // Add a print statement to verify execution
+	;console.log("done") // Add a print statement to verify execution
 }
 

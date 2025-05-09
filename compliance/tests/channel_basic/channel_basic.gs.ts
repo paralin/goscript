@@ -13,6 +13,6 @@ export async function main(): Promise<void> {
 	})
 
 	let msg = await messages.receive()
-	console.log(msg)
+	;console.log(msg)
 }
 

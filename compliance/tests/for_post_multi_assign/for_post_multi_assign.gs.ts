@@ -5,8 +5,8 @@ import * as $ from "@goscript/builtin";
 
 export function main(): void {
 	for (let i = 0, j = 5; i < j; [i, j] = [i + 1, j - 1]) {
-		console.log(i, j)
+		;console.log(i, j)
 	}
-	console.log("done")
+	;console.log("done")
 }
 

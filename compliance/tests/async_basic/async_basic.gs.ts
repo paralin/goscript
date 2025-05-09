@@ -23,8 +23,8 @@ export async function main(): Promise<void> {
 
 	// Call the async caller function
 	let finalResult = await (caller)(myChan)
-	console.log(finalResult) // Expected output: 11
+	;console.log(finalResult) // Expected output: 11
 
-	myChan.close()
+	;myChan.close()
 }
 
