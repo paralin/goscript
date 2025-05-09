@@ -1041,11 +1041,16 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 		// Add ! for null assertion
 		c.tsw.WriteLiterally("!")
 		
-		// Add .value only if we need boxed dereferencing for this type of pointer
-		// This depends on whether we're dereferencing to a primitive (needs .value)
-		// or to a struct (no .value needed)
-		if c.analysis.NeedsBoxedDeref(ptrType) {
-			c.tsw.WriteLiterally(".value")
+		// Get the element type of the pointer to determine if we need .value
+		// For multi-level dereferencing, we need to check the element type
+		if ptrType, ok := ptrType.(*types.Pointer); ok {
+			elemType := ptrType.Elem()
+			
+			// Add .value if the element type needs boxed dereferencing
+			// This is determined by checking if the element is a primitive or another pointer
+			if _, isStruct := elemType.Underlying().(*types.Struct); !isStruct {
+				c.tsw.WriteLiterally(".value")
+			}
 		}
 		return nil
 	}
