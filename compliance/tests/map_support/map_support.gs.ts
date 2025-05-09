@@ -6,7 +6,7 @@ import * as $ from "@goscript/builtin";
 export function main(): void {
 	// Create map using make
 	let scores = $.makeMap<string, number>()
-	$.println("Empty map created: Expected: true, Actual:", $.len(scores) == 0)
+	console.log("Empty map created: Expected: true, Actual:", $.len(scores) == 0)
 
 	// Add key-value pairs
 	$.mapSet(scores, "Alice", 90)
@@ -14,36 +14,36 @@ export function main(): void {
 	$.mapSet(scores, "Charlie", 92)
 
 	// Map size
-	$.println("Map size after adding 3 items: Expected: 3, Actual:", $.len(scores))
+	console.log("Map size after adding 3 items: Expected: 3, Actual:", $.len(scores))
 
 	// Access values
-	$.println("Alice's score: Expected: 90, Actual:", scores.get("Alice") ?? 0)
-	$.println("Bob's score: Expected: 85, Actual:", scores.get("Bob") ?? 0)
+	console.log("Alice's score: Expected: 90, Actual:", scores.get("Alice") ?? 0)
+	console.log("Bob's score: Expected: 85, Actual:", scores.get("Bob") ?? 0)
 
 	// Modify a value
 	$.mapSet(scores, "Bob", 88)
-	$.println("Bob's updated score: Expected: 88, Actual:", scores.get("Bob") ?? 0)
+	console.log("Bob's updated score: Expected: 88, Actual:", scores.get("Bob") ?? 0)
 
 	// Check if key exists (comma-ok idiom)
 	let value
 	let exists: boolean
 	exists = scores.has("David")
 	value = scores.get("David") ?? 0
-	$.println("Does David exist in map? Expected: false, Actual:", exists)
-	$.println("Value for non-existent key: Expected: 0, Actual:", value)
+	console.log("Does David exist in map? Expected: false, Actual:", exists)
+	console.log("Value for non-existent key: Expected: 0, Actual:", value)
 
 	// Delete a key
 	$.deleteMapEntry(scores, "Charlie")
 	exists = scores.has("Charlie")
-	$.println("After delete, does Charlie exist? Expected: false, Actual:", exists)
+	console.log("After delete, does Charlie exist? Expected: false, Actual:", exists)
 
 	// Create map with literal syntax
 	let colors = new Map([["red", "#ff0000"], ["green", "#00ff00"], ["blue", "#0000ff"]])
-	$.println("Map literal size: Expected: 3, Actual:", $.len(colors))
-	$.println("Color code for red: Expected: #ff0000, Actual:", colors.get("red") ?? "")
+	console.log("Map literal size: Expected: 3, Actual:", $.len(colors))
+	console.log("Color code for red: Expected: #ff0000, Actual:", colors.get("red") ?? "")
 
 	// Iterate over a map with range
-	$.println("Iterating over scores map:")
+	console.log("Iterating over scores map:")
 
 	// Create a new map with string keys and string values for testing iteration
 	let stringMap = new Map([["Alice", "A+"], ["Bob", "B+"], ["Charlie", "A"]])
@@ -76,7 +76,7 @@ export function main(): void {
 	for (let i = 0; i < scoreResults.length; i++) {
 		const result = scoreResults[i]
 		{
-			$.println(result)
+			console.log(result)
 		}
 	}
 }

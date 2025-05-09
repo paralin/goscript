@@ -12,7 +12,7 @@ async function receiveFromChan(ch: $.Channel<number>): Promise<number> {
 // This function calls an async function, making it async too.
 async function caller(ch: $.Channel<number>): Promise<number> {
 	// We expect this call to be awaited in TypeScript
-	let result = await (receiveFromChan)(ch)
+	let result = await receiveFromChan(ch)
 	return result + 1
 }
 
@@ -22,8 +22,8 @@ export async function main(): Promise<void> {
 	await myChan.send(10)
 
 	// Call the async caller function
-	let finalResult = await (caller)(myChan)
-	$.println(finalResult) // Expected output: 11
+	let finalResult = await caller(myChan)
+	console.log(finalResult) // Expected output: 11
 
 	myChan.close()
 }

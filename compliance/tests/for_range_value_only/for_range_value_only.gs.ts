@@ -10,10 +10,10 @@ export function main(): void {
 		const v = s[i]
 		{
 			sum += v
-			$.println(v)
+			console.log(v)
 		}
 	}
-	$.println(sum)
+	console.log(sum)
 
 	let arr = $.arrayToSlice(["a", "b", "c"])
 	let concat = ""
@@ -21,13 +21,13 @@ export function main(): void {
 		const val = arr[i]
 		{
 			concat += val
-			$.println(val)
+			console.log(val)
 		}
 	}
-	$.println(concat)
+	console.log(concat)
 
 	// Test with blank identifier for value (should still iterate)
-	$.println("Ranging with blank identifier for value:")
+	console.log("Ranging with blank identifier for value:")
 	let count = 0
 	// Both key and value are blank identifiers
 	for (let i = 0; i < s.length; i++) {
@@ -36,6 +36,6 @@ export function main(): void {
 			count++
 		}
 	}
-	$.println(count) // Should be 3
+	console.log(count) // Should be 3
 }
 

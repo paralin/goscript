@@ -10,9 +10,9 @@ export function main(): void {
 		const val = slice[idx]
 		{
 			sum += val
-			$.println("Range idx:", idx, "val:", val)
+			console.log("Range idx:", idx, "val:", val)
 		}
 	}
-	$.println("Sum:", sum)
+	console.log("Sum:", sum)
 }
 

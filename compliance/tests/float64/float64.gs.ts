@@ -10,24 +10,24 @@ export function main(): void {
 	let c: number = 0
 
 	c = a + b
-	$.println("a + b =", c)
+	console.log("a + b =", c)
 
 	c = a - b
-	$.println("a - b =", c)
+	console.log("a - b =", c)
 
 	c = a * b
-	$.println("a * b =", c)
+	console.log("a * b =", c)
 
 	c = a / b
-	$.println("a / b =", c)
+	console.log("a / b =", c)
 
 	// Assignment
 	let d = 7.89
 	c = d
-	$.println("c =", c)
+	console.log("c =", c)
 
 	// More complex expression
 	let e = (a + b) * (c - d) / a
-	$.println("(a + b) * (c - d) / a =", e)
+	console.log("(a + b) * (c - d) / a =", e)
 }
 

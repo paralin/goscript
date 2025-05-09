@@ -5,8 +5,8 @@ import * as $ from "@goscript/builtin";
 
 export function main(): void {
 	for (let i = 0; i < 1; i++) {
-		$.println(i)
+		console.log(i)
 	}
-	$.println("done")
+	console.log("done")
 }
 

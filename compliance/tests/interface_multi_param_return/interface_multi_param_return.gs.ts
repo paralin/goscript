@@ -34,10 +34,10 @@ class MyProcessor {
 	public Process(data: $.Slice<number>, count: number, _: string): [boolean, $.Error] {
 		const p = this
 		if (count > 0 && $.len(data) > 0) {
-			$.println("Processing successful")
+			console.log("Processing successful")
 			return [true, null]
 		}
-		$.println("Processing failed")
+		console.log("Processing failed")
 		return [false, null]
 	}
 
@@ -59,9 +59,9 @@ export function main(): void {
 	let [success, ] = processor.Process(data, 5, "unused")
 
 	if (success) {
-		$.println("Main: Success reported")
+		console.log("Main: Success reported")
 	} else {
-		$.println("Main: Failure reported")
+		console.log("Main: Failure reported")
 	}
 }
 

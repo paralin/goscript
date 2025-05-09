@@ -54,12 +54,12 @@ export function main(): void {
 
 	// Accessing field on pointer type: Should generate ptr.MyInt
 	ptr.MyInt = 40
-	$.println("ptr.MyInt:", ptr.MyInt) // Expected: 40
+	console.log("ptr.MyInt:", ptr.MyInt) // Expected: 40
 
 	// Accessing pointer value, should use .value
-	$.println("ptrToVal.MyInt:", ptrToVal!.value.MyInt)
+	console.log("ptrToVal.MyInt:", ptrToVal!.value.MyInt)
 
 	let myIntVal = ptrToVal!.value.MyInt
-	$.println("myIntVal:", myIntVal)
+	console.log("myIntVal:", myIntVal)
 }
 

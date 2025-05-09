@@ -6,7 +6,7 @@ import * as $ from "@goscript/builtin";
 export function main(): void {
 	using __defer = new $.DisposableStack();
 	__defer.defer(() => {
-		$.println("deferred")});
-	$.println("main")
+		console.log("deferred")});
+	console.log("main")
 }
 

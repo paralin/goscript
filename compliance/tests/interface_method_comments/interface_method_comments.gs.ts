@@ -18,8 +18,8 @@ const MyInterface__typeInfo = $.registerType(
 
 export function main(): void {
 	// This test verifies that comments on interface methods are preserved.
-	$.println("Test started")
+	console.log("Test started")
 	// No actual execution needed, just compilation check.
-	$.println("Test finished")
+	console.log("Test finished")
 }
 

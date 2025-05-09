@@ -14,6 +14,6 @@ export async function main(): Promise<void> {
 		}
 	})
 	await ch.receive()
-	$.println("done") // Add a print statement to verify execution
+	console.log("done") // Add a print statement to verify execution
 }
 
