@@ -41,7 +41,7 @@ class Person {
 
 	public Greet(): void {
 		const p = this
-		console.log("Hello, my name is " + p.Name)
+		;console.log("Hello, my name is " + p.Name)
 	}
 
 	// Register this type with the runtime type system
@@ -197,7 +197,7 @@ class Contact {
 
 	public Call(): void {
 		const c = this
-		console.log("Calling " + c.Phone)
+		;console.log("Calling " + c.Phone)
 	}
 
 	// Register this type with the runtime type system
@@ -328,9 +328,9 @@ export function main(): void {
 	let e = new Employee({ID: 123, Person: {Name: "Alice", Age: 30}})
 
 	// Accessing embedded fields
-	console.log("Employee Name:", e.Name)
-	console.log("Employee Age:", e.Age)
-	console.log("Employee ID:", e.ID)
+	;console.log("Employee Name:", e.Name)
+	;console.log("Employee Age:", e.Age)
+	;console.log("Employee ID:", e.ID)
 
 	// Calling embedded method
 	e.Greet()
@@ -339,42 +339,42 @@ export function main(): void {
 	let ep = new Employee({ID: 456, Person: {Name: "Bob", Age: 25}})
 
 	// Accessing embedded fields via pointer
-	console.log("Employee Pointer Name:", ep.Name)
-	console.log("Employee Pointer Age:", ep.Age)
-	console.log("Employee Pointer ID:", ep.ID)
+	;console.log("Employee Pointer Name:", ep.Name)
+	;console.log("Employee Pointer Age:", ep.Age)
+	;console.log("Employee Pointer ID:", ep.ID)
 
 	// Calling embedded method via pointer
-	ep.Greet()
+	;ep.Greet()
 
 	// --- Multiple Embedding Tests ---
-	console.log("\n--- Multiple Embedding ---")
+	;console.log("\n--- Multiple Embedding ---")
 	let m: $.Box<Manager> = $.box(new Manager({Level: 5, Address: {Street: "123 Main St", City: "Anytown"}, Contact: {Phone: "555-1234"}, Person: {Name: "Charlie", Age: 40}}))
 
 	// Accessing fields from all embedded structs and the outer struct
-	console.log("Manager Name:", m!.value.Name) // From Person
-	console.log("Manager Age:", m!.value.Age) // From Person
-	console.log("Manager Street:", m!.value.Street) // From Address
-	console.log("Manager City:", m!.value.City) // From Address
-	console.log("Manager Phone:", m!.value.Phone) // From Contact
-	console.log("Manager Level:", m!.value.Level) // From Manager
+	;console.log("Manager Name:", m!.value.Name) // From Person
+	;console.log("Manager Age:", m!.value.Age) // From Person
+	;console.log("Manager Street:", m!.value.Street) // From Address
+	;console.log("Manager City:", m!.value.City) // From Address
+	;console.log("Manager Phone:", m!.value.Phone) // From Contact
+	;console.log("Manager Level:", m!.value.Level) // From Manager
 
 	// Calling methods from embedded structs
 	m!.value.Greet() // From Person
-	console.log("Manager Full Address:", m!.value.FullAddress()) // From Address
+	;console.log("Manager Full Address:", m!.value.FullAddress()) // From Address
 	m!.value.Call() // From Contact
 
 	// Test with a pointer
 	let mp = m
-	console.log("\n--- Multiple Embedding (Pointer) ---")
-	console.log("Manager Pointer Name:", mp!.value.Name)
-	mp!.value.Greet()
-	console.log("Manager Pointer Full Address:", mp!.value.FullAddress())
-	mp!.value.Call()
+	;console.log("\n--- Multiple Embedding (Pointer) ---")
+	;console.log("Manager Pointer Name:", mp!.value.Name)
+	;mp!.value.Greet()
+	;console.log("Manager Pointer Full Address:", mp!.value.FullAddress())
+	;mp!.value.Call()
 
 	// Modify through pointer
 	mp!.value.Age = 41
 	mp!.value.City = "New City"
-	console.log("Modified Manager Age:", m!.value.Age)
-	console.log("Modified Manager City:", m!.value.City)
+	;console.log("Modified Manager Age:", m!.value.Age)
+	;console.log("Modified Manager City:", m!.value.City)
 }
 
