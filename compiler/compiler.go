@@ -2200,45 +2200,8 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	// Write arrow function: (params) => { body }
 	c.tsw.WriteLiterally("(")
 	
-	// Check if this is a variadic function
-	isVariadic := false
-	if exp.Type.Params != nil && len(exp.Type.Params.List) > 0 {
-		lastParam := exp.Type.Params.List[len(exp.Type.Params.List)-1]
-		if _, ok := lastParam.Type.(*ast.Ellipsis); ok {
-			isVariadic = true
-		}
-	}
-
-	if isVariadic {
-		for i, field := range exp.Type.Params.List[:len(exp.Type.Params.List)-1] {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-			c.WriteField(field, true)
-		}
-
-		lastParam := exp.Type.Params.List[len(exp.Type.Params.List)-1]
-		if len(exp.Type.Params.List) > 1 {
-			c.tsw.WriteLiterally(", ")
-		}
-
-		for i, name := range lastParam.Names {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ")
-			}
-			c.tsw.WriteLiterally("...")
-			c.tsw.WriteLiterally(name.Name)
-		}
-
-		c.tsw.WriteLiterally(": ")
-		if ellipsis, ok := lastParam.Type.(*ast.Ellipsis); ok {
-			c.WriteTypeExpr(ellipsis.Elt)
-			c.tsw.WriteLiterally("[]")
-		}
-	} else {
-		// Normal parameters
-		c.WriteFieldList(exp.Type.Params, true) // true = arguments
-	}
+	// Use WriteFieldList which now handles variadic parameters
+	c.WriteFieldList(exp.Type.Params, true) // true = arguments
 	
 	c.tsw.WriteLiterally(")")
 
@@ -2973,21 +2936,63 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 		c.tsw.Indent(1)
 	}
 
-	// Handle parameter list for function declarations
-	for i, field := range a.List {
-		if i > 0 && isArguments {
-			c.tsw.WriteLiterally(", ")
+	// Check if this is a variadic function parameter list
+	isVariadic := false
+	if isArguments && a != nil && len(a.List) > 0 {
+		lastParam := a.List[len(a.List)-1]
+		if _, ok := lastParam.Type.(*ast.Ellipsis); ok {
+			isVariadic = true
 		}
+	}
 
-		if isArguments {
-			// For function parameters, write "name: type"
+	if isArguments && isVariadic {
+		// Handle non-variadic parameters first
+		for i, field := range a.List[:len(a.List)-1] {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
 			c.WriteField(field, true)
 			c.tsw.WriteLiterally(": ")
 			typ := c.pkg.TypesInfo.TypeOf(field.Type)
-			c.WriteGoType(typ) // Use WriteGoType for parameter type
-		} else {
-			// For struct fields and other non-argument fields
-			c.WriteField(field, false)
+			c.WriteGoType(typ)
+		}
+
+		// Handle the variadic parameter
+		lastParam := a.List[len(a.List)-1]
+		if len(a.List) > 1 {
+			c.tsw.WriteLiterally(", ")
+		}
+
+		for i, name := range lastParam.Names {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.tsw.WriteLiterally("...")
+			c.tsw.WriteLiterally(name.Name)
+		}
+
+		c.tsw.WriteLiterally(": ")
+		if ellipsis, ok := lastParam.Type.(*ast.Ellipsis); ok {
+			c.WriteTypeExpr(ellipsis.Elt)
+			c.tsw.WriteLiterally("[]")
+		}
+	} else {
+		// Handle regular parameter list for function declarations
+		for i, field := range a.List {
+			if i > 0 && isArguments {
+				c.tsw.WriteLiterally(", ")
+			}
+
+			if isArguments {
+				// For function parameters, write "name: type"
+				c.WriteField(field, true)
+				c.tsw.WriteLiterally(": ")
+				typ := c.pkg.TypesInfo.TypeOf(field.Type)
+				c.WriteGoType(typ) // Use WriteGoType for parameter type
+			} else {
+				// For struct fields and other non-argument fields
+				c.WriteField(field, false)
+			}
 		}
 	}
 
