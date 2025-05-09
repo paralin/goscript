@@ -60,7 +60,7 @@ class MyError {
 	);
 }
 
-export function NewMyError(text: string): $.Error {
+export function NewMyError(text: string): $.Box<MyError> | null {
 	return new MyError({s: text})
 }
 
