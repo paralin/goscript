@@ -9,7 +9,7 @@ export function main(): void {
 	}
 
 
-	let message = (greet!)("world")
+	let message = greet!("world")
 	console.log(message)
 }
 
