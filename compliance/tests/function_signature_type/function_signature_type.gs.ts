@@ -66,7 +66,7 @@ export function NewMyError(text: string): $.Error {
 
 export function main(): void {
 	fn1 = (a: number, b: string): [boolean, $.Error] => {
-		console.log("fn1 called with:", a, b)
+		;console.log("fn1 called with:", a, b)
 		if (a > 0) {
 			return [true, null]
 		}
@@ -75,55 +75,55 @@ export function main(): void {
 
 
 	fn2 = (p0: number, p1: string): boolean => {
-		console.log("fn2 called with:", p0, p1)
+		;console.log("fn2 called with:", p0, p1)
 		return p0 == $.len(p1)
 	}
 
 
 	fn3 = (): void => {
-		console.log("fn3 called")
+		;console.log("fn3 called")
 	}
 
 
 	// Newline after all strings
 	fn4 = (a: number, ...b: string[]): void => {
-		console.log("fn4 called with: ", a)
+		;console.log("fn4 called with: ", a)
 		for (let i = 0; i < b.length; i++) {
 			const s = b[i]
 			{
-				console.log(" ", s)
+				;console.log(" ", s)
 			}
 		}
-		console.log() // Newline after all strings
+		;console.log() // Newline after all strings
 	}
 
 
 	let [res1, err1] = (fn1!)(10, "hello")
-	console.log("fn1 result 1: ", res1, " ")
+	;console.log("fn1 result 1: ", res1, " ")
 	if (err1 != null) {
-		console.log(err1.Error())
+		;console.log(err1.Error())
 	} else {
-		console.log("nil")
+		;console.log("nil")
 	}
 
 	let [res1_2, err1_2] = (fn1!)(-5, "world")
-	console.log("fn1 result 2: ", res1_2, " ")
+	;console.log("fn1 result 2: ", res1_2, " ")
 	if (err1_2 != null) {
-		console.log(err1_2.Error())
+		;console.log(err1_2.Error())
 	} else {
-		console.log("nil")
+		;console.log("nil")
 	}
 
 	let res2 = (fn2!)(5, "hello")
-	console.log("fn2 result 1:", res2)
+	;console.log("fn2 result 1:", res2)
 
 	let res2_2 = (fn2!)(3, "hey")
-	console.log("fn2 result 2:", res2_2)
+	;console.log("fn2 result 2:", res2_2)
 
-	(fn3!)()
+	;(fn3!)()
 
-	(fn4!)(1)
-	(fn4!)(2, "one")
-	(fn4!)(3, "two", "three")
+	;(fn4!)(1)
+	;(fn4!)(2, "one")
+	;(fn4!)(3, "two", "three")
 }
 

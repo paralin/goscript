@@ -4811,18 +4811,9 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 		return nil
 	}
 
-	// Special case: if this is a statement that starts with a parenthesis, we need to add a semicolon
-	// Only add semicolons before parenthesized function calls like (fn)() or (fn!)()
-	switch x := exp.X.(type) {
-	case *ast.CallExpr:
-		// Only add semicolon if the function itself is parenthesized
-		if _, isParen := x.Fun.(*ast.ParenExpr); isParen {
-			c.tsw.WriteLiterally(";")
-		}
-	case *ast.ParenExpr:
-		// This handles any statement that starts with a parenthesis
-		c.tsw.WriteLiterally(";")
-	}
+	// function calls as method invocations on the previous line
+	c.tsw.WriteLiterally(";")
+
 
 	// Handle other expression statements
 	if err := c.WriteValueExpr(exp.X); err != nil { // Expression statement evaluates a value
