@@ -1041,10 +1041,9 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 		// Add ! for null assertion
 		c.tsw.WriteLiterally("!")
 		
-		// Add .value only if we need boxed dereferencing for this type of pointer
-		if c.analysis.NeedsBoxedDeref(ptrType) {
-			c.tsw.WriteLiterally(".value")
-		}
+		// For multi-level dereferencing, we always need .value
+		// This is because the inner expression already returns a Box<T>
+		c.tsw.WriteLiterally(".value")
 		return nil
 	}
 
