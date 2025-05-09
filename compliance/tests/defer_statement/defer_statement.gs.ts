@@ -7,6 +7,6 @@ export function main(): void {
 	using __defer = new $.DisposableStack();
 	__defer.defer(() => {
 		console.log("deferred")});
-	console.log("main")
+	;console.log("main")
 }
 

@@ -21,6 +21,6 @@ export function main(): void {
 	// should be: p1.value = y
 	p1!.value = y
 
-	console.log("***p3 ==", p3!.value!.value!.value)
+	;console.log("***p3 ==", p3!.value!.value!.value)
 }
 

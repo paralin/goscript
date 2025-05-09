@@ -63,9 +63,9 @@ export function main(): void {
 
 	let { ok: ok } = $.typeAssert<MyStruct>(i, 'MyStruct')
 	if (ok) {
-		console.log("Type assertion successful")
+		;console.log("Type assertion successful")
 	} else {
-		console.log("Type assertion failed")
+		;console.log("Type assertion failed")
 	}
 
 	// try a second time since this generates something different when using = and not :=
@@ -73,18 +73,18 @@ export function main(): void {
 
 	// expected
 	if (ok) {
-		console.log("Type assertion successful")
+		;console.log("Type assertion successful")
 	} else {
 		// expected
-		console.log("Type assertion failed")
+		;console.log("Type assertion failed")
 	}
 
 	// assign result to a variable
 	let { value: val, ok: ok2 } = $.typeAssert<MyStruct>(i, 'MyStruct')
 	if (!ok2) {
-		console.log("type assertion failed")
+		;console.log("type assertion failed")
 	} else {
-		console.log("type assertion success", val.Value)
+		;console.log("type assertion success", val.Value)
 	}
 }
 
