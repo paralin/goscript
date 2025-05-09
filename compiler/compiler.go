@@ -698,37 +698,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		// Handle type assertion in an expression context
 		return c.WriteTypeAssertExpr(exp)
 	case *ast.IndexExpr:
-		// Handle map access: use Map.get() instead of brackets for reading values
-		if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
-			// Check if it's a map type
-			if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
-				if err := c.WriteValueExpr(exp.X); err != nil {
-					return err
-				}
-				c.tsw.WriteLiterally(".get(")
-				if err := c.WriteValueExpr(exp.Index); err != nil {
-					return err
-				}
-				// Map.get() returns undefined when key not found, but Go returns zero value
-				// Add nullish coalescing with the appropriate zero value for the map's value type
-				c.tsw.WriteLiterally(") ?? ")
-
-				// Generate the zero value based on the map's value type
-				c.WriteZeroValueForType(mapType.Elem())
-				return nil
-			}
-		}
-
-		// Regular array/slice access: use brackets
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return err
-		}
-		c.tsw.WriteLiterally("![") // non-null assertion
-		if err := c.WriteValueExpr(exp.Index); err != nil {
-			return err
-		}
-		c.tsw.WriteLiterally("]")
-		return nil
+		return c.WriteIndexExpr(exp)
 	case *ast.SliceExpr:
 		// Translate Go slice expression to $.slice(x, low, high, max)
 		c.tsw.WriteLiterally("$.slice(")
@@ -781,6 +751,41 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled value expr: %T", exp))
 		return nil
 	}
+}
+
+// WriteIndexExpr translates a Go index expression (a[b]) to its TypeScript equivalent.
+func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
+	// Handle map access: use Map.get() instead of brackets for reading values
+	if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
+		// Check if it's a map type
+		if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return err
+			}
+			c.tsw.WriteLiterally(".get(")
+			if err := c.WriteValueExpr(exp.Index); err != nil {
+				return err
+			}
+			// Map.get() returns undefined when key not found, but Go returns zero value
+			// Add nullish coalescing with the appropriate zero value for the map's value type
+			c.tsw.WriteLiterally(") ?? ")
+
+			// Generate the zero value based on the map's value type
+			c.WriteZeroValueForType(mapType.Elem())
+			return nil
+		}
+	}
+
+	// Regular array/slice access: use brackets
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return err
+	}
+	c.tsw.WriteLiterally("![") // non-null assertion
+	if err := c.WriteValueExpr(exp.Index); err != nil {
+		return err
+	}
+	c.tsw.WriteLiterally("]")
+	return nil
 }
 
 // WriteTypeAssertExpr translates a Go type assertion expression (e.g., `x.(T)`)
@@ -3893,7 +3898,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				// If it's a blank identifier, we write nothing,
 				// leaving an empty slot in the destructuring array.
 			} else if indexExpr, ok := l.(*ast.IndexExpr); ok && allIndexExprs { // MODIFICATION: Added 'else if'
-				// Handle array[index] with non-null assertion after array name
+				// Note: We don't use WriteIndexExpr here because we need direct array access for swapping
 				if err := c.WriteValueExpr(indexExpr.X); err != nil {
 					return err
 				}
@@ -3916,7 +3921,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				c.tsw.WriteLiterally(", ")
 			}
 			if indexExpr, ok := r.(*ast.IndexExpr); ok && allIndexExprs {
-				// Handle array[index] with non-null assertion after array name
+				// Note: We don't use WriteIndexExpr here because we need direct array access for swapping
 				if err := c.WriteValueExpr(indexExpr.X); err != nil {
 					return err
 				}
@@ -3944,7 +3949,8 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			c.tsw.WriteLiterally(", ")
 		}
 
-		// Handle map indexing assignment specially
+		// Handle map indexing assignment specially 
+		// Note: We don't use WriteIndexExpr here because we need to use $.mapSet instead of .get
 		currentIsMapIndex := false
 		if indexExpr, ok := l.(*ast.IndexExpr); ok {
 			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
@@ -4316,6 +4322,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		}
 
 		// Handle index expressions differently (special case for map assignments)
+		// Note: We don't use WriteIndexExpr here because we need special handling for map assignments
 		if indexExpr, ok := lhsExpr.(*ast.IndexExpr); ok {
 			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
 				if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
@@ -4361,6 +4368,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	}
 
 	// writeMapLookupWithExists handles the map comma-ok idiom: value, exists := myMap[key]
+	// Note: We don't use WriteIndexExpr here because we need to handle .has() and .get() separately
 	writeMapLookupWithExists := func(lhs []ast.Expr, indexExpr *ast.IndexExpr, tok token.Token) error {
 		// First check that we have exactly two LHS expressions (value and exists)
 		if len(lhs) != 2 {
