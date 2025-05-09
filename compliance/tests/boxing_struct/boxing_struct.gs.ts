@@ -45,10 +45,10 @@ export function main(): void {
 	let ptrToVal = val
 
 	// Accessing pointer value, should use .value
-	$.println("ptrToVal.MyInt:", ptrToVal!.value.MyInt)
+	console.log("ptrToVal.MyInt:", ptrToVal!.value.MyInt)
 
 	// Accessing pointer value, should use .value
 	let myIntVal = ptrToVal!.value.MyInt
-	$.println("myIntVal:", myIntVal)
+	console.log("myIntVal:", myIntVal)
 }
 

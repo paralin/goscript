@@ -9,19 +9,19 @@ function returnsOneIntOneBool(): [number, boolean] {
 
 export function main(): void {
 	let i: number = 0
-	$.println("initial i:", i) // Use i to avoid unused error before :=
+	console.log("initial i:", i) // Use i to avoid unused error before :=
 
 	// i already exists from the var declaration above.
 	// err is a new variable being declared.
-	let [i, err] = (returnsOneIntOneBool)()
+	let [i, err] = returnsOneIntOneBool()
 
-	$.println("after assign i:", i) // Use i
+	console.log("after assign i:", i) // Use i
 	// Use err
 	if (err) {
 		// Use err
-		$.println("err is true")
+		console.log("err is true")
 	} else {
-		$.println("err is false")
+		console.log("err is false")
 	}
 }
 

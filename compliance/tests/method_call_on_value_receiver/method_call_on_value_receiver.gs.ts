@@ -57,6 +57,6 @@ class MyStruct {
 
 export function main(): void {
 	let ms = new MyStruct({MyInt: 1, MyString: "bar"})
-	$.println("Method call on value: Expected: bar, Actual:", ms.GetMyString())
+	console.log("Method call on value: Expected: bar, Actual:", ms.GetMyString())
 }
 

@@ -5,80 +5,80 @@ import * as $ from "@goscript/builtin";
 
 export function main(): void {
 	let i = 2
-	$.println("Integer switch:")
+	console.log("Integer switch:")
 	switch (i) {
 		case 1:
-			$.println("one")
+			console.log("one")
 			break
 		case 2:
-			$.println("two")
+			console.log("two")
 			break
 		case 3:
-			$.println("three")
+			console.log("three")
 			break
 		default:
-			$.println("other integer")
+			console.log("other integer")
 			break
 	}
 
 	let s = "hello"
-	$.println("\nString switch:")
+	console.log("\nString switch:")
 	switch (s) {
 		case "world":
-			$.println("world")
+			console.log("world")
 			break
 		case "hello":
-			$.println("hello")
+			console.log("hello")
 			break
 		default:
-			$.println("other string")
+			console.log("other string")
 			break
 	}
 	let x = -5
-	$.println("\nSwitch without expression:")
+	console.log("\nSwitch without expression:")
 
 	// x > 0
 	switch (true) {
 		case x < 0:
-			$.println("negative")
+			console.log("negative")
 			break
 		case x == 0:
-			$.println("zero")
+			console.log("zero")
 			break
 		default:
-			$.println("positive")
+			console.log("positive")
 			break
 	}
 
 	x = 0
-	$.println("\nSwitch without expression (zero):")
+	console.log("\nSwitch without expression (zero):")
 
 	// x > 0
 	switch (true) {
 		case x < 0:
-			$.println("negative")
+			console.log("negative")
 			break
 		case x == 0:
-			$.println("zero")
+			console.log("zero")
 			break
 		default:
-			$.println("positive")
+			console.log("positive")
 			break
 	}
 
 	x = 10
-	$.println("\nSwitch without expression (positive):")
+	console.log("\nSwitch without expression (positive):")
 
 	// x > 0
 	switch (true) {
 		case x < 0:
-			$.println("negative")
+			console.log("negative")
 			break
 		case x == 0:
-			$.println("zero")
+			console.log("zero")
 			break
 		default:
-			$.println("positive")
+			console.log("positive")
 			break
 	}
 }

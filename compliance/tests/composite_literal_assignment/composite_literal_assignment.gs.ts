@@ -67,8 +67,8 @@ export function main(): void {
 	let structLiteralCopy = structLiteral.clone()
 	structLiteralCopy.MyString = "modified composite literal copy"
 	// Expected: "composite literal"
-	$.println("Original struct literal: Expected: composite literal, Actual: " + structLiteral.MyString)
+	console.log("Original struct literal: Expected: composite literal, Actual: " + structLiteral.MyString)
 	// Expected: "modified composite literal copy"
-	$.println("Modified struct literal copy: Expected: modified composite literal copy, Actual: " + structLiteralCopy.MyString)
+	console.log("Modified struct literal copy: Expected: modified composite literal copy, Actual: " + structLiteralCopy.MyString)
 }
 

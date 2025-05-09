@@ -9,14 +9,14 @@ export async function main(): Promise<void> {
 
 	// Wait for signal from main
 	__defer.defer(async () => {
-		$.println("deferred start")
+		console.log("deferred start")
 		await ch.receive()
-		$.println("deferred end")
+		console.log("deferred end")
 	});
 
-	$.println("main start")
-	$.println("main signaling defer")
+	console.log("main start")
+	console.log("main signaling defer")
 	await ch.send(true)
-	$.println("main end")
+	console.log("main end")
 }
 

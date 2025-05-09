@@ -6,12 +6,12 @@ import * as $ from "@goscript/builtin";
 export function main(): void {
 	let i = 0
 	for (; ; ) {
-		$.println("Looping forever...")
+		console.log("Looping forever...")
 		i++
 		if (i >= 3) {
 			break
 		}
 	}
-	$.println("Loop finished")
+	console.log("Loop finished")
 }
 
