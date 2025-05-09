@@ -4,20 +4,20 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	;console.log("Starting loop")
+	console.log("Starting loop");
 	for (let i = 0; i < 3; i++) {
-		;console.log("Iteration:", i)
+		console.log("Iteration:", i);
 	}
-	;console.log("Loop finished")
+	console.log("Loop finished");
 
-	;console.log("Starting loop")
+	console.log("Starting loop");
 	let x = 0
 	for (let _i = 0; _i < 5; _i++) {
 		{
-			;console.log("Iteration:", x)
+			console.log("Iteration:", x);
 			x++
 		}
 	}
-	;console.log("Loop finished")
+	console.log("Loop finished");
 }
 

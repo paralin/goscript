@@ -63,18 +63,18 @@ class MyStruct {
 
 export function main(): void {
 	let s = new MyStruct({})
-	;console.log(s.PointerField == null)
-	;console.log(s.interfaceField == null)
+	console.log(s.PointerField == null);
+	console.log(s.interfaceField == null);
 
 	let i: $.Box<number> = $.box(10)
 	s.PointerField = i
-	;console.log(s.PointerField != null)
-	;console.log(s.PointerField!.value)
+	console.log(s.PointerField != null);
+	console.log(s.PointerField!.value);
 	i!.value = 15
-	;console.log(s.PointerField!.value)
+	console.log(s.PointerField!.value);
 
 	let mi: MyInterface = null
 	s.interfaceField = mi
-	;console.log(s.interfaceField == null)
+	console.log(s.interfaceField == null);
 }
 

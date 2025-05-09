@@ -54,6 +54,6 @@ export function main(): void {
 	// Create a pointer to a MyStruct instance using a composite literal.
 	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	// Expected: "hello world"
-	;console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + structPointer.MyString)
+	console.log("Initial MyString (via pointer): Expected: hello world, Actual: " + structPointer.MyString);
 }
 

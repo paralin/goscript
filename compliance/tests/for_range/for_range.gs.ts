@@ -12,12 +12,12 @@ export function main(): void {
 			sum += num
 		}
 	}
-	;console.log("sum:", sum)
+	console.log("sum:", sum);
 
 	for (let i = 0; i < nums.length; i++) {
 		const num = nums[i]
 		{
-			;console.log("index:", i, "value:", num)
+			console.log("index:", i, "value:", num);
 		}
 	}
 
@@ -26,7 +26,7 @@ export function main(): void {
 	for (let i = 0; i < arr.length; i++) {
 		const s = arr[i]
 		{
-			;console.log("index:", i, "value:", s)
+			console.log("index:", i, "value:", s);
 		}
 	}
 
@@ -39,34 +39,34 @@ export function main(): void {
 		for (let i = 0; i < _runes.length; i++) {
 			const c = _runes[i]
 			{
-				;console.log("index:", i, "value:", c) // Note: c will be a rune (int32)
+				console.log("index:", i, "value:", c) // Note: c will be a rune (int32);
 			}
 		}
 	}
 
 	// Test ranging over a slice without key or value
-	;console.log("Ranging over slice (no key/value):")
+	console.log("Ranging over slice (no key/value):");
 	for (let _i = 0; _i < nums.length; _i++) {
 		{
-			;console.log("Iterating slice")
+			console.log("Iterating slice");
 		}
 	}
 
 	// Test ranging over an array without key or value
-	;console.log("Ranging over array (no key/value):")
+	console.log("Ranging over array (no key/value):");
 	for (let _i = 0; _i < arr.length; _i++) {
 		{
-			;console.log("Iterating array")
+			console.log("Iterating array");
 		}
 	}
 
 	// Test ranging over a string without key or value
-	;console.log("Ranging over string (no key/value):")
+	console.log("Ranging over string (no key/value):");
 	{
 		const _runes = $.stringToRunes(str)
 		for (let i = 0; i < _runes.length; i++) {
 			{
-				;console.log("Iterating string")
+				console.log("Iterating string");
 			}
 		}
 	}

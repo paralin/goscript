@@ -7,7 +7,7 @@ let counter: number = 0
 
 function increment_counter(): void {
 	counter++
-	;console.log("counter incremented to", counter)
+	console.log("counter incremented to", counter);
 }
 
 export function main(): void {
@@ -16,12 +16,12 @@ export function main(): void {
 	// to ensure the loop terminates as increment_counter() in post
 	// does not affect 'i'.
 	for (let i = 0; i < 2; (increment_counter)()) {
-		;console.log("loop iteration:", i)
+		console.log("loop iteration:", i);
 		// We need to manually increment i or change the condition
 		// to ensure the loop terminates as increment_counter() in post
 		// does not affect 'i'.
 		i++
 	}
-	;console.log("done", "final counter:", counter)
+	console.log("done", "final counter:", counter);
 }
 

@@ -42,6 +42,6 @@ class MyStruct {
 export function main(): void {
 	let myStruct = new MyStruct({myPrivate: 4})
 	myStruct.myPrivate = 10
-	;console.log(myStruct.myPrivate)
+	console.log(myStruct.myPrivate);
 }
 
