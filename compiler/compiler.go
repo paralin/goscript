@@ -4858,8 +4858,6 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 		}
 	}
 
-	// Add semicolon to prevent TypeScript from misinterpreting the next line
-	c.tsw.WriteLiterally(";")
 	c.tsw.WriteLine("") // Finish with a newline
 	return nil
 }
