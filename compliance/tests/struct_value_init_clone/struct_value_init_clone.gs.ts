@@ -52,22 +52,22 @@ class Point {
 export function main(): void {
 	// Initialize directly
 	let p1 = new Point({X: 1, Y: 2})
-	console.log("p1:", p1.X, p1.Y)
+	$.println("p1:", p1.X, p1.Y)
 
 	// Assign to another variable (should trigger clone)
 	let p2 = p1.clone()
 	p2.X = 10
 
 	// Print both to show they are independent
-	console.log("p1 after p2 mod:", p1.X, p1.Y)
-	console.log("p2:", p2.X, p2.Y)
+	$.println("p1 after p2 mod:", p1.X, p1.Y)
+	$.println("p2:", p2.X, p2.Y)
 
 	// Initialize via variable assignment
 	let v = new Point({X: 3, Y: 4})
 	let p3 = v.clone()
 	p3.Y = 40
 
-	console.log("v after p3 mod:", v.X, v.Y)
-	console.log("p3:", p3.X, p3.Y)
+	$.println("v after p3 mod:", v.X, v.Y)
+	$.println("p3:", p3.X, p3.Y)
 }
 

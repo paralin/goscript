@@ -61,12 +61,12 @@ export function main(): void {
 
 	// === Verifying Copy Independence ===
 	// Expected: "hello world"
-	console.log("pointerCopy (points to original structPointer): Expected: hello world, Actual: " + pointerCopy.MyString)
+	$.println("pointerCopy (points to original structPointer): Expected: hello world, Actual: " + pointerCopy.MyString)
 	// Expected: "original dereferenced copy modified"
-	console.log("dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: " + dereferencedStructCopy.MyString)
+	$.println("dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: " + dereferencedStructCopy.MyString)
 	// Expected: "value copy 1"
-	console.log("valueCopy1: Expected: value copy 1, Actual: " + valueCopy1.MyString)
+	$.println("valueCopy1: Expected: value copy 1, Actual: " + valueCopy1.MyString)
 	// Expected: "value copy 2"
-	console.log("valueCopy2: Expected: value copy 2, Actual: " + valueCopy2.MyString)
+	$.println("valueCopy2: Expected: value copy 2, Actual: " + valueCopy2.MyString)
 }
 

@@ -19,7 +19,7 @@ export async function main(): Promise<void> {
 			channel: ch,
 			value: 2,
 			onSelected: async (result) => {
-				console.log("Sent value")
+				$.println("Sent value")
 			}
 		},
 		{
@@ -27,7 +27,7 @@ export async function main(): Promise<void> {
 			isSend: false,
 			channel: null,
 			onSelected: async (result) => {
-				console.log("Default case hit")
+				$.println("Default case hit")
 			}
 		},
 	], true)

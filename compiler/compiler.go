@@ -424,7 +424,15 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 		if i > 0 {
 			c.tsw.WriteLiterally(", ")
 		}
+		
 		param := params.At(i)
+		paramSlice, paramIsSlice := param.Type().(*types.Slice)
+		
+		paramVariadic := i == params.Len()-1 && t.Variadic()
+		if paramVariadic {
+			c.tsw.WriteLiterally("...")
+		}
+		
 		// Use parameter name if available, otherwise use p0, p1, etc.
 		if param.Name() != "" {
 			c.tsw.WriteLiterally(param.Name())
@@ -432,7 +440,13 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 			c.tsw.WriteLiterally(fmt.Sprintf("p%d", i))
 		}
 		c.tsw.WriteLiterally(": ")
-		c.WriteGoType(param.Type())
+		
+		if paramVariadic && paramIsSlice {
+			c.WriteGoType(paramSlice.Elem())
+			c.tsw.WriteLiterally("[]")
+		} else {
+			c.WriteGoType(param.Type())
+		}
 	}
 	c.tsw.WriteLiterally(")")
 
@@ -2146,7 +2160,47 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 
 	// Write arrow function: (params) => { body }
 	c.tsw.WriteLiterally("(")
-	c.WriteFieldList(exp.Type.Params, true) // true = arguments
+	
+	// Check if this is a variadic function
+	isVariadic := false
+	if exp.Type.Params != nil && len(exp.Type.Params.List) > 0 {
+		lastParam := exp.Type.Params.List[len(exp.Type.Params.List)-1]
+		if _, ok := lastParam.Type.(*ast.Ellipsis); ok {
+			isVariadic = true
+		}
+	}
+
+	if isVariadic {
+		for i, field := range exp.Type.Params.List[:len(exp.Type.Params.List)-1] {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteField(field, true)
+		}
+
+		lastParam := exp.Type.Params.List[len(exp.Type.Params.List)-1]
+		if len(exp.Type.Params.List) > 1 {
+			c.tsw.WriteLiterally(", ")
+		}
+
+		for i, name := range lastParam.Names {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.tsw.WriteLiterally("...")
+			c.tsw.WriteLiterally(name.Name)
+		}
+
+		c.tsw.WriteLiterally(": ")
+		if ellipsis, ok := lastParam.Type.(*ast.Ellipsis); ok {
+			c.WriteTypeExpr(ellipsis.Elt)
+			c.tsw.WriteLiterally("[]")
+		}
+	} else {
+		// Normal parameters
+		c.WriteFieldList(exp.Type.Params, true) // true = arguments
+	}
+	
 	c.tsw.WriteLiterally(")")
 
 	// Handle return type for function literals

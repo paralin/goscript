@@ -7,7 +7,7 @@ export function main(): void {
 
 	// Modify j to see a clearer change in output
 	for (let i = 0, j = 1; i < 2; i++) {
-		console.log(i, j)
+		$.println(i, j)
 		j += 10
 	}
 }

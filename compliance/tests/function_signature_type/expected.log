@@ -1,0 +1,19 @@
+fn1 called with: 10 hello
+fn1 result 1:  true  
+nil
+fn1 called with: -5 world
+fn1 result 2:  false  
+a was not positive
+fn2 called with: 5 hello
+fn2 result 1: true
+fn2 called with: 3 hey
+fn2 result 2: true
+fn3 called
+fn4 called with:  1
+
+fn4 called with:  2
+  one
+
+fn4 called with:  3
+  two
+  three

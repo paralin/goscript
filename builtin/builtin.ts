@@ -895,3 +895,11 @@ export class AsyncDisposableStack implements AsyncDisposable {
     }
   }
 }
+
+/**
+ * Implementation of Go's built-in println function
+ * @param args Arguments to print
+ */
+export function println(...args: any[]): void {
+  console.log(...args);
+}

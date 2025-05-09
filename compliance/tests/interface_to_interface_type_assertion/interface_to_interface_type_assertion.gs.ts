@@ -75,9 +75,9 @@ export function main(): void {
 
 	let { ok: ok } = $.typeAssert<MyOtherInterface>(i, 'MyOtherInterface')
 	if (ok) {
-		console.log("Type assertion successful")
+		$.println("Type assertion successful")
 	} else {
-		console.log("Type assertion failed")
+		$.println("Type assertion failed")
 	}
 }
 

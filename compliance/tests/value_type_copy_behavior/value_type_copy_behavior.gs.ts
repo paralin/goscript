@@ -97,9 +97,9 @@ class NestedStruct {
 
 export function main(): void {
 	// Horizontal line for output clarity
-	console.log("----------------------------------------------------------")
-	console.log("VALUE TYPE COPY BEHAVIOR TEST")
-	console.log("----------------------------------------------------------")
+	$.println("----------------------------------------------------------")
+	$.println("VALUE TYPE COPY BEHAVIOR TEST")
+	$.println("----------------------------------------------------------")
 
 	// original is the starting struct instance.
 	// We take its address later for pointerCopy, so it might be allocated on the heap (boxed).
@@ -119,19 +119,19 @@ export function main(): void {
 	original!.value.MyString = "original modified"
 	valueCopy2.MyString = "value copy 2"
 
-	console.log("Value Copy Test:")
+	$.println("Value Copy Test:")
 	// valueCopy1 was modified independently.
-	console.log("  valueCopy1.MyString: " + valueCopy1.MyString) // Expected: "value copy 1"
+	$.println("  valueCopy1.MyString: " + valueCopy1.MyString) // Expected: "value copy 1"
 	// original was modified after copies, showing its current state.
-	console.log("  original.MyString: " + original!.value.MyString) // Expected: "original modified"
+	$.println("  original.MyString: " + original!.value.MyString) // Expected: "original modified"
 	// valueCopy2 was modified independently.
-	console.log("  valueCopy2.MyString: " + valueCopy2.MyString) // Expected: "value copy 2"
+	$.println("  valueCopy2.MyString: " + valueCopy2.MyString) // Expected: "value copy 2"
 
 	// === Pointer Behavior ===
 	// Demonstrate how modifications via a pointer affect the original struct.
-	console.log("\nPointer Behavior Test:")
+	$.println("\nPointer Behavior Test:")
 	// Show the state of 'original' before modification via the pointer.
-	console.log("  Before pointer modification - original.MyString: " + original!.value.MyString)
+	$.println("  Before pointer modification - original.MyString: " + original!.value.MyString)
 
 	// Modify the struct 'original' *through* the pointerCopy.
 	pointerCopy!.value.MyString = "modified through pointer"
@@ -139,12 +139,12 @@ export function main(): void {
 
 	// Show the state of 'original' *after* modification via the pointer.
 	// Both fields reflect the changes made through pointerCopy.
-	console.log("  After pointer modification - original.MyString:", original!.value.MyString)
-	console.log("  After pointer modification - original.MyInt:", original!.value.MyInt)
+	$.println("  After pointer modification - original.MyString:", original!.value.MyString)
+	$.println("  After pointer modification - original.MyInt:", original!.value.MyInt)
 
 	// === Nested Struct Behavior ===
 	// Demonstrate copy behavior with structs containing other structs.
-	console.log("\nNested Struct Test:")
+	$.println("\nNested Struct Test:")
 	let nestedOriginal = new NestedStruct({InnerStruct: new MyStruct({MyInt: 20, MyString: "inner original"}), Value: 10})
 
 	// Create a value copy of the nested struct. This copies both the outer
@@ -156,11 +156,11 @@ export function main(): void {
 	nestedCopy.Value = 30
 
 	// Show that modifications to nestedCopy did not affect nestedOriginal.
-	console.log("  nestedCopy.Value: ", nestedCopy.Value) // Expected: 30
-	console.log("  nestedOriginal.Value: ", nestedOriginal.Value) // Expected: 10
-	console.log("  nestedCopy.InnerStruct.MyString: " + nestedCopy.InnerStruct.MyString) // Expected: "inner modified"
-	console.log("  nestedOriginal.InnerStruct.MyString: " + nestedOriginal.InnerStruct.MyString) // Expected: "inner original"
+	$.println("  nestedCopy.Value: ", nestedCopy.Value) // Expected: 30
+	$.println("  nestedOriginal.Value: ", nestedOriginal.Value) // Expected: 10
+	$.println("  nestedCopy.InnerStruct.MyString: " + nestedCopy.InnerStruct.MyString) // Expected: "inner modified"
+	$.println("  nestedOriginal.InnerStruct.MyString: " + nestedOriginal.InnerStruct.MyString) // Expected: "inner original"
 
-	console.log("----------------------------------------------------------")
+	$.println("----------------------------------------------------------")
 }
 

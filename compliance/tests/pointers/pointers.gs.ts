@@ -56,56 +56,56 @@ export function main(): void {
 
 	let ppp1 = pp1
 
-	console.log("--- Initial Values ---")
-	console.log("s1.Val:", s1!.value.Val) // 1
-	console.log("s2.Val:", s2!.value.Val) // 2
-	console.log("p1==p2:", (p1!.value === p2!.value)) // true
-	console.log("p1==p3:", (p1!.value === p3!.value)) // false
+	$.println("--- Initial Values ---")
+	$.println("s1.Val:", s1!.value.Val) // 1
+	$.println("s2.Val:", s2!.value.Val) // 2
+	$.println("p1==p2:", (p1!.value === p2!.value)) // true
+	$.println("p1==p3:", (p1!.value === p3!.value)) // false
 
 	// --- Pointer Comparisons ---
-	console.log("\n--- Pointer Comparisons ---")
-	console.log("pp1==pp2:", (pp1!.value === pp2)) // false
-	console.log("pp1==pp3:", (pp1!.value === pp3)) // false
-	console.log("*pp1==*pp2:", (pp1!.value!.value === pp2!.value)) // true
-	console.log("*pp1==*pp3:", (pp1!.value!.value === pp3!.value)) // false
-	console.log("(**pp1).Val == (**pp2).Val:", pp1!.value!.value!.Val == pp2!.value!.Val) // true
-	console.log("(**pp1).Val == (**pp3).Val:", pp1!.value!.value!.Val == pp3!.value!.Val) // false
+	$.println("\n--- Pointer Comparisons ---")
+	$.println("pp1==pp2:", (pp1!.value === pp2)) // false
+	$.println("pp1==pp3:", (pp1!.value === pp3)) // false
+	$.println("*pp1==*pp2:", (pp1!.value!.value === pp2!.value)) // true
+	$.println("*pp1==*pp3:", (pp1!.value!.value === pp3!.value)) // false
+	$.println("(**pp1).Val == (**pp2).Val:", pp1!.value!.value!.Val == pp2!.value!.Val) // true
+	$.println("(**pp1).Val == (**pp3).Val:", pp1!.value!.value!.Val == pp3!.value!.Val) // false
 
 	// Triple pointer comparisons
-	console.log("ppp1==ppp1:", (ppp1 === ppp1)) // true
-	console.log("*ppp1==pp1:", (ppp1!.value === pp1!.value)) // true
-	console.log("**ppp1==p1:", (ppp1!.value!.value === p1!.value)) // true
-	console.log("(***ppp1).Val == s1.Val:", ppp1!.value!.value!.Val == s1!.value.Val) // true
+	$.println("ppp1==ppp1:", (ppp1 === ppp1)) // true
+	$.println("*ppp1==pp1:", (ppp1!.value === pp1!.value)) // true
+	$.println("**ppp1==p1:", (ppp1!.value!.value === p1!.value)) // true
+	$.println("(***ppp1).Val == s1.Val:", ppp1!.value!.value!.Val == s1!.value.Val) // true
 
 	// --- Modifications through Pointers ---
-	console.log("\n--- Modifications ---")
+	$.println("\n--- Modifications ---")
 	p1!.value!.value = new MyStruct({Val: 10})
-	console.log("After *p1 = {Val: 10}:")
-	console.log("  s1.Val:", s1!.value.Val) // 10
-	console.log("  (*p2).Val:", p2!.value!.value.Val) // 10
-	console.log("  (**pp1).Val:", pp1!.value!.value!.Val) // 10
-	console.log("  (***ppp1).Val:", ppp1!.value!.value!.Val) // 10
-	console.log("  s2.Val:", s2!.value.Val) // 2 (unmodified)
+	$.println("After *p1 = {Val: 10}:")
+	$.println("  s1.Val:", s1!.value.Val) // 10
+	$.println("  (*p2).Val:", p2!.value!.value.Val) // 10
+	$.println("  (**pp1).Val:", pp1!.value!.value!.Val) // 10
+	$.println("  (***ppp1).Val:", ppp1!.value!.value!.Val) // 10
+	$.println("  s2.Val:", s2!.value.Val) // 2 (unmodified)
 
 	pp3!.value!.value = new MyStruct({Val: 20})
-	console.log("After **pp3 = {Val: 20}:")
-	console.log("  s2.Val:", s2!.value.Val) // 20
-	console.log("  (*p3).Val:", p3!.value!.value.Val) // 20
-	console.log("  s1.Val:", s1!.value.Val) // 10 (unmodified)
+	$.println("After **pp3 = {Val: 20}:")
+	$.println("  s2.Val:", s2!.value.Val) // 20
+	$.println("  (*p3).Val:", p3!.value!.value.Val) // 20
+	$.println("  s1.Val:", s1!.value.Val) // 10 (unmodified)
 
 	// --- Nil Pointers ---
-	console.log("\n--- Nil Pointers ---")
+	$.println("\n--- Nil Pointers ---")
 	let np: $.Box<$.Box<MyStruct> | null> = $.box(null)
 	let npp: $.Box<$.Box<MyStruct> | null> | null = null
 	let nppp: $.Box<$.Box<$.Box<MyStruct> | null> | null> | null = null
 
-	console.log("np == nil:", np!.value == null) // true
-	console.log("npp == nil:", npp == null) // true
-	console.log("nppp == nil:", nppp == null) // true
+	$.println("np == nil:", np!.value == null) // true
+	$.println("npp == nil:", npp == null) // true
+	$.println("nppp == nil:", nppp == null) // true
 
 	npp = np
-	console.log("After npp = &np:")
-	console.log("  npp == nil:", npp == null) // false
-	console.log("  *npp == nil:", npp!.value == null) // true
+	$.println("After npp = &np:")
+	$.println("  npp == nil:", npp == null) // false
+	$.println("  *npp == nil:", npp!.value == null) // true
 }
 
