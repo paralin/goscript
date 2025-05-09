@@ -68,14 +68,14 @@ export const arrayToSlice = <T>(
   if (arr == null) return null;
   
   const result = [...arr] as Slice<T>;
-  result.__capacity = arr.length;
+  result!.__capacity = arr.length;
   
   // Recursively convert nested arrays if depth > 1
   if (depth > 1 && arr.length > 0) {
     for (let i = 0; i < arr.length; i++) {
       const item = arr[i];
       if (Array.isArray(item)) {
-        result[i] = arrayToSlice(item as any[], depth - 1) as any;
+        result![i] = arrayToSlice(item as any[], depth - 1) as any;
       }
     }
   }
