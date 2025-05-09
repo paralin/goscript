@@ -4811,6 +4811,13 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 		return nil
 	}
 
+	// Special case: if this is a call expression, we need to add a semicolon
+	if _, ok := exp.X.(*ast.CallExpr); ok {
+		// Check if the function is a parenthesized expression or has a non-null assertion
+		// This handles cases like (fn)() or (fn!)()
+		c.tsw.WriteLiterally(";")
+	}
+
 	// Handle other expression statements
 	if err := c.WriteValueExpr(exp.X); err != nil { // Expression statement evaluates a value
 		return err
