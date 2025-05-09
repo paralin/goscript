@@ -4811,11 +4811,20 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 		return nil
 	}
 
-	// Special case: if this is a call expression, we need to add a semicolon
-	if _, ok := exp.X.(*ast.CallExpr); ok {
-		// Check if the function is a parenthesized expression or has a non-null assertion
-		// This handles cases like (fn)() or (fn!)()
-		c.tsw.WriteLiterally(";")
+	// Special case: if this is a standalone call expression that starts with a parenthesis
+	// or has a non-null assertion, we need to add a semicolon to prevent TypeScript
+	if callExpr, ok := exp.X.(*ast.CallExpr); ok {
+		// Only add semicolon for standalone function calls like (fn3!)()
+		if _, isParen := callExpr.Fun.(*ast.ParenExpr); isParen {
+			// This handles cases like (fn)()
+			c.tsw.WriteLiterally(";")
+		} else if unaryExpr, isUnary := callExpr.Fun.(*ast.UnaryExpr); isUnary && unaryExpr.Op == token.NOT {
+			// This handles cases like (fn!)() where fn! is a non-null assertion
+			if _, isIdent := unaryExpr.X.(*ast.Ident); isIdent {
+				// Only add semicolon if it's a standalone function call with non-null assertion
+				c.tsw.WriteLiterally(";")
+			}
+		}
 	}
 
 	// Handle other expression statements
