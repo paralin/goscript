@@ -56,11 +56,11 @@ export function NewMyStruct(pub: string, priv: number): MyStruct {
 function accessPrivateField(s: MyStruct): void {
 	// Accessing privateField directly from a function in the same package
 	// This should trigger the generation of the _private field
-	console.log("Accessing privateField:", s.privateField)
+	$.println("Accessing privateField:", s.privateField)
 }
 
 export function main(): void {
-	let s = NewMyStruct("hello", 123).clone()
-	accessPrivateField(s)
+	let s = (NewMyStruct)("hello", 123)
+	(accessPrivateField)(s)
 }
 

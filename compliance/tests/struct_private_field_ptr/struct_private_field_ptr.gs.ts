@@ -44,6 +44,6 @@ export function main(): void {
 	let intVar: $.Box<number> = $.box(10)
 	myStruct.myPrivate = intVar
 	intVar!.value = 15
-	console.log(myStruct.myPrivate!.value)
+	$.println(myStruct.myPrivate!.value)
 }
 

@@ -4,6 +4,6 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	console.log("Hello world!")
+	$.println("Hello world!")
 }
 

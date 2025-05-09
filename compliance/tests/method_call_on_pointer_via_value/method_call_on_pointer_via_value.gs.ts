@@ -62,6 +62,6 @@ export function main(): void {
 
 	// Verify the value was modified through the method call.
 	// Expected: 200
-	console.log("Value after pointer method call via value: Expected: 200, Actual:", msValue.GetValue())
+	$.println("Value after pointer method call via value: Expected: 200, Actual:", msValue.GetValue())
 }
 

@@ -81,9 +81,9 @@ export function main(): void {
 
 	let { ok: ok } = $.typeAssert<ReadCloser>(rwc, 'ReadCloser')
 	if (ok) {
-		console.log("Embedded interface assertion successful")
+		$.println("Embedded interface assertion successful")
 	} else {
-		console.log("Embedded interface assertion failed")
+		$.println("Embedded interface assertion failed")
 	}
 }
 
