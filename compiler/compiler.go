@@ -424,15 +424,15 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 		if i > 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		
+
 		param := params.At(i)
 		paramSlice, paramIsSlice := param.Type().(*types.Slice)
-		
+
 		paramVariadic := i == params.Len()-1 && t.Variadic()
 		if paramVariadic {
 			c.tsw.WriteLiterally("...")
 		}
-		
+
 		// Use parameter name if available, otherwise use p0, p1, etc.
 		if param.Name() != "" {
 			c.tsw.WriteLiterally(param.Name())
@@ -440,7 +440,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 			c.tsw.WriteLiterally(fmt.Sprintf("p%d", i))
 		}
 		c.tsw.WriteLiterally(": ")
-		
+
 		if paramVariadic && paramIsSlice {
 			c.WriteGoType(paramSlice.Elem())
 			c.tsw.WriteLiterally("[]")
@@ -1538,13 +1538,12 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 
 			// Check if the function expression is a variable (nullable function)
-			needsNonNullAssertion := false
 			isFunc, isNillable := isFunctionNillable(c.pkg.TypesInfo, expFun)
-			if isFunc && isNillable {
-				needsNonNullAssertion = true
+			needsNonNullAssertion := isFunc && isNillable
+			if needsNonNullAssertion {
+				c.tsw.WriteLiterally("(")
 			}
 
-			c.tsw.WriteLiterally("(")
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
@@ -1552,8 +1551,8 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			// Only add non-null assertion if needed
 			if needsNonNullAssertion {
 				c.tsw.WriteLiterally("!")
+				c.tsw.WriteLiterally(")")
 			}
-			c.tsw.WriteLiterally(")")
 
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
