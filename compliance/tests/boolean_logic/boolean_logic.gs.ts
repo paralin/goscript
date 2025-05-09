@@ -10,8 +10,8 @@ export function main(): void {
 	let and = a && b
 	let or = a || b
 	let notA = !a
-	console.log("AND: Expected: false, Actual:", and);
-	console.log("OR: Expected: true, Actual:", or);
-	console.log("NOT: Expected: false, Actual:", notA);
+	console.log("AND: Expected: false, Actual:", and)
+	console.log("OR: Expected: true, Actual:", or)
+	console.log("NOT: Expected: false, Actual:", notA)
 }
 

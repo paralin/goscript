@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	let ch = $.makeChannel<number>(0, 0)
-	ch.close();
+	ch.close()
 
 	//nolint:staticcheck
 
@@ -21,9 +21,9 @@ export async function main(): Promise<void> {
 				const val = result.value
 				const ok = result.ok
 				if (ok) {
-					console.log("Received value with ok==true:", val) // Should not be reached;
+					console.log("Received value with ok==true:", val) // Should not be reached
 				} else {
-					console.log("Received zero value with ok==false:", val) // Should be reached;
+					console.log("Received zero value with ok==false:", val) // Should be reached
 				}
 			}
 		},

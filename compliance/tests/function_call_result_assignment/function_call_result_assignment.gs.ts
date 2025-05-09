@@ -71,8 +71,8 @@ export function main(): void {
 	let structFromFuncCopy = structFromFunc.clone()
 	structFromFuncCopy.MyString = "modified function result copy"
 	// Expected: "function result"
-	console.log("Original struct from function: Expected: function result, Actual: " + structFromFunc.MyString);
+	console.log("Original struct from function: Expected: function result, Actual: " + structFromFunc.MyString)
 	// Expected: "modified function result copy"
-	console.log("Modified struct from function copy: Expected: modified function result copy, Actual: " + structFromFuncCopy.MyString);
+	console.log("Modified struct from function copy: Expected: modified function result copy, Actual: " + structFromFuncCopy.MyString)
 }
 

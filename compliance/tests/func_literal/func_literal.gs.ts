@@ -10,6 +10,6 @@ export function main(): void {
 
 
 	let message = (greet!)("world")
-	console.log(message);
+	console.log(message)
 }
 

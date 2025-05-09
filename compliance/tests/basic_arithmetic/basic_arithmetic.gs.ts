@@ -10,10 +10,10 @@ export function main(): void {
 	let mul = 6 * 7
 	let div = 20 / 5
 	let mod = 17 % 3
-	console.log("Addition: Expected: 5, Actual:", add);
-	console.log("Subtraction: Expected: 6, Actual:", sub);
-	console.log("Multiplication: Expected: 42, Actual:", mul);
-	console.log("Division: Expected: 4, Actual:", div);
-	console.log("Modulus: Expected: 2, Actual:", mod);
+	console.log("Addition: Expected: 5, Actual:", add)
+	console.log("Subtraction: Expected: 6, Actual:", sub)
+	console.log("Multiplication: Expected: 42, Actual:", mul)
+	console.log("Division: Expected: 4, Actual:", div)
+	console.log("Modulus: Expected: 2, Actual:", mod)
 }
 
