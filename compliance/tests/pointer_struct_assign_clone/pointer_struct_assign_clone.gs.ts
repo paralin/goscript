@@ -69,13 +69,13 @@ export function main(): void {
 	// Test assignment of a struct from a function call
 	let s3 = new MyStruct({Value: 70})
 	let p3 = new MyStruct({Value: 80})
-	p3!.value = (getStruct!)().clone()
+	p3!.value = (getStruct)().clone()
 	console.log(p3.Value) // Expected: 100
 	console.log(s3.Value) // Expected: 70
 
 	// Test assignment of a struct from a pointer returned by a function call
 	let p4 = new MyStruct({Value: 90})
-	p4!.value = (getStructPointer!)()!.clone()
+	p4!.value = (getStructPointer)()!.clone()
 	console.log(p4.Value) // Expected: 110
 }
 

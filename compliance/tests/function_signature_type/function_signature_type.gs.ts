@@ -60,7 +60,7 @@ class MyError {
 	);
 }
 
-export function NewMyError(text: string): $.Box<MyError> | null {
+export function NewMyError(text: string): MyError {
 	return new MyError({s: text})
 }
 
@@ -106,19 +106,19 @@ export function main(): void {
 		console.log("nil")
 	}
 
-	let [res1_2, err1_2] = (fn1!)(-5, "world")
-	console.log("fn1 result 2: ", res1_2, " ")
+	let [res1_2, err1_2] = (fn1!)(-5, "world");
+	console.log("fn1 result 2: ", res1_2, " ");
 	if (err1_2 != null) {
 		console.log(err1_2.Error())
 	} else {
 		console.log("nil")
 	}
 
-	let res2 = (fn2!)(5, "hello")
+	let res2 = (fn2!)(5, "hello");
 	console.log("fn2 result 1:", res2)
 
-	let res2_2 = (fn2!)(3, "hey")
-	console.log("fn2 result 2:", res2_2)
+	let res2_2: boolean = (fn2!)(3, "hey");
+	console.log("fn2 result 2:", res2_2);
 
 	(fn3!)()
 

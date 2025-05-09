@@ -11,7 +11,7 @@ export function main(): void {
 	// Using a function call in the for loop's init statement
 	// The condition is false to prevent the loop body from executing during the test,
 	// focusing only on the init part's translation and execution.
-	for ((init_func!)(); false; ) {
+	for ((init_func)(); false; ) {
 		console.log("loop body (should not be printed)")
 	}
 	console.log("done")
