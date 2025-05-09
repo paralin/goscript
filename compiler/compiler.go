@@ -1038,9 +1038,13 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 			return fmt.Errorf("failed to write inner star expression: %w", err)
 		}
 
-		// Always add .value for multi-level dereferences
-		// For expressions like **p, each * adds a .value
-		c.tsw.WriteLiterally("!.value")
+		// Add ! for null assertion
+		c.tsw.WriteLiterally("!")
+		
+		// Add .value only if we need boxed dereferencing for this type of pointer
+		if c.analysis.NeedsBoxedDeref(ptrType) {
+			c.tsw.WriteLiterally(".value")
+		}
 		return nil
 	}
 
