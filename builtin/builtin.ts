@@ -9,6 +9,13 @@ interface GoSliceObject<T> {
 }
 
 /**
+ * ProxyTarget represents the target object used by the slice proxy
+ */
+interface SliceProxyTarget<T> {
+  __meta__: GoSliceObject<T>
+}
+
+/**
  * SliceProxy is a proxy object for complex slices
  */
 export type SliceProxy<T> = T[] & {
@@ -154,7 +161,7 @@ export const goSlice = <T>(
   const newLength = high - low
   const newOffset = oldOffset + low
 
-  const target = {
+  const target: SliceProxyTarget<T> = {
     __meta__: {
       backing: backing,
       offset: newOffset,
@@ -163,8 +170,8 @@ export const goSlice = <T>(
     },
   }
 
-  const handler = {
-    get(target: any, prop: string | symbol): any {
+  const handler: ProxyHandler<SliceProxyTarget<T>> = {
+    get(target: SliceProxyTarget<T>, prop: string | symbol): unknown {
       if (typeof prop === 'string' && /^\d+$/.test(prop)) {
         const index = Number(prop)
         if (index >= 0 && index < target.__meta__.length) {
@@ -195,24 +202,25 @@ export const goSlice = <T>(
           target.__meta__.offset,
           target.__meta__.offset + target.__meta__.length,
         )
-        return backingSlice[prop].bind(backingSlice)
+        const method = backingSlice[prop as keyof typeof backingSlice]
+        return typeof method === 'function' ? method.bind(backingSlice) : method
       }
 
       return Reflect.get(target, prop)
     },
 
-    set(target: any, prop: string | symbol, value: any): boolean {
+    set(target: SliceProxyTarget<T>, prop: string | symbol, value: unknown): boolean {
       if (typeof prop === 'string' && /^\d+$/.test(prop)) {
         const index = Number(prop)
         if (index >= 0 && index < target.__meta__.length) {
-          target.__meta__.backing[target.__meta__.offset + index] = value
+          target.__meta__.backing[target.__meta__.offset + index] = value as T
           return true
         }
         if (
           index === target.__meta__.length &&
           target.__meta__.length < target.__meta__.capacity
         ) {
-          target.__meta__.backing[target.__meta__.offset + index] = value
+          target.__meta__.backing[target.__meta__.offset + index] = value as T
           target.__meta__.length++
           return true
         }
@@ -255,7 +263,7 @@ export const arrayToSlice = <T>(
 
   if (arr.length === 0) return arr
 
-  const target = {
+  const target: SliceProxyTarget<T> = {
     __meta__: {
       backing: arr,
       offset: 0,
@@ -264,8 +272,8 @@ export const arrayToSlice = <T>(
     },
   }
 
-  const handler = {
-    get(target: any, prop: string | symbol): any {
+  const handler: ProxyHandler<SliceProxyTarget<T>> = {
+    get(target: SliceProxyTarget<T>, prop: string | symbol): unknown {
       if (typeof prop === 'string' && /^\d+$/.test(prop)) {
         const index = Number(prop)
         if (index >= 0 && index < target.__meta__.length) {
@@ -296,24 +304,25 @@ export const arrayToSlice = <T>(
           target.__meta__.offset,
           target.__meta__.offset + target.__meta__.length,
         )
-        return backingSlice[prop].bind(backingSlice)
+        const method = backingSlice[prop as keyof typeof backingSlice]
+        return typeof method === 'function' ? method.bind(backingSlice) : method
       }
 
       return Reflect.get(target, prop)
     },
 
-    set(target: any, prop: string | symbol, value: any): boolean {
+    set(target: SliceProxyTarget<T>, prop: string | symbol, value: unknown): boolean {
       if (typeof prop === 'string' && /^\d+$/.test(prop)) {
         const index = Number(prop)
         if (index >= 0 && index < target.__meta__.length) {
-          target.__meta__.backing[target.__meta__.offset + index] = value
+          target.__meta__.backing[target.__meta__.offset + index] = value as T
           return true
         }
         if (
           index === target.__meta__.length &&
           target.__meta__.length < target.__meta__.capacity
         ) {
-          target.__meta__.backing[target.__meta__.offset + index] = value
+          target.__meta__.backing[target.__meta__.offset + index] = value as T
           target.__meta__.length++
           return true
         }
@@ -334,13 +343,13 @@ export const arrayToSlice = <T>(
   if (depth > 1 && arr.length > 0) {
     for (let i = 0; i < arr.length; i++) {
       const item = arr[i]
-      if (isComplexSlice(item as any)) {
+      if (isComplexSlice(item as unknown as Slice<unknown>)) {
       } else if (Array.isArray(item)) {
-        arr[i] = arrayToSlice(item as any[], depth - 1) as any
+        arr[i] = arrayToSlice(item as unknown as T[], depth - 1) as unknown as T
       } else if (
         item &&
         typeof item === 'object' &&
-        isComplexSlice(item as any)
+        isComplexSlice(item as unknown as Slice<unknown>)
       ) {
         // Preserve capacity information for complex slices
       }
@@ -469,7 +478,7 @@ export const append = <T>(slice: Slice<T>, ...elements: T[]): T[] => {
       }
 
       result.__meta__ = {
-        backing: slice as any,
+        backing: slice as unknown as T[],
         offset: 0,
         length: newLen,
         capacity: oldCap,
@@ -714,11 +723,11 @@ export enum TypeKind {
 export interface TypeInfo {
   name: string
   kind: TypeKind
-  zeroValue: any
+  zeroValue: unknown
   // For interfaces, the set of methods
   methods?: Set<string>
   // For structs, the constructor
-  constructor?: new (...args: any[]) => any
+  constructor?: new (...args: unknown[]) => unknown
 }
 
 // Registry to store runtime type information
@@ -737,9 +746,9 @@ const typeRegistry = new Map<string, TypeInfo>()
 export const registerType = (
   name: string,
   kind: TypeKind,
-  zeroValue: any,
+  zeroValue: unknown,
   methods?: Set<string>,
-  constructor?: new (...args: any[]) => any,
+  constructor?: new (...args: unknown[]) => unknown,
 ): TypeInfo => {
   const typeInfo: TypeInfo = {
     name,
@@ -768,7 +777,7 @@ export interface TypeAssertResult<T> {
  * @returns An object with the asserted value and whether the assertion succeeded.
  */
 export function typeAssert<T>(
-  value: any,
+  value: unknown,
   typeName: string,
 ): TypeAssertResult<T> {
   // Get the type information from the registry
@@ -796,7 +805,7 @@ export function typeAssert<T>(
       // For interfaces, check if the value has all the required methods
       if (typeInfo.methods && typeof value === 'object') {
         const allMethodsPresent = Array.from(typeInfo.methods).every(
-          (method) => typeof (value as any)[method] === 'function',
+          (method) => typeof (value as Record<string, unknown>)[method] === 'function',
         )
         if (allMethodsPresent) {
           return { value: value as T, ok: true }
@@ -1170,11 +1179,11 @@ class BufferedChannel<T> implements Channel<T> {
 /**
  * Represents a case in a select statement.
  */
-export interface SelectCase<T> {
+export interface SelectCase<T, V = unknown> {
   id: number
   isSend: boolean // true for send, false for receive
-  channel: Channel<any> | null // Allow null
-  value?: any // Value to send for send cases
+  channel: Channel<V> | null // Allow null
+  value?: V // Value to send for send cases
   // Optional handlers for when this case is selected
   onSelected?: (result: SelectResult<T>) => Promise<void>
 }
@@ -1233,7 +1242,7 @@ export async function selectStatement<T>(
       } else {
         const result = await selectedCase.channel.selectReceive(selectedCase.id)
         if (selectedCase.onSelected) {
-          await selectedCase.onSelected(result) // Await the handler
+          await selectedCase.onSelected(result as SelectResult<T>) // Await the handler
         }
       }
     } else {
