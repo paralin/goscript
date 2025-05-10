@@ -458,7 +458,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLinef("  $.TypeKind.Struct,")
 	c.tsw.WriteLinef("  new %s(),", className)
 	c.tsw.WriteLinef("  new Set([%s]),", c.collectMethodNames(className)) // collectMethodNames should ideally consider promoted methods too
-	c.tsw.WriteLinef("  %s", className)
+	c.tsw.WriteLinef("  %s as new (...args: unknown[]) => unknown", className)
 	c.tsw.WriteLinef(");")
 
 	c.tsw.Indent(-1)
