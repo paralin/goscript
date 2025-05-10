@@ -120,10 +120,10 @@ export function main(): void {
 	let res2_2 = (fn2!)(3, "hey")
 	console.log("fn2 result 2:", res2_2)
 
-	(fn3!)()
+	;(fn3!)()
 
-	(fn4!)(1)
-	(fn4!)(2, "one")
-	(fn4!)(3, "two", "three")
+	;(fn4!)(1)
+	;(fn4!)(2, "one")
+	;(fn4!)(3, "two", "three")
 }
 

@@ -344,7 +344,7 @@ export function main(): void {
 	console.log("Employee Pointer ID:", ep.ID)
 
 	// Calling embedded method via pointer
-	ep.Greet()
+	;ep.Greet()
 
 	// --- Multiple Embedding Tests ---
 	console.log("\n--- Multiple Embedding ---")
@@ -367,9 +367,9 @@ export function main(): void {
 	let mp = m
 	console.log("\n--- Multiple Embedding (Pointer) ---")
 	console.log("Manager Pointer Name:", mp!.value.Name)
-	mp!.value.Greet()
+	;mp!.value.Greet()
 	console.log("Manager Pointer Full Address:", mp!.value.FullAddress())
-	mp!.value.Call()
+	;mp!.value.Call()
 
 	// Modify through pointer
 	mp!.value.Age = 41
