@@ -464,6 +464,5 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 
 	// Write tsconfig.json for type checking
 	tsconfigPathForCheck := WriteTypeCheckConfig(t, workspaceDir, testDir)
-
 	RunTypeScriptTypeCheck(t, workspaceDir, testDir, tsconfigPathForCheck)
 }
