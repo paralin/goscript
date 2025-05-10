@@ -4193,23 +4193,113 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// writeMultiVarAssignFromCall handles multi-variable assignment from a single function call.
 	writeMultiVarAssignFromCall := func(lhs []ast.Expr, callExpr *ast.CallExpr, tok token.Token) error {
-		// Determine if 'let' or 'const' is needed for :=
+		// For token.DEFINE (:=), we need to check if any of the variables are already declared
+		// In Go, := can be used for redeclaration if at least one variable is new
 		if tok == token.DEFINE {
-			// For simplicity, use 'let' for := in multi-variable assignments.
-			// More advanced analysis might be needed to determine if const is possible.
-			c.tsw.WriteLiterally("let ")
+			// For token.DEFINE (:=), we need to handle variable declarations differently
+			// In Go, := can redeclare existing variables if at least one variable is new
+			
+			// First, identify which variables are new vs existing
+			newVars := make([]bool, len(lhs))
+			anyNewVars := false
+			allNewVars := true
+			
+			// For multi-variable assignments with :=, we need to determine which variables
+			// are already in scope and which are new declarations
+			for i, lhsExpr := range lhs {
+				if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name != "_" {
+					// In Go, variables declared with := can be redeclared if at least one is new
+					// For TypeScript, we need to separately declare new variables
+					
+					// Check if this variable is already in scope
+					// - If the variable is used elsewhere before this point, it's existing
+					// - Otherwise, it's a new variable being declared
+					isNew := true
+					
+					// Check if the variable is used elsewhere in the code
+					if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil {
+						// If it's in Uses, it's referenced elsewhere, so it exists
+						isNew = false
+						allNewVars = false
+					}
+					
+					newVars[i] = isNew
+					if isNew {
+						anyNewVars = true
+					}
+				}
+			}
+			
+			// Get function return types if available
+			var resultTypes []*types.Var
+			if callExpr.Fun != nil {
+				if funcType, ok := c.pkg.TypesInfo.TypeOf(callExpr.Fun).Underlying().(*types.Signature); ok {
+					if funcType.Results() != nil && funcType.Results().Len() > 0 {
+						for i := 0; i < funcType.Results().Len(); i++ {
+							resultTypes = append(resultTypes, funcType.Results().At(i))
+						}
+					}
+				}
+			}
+			
+			if allNewVars && anyNewVars {
+				c.tsw.WriteLiterally("let [")
+				
+				for i, lhsExpr := range lhs {
+					if i != 0 {
+						c.tsw.WriteLiterally(", ")
+					}
+					
+					if ident, ok := lhsExpr.(*ast.Ident); ok {
+						if ident.Name == "_" {
+							// For underscore variables, use empty slots in destructuring pattern
+						} else {
+							c.WriteIdent(ident, false)
+						}
+					} else {
+						c.WriteValueExpr(lhsExpr)
+					}
+				}
+				c.tsw.WriteLiterally("] = ")
+				c.WriteValueExpr(callExpr)
+				c.tsw.WriteLine("")
+				return nil
+			} else if anyNewVars {
+				// If only some variables are new, declare them separately before the assignment
+				// Declare each new variable with appropriate type
+				for i, lhsExpr := range lhs {
+					if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name != "_" && newVars[i] {
+						c.tsw.WriteLiterally("let ")
+						c.WriteIdent(ident, false)
+						
+						// Add type annotation if we have type information
+						if i < len(resultTypes) {
+							c.tsw.WriteLiterally(": ")
+							c.WriteGoType(resultTypes[i].Type())
+						}
+						
+						c.tsw.WriteLine("")
+					}
+				}
+			}
 		}
 
 		// Write the left-hand side as a destructuring pattern
+		// For token.DEFINE, we've already declared any new variables above
 		c.tsw.WriteLiterally("[")
+
 		for i, lhsExpr := range lhs {
 			if i != 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			// Write the variable name, omitting '_' for blank identifier
-			if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name != "_" {
-				c.WriteIdent(ident, false)
-			} else if !ok {
+			
+			if ident, ok := lhsExpr.(*ast.Ident); ok {
+				if ident.Name == "_" {
+					// For underscore variables, use empty slots in destructuring pattern
+				} else {
+					c.WriteIdent(ident, false)
+				}
+			} else {
 				// Should not happen for valid Go code in this context, but handle defensively
 				return errors.Errorf("unhandled LHS expression in destructuring: %T", lhsExpr)
 			}

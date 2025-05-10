@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -46,15 +47,26 @@ func TestCompliance(t *testing.T) {
 		testPaths = append(testPaths, testPath)
 	}
 
+	// limit concurrency
+	simulLimit := make(chan struct{}, runtime.GOMAXPROCS(-1))
+	for range cap(simulLimit) {
+		simulLimit <- struct{}{}
+	}
+
 	// Now run tests in parallel with goroutines
 	var wg sync.WaitGroup
 	var ranTests atomic.Int32
 	for _, testPath := range testPaths {
 		wg.Add(1)
 		go func(path string) {
-			defer wg.Done()
+			defer wg.Done() // runs even if t.Run is skipped
 			t.Run(filepath.Base(path), func(t *testing.T) {
 				ranTests.Add(1)
+				// limit how many tests can run simultaneously
+				<-simulLimit
+				defer func() {
+					simulLimit <- struct{}{}
+				}()
 				compliance.RunGoScriptTestDir(t, workspaceDir, path) // Pass workspaceDir
 			})
 		}(testPath)
