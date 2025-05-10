@@ -1,49 +1,235 @@
 /**
- * Represents a Go slice with an underlying TypeScript array and capacity information.
- * Similar to Go slices, this tracks both the visible length and the underlying capacity.
- * null represents the nil state.
+ * GoSliceObject contains metadata for complex slice views
  */
-export type Slice<T> = (Array<T> & { __capacity?: number }) | null
-
-/**
- * Creates a new slice (TypeScript array) with the specified length and capacity.
- * @param len The length of the slice.
- * @param cap The capacity of the slice (optional).
- * @returns A new TypeScript array representing the slice.
- */
-export const makeSlice = <T>(
-  len: number,
-  cap?: number,
-): Slice<T> => {
-  const slice = new Array<T>(len) as Slice<T>
-  slice!.__capacity = cap !== undefined ? cap : len
-  return slice
+interface GoSliceObject<T> {
+  backing: T[] // The backing array
+  offset: number // Offset into the backing array
+  length: number // Length of the slice
+  capacity: number // Capacity of the slice
 }
 
 /**
- * Creates a new slice header that shares the backing array.
+ * SliceProxy is a proxy object for complex slices
+ */
+export type SliceProxy<T> = T[] & {
+  __meta__: GoSliceObject<T>
+}
+
+/**
+ * Slice<T> is a union type that is either a plain array or a proxy
+ * null represents the nil state.
+ */
+export type Slice<T> = T[] | SliceProxy<T> | null
+
+export function asArray<T>(slice: Slice<T>): T[] {
+  return slice as T[]
+}
+
+/**
+ * isComplexSlice checks if a slice is a complex slice (has __meta__ property)
+ */
+function isComplexSlice<T>(slice: Slice<T>): slice is SliceProxy<T> {
+  return (
+    slice !== null &&
+    slice !== undefined &&
+    '__meta__' in slice &&
+    slice.__meta__ !== undefined
+  )
+}
+
+/**
+ * Creates a new slice with the specified length and capacity.
+ * @param length The length of the slice.
+ * @param capacity The capacity of the slice (optional).
+ * @returns A new slice.
+ */
+export const makeSlice = <T>(length: number, capacity?: number): Slice<T> => {
+  if (capacity === undefined) {
+    capacity = length
+  }
+
+  if (length < 0 || capacity < 0 || length > capacity) {
+    throw new Error(
+      `Invalid slice length (${length}) or capacity (${capacity})`,
+    )
+  }
+
+  const arr = new Array<T>(length)
+
+  // Always create a complex slice with metadata to preserve capacity information
+  const proxy = arr as SliceProxy<T>
+  proxy.__meta__ = {
+    backing: new Array<T>(capacity),
+    offset: 0,
+    length: length,
+    capacity: capacity,
+  }
+
+  for (let i = 0; i < length; i++) {
+    proxy.__meta__.backing[i] = arr[i]
+  }
+
+  return proxy
+}
+
+/**
+ * goSlice creates a slice from s[low:high:max]
  * Arguments mirror Go semantics; omitted indices are undefined.
  *
- * @param arr  The original slice/array produced by makeSlice or another slice
- * @param low  Starting index (defaults to 0)
- * @param high Ending index (defaults to arr.length)
- * @param max  Capacity limit (defaults to original capacity)
+ * @param s The original slice
+ * @param low Starting index (defaults to 0)
+ * @param high Ending index (defaults to s.length)
+ * @param max Capacity limit (defaults to original capacity)
  */
-export const slice = <T>(
-  arr: Slice<T>,
+export const goSlice = <T>(
+  s: Slice<T>,
   low?: number,
   high?: number,
   max?: number,
 ): Slice<T> => {
-  const start = low ?? 0
-  const origLen = arr ? arr.length : 0
-  const origCap = arr?.__capacity ?? origLen
-  const end = high !== undefined ? high : origLen
-  const newCap = max !== undefined ? max - start : origCap - start
+  if (s === null || s === undefined) {
+    throw new Error('Cannot slice nil')
+  }
 
-  const newArr = (arr?.slice(start, end) ?? null) as Slice<T>
-  if (newArr?.__capacity !== undefined) newArr.__capacity = newCap
-  return newArr
+  const slen = len(s)
+  low = low ?? 0
+  high = high ?? slen
+
+  if (low < 0 || high < low) {
+    throw new Error(`Invalid slice indices: ${low}:${high}`)
+  }
+
+  // In Go, high can be up to capacity, not just length
+  const scap = cap(s)
+  if (high > scap) {
+    throw new Error(`Slice index out of range: ${high} > ${scap}`)
+  }
+
+  if (
+    Array.isArray(s) &&
+    !isComplexSlice(s) &&
+    low === 0 &&
+    high === s.length &&
+    max === undefined
+  ) {
+    return s
+  }
+
+  let backing: T[]
+  let oldOffset = 0
+  let oldCap = scap
+
+  // Get the backing array and offset
+  if (isComplexSlice(s)) {
+    backing = s.__meta__.backing
+    oldOffset = s.__meta__.offset
+    oldCap = s.__meta__.capacity
+  } else {
+    backing = s as T[]
+  }
+
+  let newCap
+  if (max !== undefined) {
+    if (max < high) {
+      throw new Error(`Invalid slice indices: ${low}:${high}:${max}`)
+    }
+    if (isComplexSlice(s) && max > oldOffset + oldCap) {
+      throw new Error(
+        `Slice index out of range: ${max} > ${oldOffset + oldCap}`,
+      )
+    }
+    if (!isComplexSlice(s) && max > s.length) {
+      throw new Error(`Slice index out of range: ${max} > ${s.length}`)
+    }
+    newCap = max - low
+  } else {
+    // For slices of slices, capacity should be the capacity of the original slice minus the low index
+    if (isComplexSlice(s)) {
+      newCap = oldCap - low
+    } else {
+      newCap = s.length - low
+    }
+  }
+
+  const newLength = high - low
+  const newOffset = oldOffset + low
+
+  const target = {
+    __meta__: {
+      backing: backing,
+      offset: newOffset,
+      length: newLength,
+      capacity: newCap,
+    },
+  }
+
+  const handler = {
+    get(target: any, prop: string | symbol): any {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const index = Number(prop)
+        if (index >= 0 && index < target.__meta__.length) {
+          return target.__meta__.backing[target.__meta__.offset + index]
+        }
+        throw new Error(
+          `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+        )
+      }
+
+      if (prop === 'length') {
+        return target.__meta__.length
+      }
+
+      if (prop === '__meta__') {
+        return target.__meta__
+      }
+
+      if (
+        prop === 'slice' ||
+        prop === 'map' ||
+        prop === 'filter' ||
+        prop === 'reduce' ||
+        prop === 'forEach' ||
+        prop === Symbol.iterator
+      ) {
+        const backingSlice = target.__meta__.backing.slice(
+          target.__meta__.offset,
+          target.__meta__.offset + target.__meta__.length,
+        )
+        return backingSlice[prop].bind(backingSlice)
+      }
+
+      return Reflect.get(target, prop)
+    },
+
+    set(target: any, prop: string | symbol, value: any): boolean {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const index = Number(prop)
+        if (index >= 0 && index < target.__meta__.length) {
+          target.__meta__.backing[target.__meta__.offset + index] = value
+          return true
+        }
+        if (
+          index === target.__meta__.length &&
+          target.__meta__.length < target.__meta__.capacity
+        ) {
+          target.__meta__.backing[target.__meta__.offset + index] = value
+          target.__meta__.length++
+          return true
+        }
+        throw new Error(
+          `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+        )
+      }
+
+      if (prop === 'length' || prop === '__meta__') {
+        return false
+      }
+
+      return Reflect.set(target, prop, value)
+    },
+  }
+
+  return new Proxy(target, handler) as unknown as SliceProxy<T>
 }
 
 /**
@@ -63,81 +249,352 @@ export const makeMap = <K, V>(): Map<K, V> => {
  */
 export const arrayToSlice = <T>(
   arr: T[] | null | undefined,
-  depth: number = 1
-): Slice<T> => {
-  if (arr == null) return null;
-  
-  const result = [...arr] as Slice<T>;
-  result!.__capacity = arr.length;
-  
+  depth: number = 1,
+): T[] => {
+  if (arr == null) return [] as T[]
+
+  if (arr.length === 0) return arr
+
+  const target = {
+    __meta__: {
+      backing: arr,
+      offset: 0,
+      length: arr.length,
+      capacity: arr.length,
+    },
+  }
+
+  const handler = {
+    get(target: any, prop: string | symbol): any {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const index = Number(prop)
+        if (index >= 0 && index < target.__meta__.length) {
+          return target.__meta__.backing[target.__meta__.offset + index]
+        }
+        throw new Error(
+          `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+        )
+      }
+
+      if (prop === 'length') {
+        return target.__meta__.length
+      }
+
+      if (prop === '__meta__') {
+        return target.__meta__
+      }
+
+      if (
+        prop === 'slice' ||
+        prop === 'map' ||
+        prop === 'filter' ||
+        prop === 'reduce' ||
+        prop === 'forEach' ||
+        prop === Symbol.iterator
+      ) {
+        const backingSlice = target.__meta__.backing.slice(
+          target.__meta__.offset,
+          target.__meta__.offset + target.__meta__.length,
+        )
+        return backingSlice[prop].bind(backingSlice)
+      }
+
+      return Reflect.get(target, prop)
+    },
+
+    set(target: any, prop: string | symbol, value: any): boolean {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const index = Number(prop)
+        if (index >= 0 && index < target.__meta__.length) {
+          target.__meta__.backing[target.__meta__.offset + index] = value
+          return true
+        }
+        if (
+          index === target.__meta__.length &&
+          target.__meta__.length < target.__meta__.capacity
+        ) {
+          target.__meta__.backing[target.__meta__.offset + index] = value
+          target.__meta__.length++
+          return true
+        }
+        throw new Error(
+          `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+        )
+      }
+
+      if (prop === 'length' || prop === '__meta__') {
+        return false
+      }
+
+      return Reflect.set(target, prop, value)
+    },
+  }
+
   // Recursively convert nested arrays if depth > 1
   if (depth > 1 && arr.length > 0) {
     for (let i = 0; i < arr.length; i++) {
-      const item = arr[i];
-      if (Array.isArray(item)) {
-        result![i] = arrayToSlice(item as any[], depth - 1) as any;
+      const item = arr[i]
+      if (isComplexSlice(item as any)) {
+      } else if (Array.isArray(item)) {
+        arr[i] = arrayToSlice(item as any[], depth - 1) as any
+      } else if (
+        item &&
+        typeof item === 'object' &&
+        isComplexSlice(item as any)
+      ) {
+        // Preserve capacity information for complex slices
       }
     }
   }
-  
-  return result;
+
+  return new Proxy(target, handler) as unknown as SliceProxy<T>
 }
 
 /**
- * Returns the length of a collection (string, array, or map).
- * @param collection The collection to get the length of.
+ * Returns the length of a collection (string, array, slice, map, or set).
+ * @param obj The collection to get the length of.
  * @returns The length of the collection.
  */
-export const len = <T=unknown, V=unknown>(
-  collection: string | Array<T> | Slice<T> | Map<T, V>,
+export const len = <T = unknown, V = unknown>(
+  obj: string | Array<T> | Slice<T> | Map<T, V> | Set<T> | null | undefined,
 ): number => {
-  if (!collection) return 0
-  if (typeof collection === 'string' || Array.isArray(collection)) {
-    return collection.length
-  } else if (collection instanceof Map) {
-    return collection.size
+  if (obj === null || obj === undefined) {
+    return 0
   }
+
+  if (typeof obj === 'string') {
+    return obj.length
+  }
+
+  if (obj instanceof Map || obj instanceof Set) {
+    return obj.size
+  }
+
+  if (isComplexSlice(obj)) {
+    return obj.__meta__.length
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.length
+  }
+
   return 0 // Default fallback
 }
 
 /**
- * Returns the capacity of a slice (TypeScript array).
- * @param slice The slice (TypeScript array).
+ * Returns the capacity of a slice.
+ * @param obj The slice.
  * @returns The capacity of the slice.
  */
-export const cap = <T>(slice: Slice<T>): number => {
-  return slice?.__capacity ?? slice?.length ?? 0
+export const cap = <T>(obj: Slice<T>): number => {
+  if (obj === null || obj === undefined) {
+    return 0
+  }
+
+  if (isComplexSlice(obj)) {
+    return obj.__meta__.capacity
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.length
+  }
+
+  return 0
 }
 
 /**
- * Appends elements to a slice (TypeScript array).
+ * Appends elements to a slice.
  * Note: In Go, append can return a new slice if the underlying array is reallocated.
- * This helper emulates that by returning the modified array.
- * @param slice The slice (TypeScript array) to append to.
+ * This helper emulates that by returning the modified or new slice.
+ * @param slice The slice to append to.
  * @param elements The elements to append.
- * @returns The modified slice (TypeScript array).
+ * @returns The modified or new slice.
  */
-export const append = <T>(
-  slice: Slice<T> | null,
-  ...elements: T[]
-): Slice<T> => {
-  if (slice) {
-    slice.push(...elements)
+export const append = <T>(slice: Slice<T>, ...elements: T[]): T[] => {
+  if (slice === null || slice === undefined) {
+    if (elements.length === 0) {
+      return [] as T[]
+    } else {
+      return elements.slice(0) as T[]
+    }
+  }
+
+  if (elements.length === 0) {
+    return slice
+  }
+
+  const oldLen = len(slice)
+  const oldCap = cap(slice)
+  const newLen = oldLen + elements.length
+
+  if (newLen <= oldCap) {
+    if (isComplexSlice(slice)) {
+      const offset = slice.__meta__.offset
+      const backing = slice.__meta__.backing
+
+      for (let i = 0; i < elements.length; i++) {
+        backing[offset + oldLen + i] = elements[i]
+      }
+
+      const result = new Array(newLen) as SliceProxy<T>
+
+      for (let i = 0; i < oldLen; i++) {
+        result[i] = backing[offset + i]
+      }
+      for (let i = 0; i < elements.length; i++) {
+        result[oldLen + i] = elements[i]
+      }
+
+      result.__meta__ = {
+        backing: backing,
+        offset: offset,
+        length: newLen,
+        capacity: oldCap,
+      }
+
+      return result
+    } else {
+      const result = new Array(newLen) as SliceProxy<T>
+
+      for (let i = 0; i < oldLen; i++) {
+        result[i] = slice[i]
+      }
+
+      for (let i = 0; i < elements.length; i++) {
+        result[i + oldLen] = elements[i]
+
+        if (i + oldLen < oldCap && Array.isArray(slice)) {
+          slice[i + oldLen] = elements[i]
+        }
+      }
+
+      result.__meta__ = {
+        backing: slice as any,
+        offset: 0,
+        length: newLen,
+        capacity: oldCap,
+      }
+
+      return result
+    }
   } else {
-    slice = [...elements]
+    let newCap = oldCap
+    if (newCap == 0) {
+      newCap = elements.length
+    } else {
+      if (newCap < 1024) {
+        newCap *= 2
+      } else {
+        newCap += newCap / 4
+      }
+
+      // Ensure the new capacity fits all the elements
+      if (newCap < newLen) {
+        newCap = newLen
+      }
+    }
+
+    const newBacking = new Array<T>(newCap)
+
+    if (isComplexSlice(slice)) {
+      const offset = slice.__meta__.offset
+      const backing = slice.__meta__.backing
+
+      for (let i = 0; i < oldLen; i++) {
+        newBacking[i] = backing[offset + i]
+      }
+    } else {
+      for (let i = 0; i < oldLen; i++) {
+        newBacking[i] = slice[i]
+      }
+    }
+
+    for (let i = 0; i < elements.length; i++) {
+      newBacking[oldLen + i] = elements[i]
+    }
+
+    if (newLen === newCap) {
+      return newBacking.slice(0, newLen) as T[]
+    }
+
+    const result = new Array(newLen) as SliceProxy<T>
+
+    for (let i = 0; i < newLen; i++) {
+      result[i] = newBacking[i]
+    }
+
+    result.__meta__ = {
+      backing: newBacking,
+      offset: 0,
+      length: newLen,
+      capacity: newCap,
+    }
+
+    return result
   }
-  // update capacity
-  if (slice.__capacity !== undefined && slice.length > slice.__capacity) {
-    slice.__capacity = slice.length
+}
+
+/**
+ * Copies elements from src to dst.
+ * @param dst The destination slice.
+ * @param src The source slice.
+ * @returns The number of elements copied.
+ */
+export const copy = <T>(dst: Slice<T>, src: Slice<T>): number => {
+  if (dst === null || src === null) {
+    return 0
   }
-  return slice
+
+  const dstLen = len(dst)
+  const srcLen = len(src)
+
+  const count = Math.min(dstLen, srcLen)
+
+  if (count === 0) {
+    return 0
+  }
+
+  if (isComplexSlice(dst)) {
+    const dstOffset = dst.__meta__.offset
+    const dstBacking = dst.__meta__.backing
+
+    if (isComplexSlice(src)) {
+      const srcOffset = src.__meta__.offset
+      const srcBacking = src.__meta__.backing
+
+      for (let i = 0; i < count; i++) {
+        dstBacking[dstOffset + i] = srcBacking[srcOffset + i]
+        dst[i] = srcBacking[srcOffset + i] // Update the proxy array
+      }
+    } else {
+      for (let i = 0; i < count; i++) {
+        dstBacking[dstOffset + i] = src[i]
+        dst[i] = src[i] // Update the proxy array
+      }
+    }
+  } else {
+    if (isComplexSlice(src)) {
+      const srcOffset = src.__meta__.offset
+      const srcBacking = src.__meta__.backing
+
+      for (let i = 0; i < count; i++) {
+        dst[i] = srcBacking[srcOffset + i]
+      }
+    } else {
+      for (let i = 0; i < count; i++) {
+        dst[i] = src[i]
+      }
+    }
+  }
+
+  return count
 }
 
 /**
  * Represents the Go error type (interface).
  */
 export type Error = {
-	Error(): string
+  Error(): string
 } | null
 
 /**
@@ -155,7 +612,7 @@ export const stringToRunes = (str: string): number[] => {
  * @returns The resulting string.
  */
 export const runesToString = (runes: Slice<number>): string => {
-  return runes?.length ? String.fromCharCode(...runes) : ""
+  return runes?.length ? String.fromCharCode(...runes) : ''
 }
 
 /**
@@ -165,14 +622,14 @@ export const runesToString = (runes: Slice<number>): string => {
  * @returns The byte value (0-255).
  */
 export const byte = (n: number): number => {
-  return n & 0xFF; // Bitwise AND with 255 ensures we get a value in the range 0-255
+  return n & 0xff // Bitwise AND with 255 ensures we get a value in the range 0-255
 }
 
 /** Box represents a Go variable which can be referred to by other variables.
- * 
+ *
  * For example:
  *   var myVariable int
- *  
+ *
  */
 export type Box<T> = { value: T }
 
@@ -186,7 +643,9 @@ export function box<T>(v: T): Box<T> {
 /** Dereference a pointer‐box, throws on null → simulates Go panic. */
 export function unbox<T>(b: Box<T>): T {
   if (b === null) {
-    throw new Error('runtime error: invalid memory address or nil pointer dereference')
+    throw new Error(
+      'runtime error: invalid memory address or nil pointer dereference',
+    )
   }
   return b.value
 }
@@ -845,13 +1304,15 @@ export const makeChannel = <T>(
  * Implements the `Disposable` interface for use with `using` declarations.
  */
 export class DisposableStack implements Disposable {
-  #stack: (() => void)[] = [];
+  #stack: (() => void)[] = []
 
   /**
    * Adds a function to be executed when the stack is disposed.
    * @param fn The function to defer.
    */
-  defer(fn: () => void): void { this.#stack.push(fn); }
+  defer(fn: () => void): void {
+    this.#stack.push(fn)
+  }
 
   /**
    * Disposes of the resources in the stack by executing the deferred functions
@@ -862,8 +1323,8 @@ export class DisposableStack implements Disposable {
   [Symbol.dispose](): void {
     // Emulate Go: if a deferred throws, stop and rethrow
     while (this.#stack.length) {
-      const fn = this.#stack.pop()!;
-      fn();
+      const fn = this.#stack.pop()!
+      fn()
     }
   }
 }
@@ -874,14 +1335,14 @@ export class DisposableStack implements Disposable {
  * Implements the `AsyncDisposable` interface for use with `await using` declarations.
  */
 export class AsyncDisposableStack implements AsyncDisposable {
-  #stack: (() => Promise<void> | void)[] = [];
+  #stack: (() => Promise<void> | void)[] = []
 
   /**
    * Adds a synchronous or asynchronous function to be executed when the stack is disposed.
    * @param fn The function to defer. Can return void or a Promise<void>.
    */
   defer(fn: () => Promise<void> | void): void {
-    this.#stack.push(fn);
+    this.#stack.push(fn)
   }
 
   /**
@@ -891,7 +1352,7 @@ export class AsyncDisposableStack implements AsyncDisposable {
   async [Symbol.asyncDispose](): Promise<void> {
     // Execute in LIFO order, awaiting each potentially async function
     for (let i = this.#stack.length - 1; i >= 0; --i) {
-      await this.#stack[i]();
+      await this.#stack[i]()
     }
   }
 }
@@ -901,5 +1362,5 @@ export class AsyncDisposableStack implements AsyncDisposable {
  * @param args Arguments to print
  */
 export function println(...args: any[]): void {
-  console.log(...args);
+  console.log(...args)
 }

@@ -700,8 +700,8 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	case *ast.IndexExpr:
 		return c.WriteIndexExpr(exp)
 	case *ast.SliceExpr:
-		// Translate Go slice expression to $.slice(x, low, high, max)
-		c.tsw.WriteLiterally("$.slice(")
+		// Translate Go slice expression to $.goSlice(x, low, high, max)
+		c.tsw.WriteLiterally("$.goSlice(")
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return err
 		}

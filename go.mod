@@ -7,7 +7,6 @@ toolchain go1.24.3
 require (
 	github.com/aperturerobotics/cli v1.0.0
 	github.com/pkg/errors v0.9.1
-	github.com/sanity-io/litter v1.5.8
 	github.com/sirupsen/logrus v1.9.3
 	golang.org/x/tools v0.33.0
 )
