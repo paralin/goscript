@@ -30,7 +30,7 @@ export function main(): void {
 
 	// Create slice from array literal
 	let arrLit = $.arrayToSlice([1, 2, 3, 4, 5])
-	let sliceFromLit = $.slice(arrLit, undefined, undefined)
+	let sliceFromLit = $.goSlice(arrLit, undefined, undefined)
 	console.log($.len(sliceFromLit)) // 5
 	console.log($.cap(sliceFromLit)) // 5
 	console.log(sliceFromLit![0]) // 1
@@ -38,14 +38,14 @@ export function main(): void {
 
 	// Create slice from array variable
 	let arrVar = $.arrayToSlice(["a", "b", "c", "d"])
-	let sliceFromVar = $.slice(arrVar, undefined, undefined)
+	let sliceFromVar = $.goSlice(arrVar, undefined, undefined)
 	console.log($.len(sliceFromVar)) // 4
 	console.log($.cap(sliceFromVar)) // 4
 	console.log(sliceFromVar![0]) // a
 	console.log(sliceFromVar![3]) // d
 
 	// Create slice with specific indices
-	let sliceIndices = $.slice(arrVar, 1, 3)
+	let sliceIndices = $.goSlice(arrVar, 1, 3)
 	console.log($.len(sliceIndices)) // 2
 	console.log($.cap(sliceIndices)) // 3 (cap is from start index to end of original array)
 	console.log(sliceIndices![0]) // b
@@ -68,7 +68,7 @@ export function main(): void {
 	// Modify slice, check original array
 	console.log("--- Modify slice, check array ---")
 	let modArr = $.arrayToSlice([10, 20, 30])
-	let modSlice = $.slice(modArr, undefined, undefined)
+	let modSlice = $.goSlice(modArr, undefined, undefined)
 	modSlice![1] = 25
 	console.log(modArr![1]) // 25 (original array should be modified)
 	console.log(modSlice![1]) // 25
@@ -82,7 +82,7 @@ export function main(): void {
 	// Append to sub-slice within capacity
 	console.log("--- Append sub-slice w/in capacity ---")
 	let appendArr = $.arrayToSlice([1, 2, 3, 4, 5])
-	let appendSlice1 = $.slice(appendArr, 0, 2)
+	let appendSlice1 = $.goSlice(appendArr, 0, 2)
 	console.log($.len(appendSlice1)) // 2
 	console.log($.cap(appendSlice1)) // 5
 	let appendSlice2 = $.append(appendSlice1, 99)
@@ -93,7 +93,7 @@ export function main(): void {
 
 	// Append to sub-slice exceeding capacity
 	console.log("--- Append sub-slice exceed capacity ---")
-	let appendSlice3 = $.slice(appendArr, 3, 5)
+	let appendSlice3 = $.goSlice(appendArr, 3, 5)
 	console.log($.len(appendSlice3)) // 2
 	console.log($.cap(appendSlice3)) // 2
 	let appendSlice4 = $.append(appendSlice3, 101)
@@ -112,11 +112,11 @@ export function main(): void {
 	// Slicing a slice
 	console.log("--- Slicing a slice ---")
 	let baseSlice = $.arrayToSlice([0, 10, 20, 30, 40, 50])
-	let subSlice1 = $.slice(baseSlice, 1, 4)
+	let subSlice1 = $.goSlice(baseSlice, 1, 4)
 	console.log($.len(subSlice1)) // 3
 	console.log($.cap(subSlice1)) // 5
 	console.log(subSlice1![0]) // 10
-	let subSlice2 = $.slice(subSlice1, 1, 3)
+	let subSlice2 = $.goSlice(subSlice1, 1, 3)
 	console.log($.len(subSlice2)) // 2
 	console.log($.cap(subSlice2)) // 4
 	console.log(subSlice2![0]) // 20
@@ -128,7 +128,7 @@ export function main(): void {
 	// Three-index slicing (if supported) - Check capacity
 	console.log("--- Three-index slicing ---")
 	let threeIndexArr = $.arrayToSlice([0, 1, 2, 3, 4, 5])
-	let threeIndexSlice = $.slice(threeIndexArr, 1, 3, 4)
+	let threeIndexSlice = $.goSlice(threeIndexArr, 1, 3, 4)
 	console.log($.len(threeIndexSlice)) // 2
 	console.log($.cap(threeIndexSlice)) // 3
 	console.log(threeIndexSlice![0]) // 1
@@ -226,7 +226,7 @@ export function main(): void {
 	console.log("innerSliceWithCap[2]:", innerSliceWithCap![2]) // 60
 
 	// Check if the original slice of slices reflects the change (it should, as append was within capacity)
-	console.log("sliceOfSlicesWithCap[1][2]:", $.slice(sliceOfSlicesWithCap![1], undefined, 3)![2]) // 60
+	console.log("sliceOfSlicesWithCap[1][2]:", $.goSlice(sliceOfSlicesWithCap![1], undefined, 3)![2]) // 60
 
 	// Append to inner slice exceeding capacity
 	console.log("--- Append to inner slice exceeding capacity ---")
@@ -246,7 +246,7 @@ export function main(): void {
 
 	// Slicing a slice of slices
 	console.log("--- Slicing a slice of slices ---")
-	let subSliceOfSlices = $.slice(sliceOfSlices, 1, 3)
+	let subSliceOfSlices = $.goSlice(sliceOfSlices, 1, 3)
 	console.log("Length of subSliceOfSlices:", $.len(subSliceOfSlices)) // 2
 	console.log("Capacity of subSliceOfSlices:", $.cap(subSliceOfSlices)) // 2
 	console.log("subSliceOfSlices[0][0]:", subSliceOfSlices![0]![0]) // 4
