@@ -503,7 +503,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 					v.analysis.AsyncFuncs[v.currentFuncObj] = true
 					v.inAsyncFunction = true // Update visitor state
 					// Mark the FuncDecl node itself if possible (might need to store the node too)
-					for nodeAst, _ := range v.analysis.IsInAsyncFunctionMap { // Find the node to update
+					for nodeAst := range v.analysis.IsInAsyncFunctionMap { // Find the node to update
 						if fd, ok := nodeAst.(*ast.FuncDecl); ok && v.pkg.TypesInfo.ObjectOf(fd.Name) == v.currentFuncObj {
 							v.analysis.IsInAsyncFunctionMap[nodeAst] = true
 						}

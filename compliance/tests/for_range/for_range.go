@@ -41,5 +41,4 @@ func main() {
 	for range str {
 		println("Iterating string")
 	}
-
 }

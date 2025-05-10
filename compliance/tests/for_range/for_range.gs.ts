@@ -70,6 +70,5 @@ export function main(): void {
 			}
 		}
 	}
-
 }
 
