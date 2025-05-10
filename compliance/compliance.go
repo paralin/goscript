@@ -3,6 +3,7 @@ package compliance
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt" // Added for Sprintf
 	"io"
 	"os"
@@ -238,6 +239,91 @@ func copyFile(src, dst string) error {
 	return nil
 }
 
+// WriteTypeCheckConfig writes a tsconfig.json file in the test directory that extends the root tsconfig.json
+func WriteTypeCheckConfig(t *testing.T, workspaceDir, testDir string) string {
+	t.Helper()
+
+	// Find the .gs.ts files in the test directory
+	gsTsFiles, err := filepath.Glob(filepath.Join(testDir, "*.gs.ts"))
+	if err != nil || len(gsTsFiles) == 0 {
+		t.Fatalf("could not find .gs.ts files in test dir %s: %v", testDir, err)
+	}
+
+	// Construct the include list with relative paths
+	var includes []string
+	for _, file := range gsTsFiles {
+		includes = append(includes, filepath.Base(file))
+	}
+
+	absTestDir, err := filepath.Abs(testDir)
+	if err != nil {
+		t.Fatalf("failed to get absolute path for %s: %v", testDir, err)
+	}
+
+	absWorkspaceDir, err := filepath.Abs(workspaceDir)
+	if err != nil {
+		t.Fatalf("failed to get absolute path for %s: %v", workspaceDir, err)
+	}
+
+	relWorkspacePath, err := filepath.Rel(absTestDir, absWorkspaceDir)
+	if err != nil {
+		t.Fatalf("failed to get relative path from %s to %s: %v", absTestDir, absWorkspaceDir, err)
+	}
+
+	// Ensure the path uses forward slashes for JSON compatibility
+	relWorkspacePathForJSON := filepath.ToSlash(relWorkspacePath)
+	rootTsConfigPath := filepath.ToSlash(filepath.Join(relWorkspacePathForJSON, "tsconfig.json"))
+
+	// Create tsconfig.json content
+	tsconfig := map[string]interface{}{
+		"extends": rootTsConfigPath,
+		"include": includes,
+		"compilerOptions": map[string]interface{}{
+			"noEmit": true,
+		},
+	}
+
+	tsconfigContentBytes, err := json.MarshalIndent(tsconfig, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal tsconfig to JSON: %v", err)
+	}
+
+	// Write tsconfig.json to the test directory
+	tsconfigPath := filepath.Join(testDir, "tsconfig.json")
+	if err := os.WriteFile(tsconfigPath, tsconfigContentBytes, 0o644); err != nil {
+		t.Fatalf("failed to write tsconfig.json to test dir: %v", err)
+	}
+
+	return tsconfigPath
+}
+
+// RunTypeScriptTypeCheck runs tsc --project tsconfig.json to typecheck the generated .gs.ts files.
+func RunTypeScriptTypeCheck(t *testing.T, workspaceDir, testDir string, tsconfigPath string) {
+	t.Helper()
+
+	// Create a sub-test for the typecheck
+	t.Run("TypeCheck", func(t *testing.T) {
+		cmd := exec.Command("tsc", "--project", "tsconfig.json")
+		cmd.Dir = testDir
+
+		// Prepend node_modules/.bin to PATH
+		nodeBinDir := filepath.Join(workspaceDir, "node_modules", ".bin")
+		currentPath := os.Getenv("PATH")
+		newPath := fmt.Sprintf("%s%c%s", nodeBinDir, os.PathListSeparator, currentPath)
+		cmd.Env = append(os.Environ(), "PATH="+newPath) // Set the modified PATH
+
+		var outBuf, errBuf bytes.Buffer
+		cmd.Stdout = &outBuf
+		cmd.Stderr = &errBuf
+
+		if err := cmd.Run(); err != nil {
+			t.Fatalf("TypeScript type checking failed: %v\nstdout: %s\nstderr: %s", err, outBuf.String(), errBuf.String())
+		}
+
+		t.Logf("TypeScript type checking passed")
+	})
+}
+
 // RunGoScriptTestDir compiles all .go files in testDir, runs the generated TypeScript, and compares output to expected.log.
 func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	t.Helper()
@@ -346,4 +432,29 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 		actualLogPath := filepath.Join(testDir, "actual.log")
 		os.Remove(actualLogPath) //nolint:errcheck
 	}
+
+	// Check for skip-typecheck file
+	skipTypeCheckPath := filepath.Join(testDir, "skip-typecheck")
+	if _, err := os.Stat(skipTypeCheckPath); err == nil {
+		t.Logf("Skipping TypeScript type checking for %s: skip-typecheck file found", filepath.Base(testDir))
+		return // Skip the type checking
+	} else if !os.IsNotExist(err) {
+		// If there was an error other than "not exists", fail the test
+		t.Fatalf("failed to check for skip-typecheck file in %s: %v", testDir, err)
+	}
+
+	// Check for expect-typecheck-fail file
+	expectTypeCheckFailPath := filepath.Join(testDir, "expect-typecheck-fail")
+	if _, err := os.Stat(expectTypeCheckFailPath); err == nil {
+		t.Logf("Skipping TypeScript type checking for %s: expect-typecheck-fail file found", filepath.Base(testDir))
+		return // Skip the type checking
+	} else if !os.IsNotExist(err) {
+		// If there was an error other than "not exists", fail the test
+		t.Fatalf("failed to check for expect-typecheck-fail file in %s: %v", testDir, err)
+	}
+
+	// Write tsconfig.json for type checking
+	tsconfigPathForCheck := WriteTypeCheckConfig(t, workspaceDir, testDir)
+
+	RunTypeScriptTypeCheck(t, workspaceDir, testDir, tsconfigPathForCheck)
 }

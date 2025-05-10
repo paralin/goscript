@@ -30,7 +30,7 @@ export function main(): void {
 	console.log("Ranging with blank identifier for value:")
 	let count = 0
 	// Both key and value are blank identifiers
-	for (let i = 0; i < s.length; i++) {
+	for (let _i = 0; _i < s.length; _i++) {
 		{
 			// Both key and value are blank identifiers
 			count++

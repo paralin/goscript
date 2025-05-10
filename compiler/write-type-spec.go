@@ -3,10 +3,11 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
-	// types provides type information for Go types.
 	"go/types"
-	"github.com/pkg/errors"
 	"strings"
+
+	// types provides type information for Go types.
+	"github.com/pkg/errors"
 )
 
 func (c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string {
@@ -14,7 +15,7 @@ func (c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string {
 	if ptr, isPtr := trueType.(*types.Pointer); isPtr {
 		trueType = ptr.Elem()
 	}
-	
+
 	if named, isNamed := trueType.(*types.Named); isNamed {
 		return named.Obj().Name()
 	} else {
@@ -29,14 +30,14 @@ func (c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string {
 
 func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Type) {
 	fieldTypeStr := c.getTypeString(fieldType)
-	
+
 	// Generate getter
 	c.tsw.WriteLinef("public get %s(): %s {", fieldName, fieldTypeStr)
 	c.tsw.Indent(1)
 	c.tsw.WriteLinef("return this._fields.%s.value", fieldName)
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
-	
+
 	// Generate setter
 	c.tsw.WriteLinef("public set %s(value: %s) {", fieldName, fieldTypeStr)
 	c.tsw.Indent(1)
@@ -49,7 +50,7 @@ func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Typ
 func (c *GoToTSCompiler) writeBoxedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
 	c.tsw.WriteLiterally(fieldName)
 	c.tsw.WriteLiterally(": $.box(")
-	
+
 	if isEmbedded {
 		if _, isPtr := fieldType.(*types.Pointer); isPtr {
 			c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
@@ -66,7 +67,7 @@ func (c *GoToTSCompiler) writeBoxedFieldInitializer(fieldName string, fieldType 
 				structTypeNameForClone = named.Obj().Name()
 			}
 		}
-		
+
 		if isStructValueType {
 			c.tsw.WriteLiterallyf("init?.%s?.clone() ?? new %s()", fieldName, structTypeNameForClone)
 		} else {
@@ -74,13 +75,14 @@ func (c *GoToTSCompiler) writeBoxedFieldInitializer(fieldName string, fieldType 
 			c.WriteZeroValueForType(fieldType)
 		}
 	}
-	
+
 	c.tsw.WriteLiterally(")")
 }
+
 func (c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
 	c.tsw.WriteLiterally(fieldName)
 	c.tsw.WriteLiterally(": $.box(")
-	
+
 	if isEmbedded {
 		isPointerToStruct := false
 		trueType := fieldType
@@ -88,7 +90,7 @@ func (c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType
 			trueType = ptr.Elem()
 			isPointerToStruct = true
 		}
-		
+
 		if named, isNamed := trueType.(*types.Named); isNamed {
 			_, isUnderlyingStruct := named.Underlying().(*types.Struct)
 			if isUnderlyingStruct && !isPointerToStruct { // Is a value struct
@@ -106,17 +108,16 @@ func (c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType
 				isValueTypeStruct = true
 			}
 		}
-		
+
 		if isValueTypeStruct {
 			c.tsw.WriteLiterallyf("this._fields.%s.value?.clone() ?? null", fieldName)
 		} else {
 			c.tsw.WriteLiterallyf("this._fields.%s.value", fieldName)
 		}
 	}
-	
+
 	c.tsw.WriteLiterally(")")
 }
-
 
 // WriteTypeSpec writes the type specification to the output.
 func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
@@ -227,7 +228,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		} else {
 			fieldKeyName = field.Name()
 		}
-		
+
 		c.writeBoxedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
 
 		if i < numFields-1 {
@@ -259,7 +260,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		} else {
 			fieldKeyName = field.Name()
 		}
-		
+
 		c.writeClonedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
 
 		if i < numFields-1 {
@@ -323,7 +324,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 
 		embeddedFieldType := field.Type()
 		embeddedFieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
-		
+
 		// Skip if not a named type (required for proper embedding promotion)
 		trueEmbeddedType := embeddedFieldType
 		if ptr, isPtr := trueEmbeddedType.(*types.Pointer); isPtr {

@@ -20,7 +20,7 @@ func main() {
 	// Test with blank identifier for value (should still iterate)
 	println("Ranging with blank identifier for value:")
 	count := 0
-	for _, _ = range s { // Both key and value are blank identifiers
+	for range s { // Both key and value are blank identifiers
 		count++
 	}
 	println(count) // Should be 3

@@ -424,15 +424,15 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 		if i > 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		
+
 		param := params.At(i)
 		paramSlice, paramIsSlice := param.Type().(*types.Slice)
-		
+
 		paramVariadic := i == params.Len()-1 && t.Variadic()
 		if paramVariadic {
 			c.tsw.WriteLiterally("...")
 		}
-		
+
 		// Use parameter name if available, otherwise use p0, p1, etc.
 		if param.Name() != "" {
 			c.tsw.WriteLiterally(param.Name())
@@ -440,7 +440,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 			c.tsw.WriteLiterally(fmt.Sprintf("p%d", i))
 		}
 		c.tsw.WriteLiterally(": ")
-		
+
 		if paramVariadic && paramIsSlice {
 			c.WriteGoType(paramSlice.Elem())
 			c.tsw.WriteLiterally("[]")
@@ -1741,7 +1741,7 @@ func (c *GoToTSCompiler) writeBoxedValue(expr ast.Expr) error {
 	if expr == nil {
 		return fmt.Errorf("nil expression passed to writeBoxedValue")
 	}
-	
+
 	// Handle different expression types
 	switch e := expr.(type) {
 	case *ast.Ident:
@@ -1765,14 +1765,14 @@ func (c *GoToTSCompiler) writeBoxedValueWithMethods(expr ast.Expr, typ types.Typ
 	if expr == nil {
 		return fmt.Errorf("nil expression passed to writeBoxedValueWithMethods")
 	}
-	
+
 	// First, write the expression using writeBoxedValue
 	if err := c.writeBoxedValue(expr); err != nil {
 		return err
 	}
-	
+
 	// to handle special cases for types with methods if needed in the future
-	
+
 	return nil
 }
 
@@ -2204,10 +2204,10 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 
 	// Write arrow function: (params) => { body }
 	c.tsw.WriteLiterally("(")
-	
+
 	// Use WriteFieldList which now handles variadic parameters
 	c.WriteFieldList(exp.Type.Params, true) // true = arguments
-	
+
 	c.tsw.WriteLiterally(")")
 
 	// Handle return type for function literals
@@ -3949,7 +3949,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			c.tsw.WriteLiterally(", ")
 		}
 
-		// Handle map indexing assignment specially 
+		// Handle map indexing assignment specially
 		// Note: We don't use WriteIndexExpr here because we need to use $.mapSet instead of .get
 		currentIsMapIndex := false
 		if indexExpr, ok := l.(*ast.IndexExpr); ok {
