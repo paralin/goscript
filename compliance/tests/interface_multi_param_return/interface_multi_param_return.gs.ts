@@ -10,7 +10,7 @@ type MultiParamReturner = null | {
 const MultiParamReturner__typeInfo = $.registerType(
   'MultiParamReturner',
   $.TypeKind.Interface,
-  null, // Zero value for interface is null
+  null as unknown, // Zero value for interface is null
   new Set(['Process']),
   undefined
 );
@@ -47,7 +47,7 @@ class MyProcessor {
 	  $.TypeKind.Struct,
 	  new MyProcessor(),
 	  new Set(['Process']),
-	  MyProcessor
+	  MyProcessor as new (...args: unknown[]) => unknown
 	);
 }
 

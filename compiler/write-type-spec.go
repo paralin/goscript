@@ -494,7 +494,7 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 	c.tsw.WriteLinef("const %s__typeInfo = $.registerType(", interfaceName)
 	c.tsw.WriteLinef("  '%s',", interfaceName)
 	c.tsw.WriteLinef("  $.TypeKind.Interface,")
-	c.tsw.WriteLinef("  null, // Zero value for interface is null")
+	c.tsw.WriteLinef("  null as unknown, // Zero value for interface is null")
 	c.tsw.WriteLinef("  new Set([%s]),", c.collectInterfaceMethods(t))
 	c.tsw.WriteLinef("  undefined")
 	c.tsw.WriteLinef(");")
