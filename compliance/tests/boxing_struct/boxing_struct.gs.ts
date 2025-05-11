@@ -35,7 +35,7 @@ class MyStruct {
 	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set([]),
-	  MyStruct
+	  MyStruct as new (...args: unknown[]) => unknown
 	);
 }
 
