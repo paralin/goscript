@@ -58,9 +58,41 @@ func main() {
 	arr := [3]int{1, 2, 3}
 	println("Array elements:", arr[0], arr[1], arr[2])
 
-	// Slices and range loop
+	// Slices - Basic initialization and access
 	slice := []int{4, 5, 6}
 	println("Slice elements:", slice[0], slice[1], slice[2])
+	println("Slice length:", len(slice), "capacity:", cap(slice))
+	
+	sliceWithCap := make([]int, 3, 5)
+	println("\nSlice created with make([]int, 3, 5):")
+	println("Length:", len(sliceWithCap), "Capacity:", cap(sliceWithCap))
+	
+	println("\nAppend and capacity growth:")
+	growingSlice := make([]int, 0, 2)
+	println("Initial - Length:", len(growingSlice), "Capacity:", cap(growingSlice))
+	
+	for i := 1; i <= 4; i++ {
+		growingSlice = append(growingSlice, i)
+		println("After append", i, "- Length:", len(growingSlice), "Capacity:", cap(growingSlice))
+	}
+	
+	println("\nSlicing operations and shared backing arrays:")
+	original := []int{10, 20, 30, 40, 50}
+	println("Original slice - Length:", len(original), "Capacity:", cap(original))
+	
+	slice1 := original[1:3]
+	println("slice1 := original[1:3] - Values:", slice1[0], slice1[1])
+	println("slice1 - Length:", len(slice1), "Capacity:", cap(slice1))
+	
+	slice2 := original[1:3:4]
+	println("slice2 := original[1:3:4] - Values:", slice2[0], slice2[1])
+	println("slice2 - Length:", len(slice2), "Capacity:", cap(slice2))
+	
+	println("\nShared backing arrays:")
+	slice1[0] = 999
+	println("After slice1[0] = 999:")
+	println("original[1]:", original[1], "slice1[0]:", slice1[0], "slice2[0]:", slice2[0])
+	
 	sum := 0
 	for idx, val := range slice {
 		sum += val
