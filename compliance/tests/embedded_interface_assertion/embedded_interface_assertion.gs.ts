@@ -11,7 +11,7 @@ type Reader = null | {
 const Reader__typeInfo = $.registerType(
   'Reader',
   $.TypeKind.Interface,
-  null, // Zero value for interface is null
+  null as unknown, // Zero value for interface is null
   new Set(['Read']),
   undefined
 );
@@ -23,7 +23,7 @@ type Closer = null | {
 const Closer__typeInfo = $.registerType(
   'Closer',
   $.TypeKind.Interface,
-  null, // Zero value for interface is null
+  null as unknown, // Zero value for interface is null
   new Set(['Close']),
   undefined
 );
@@ -33,7 +33,7 @@ type ReadCloser = null | Reader & Closer
 const ReadCloser__typeInfo = $.registerType(
   'ReadCloser',
   $.TypeKind.Interface,
-  null, // Zero value for interface is null
+  null as unknown, // Zero value for interface is null
   new Set(['Close', 'Read']),
   undefined
 );
@@ -70,7 +70,7 @@ class MyStruct {
 	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set(['Read', 'Close']),
-	  MyStruct
+	  MyStruct as new (...args: unknown[]) => unknown
 	);
 }
 
