@@ -1,34 +1,18 @@
 
 
-const $ = {
-  println: console.log
-};
-
-/**
- * Printf formats according to a format specifier and writes to standard output.
- * It returns the number of bytes written.
- */
-function Printf(format, ...args) {
+export const Printf = function(format, ...args) {
   const str = Sprintf(format, ...args);
   console.log(str);
   return str.length;
-}
+};
 
-/**
- * Println formats using the default formats for its operands and writes to standard output.
- * Spaces are always added between operands and a newline is appended.
- * It returns the number of bytes written.
- */
-function Println(...args) {
+export const Println = function(...args) {
   const str = args.map(arg => String(arg)).join(" ") + "\n";
   console.log(str);
   return str.length;
-}
+};
 
-/**
- * Sprintf formats according to a format specifier and returns the resulting string.
- */
-function Sprintf(format, ...args) {
+export const Sprintf = function(format, ...args) {
   let argIndex = 0;
   return format.replace(/%[vdsfTt]/g, match => {
     if (argIndex >= args.length) return match;
@@ -43,10 +27,4 @@ function Sprintf(format, ...args) {
       default: return match;
     }
   });
-}
-
-module.exports = {
-  Printf,
-  Println,
-  Sprintf
 };
