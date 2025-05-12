@@ -1304,14 +1304,14 @@ export const makeChannel = <T>(
  * Implements the `Disposable` interface for use with `using` declarations.
  */
 export class DisposableStack implements Disposable {
-  #stack: (() => void)[] = []
+  private stack: (() => void)[] = []
 
   /**
    * Adds a function to be executed when the stack is disposed.
    * @param fn The function to defer.
    */
   defer(fn: () => void): void {
-    this.#stack.push(fn)
+    this.stack.push(fn)
   }
 
   /**
@@ -1322,8 +1322,8 @@ export class DisposableStack implements Disposable {
    */
   [Symbol.dispose](): void {
     // Emulate Go: if a deferred throws, stop and rethrow
-    while (this.#stack.length) {
-      const fn = this.#stack.pop()!
+    while (this.stack.length) {
+      const fn = this.stack.pop()!
       fn()
     }
   }
@@ -1335,14 +1335,14 @@ export class DisposableStack implements Disposable {
  * Implements the `AsyncDisposable` interface for use with `await using` declarations.
  */
 export class AsyncDisposableStack implements AsyncDisposable {
-  #stack: (() => Promise<void> | void)[] = []
+  private stack: (() => Promise<void> | void)[] = []
 
   /**
    * Adds a synchronous or asynchronous function to be executed when the stack is disposed.
    * @param fn The function to defer. Can return void or a Promise<void>.
    */
   defer(fn: () => Promise<void> | void): void {
-    this.#stack.push(fn)
+    this.stack.push(fn)
   }
 
   /**
@@ -1351,8 +1351,8 @@ export class AsyncDisposableStack implements AsyncDisposable {
    */
   async [Symbol.asyncDispose](): Promise<void> {
     // Execute in LIFO order, awaiting each potentially async function
-    for (let i = this.#stack.length - 1; i >= 0; --i) {
-      await this.#stack[i]()
+    for (let i = this.stack.length - 1; i >= 0; --i) {
+      await this.stack[i]()
     }
   }
 }
