@@ -4,6 +4,7 @@ package gs
 
 import (
 	"embed"
+	"strings"
 )
 
 //go:embed fmt
@@ -18,4 +19,19 @@ func GetOverride(pkgPath, fileName string) (string, bool) {
 		return "", false
 	}
 	return string(data), true
+}
+
+func HasPackageOverride(pkgPath string) bool {
+	entries, err := GsOverrides.ReadDir(pkgPath)
+	if err != nil {
+		return false
+	}
+	return len(entries) > 0
+}
+
+func IsStandardLibraryPackage(pkgPath string) bool {
+	return !strings.Contains(pkgPath, ".") && 
+		!strings.HasPrefix(pkgPath, "github.com/") &&
+		!strings.HasPrefix(pkgPath, "golang.org/") &&
+		!strings.HasPrefix(pkgPath, "gopkg.in/")
 }

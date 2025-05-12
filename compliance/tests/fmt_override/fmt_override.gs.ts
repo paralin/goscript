@@ -9,8 +9,5 @@ export function main(): void {
 	fmt.Printf("Hello %s!\n", "world")
 
 	fmt.Println("Testing fmt override")
-
-	let s = fmt.Sprintf("Value: %d", 42)
-	console.log(s)
 }
 

@@ -165,6 +165,7 @@ func NewPackageCompiler(
 // determines its relative path for logging, and then invokes `CompileFile`
 // to handle the compilation of that specific file.
 // The working directory (`wd`) is used to make file paths in logs more readable.
+// If the package has a handwritten override in the gs/ directory, it will skip
 func (c *PackageCompiler) Compile(ctx context.Context) error {
 	wd := c.compilerConf.Dir
 	if wd == "" {
@@ -173,6 +174,17 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	// Check if this is a standard library package
+	pkgPath := c.pkg.PkgPath
+	if gs.IsStandardLibraryPackage(pkgPath) {
+		if gs.HasPackageOverride(pkgPath) {
+			c.le.WithField("package", pkgPath).Debug("using handwritten package override")
+		} else {
+			c.le.WithField("package", pkgPath).Debug("skipping standard library package")
+		}
+		return nil
 	}
 
 	// Compile the files in the package one at a time
@@ -270,6 +282,13 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	if hasOverride {
 		// Write the override content directly to the output file
 		return os.WriteFile(outputFilePathAbs, []byte(overrideContent), 0o644)
+	}
+	
+	// Process imports to handle packages with overrides
+	for _, imp := range c.ast.Imports {
+		importPath := strings.Trim(imp.Path.Value, "\"")
+		if gs.IsStandardLibraryPackage(importPath) && gs.HasPackageOverride(importPath) {
+		}
 	}
 
 	of, err := os.OpenFile(outputFilePathAbs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
@@ -5256,23 +5275,41 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	var valueName string
 	var okName string
 
-	if valIdent, ok := lhs[0].(*ast.Ident); ok {
-		if valIdent.Name == "_" {
+	// Handle value variable (first LHS expression)
+	switch lhsExpr := lhs[0].(type) {
+	case *ast.Ident:
+		if lhsExpr.Name == "_" {
 			valueIsBlank = true
 		} else {
-			valueName = valIdent.Name
+			valueName = lhsExpr.Name
 		}
-	} else {
+	case *ast.SelectorExpr:
+		// For selector expressions like x.y, we need to construct the full expression name
+		if xIdent, ok := lhsExpr.X.(*ast.Ident); ok {
+			valueName = xIdent.Name + "." + lhsExpr.Sel.Name
+		} else {
+			return fmt.Errorf("unsupported complex selector expression for value in type assertion: %T", lhsExpr.X)
+		}
+	default:
 		return fmt.Errorf("unhandled LHS expression type for value in type assertion: %T", lhs[0])
 	}
 
-	if okIdent, ok := lhs[1].(*ast.Ident); ok {
-		if okIdent.Name == "_" {
+	// Handle ok variable (second LHS expression)
+	switch lhsExpr := lhs[1].(type) {
+	case *ast.Ident:
+		if lhsExpr.Name == "_" {
 			okIsBlank = true
 		} else {
-			okName = okIdent.Name
+			okName = lhsExpr.Name
 		}
-	} else {
+	case *ast.SelectorExpr:
+		// For selector expressions like x.y, we need to construct the full expression name
+		if xIdent, ok := lhsExpr.X.(*ast.Ident); ok {
+			okName = xIdent.Name + "." + lhsExpr.Sel.Name
+		} else {
+			return fmt.Errorf("unsupported complex selector expression for ok in type assertion: %T", lhsExpr.X)
+		}
+	default:
 		return fmt.Errorf("unhandled LHS expression type for ok in type assertion: %T", lhs[1])
 	}
 

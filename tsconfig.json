@@ -13,6 +13,7 @@
     "sourceMap": true, // Generate source maps for debugging
     "paths": {
       "@goscript/builtin": ["./builtin/builtin.ts"],
+      "@goscript/fmt": ["./gs/fmt/index.ts"],
       "@goscript/*": ["./gs/*/%.gs.ts", "./builtin/*.ts"]
     }
   },
