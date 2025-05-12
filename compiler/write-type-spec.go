@@ -28,17 +28,23 @@ func (c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string {
 	}
 }
 
-func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Type) {
+func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Type, doc, comment *ast.CommentGroup) {
 	fieldTypeStr := c.getTypeString(fieldType)
 
 	// Generate getter
+	if doc != nil {
+		c.WriteDoc(doc)
+	}
+	if comment != nil {
+		c.WriteDoc(comment)
+	}
 	c.tsw.WriteLinef("public get %s(): %s {", fieldName, fieldTypeStr)
 	c.tsw.Indent(1)
 	c.tsw.WriteLinef("return this._fields.%s.value", fieldName)
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
 
-	// Generate setter
+	// Generate setter (no comments)
 	c.tsw.WriteLinef("public set %s(value: %s) {", fieldName, fieldTypeStr)
 	c.tsw.Indent(1)
 	c.tsw.WriteLinef("this._fields.%s.value = value", fieldName)
@@ -177,7 +183,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			if fieldType == nil {
 				fieldType = types.Typ[types.Invalid]
 			}
-			c.writeGetterSetter(fieldName, fieldType)
+			c.writeGetterSetter(fieldName, fieldType, field.Doc, field.Comment)
 		}
 	}
 
@@ -186,7 +192,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		field := underlyingStruct.Field(i)
 		if field.Anonymous() {
 			fieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
-			c.writeGetterSetter(fieldKeyName, field.Type())
+			c.writeGetterSetter(fieldKeyName, field.Type(), nil, nil)
 		}
 	}
 
