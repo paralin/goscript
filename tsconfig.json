@@ -12,9 +12,12 @@
     "declaration": true, // Generate .d.ts files
     "sourceMap": true, // Generate source maps for debugging
     "paths": {
-      "@goscript/builtin": ["./builtin/builtin.ts"]
+      "@goscript/builtin": ["./builtin/builtin.ts"],
+      "@goscript/fmt": ["./gs/fmt/fmt.gs.ts"],
+      "@goscript/errors": ["./builtin/errors.ts"],
+      "@goscript/slices": ["./builtin/slices.ts"]
     }
   },
-  "include": ["compiler", "builtin", "compliance"],
+  "include": ["compiler", "builtin", "compliance", "gs"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"] // Exclude tests from build output
 }
