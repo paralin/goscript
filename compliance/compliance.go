@@ -363,7 +363,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	}
 
 	outputDir := filepath.Join(tempDir, "output")
-	
+
 	var tsRunner string
 	t.Run("Compile", func(t *testing.T) {
 		CompileGoToTypeScript(t, testDir, tempDir, outputDir, le) // Pass testDir to enable copying output files back to the test directory

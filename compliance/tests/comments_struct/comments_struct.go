@@ -10,7 +10,7 @@ type TestStruct struct {
 
 func main() {
 	s := TestStruct{
-		IntField: 42,
+		IntField:    42,
 		StringField: "hello",
 	}
 	println("IntField:", s.IntField)
