@@ -75,5 +75,6 @@ func compilePackage(c *cli.Context) error {
 	// build flags
 	cliCompilerConfig.BuildFlags = slices.Clone(cliCompilerBuildFlags.Value())
 
+	// Compile the packages and their dependencies
 	return cliCompiler.CompilePackages(context.Background(), pkgs...)
 }

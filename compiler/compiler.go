@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aperturerobotics/goscript/gs"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/tools/go/packages"
@@ -88,13 +89,41 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 		return err
 	}
 
-	for _, pkg := range pkgs {
+	// Process all requested packages and their dependencies
+	// Use a map to track packages we've already processed
+	processedPkgs := make(map[string]bool)
+	
+	var processPackage func(pkg *packages.Package) error
+	processPackage = func(pkg *packages.Package) error {
+		// Skip if already processed
+		if processedPkgs[pkg.ID] {
+			return nil
+		}
+		processedPkgs[pkg.ID] = true
+
+		// Process this package
 		pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkg)
 		if err != nil {
 			return err
 		}
 
 		if err := pkgCompiler.Compile(ctx); err != nil {
+			return err
+		}
+
+		// Process its dependencies
+		for _, depPkg := range pkg.Imports {
+			if err := processPackage(depPkg); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	// Process the main packages and their dependencies
+	for _, pkg := range pkgs {
+		if err := processPackage(pkg); err != nil {
 			return err
 		}
 	}
@@ -234,6 +263,13 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 
 	if err := os.MkdirAll(filepath.Dir(outputFilePathAbs), 0o755); err != nil {
 		return err
+	}
+
+	// Check if there's a handwritten override for this file
+	overrideContent, hasOverride := gs.GetOverride(pkgPath, filepath.Base(c.fullPath)+".gs.ts")
+	if hasOverride {
+		// Write the override content directly to the output file
+		return os.WriteFile(outputFilePathAbs, []byte(overrideContent), 0o644)
 	}
 
 	of, err := os.OpenFile(outputFilePathAbs, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
