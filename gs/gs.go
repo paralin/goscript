@@ -4,7 +4,6 @@ import (
 	"embed"
 )
 
-//
 var GsOverrides embed.FS
 
 func GetOverride(pkgPath, fileName string) (string, bool) {
