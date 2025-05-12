@@ -18,6 +18,7 @@ class MyStruct {
 		this._fields.MyString.value = value
 	}
 
+	//nolint:unused
 	public get myBool(): boolean {
 		return this._fields.myBool.value
 	}
