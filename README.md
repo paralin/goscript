@@ -64,40 +64,40 @@ You can also use the compiler directly within your Go code. Here's a basic examp
 package main
 
 import (
-	"context"
-	"log"
+    "context"
+    "log"
 
-	"github.com/aperturerobotics/goscript/compiler"
-	"github.com/sirupsen/logrus"
+    "github.com/aperturerobotics/goscript/compiler"
+    "github.com/sirupsen/logrus"
 )
 
 func main() {
-	// Initialize logger (optional)
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel) // Adjust log level as needed
-	le := logrus.NewEntry(logger)
+    // Initialize logger (optional)
+    logger := logrus.New()
+    logger.SetLevel(logrus.DebugLevel) // Adjust log level as needed
+    le := logrus.NewEntry(logger)
 
-	// Configure the compiler
-	conf := &compiler.Config{
-		OutputPathRoot: "./ts_output",          // Directory for generated TypeScript files
-	}
-	if err := conf.Validate(); err != nil {
-		log.Fatalf("invalid compiler config: %v", err)
-	}
+    // Configure the compiler
+    conf := &compiler.Config{
+        OutputPathRoot: "./ts_output",          // Directory for generated TypeScript files
+    }
+    if err := conf.Validate(); err != nil {
+        log.Fatalf("invalid compiler config: %v", err)
+    }
 
-	// Create a new compiler instance
-	comp, err := compiler.NewCompiler(conf, le, nil) // Pass nil for default package loading options
-	if err != nil {
-		log.Fatalf("failed to create compiler: %v", err)
-	}
+    // Create a new compiler instance
+    comp, err := compiler.NewCompiler(conf, le, nil) // Pass nil for default package loading options
+    if err != nil {
+        log.Fatalf("failed to create compiler: %v", err)
+    }
 
-	// Compile the desired Go package(s)
-	// Replace "." with the specific Go import path of the package you want to compile
-	if err := comp.CompilePackages(context.Background(), "your/go/package/path"); err != nil {
-		log.Fatalf("compilation failed: %v", err)
-	}
+    // Compile the desired Go package(s)
+    // Replace "." with the specific Go import path of the package you want to compile
+    if err := comp.CompilePackages(context.Background(), "your/go/package/path"); err != nil {
+        log.Fatalf("compilation failed: %v", err)
+    }
 
-	log.Println("Compilation successful!")
+    log.Println("Compilation successful!")
 }
 
 ```
