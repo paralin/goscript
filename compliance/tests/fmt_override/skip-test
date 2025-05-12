@@ -1,2 +1,2 @@
-This test is skipped in the compliance test runner but tested directly using run_test.sh.
+This test is skipped in the compliance test runner but tested directly using direct_test.js.
 The fmt package override is verified to work correctly in fmt_override_test.go.
