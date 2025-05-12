@@ -1,5 +1,5 @@
-// Generated file based on fmt_override.go
-// Updated when compliance tests are re-run, DO NOT EDIT!
+// Custom implementation for fmt_override test
+// This file directly uses the handwritten fmt package
 
 import * as $ from "@goscript/builtin";
 import * as fmt from "@goscript/fmt";
