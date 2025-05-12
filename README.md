@@ -226,9 +226,41 @@ func main() {
   arr := [3]int{1, 2, 3}
   println("Array elements:", arr[0], arr[1], arr[2])
 
-  // Slices and range loop
+  // Slices - Basic initialization and access
   slice := []int{4, 5, 6}
   println("Slice elements:", slice[0], slice[1], slice[2])
+  println("Slice length:", len(slice), "capacity:", cap(slice))
+  
+  sliceWithCap := make([]int, 3, 5)
+  println("\nSlice created with make([]int, 3, 5):")
+  println("Length:", len(sliceWithCap), "Capacity:", cap(sliceWithCap))
+  
+  println("\nAppend and capacity growth:")
+  growingSlice := make([]int, 0, 2)
+  println("Initial - Length:", len(growingSlice), "Capacity:", cap(growingSlice))
+  
+  for i := 1; i <= 4; i++ {
+    growingSlice = append(growingSlice, i)
+    println("After append", i, "- Length:", len(growingSlice), "Capacity:", cap(growingSlice))
+  }
+  
+  println("\nSlicing operations and shared backing arrays:")
+  original := []int{10, 20, 30, 40, 50}
+  println("Original slice - Length:", len(original), "Capacity:", cap(original))
+  
+  slice1 := original[1:3]
+  println("slice1 := original[1:3] - Values:", slice1[0], slice1[1])
+  println("slice1 - Length:", len(slice1), "Capacity:", cap(slice1))
+  
+  slice2 := original[1:3:4]
+  println("slice2 := original[1:3:4] - Values:", slice2[0], slice2[1])
+  println("slice2 - Length:", len(slice2), "Capacity:", cap(slice2))
+  
+  println("\nShared backing arrays:")
+  slice1[0] = 999
+  println("After slice1[0] = 999:")
+  println("original[1]:", original[1], "slice1[0]:", slice1[0], "slice2[0]:", slice2[0])
+  
   sum := 0
   for idx, val := range slice {
     sum += val
@@ -294,8 +326,23 @@ func main() {
     println("Goroutine: Sending message")
     ch <- "Hello from goroutine!"
   }()
+
   msg := <-ch
   println("Main goroutine: Received message:", msg)
+
+  // Select statement
+  println("\nSelect statement:")
+  selectCh := make(chan string)
+  go func() {
+    selectCh <- "Message from select goroutine!"
+  }()
+  anotherCh := make(chan string)
+  select {
+  case selectMsg := <-selectCh:
+    println("Select received:", selectMsg)
+  case anotherMsg := <-anotherCh: // Add another case
+    println("Select received from another channel:", anotherMsg)
+  }
 
   // Function Literals
   println("\nFunction Literals:")
@@ -310,7 +357,7 @@ func main() {
 Generated with `goscript compile .`:
 
 ```typescript
-import * as goscript from "@goscript/builtin"
+import * as $ from "@goscript/builtin"
 
 class MyStruct {
   // MyInt is a public integer field, initialized to zero.
@@ -373,12 +420,44 @@ export async function main(): Promise<void> {
   console.log("string(0x221A):", s3)
 
   // Arrays
-  let arr = [1, 2, 3]
-  console.log("Array elements:", arr[0], arr[1], arr[2])
+  let arr = $.arrayToSlice([1, 2, 3])
+  console.log("Array elements:", arr![0], arr![1], arr![2])
 
-  // Slices and range loop
-  let slice = [4, 5, 6]
-  console.log("Slice elements:", slice[0], slice[1], slice[2])
+  // Slices - Basic initialization and access
+  let slice = $.arrayToSlice([4, 5, 6])
+  console.log("Slice elements:", slice![0], slice![1], slice![2])
+  console.log("Slice length:", $.len(slice), "capacity:", $.cap(slice))
+
+  let sliceWithCap = $.makeSlice<number>(3, 5)
+  console.log("\nSlice created with make([]int, 3, 5):")
+  console.log("Length:", $.len(sliceWithCap), "Capacity:", $.cap(sliceWithCap))
+
+  console.log("\nAppend and capacity growth:")
+  let growingSlice = $.makeSlice<number>(0, 2)
+  console.log("Initial - Length:", $.len(growingSlice), "Capacity:", $.cap(growingSlice))
+
+  for (let i = 1; i <= 4; i++) {
+    growingSlice = $.append(growingSlice, i)
+    console.log("After append", i, "- Length:", $.len(growingSlice), "Capacity:", $.cap(growingSlice))
+  }
+
+  console.log("\nSlicing operations and shared backing arrays:")
+  let original = $.arrayToSlice([10, 20, 30, 40, 50])
+  console.log("Original slice - Length:", $.len(original), "Capacity:", $.cap(original))
+
+  let slice1 = $.goSlice(original, 1, 3)
+  console.log("slice1 := original[1:3] - Values:", slice1![0], slice1![1])
+  console.log("slice1 - Length:", $.len(slice1), "Capacity:", $.cap(slice1))
+
+  let slice2 = $.goSlice(original, 1, 3, 4)
+  console.log("slice2 := original[1:3:4] - Values:", slice2![0], slice2![1])
+  console.log("slice2 - Length:", $.len(slice2), "Capacity:", $.cap(slice2))
+
+  console.log("\nShared backing arrays:")
+  slice1![0] = 999
+  console.log("After slice1[0] = 999:")
+  console.log("original[1]:", original![1], "slice1[0]:", slice1![0], "slice2[0]:", slice2![0])
+
   let sum = 0
   for (let idx = 0; idx < slice.length; idx++) {
     const val = slice[idx]
@@ -444,13 +523,48 @@ export async function main(): Promise<void> {
 
   // Goroutines and Channels
   console.log("\nGoroutines and Channels:")
-  let ch = goscript.makeChannel<string>(0)
+  let ch = $.makeChannel<string>(0, "")
   queueMicrotask(async () => {
-    console.log("Goroutine: Sending message")
-    await ch.send("Hello from goroutine!")
+    {
+      console.log("Goroutine: Sending message")
+      await ch.send("Hello from goroutine!")
+    }
   })
+
   let msg = await ch.receive()
   console.log("Main goroutine: Received message:", msg)
+
+  // Select statement
+  console.log("\nSelect statement:")
+  let selectCh = $.makeChannel<string>(0, "")
+  queueMicrotask(async () => {
+    {
+      await selectCh.send("Message from select goroutine!")
+    }
+  })
+  let anotherCh = $.makeChannel<string>(0, "")
+
+  // Add another case
+  await $.selectStatement([
+    {
+      id: 0,
+      isSend: false,
+      channel: selectCh,
+      onSelected: async (result) => {
+        const selectMsg = result.value
+        console.log("Select received:", selectMsg)
+      }
+    },
+    {
+      id: 1,
+      isSend: false,
+      channel: anotherCh,
+      onSelected: async (result) => {
+        const anotherMsg = result.value
+        console.log("Select received from another channel:", anotherMsg)
+      }
+    },
+  ], false)
 
   // Function Literals
   console.log("\nFunction Literals:")
