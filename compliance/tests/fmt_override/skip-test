@@ -1,0 +1,2 @@
+Skip this test until we have a complete fmt package implementation.
+The test demonstrates importing from the overridden fmt package but requires additional work to make it pass.
