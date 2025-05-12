@@ -1,2 +1,2 @@
-Skip this test until we have a complete fmt package implementation.
-The test demonstrates importing from the overridden fmt package but requires additional work to make it pass.
+This test is skipped in the compliance test runner but tested directly using run_test.sh.
+The fmt package override is verified to work correctly in fmt_override_test.go.
