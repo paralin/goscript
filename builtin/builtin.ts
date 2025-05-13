@@ -698,14 +698,33 @@ export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
  * Represents the kinds of Go types that can be registered at runtime.
  */
 export enum TypeKind {
-  Struct = 'struct',
-  Interface = 'interface',
-  Basic = 'basic',
-  Pointer = 'pointer',
-  Slice = 'slice',
-  Map = 'map',
-  Channel = 'channel',
-  Function = 'function',
+    Basic = 'basic',
+    Interface = 'interface',
+    Struct = 'struct',
+    Map = 'map',
+    Slice = 'slice',
+    Array = 'array',
+    Pointer = 'pointer',
+    Function = 'function',
+    Channel = 'channel',
+}
+
+/**
+ * Type description for runtime type checking.
+ * Can be a string (type name) or a structured description.
+ */
+export interface TypeDescription {
+    kind: TypeKind;
+    name?: string;
+    keyType?: string | TypeDescription;   // For maps
+    elemType?: string | TypeDescription;  // For maps, slices, arrays
+    // For interfaces and structs
+    methods?: Set<string>;                // Available methods
+    fields?: Set<string>;                 // Field names for struct types
+    constructor?: any;                    // Constructor reference for structs
+    // For functions
+    params?: (string | TypeDescription)[];
+    results?: (string | TypeDescription)[];
 }
 
 /**
@@ -767,110 +786,283 @@ export interface TypeAssertResult<T> {
  * @param typeName The name of the target type.
  * @returns An object with the asserted value and whether the assertion succeeded.
  */
-export function typeAssert<T>(
-  value: any,
-  typeName: string,
-): TypeAssertResult<T> {
-  // Get the type information from the registry
-  const typeInfo = typeRegistry.get(typeName)
-  if (!typeInfo) {
-    console.warn(`Type information for '${typeName}' not found in registry.`)
-    return { value: null as unknown as T, ok: false }
-  }
-
-  // If value is null or undefined, assertion fails
-  if (value === null || value === undefined) {
-    return { value: typeInfo.zeroValue as T, ok: false }
-  }
-
-  // Check based on the kind of the target type
-  switch (typeInfo.kind) {
-    case TypeKind.Struct:
-      // For structs, use instanceof with the constructor
-      if (typeInfo.constructor && value instanceof typeInfo.constructor) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Interface:
-      // For interfaces, check if the value has all the required methods
-      if (typeInfo.methods && typeof value === 'object') {
-        const allMethodsPresent = Array.from(typeInfo.methods).every(
-          (method) => typeof (value as any)[method] === 'function',
-        )
-        if (allMethodsPresent) {
-          return { value: value as T, ok: true }
+/**
+ * Normalizes a type description to a structured TypeDescription object.
+ * 
+ * @param desc The type description or name.
+ * @returns A normalized TypeDescription object.
+ */
+function normalizeTypeDescription(desc: string | TypeDescription): TypeDescription {
+    if (typeof desc === 'string') {
+        const typeInfo = typeRegistry.get(desc);
+        if (typeInfo) {
+            return {
+                kind: typeInfo.kind,
+                name: typeInfo.name,
+                methods: typeInfo.methods,
+                constructor: typeInfo.constructor
+            };
         }
-      }
-      break
-
-    case TypeKind.Basic: {
-      // For basic types, check if the value matches the expected JavaScript type
-      // This is a simple check for common basic types
-      const basicType = typeof value
-      if (
-        basicType === 'string' ||
-        basicType === 'number' ||
-        basicType === 'boolean'
-      ) {
-        return { value: value as T, ok: true }
-      }
-      break
+        return { 
+            kind: TypeKind.Basic,
+            name: desc
+        };
     }
+    
+    return desc;
+}
 
-    case TypeKind.Pointer:
-      // For pointers, check if value is not null or undefined
-      // In Go, pointers can be nil which we represent as null/undefined in TS
-      if (value !== null && value !== undefined) {
-        return { value: value as T, ok: true }
-      }
-      break
+/**
+ * Checks if a value matches a type description.
+ * 
+ * @param value The value to check.
+ * @param desc The type description to match against.
+ * @returns True if the value matches the type description, false otherwise.
+ */
+function matchesType(value: any, desc: TypeDescription): boolean {
+    if (value === null || value === undefined) {
+        return false;
+    }
+    
+    switch (desc.kind) {
+        case TypeKind.Basic:
+            if (desc.name === 'string') return typeof value === 'string';
+            if (desc.name === 'number' || desc.name === 'int' || desc.name === 'float64') return typeof value === 'number';
+            if (desc.name === 'boolean' || desc.name === 'bool') return typeof value === 'boolean';
+            return false;
+            
+        case TypeKind.Struct:
+            // For structs, use instanceof with the constructor
+            if (desc.constructor && value instanceof desc.constructor) {
+                return true;
+            }
+            
+            if (desc.fields && typeof value === 'object') {
+                // For struct type assertions, we need to check that the value has exactly
+                const descFields = Array.from(desc.fields);
+                const valueFields = Object.keys(value);
+                
+                const condition1 = descFields.every(field => field in value);
+                const condition2 = valueFields.length === descFields.length;
+                const condition3 = valueFields.every(field => descFields.includes(field));
+                
+                console.log("Struct field matching debug:", {
+                    descFields,
+                    valueFields,
+                    "allDescFieldsInValue": condition1,
+                    "sameFieldCount": condition2,
+                    "allValueFieldsInDesc": condition3
+                });
+                
+                return condition1 && condition2 && condition3;
+            }
+            
+            return false;
+            
+        case TypeKind.Interface:
+            // For interfaces, check if the value has all the required methods
+            if (desc.methods && typeof value === 'object') {
+                return Array.from(desc.methods).every(
+                    (method) => typeof (value as any)[method] === 'function'
+                );
+            }
+            return false;
+            
+        case TypeKind.Map:
+            if (typeof value !== 'object' || value === null) return false;
+            
+            if (desc.keyType || desc.elemType) {
+                let entries: [any, any][] = [];
+                
+                if (value instanceof Map) {
+                    entries = Array.from(value.entries());
+                } else {
+                    entries = Object.entries(value);
+                }
+                
+                if (entries.length === 0) return true; // Empty map matches any map type
+                
+                const sampleSize = Math.min(5, entries.length);
+                for (let i = 0; i < sampleSize; i++) {
+                    const [k, v] = entries[i];
+                    
+                    if (desc.keyType) {
+                        const keyTypeDesc = normalizeTypeDescription(desc.keyType);
+                        
+                        if (keyTypeDesc.kind === TypeKind.Basic) {
+                            // For string keys
+                            if (keyTypeDesc.name === 'string') {
+                                if (typeof k !== 'string') return false;
+                            } 
+                            else if (keyTypeDesc.name === 'int' || keyTypeDesc.name === 'float64' || keyTypeDesc.name === 'number') {
+                                if (typeof k === 'string') {
+                                    if (!/^-?\d+(\.\d+)?$/.test(k)) return false;
+                                } else if (typeof k !== 'number') {
+                                    return false;
+                                }
+                            } 
+                            else {
+                                return false;
+                            }
+                        } else {
+                            return false;
+                        }
+                    }
+                    
+                    if (desc.elemType && !matchesType(v, normalizeTypeDescription(desc.elemType))) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+            
+        case TypeKind.Slice:
+        case TypeKind.Array:
+            // For slices and arrays, check if the value is an array and sample element types
+            if (!Array.isArray(value)) return false;
+            
+            if (desc.elemType) {
+                const arr = value as any[];
+                if (arr.length === 0) return true; // Empty array matches any array type
+                
+                const sampleSize = Math.min(5, arr.length);
+                for (let i = 0; i < sampleSize; i++) {
+                    if (!matchesType(arr[i], normalizeTypeDescription(desc.elemType))) {
+                        return false;
+                    }
+                }
+            }
+            
+            return true;
+            
+        case TypeKind.Pointer:
+            // For pointers, check if value is not null or undefined
+            return value !== null && value !== undefined;
+            
+        case TypeKind.Function:
+            // For functions, check if the value is a function
+            return typeof value === 'function';
+            
+        case TypeKind.Channel:
+            return (
+                typeof value === 'object' &&
+                value !== null &&
+                'send' in value &&
+                'receive' in value &&
+                'close' in value &&
+                typeof value.send === 'function' &&
+                typeof value.receive === 'function' &&
+                typeof value.close === 'function'
+            );
+            
+        default:
+            console.warn(`Type matching for kind '${desc.kind}' not implemented.`);
+            return false;
+    }
+}
 
-    case TypeKind.Slice:
-      // For slices, check if the value is an array
-      if (Array.isArray(value)) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Map:
-      // For maps, check if the value is a Map
-      if (value instanceof Map) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Channel:
-      // For channels, check if the value has the required Channel interface methods
-      if (
-        typeof value === 'object' &&
-        value !== null &&
-        'send' in value &&
-        'receive' in value &&
-        'close' in value &&
-        typeof value.send === 'function' &&
-        typeof value.receive === 'function' &&
-        typeof value.close === 'function'
-      ) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Function:
-      // For functions, check if the value is a function
-      if (typeof value === 'function') {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    default:
-      console.warn(
-        `Type assertion for kind '${typeInfo.kind}' not implemented.`,
-      )
-  }
-
-  // Assertion failed
-  return { value: typeInfo.zeroValue as T, ok: false }
+export function typeAssert<T>(
+    value: any,
+    typeDesc: string | TypeDescription,
+): TypeAssertResult<T> {
+    const normalizedType = normalizeTypeDescription(typeDesc);
+    
+    if (normalizedType.kind === TypeKind.Struct && normalizedType.fields && 
+        typeof value === 'object' && value !== null) {
+        
+        const descFields = Array.from(normalizedType.fields);
+        const valueFields = Object.keys(value);
+        
+        // For struct type assertions, we need exact field matching
+        const structMatch = 
+            descFields.length === valueFields.length && 
+            descFields.every(field => field in value) &&
+            valueFields.every(field => descFields.includes(field));
+        
+        if (structMatch) {
+            return { value: value as T, ok: true };
+        } else {
+            return { value: null as unknown as T, ok: false };
+        }
+    }
+    
+    if (normalizedType.kind === TypeKind.Map && 
+        typeof value === 'object' && value !== null) {
+        
+        if (normalizedType.keyType || normalizedType.elemType) {
+            let entries: [any, any][] = [];
+            
+            if (value instanceof Map) {
+                entries = Array.from(value.entries());
+            } else {
+                entries = Object.entries(value);
+            }
+            
+            if (entries.length === 0) {
+                return { value: value as T, ok: true };
+            }
+            
+            const sampleSize = Math.min(5, entries.length);
+            for (let i = 0; i < sampleSize; i++) {
+                const [k, v] = entries[i];
+                
+                if (normalizedType.keyType) {
+                    const keyTypeDesc = normalizeTypeDescription(normalizedType.keyType);
+                    
+                    if (keyTypeDesc.kind === TypeKind.Basic) {
+                        // For string keys
+                        if (keyTypeDesc.name === 'string') {
+                            if (typeof k !== 'string') {
+                                return { value: null as unknown as T, ok: false };
+                            }
+                        } 
+                        else if (keyTypeDesc.name === 'int' || keyTypeDesc.name === 'float64' || keyTypeDesc.name === 'number') {
+                            if (typeof k === 'string') {
+                                if (!/^-?\d+(\.\d+)?$/.test(k)) {
+                                    return { value: null as unknown as T, ok: false };
+                                }
+                            } else if (typeof k !== 'number') {
+                                return { value: null as unknown as T, ok: false };
+                            }
+                        } 
+                        else {
+                            return { value: null as unknown as T, ok: false };
+                        }
+                    } else {
+                        return { value: null as unknown as T, ok: false };
+                    }
+                }
+                
+                if (normalizedType.elemType) {
+                    const elemTypeDesc = normalizeTypeDescription(normalizedType.elemType);
+                    if (!matchesType(v, elemTypeDesc)) {
+                        return { value: null as unknown as T, ok: false };
+                    }
+                }
+            }
+            
+            // If we get here, the map type assertion passes
+            return { value: value as T, ok: true };
+        }
+    }
+    
+    const matches = matchesType(value, normalizedType);
+    
+    if (matches) {
+        return { value: value as T, ok: true };
+    }
+    
+    // If we get here, the assertion failed
+    // For registered types, use the zero value from the registry
+    if (typeof typeDesc === 'string') {
+        const typeInfo = typeRegistry.get(typeDesc);
+        if (typeInfo) {
+            return { value: typeInfo.zeroValue as T, ok: false };
+        }
+    }
+    
+    return { value: null as unknown as T, ok: false };
 }
 
 /**
