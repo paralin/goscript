@@ -302,6 +302,21 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 		c.WriteInterfaceType(t, nil) // No ast.InterfaceType available here
 	case *types.Signature:
 		c.WriteSignatureType(t)
+	case *types.Struct:
+		// Generate an interface with the struct's fields
+		c.tsw.WriteLiterally("{ ")
+		// Add field properties to the interface
+		if t.NumFields() > 0 {
+			for i := 0; i < t.NumFields(); i++ {
+				field := t.Field(i)
+				if i > 0 {
+					c.tsw.WriteLiterally("; ")
+				}
+				c.tsw.WriteLiterally(field.Name() + "?: ")
+				c.WriteGoType(field.Type())
+			}
+		}
+		c.tsw.WriteLiterally(" }")
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
@@ -4478,8 +4493,6 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		return nil
 	}
 
-
-
 	// writeMapLookupWithExists handles the map comma-ok idiom: value, exists := myMap[key]
 	// Note: We don't use WriteIndexExpr here because we need to handle .has() and .get() separately
 	writeMapLookupWithExists := func(lhs []ast.Expr, indexExpr *ast.IndexExpr, tok token.Token) error {
@@ -5378,6 +5391,9 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 			c.tsw.WriteLiterally("])")
 		}
 
+		// Add empty methods set to satisfy StructTypeInfo interface
+		c.tsw.WriteLiterally(", methods: new Set()")
+
 		c.tsw.WriteLiterally("}")
 	case *ast.InterfaceType:
 		c.tsw.WriteLiterally("{")
@@ -5482,17 +5498,25 @@ func isPrimitiveType(name string) bool {
 	return ok
 }
 
-// Helper function to write a type description for a type expression
+// Helper function to write a type info for a type expression
 func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 	switch t := typeExpr.(type) {
 	case *ast.Ident:
 		if isPrimitiveType(t.Name) {
 			if tsType, ok := GoBuiltinToTypescript(t.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+				c.tsw.WriteLiterally("{")
+				c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
+				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", tsType))
+				c.tsw.WriteLiterally("}")
 			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", t.Name))
+				// Fallback for other primitive types
+				c.tsw.WriteLiterally("{")
+				c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
+				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", t.Name))
+				c.tsw.WriteLiterally("}")
 			}
 		} else {
+			// For named types, just use the name string
 			c.tsw.WriteLiterally(fmt.Sprintf("'%s'", t.Name))
 		}
 	case *ast.SelectorExpr:
@@ -5510,6 +5534,49 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		c.tsw.WriteLiterally("elemType: ")
 		c.writeTypeDescription(t.Elt)
 		c.tsw.WriteLiterally("}")
+	case *ast.StructType:
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Struct, ")
+
+		// Add field names and types to the struct type info
+		if t.Fields != nil && t.Fields.List != nil {
+			c.tsw.WriteLiterally("fields: new Set([")
+
+			fields := []string{}
+			for _, field := range t.Fields.List {
+				for _, name := range field.Names {
+					fields = append(fields, fmt.Sprintf("'%s'", name.Name))
+				}
+			}
+
+			c.tsw.WriteLiterally(strings.Join(fields, ", "))
+			c.tsw.WriteLiterally("]), ")
+
+			// Add fieldTypes property to provide type information
+			c.tsw.WriteLiterally("fieldTypes: {")
+
+			hasFields := false
+			for _, field := range t.Fields.List {
+				if len(field.Names) > 0 {
+					for _, name := range field.Names {
+						if hasFields {
+							c.tsw.WriteLiterally(", ")
+						}
+						c.tsw.WriteLiterally(fmt.Sprintf("'%s': ", name.Name))
+						c.writeTypeDescription(field.Type)
+						hasFields = true
+					}
+				}
+			}
+
+			c.tsw.WriteLiterally("}, ")
+		} else {
+			c.tsw.WriteLiterally("fields: new Set(), ")
+		}
+
+		c.tsw.WriteLiterally("methods: new Set()")
+
+		c.tsw.WriteLiterally("}")
 	case *ast.MapType:
 		c.tsw.WriteLiterally("{")
 		c.tsw.WriteLiterally("kind: $.TypeKind.Map, ")
@@ -5526,6 +5593,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		c.writeTypeDescription(t.X)
 		c.tsw.WriteLiterally("}")
 	default:
+		// For other types, use the string representation
 		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", c.getTypeNameString(typeExpr)))
 	}
 }

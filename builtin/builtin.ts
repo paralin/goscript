@@ -710,154 +710,181 @@ export enum TypeKind {
 }
 
 /**
- * Type description for runtime type checking.
- * Can be a string (type name) or a structured description.
+ * TypeInfo is used for runtime type checking.
+ * Can be a registered type (from typeRegistry) or an ad-hoc type description.
+ * When used as input to typeAssert, it can be a string (type name) or a structured description.
  */
-export interface TypeDescription {
-  kind: TypeKind
-  name?: string
-  keyType?: string | TypeDescription // For maps
-  elemType?: string | TypeDescription // For maps, slices, arrays
-  // For interfaces and structs
-  methods?: Set<string> // Available methods
-  fields?: Set<string> // Field names for struct types
-  constructor?: any // Constructor reference for structs
-  // For functions
-  params?: (string | TypeDescription)[]
-  results?: (string | TypeDescription)[]
-}
 
 /**
  * Base type information shared by all type kinds
  */
 export interface BaseTypeInfo {
-  name: string;
-  kind: TypeKind;
-  zeroValue: any;
+  name?: string
+  kind: TypeKind
+  zeroValue?: any
 }
 
 /**
  * Type information for struct types
  */
 export interface StructTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Struct;
-  methods: Set<string>;
-  constructor: new (...args: any[]) => any;
+  kind: TypeKind.Struct
+  methods: Set<string>
+  ctor?: new (...args: any[]) => any
+  fields?: Set<string> // Field names for struct types
+  fieldTypes?: Record<string, TypeInfo | string> // Types for struct fields
 }
 
 /**
  * Type information for interface types
  */
 export interface InterfaceTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Interface;
-  methods: Set<string>;
+  kind: TypeKind.Interface
+  methods: Set<string>
 }
 
 /**
  * Type information for basic types (string, number, boolean)
  */
 export interface BasicTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Basic;
+  kind: TypeKind.Basic
 }
 
 /**
  * Type information for map types
  */
 export interface MapTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Map;
-  keyType?: TypeInfo;
-  elemType?: TypeInfo;
+  kind: TypeKind.Map
+  keyType?: string | TypeInfo
+  elemType?: string | TypeInfo
 }
 
 /**
  * Type information for slice types
  */
 export interface SliceTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Slice;
-  elemType?: TypeInfo;
+  kind: TypeKind.Slice
+  elemType?: string | TypeInfo
 }
 
 /**
  * Type information for array types
  */
 export interface ArrayTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Array;
-  elemType?: TypeInfo;
-  length: number;
+  kind: TypeKind.Array
+  elemType?: string | TypeInfo
+  length: number
 }
 
 /**
  * Type information for pointer types
  */
 export interface PointerTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Pointer;
-  elemType?: TypeInfo;
+  kind: TypeKind.Pointer
+  elemType?: string | TypeInfo
 }
 
 /**
  * Type information for function types
  */
 export interface FunctionTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Function;
-  params?: TypeInfo[];
-  results?: TypeInfo[];
+  kind: TypeKind.Function
+  params?: (string | TypeInfo)[]
+  results?: (string | TypeInfo)[]
 }
 
 /**
  * Type information for channel types
  */
 export interface ChannelTypeInfo extends BaseTypeInfo {
-  kind: TypeKind.Channel;
-  elemType?: TypeInfo;
-  direction?: 'send' | 'receive' | 'both';
+  kind: TypeKind.Channel
+  elemType?: string | TypeInfo
+  direction?: 'send' | 'receive' | 'both'
 }
 
 /**
  * Union type representing all possible TypeInfo variants
  */
-export type TypeInfo = 
-  | StructTypeInfo 
-  | InterfaceTypeInfo 
+export type TypeInfo =
+  | StructTypeInfo
+  | InterfaceTypeInfo
   | BasicTypeInfo
   | MapTypeInfo
   | SliceTypeInfo
   | ArrayTypeInfo
   | PointerTypeInfo
   | FunctionTypeInfo
-  | ChannelTypeInfo;
+  | ChannelTypeInfo
+
+// Type guard functions for TypeInfo variants
+export function isStructTypeInfo(info: TypeInfo): info is StructTypeInfo {
+  return info.kind === TypeKind.Struct
+}
+
+export function isInterfaceTypeInfo(info: TypeInfo): info is InterfaceTypeInfo {
+  return info.kind === TypeKind.Interface
+}
+
+export function isBasicTypeInfo(info: TypeInfo): info is BasicTypeInfo {
+  return info.kind === TypeKind.Basic
+}
+
+export function isMapTypeInfo(info: TypeInfo): info is MapTypeInfo {
+  return info.kind === TypeKind.Map
+}
+
+export function isSliceTypeInfo(info: TypeInfo): info is SliceTypeInfo {
+  return info.kind === TypeKind.Slice
+}
+
+export function isArrayTypeInfo(info: TypeInfo): info is ArrayTypeInfo {
+  return info.kind === TypeKind.Array
+}
+
+export function isPointerTypeInfo(info: TypeInfo): info is PointerTypeInfo {
+  return info.kind === TypeKind.Pointer
+}
+
+export function isFunctionTypeInfo(info: TypeInfo): info is FunctionTypeInfo {
+  return info.kind === TypeKind.Function
+}
+
+export function isChannelTypeInfo(info: TypeInfo): info is ChannelTypeInfo {
+  return info.kind === TypeKind.Channel
+}
 
 // Registry to store runtime type information
 const typeRegistry = new Map<string, TypeInfo>()
 
 /**
  * Registers a struct type with the runtime type system.
- * 
+ *
  * @param name The name of the type.
  * @param zeroValue The zero value for the type.
  * @param methods Set of method names for the struct.
- * @param constructor Constructor for the struct.
+ * @param ctor Constructor for the struct.
  * @returns The struct type information object.
  */
 export const registerStructType = (
   name: string,
   zeroValue: any,
   methods: Set<string>,
-  constructor: new (...args: any[]) => any,
+  ctor: new (...args: any[]) => any,
 ): StructTypeInfo => {
   const typeInfo: StructTypeInfo = {
     name,
     kind: TypeKind.Struct,
     zeroValue,
     methods,
-    constructor,
-  };
-  typeRegistry.set(name, typeInfo);
-  return typeInfo;
-};
+    ctor: ctor,
+  }
+  typeRegistry.set(name, typeInfo)
+  return typeInfo
+}
 
 /**
  * Registers an interface type with the runtime type system.
- * 
+ *
  * @param name The name of the type.
  * @param zeroValue The zero value for the type (usually null).
  * @param methods Set of method names the interface requires.
@@ -873,10 +900,10 @@ export const registerInterfaceType = (
     kind: TypeKind.Interface,
     zeroValue,
     methods,
-  };
-  typeRegistry.set(name, typeInfo);
-  return typeInfo;
-};
+  }
+  typeRegistry.set(name, typeInfo)
+  return typeInfo
+}
 
 /**
  * Represents the result of a type assertion.
@@ -887,77 +914,42 @@ export interface TypeAssertResult<T> {
 }
 
 /**
- * Normalizes a type description to a structured TypeDescription object.
+ * Normalizes a type info to a structured TypeInfo object.
  *
- * @param desc The type description or name.
- * @returns A normalized TypeDescription object.
+ * @param info The type info or name.
+ * @returns A normalized TypeInfo object.
  */
-function normalizeTypeDescription(
-  desc: string | TypeDescription,
-): TypeDescription {
-  if (typeof desc === 'string') {
-    const typeInfo = typeRegistry.get(desc)
+function normalizeTypeInfo(info: string | TypeInfo): TypeInfo {
+  if (typeof info === 'string') {
+    const typeInfo = typeRegistry.get(info)
     if (typeInfo) {
-      // Create a basic TypeDescription with common properties
-      const normalized: TypeDescription = {
-        kind: typeInfo.kind,
-        name: typeInfo.name,
-      }
-      
-      // Add kind-specific properties
-      switch (typeInfo.kind) {
-        case TypeKind.Struct:
-          normalized.methods = (typeInfo as StructTypeInfo).methods
-          normalized.constructor = (typeInfo as StructTypeInfo).constructor
-          break
-        case TypeKind.Interface:
-          normalized.methods = (typeInfo as InterfaceTypeInfo).methods
-          break
-        case TypeKind.Map:
-          normalized.keyType = (typeInfo as MapTypeInfo).keyType
-          normalized.elemType = (typeInfo as MapTypeInfo).elemType
-          break
-        case TypeKind.Slice:
-        case TypeKind.Array:
-        case TypeKind.Pointer:
-          normalized.elemType = (typeInfo as SliceTypeInfo | ArrayTypeInfo | PointerTypeInfo).elemType
-          break
-        case TypeKind.Function:
-          normalized.params = (typeInfo as FunctionTypeInfo).params
-          normalized.results = (typeInfo as FunctionTypeInfo).results
-          break
-        case TypeKind.Channel:
-          normalized.elemType = (typeInfo as ChannelTypeInfo).elemType
-          break
-      }
-      
-      return normalized
+      return typeInfo
     }
     return {
       kind: TypeKind.Basic,
-      name: desc,
+      name: info,
     }
   }
 
-  return desc
+  return info
 }
 
 /**
- * Validates that a map key matches the expected type description.
+ * Validates that a map key matches the expected type info.
  *
  * @param key The key to validate
- * @param keyTypeDesc The normalized type description for the key
- * @returns True if the key matches the type description, false otherwise
+ * @param keyTypeInfo The normalized type info for the key
+ * @returns True if the key matches the type info, false otherwise
  */
-function validateMapKey(key: any, keyTypeDesc: TypeDescription): boolean {
-  if (keyTypeDesc.kind === TypeKind.Basic) {
+function validateMapKey(key: any, keyTypeInfo: TypeInfo): boolean {
+  if (keyTypeInfo.kind === TypeKind.Basic) {
     // For string keys
-    if (keyTypeDesc.name === 'string') {
+    if (keyTypeInfo.name === 'string') {
       return typeof key === 'string'
     } else if (
-      keyTypeDesc.name === 'int' ||
-      keyTypeDesc.name === 'float64' ||
-      keyTypeDesc.name === 'number'
+      keyTypeInfo.name === 'int' ||
+      keyTypeInfo.name === 'float64' ||
+      keyTypeInfo.name === 'number'
     ) {
       if (typeof key === 'string') {
         return /^-?\d+(\.\d+)?$/.test(key)
@@ -970,37 +962,39 @@ function validateMapKey(key: any, keyTypeDesc: TypeDescription): boolean {
 }
 
 /**
- * Checks if a value matches a basic type description.
+ * Checks if a value matches a basic type info.
  *
  * @param value The value to check.
- * @param desc The basic type description to match against.
+ * @param info The basic type info to match against.
  * @returns True if the value matches the basic type, false otherwise.
  */
-function matchesBasicType(value: any, desc: TypeDescription): boolean {
-  if (desc.name === 'string') return typeof value === 'string'
-  if (desc.name === 'number' || desc.name === 'int' || desc.name === 'float64')
+function matchesBasicType(value: any, info: TypeInfo): boolean {
+  if (info.name === 'string') return typeof value === 'string'
+  if (info.name === 'number' || info.name === 'int' || info.name === 'float64')
     return typeof value === 'number'
-  if (desc.name === 'boolean' || desc.name === 'bool')
+  if (info.name === 'boolean' || info.name === 'bool')
     return typeof value === 'boolean'
   return false
 }
 
 /**
- * Checks if a value matches a struct type description.
+ * Checks if a value matches a struct type info.
  *
  * @param value The value to check.
- * @param desc The struct type description to match against.
+ * @param info The struct type info to match against.
  * @returns True if the value matches the struct type, false otherwise.
  */
-function matchesStructType(value: any, desc: TypeDescription): boolean {
+function matchesStructType(value: any, info: TypeInfo): boolean {
+  if (!isStructTypeInfo(info)) return false
+
   // For structs, use instanceof with the constructor
-  if (desc.constructor && value instanceof desc.constructor) {
+  if (info.ctor && value instanceof info.ctor) {
     return true
   }
 
-  if (desc.fields && typeof value === 'object') {
+  if (info.fields && typeof value === 'object') {
     // For struct type assertions, we need to check that the value has exactly
-    const descFields = Array.from(desc.fields)
+    const descFields = Array.from(info.fields as Set<string>)
     const valueFields = Object.keys(value)
 
     const condition1 = descFields.every((field) => field in value)
@@ -1022,16 +1016,21 @@ function matchesStructType(value: any, desc: TypeDescription): boolean {
 }
 
 /**
- * Checks if a value matches an interface type description.
+ * Checks if a value matches an interface type info.
  *
  * @param value The value to check.
- * @param desc The interface type description to match against.
+ * @param info The interface type info to match against.
  * @returns True if the value matches the interface type, false otherwise.
  */
-function matchesInterfaceType(value: any, desc: TypeDescription): boolean {
+function matchesInterfaceType(value: any, info: TypeInfo): boolean {
   // For interfaces, check if the value has all the required methods
-  if (desc.methods && typeof value === 'object') {
-    return Array.from(desc.methods).every(
+  if (
+    isInterfaceTypeInfo(info) &&
+    info.methods &&
+    typeof value === 'object' &&
+    value !== null
+  ) {
+    return Array.from(info.methods).every(
       (method) => typeof (value as any)[method] === 'function',
     )
   }
@@ -1039,16 +1038,17 @@ function matchesInterfaceType(value: any, desc: TypeDescription): boolean {
 }
 
 /**
- * Checks if a value matches a map type description.
+ * Checks if a value matches a map type info.
  *
  * @param value The value to check.
- * @param desc The map type description to match against.
+ * @param info The map type info to match against.
  * @returns True if the value matches the map type, false otherwise.
  */
-function matchesMapType(value: any, desc: TypeDescription): boolean {
+function matchesMapType(value: any, info: TypeInfo): boolean {
   if (typeof value !== 'object' || value === null) return false
+  if (!isMapTypeInfo(info)) return false
 
-  if (desc.keyType || desc.elemType) {
+  if (info.keyType || info.elemType) {
     let entries: [any, any][] = []
 
     if (value instanceof Map) {
@@ -1063,15 +1063,20 @@ function matchesMapType(value: any, desc: TypeDescription): boolean {
     for (let i = 0; i < sampleSize; i++) {
       const [k, v] = entries[i]
 
-      if (desc.keyType) {
-        if (!validateMapKey(k, normalizeTypeDescription(desc.keyType))) {
+      if (info.keyType) {
+        if (
+          !validateMapKey(
+            k,
+            normalizeTypeInfo(info.keyType as string | TypeInfo),
+          )
+        ) {
           return false
         }
       }
 
       if (
-        desc.elemType &&
-        !matchesType(v, normalizeTypeDescription(desc.elemType))
+        info.elemType &&
+        !matchesType(v, normalizeTypeInfo(info.elemType as string | TypeInfo))
       ) {
         return false
       }
@@ -1082,23 +1087,29 @@ function matchesMapType(value: any, desc: TypeDescription): boolean {
 }
 
 /**
- * Checks if a value matches an array or slice type description.
+ * Checks if a value matches an array or slice type info.
  *
  * @param value The value to check.
- * @param desc The array or slice type description to match against.
+ * @param info The array or slice type info to match against.
  * @returns True if the value matches the array or slice type, false otherwise.
  */
-function matchesArrayOrSliceType(value: any, desc: TypeDescription): boolean {
+function matchesArrayOrSliceType(value: any, info: TypeInfo): boolean {
   // For slices and arrays, check if the value is an array and sample element types
   if (!Array.isArray(value)) return false
+  if (!isArrayTypeInfo(info) && !isSliceTypeInfo(info)) return false
 
-  if (desc.elemType) {
+  if (info.elemType) {
     const arr = value as any[]
     if (arr.length === 0) return true // Empty array matches any array type
 
     const sampleSize = Math.min(5, arr.length)
     for (let i = 0; i < sampleSize; i++) {
-      if (!matchesType(arr[i], normalizeTypeDescription(desc.elemType))) {
+      if (
+        !matchesType(
+          arr[i],
+          normalizeTypeInfo(info.elemType as string | TypeInfo),
+        )
+      ) {
         return false
       }
     }
@@ -1108,13 +1119,13 @@ function matchesArrayOrSliceType(value: any, desc: TypeDescription): boolean {
 }
 
 /**
- * Checks if a value matches a pointer type description.
+ * Checks if a value matches a pointer type info.
  *
  * @param value The value to check.
- * @param desc The pointer type description to match against.
+ * @param info The pointer type info to match against.
  * @returns True if the value matches the pointer type, false otherwise.
  */
-function matchesPointerType(value: any, desc: TypeDescription): boolean {
+function matchesPointerType(value: any, info: TypeInfo): boolean {
   // For pointers, check if value is a Box (has a 'value' property)
   if (value === null || value === undefined) {
     return false
@@ -1125,34 +1136,36 @@ function matchesPointerType(value: any, desc: TypeDescription): boolean {
     return false
   }
 
-  if (desc.elemType) {
-    const elemTypeDesc = normalizeTypeDescription(desc.elemType)
-    return matchesType(value.value, elemTypeDesc)
+  if (!isPointerTypeInfo(info)) return false
+
+  if (info.elemType) {
+    const elemTypeInfo = normalizeTypeInfo(info.elemType as string | TypeInfo)
+    return matchesType(value.value, elemTypeInfo)
   }
 
   return true
 }
 
 /**
- * Checks if a value matches a function type description.
+ * Checks if a value matches a function type info.
  *
  * @param value The value to check.
- * @param desc The function type description to match against.
+ * @param info The function type info to match against.
  * @returns True if the value matches the function type, false otherwise.
  */
-function matchesFunctionType(value: any): boolean {
+function matchesFunctionType(value: any, info: TypeInfo): boolean {
   // For functions, check if the value is a function
   return typeof value === 'function'
 }
 
 /**
- * Checks if a value matches a channel type description.
+ * Checks if a value matches a channel type info.
  *
  * @param value The value to check.
- * @param desc The channel type description to match against.
+ * @param info The channel type info to match against.
  * @returns True if the value matches the channel type, false otherwise.
  */
-function matchesChannelType(value: any): boolean {
+function matchesChannelType(value: any, info: TypeInfo): boolean {
   return (
     typeof value === 'object' &&
     value !== null &&
@@ -1166,68 +1179,70 @@ function matchesChannelType(value: any): boolean {
 }
 
 /**
- * Checks if a value matches a type description.
+ * Checks if a value matches a type info.
  *
  * @param value The value to check.
- * @param desc The type description to match against.
- * @returns True if the value matches the type description, false otherwise.
+ * @param info The type info to match against.
+ * @returns True if the value matches the type info, false otherwise.
  */
-function matchesType(value: any, desc: TypeDescription): boolean {
+function matchesType(value: any, info: TypeInfo): boolean {
   if (value === null || value === undefined) {
     return false
   }
 
-  switch (desc.kind) {
+  switch (info.kind) {
     case TypeKind.Basic:
-      return matchesBasicType(value, desc)
+      return matchesBasicType(value, info)
 
     case TypeKind.Struct:
-      return matchesStructType(value, desc)
+      return matchesStructType(value, info)
 
     case TypeKind.Interface:
-      return matchesInterfaceType(value, desc)
+      return matchesInterfaceType(value, info)
 
     case TypeKind.Map:
-      return matchesMapType(value, desc)
+      return matchesMapType(value, info)
 
     case TypeKind.Slice:
     case TypeKind.Array:
-      return matchesArrayOrSliceType(value, desc)
+      return matchesArrayOrSliceType(value, info)
 
     case TypeKind.Pointer:
-      return matchesPointerType(value, desc)
+      return matchesPointerType(value, info)
 
     case TypeKind.Function:
-      return matchesFunctionType(value)
+      return matchesFunctionType(value, info)
 
     case TypeKind.Channel:
-      return matchesChannelType(value)
+      return matchesChannelType(value, info)
 
     default:
-      console.warn(`Type matching for kind '${desc.kind}' not implemented.`)
+      console.warn(
+        `Type matching for kind '${(info as TypeInfo).kind}' not implemented.`,
+      )
       return false
   }
 }
 
 export function typeAssert<T>(
   value: any,
-  typeDesc: string | TypeDescription,
+  typeInfo: string | TypeInfo,
 ): TypeAssertResult<T> {
-  const normalizedType = normalizeTypeDescription(typeDesc)
+  const normalizedType = normalizeTypeInfo(typeInfo)
 
   if (
-    normalizedType.kind === TypeKind.Struct &&
+    isStructTypeInfo(normalizedType) &&
     normalizedType.fields &&
     typeof value === 'object' &&
     value !== null
   ) {
-    const descFields = Array.from(normalizedType.fields)
+    const descFields = Array.from(normalizedType.fields as Set<string>)
     const valueFields = Object.keys(value)
 
     // For struct type assertions, we need exact field matching
     const structMatch =
       descFields.length === valueFields.length &&
-      descFields.every((field) => field in value) &&
+      descFields.every((field: string) => field in value) &&
       valueFields.every((field) => descFields.includes(field))
 
     if (structMatch) {
@@ -1238,7 +1253,7 @@ export function typeAssert<T>(
   }
 
   if (
-    normalizedType.kind === TypeKind.Map &&
+    isMapTypeInfo(normalizedType) &&
     typeof value === 'object' &&
     value !== null
   ) {
@@ -1261,15 +1276,20 @@ export function typeAssert<T>(
 
         if (normalizedType.keyType) {
           if (
-            !validateMapKey(k, normalizeTypeDescription(normalizedType.keyType))
+            !validateMapKey(
+              k,
+              normalizeTypeInfo(normalizedType.keyType as string | TypeInfo),
+            )
           ) {
             return { value: null as unknown as T, ok: false }
           }
         }
 
         if (normalizedType.elemType) {
-          const elemTypeDesc = normalizeTypeDescription(normalizedType.elemType)
-          if (!matchesType(v, elemTypeDesc)) {
+          const elemTypeInfo = normalizeTypeInfo(
+            normalizedType.elemType as string | TypeInfo,
+          )
+          if (!matchesType(v, elemTypeInfo)) {
             return { value: null as unknown as T, ok: false }
           }
         }
@@ -1288,11 +1308,13 @@ export function typeAssert<T>(
 
   // If we get here, the assertion failed
   // For registered types, use the zero value from the registry
-  if (typeof typeDesc === 'string') {
-    const typeInfo = typeRegistry.get(typeDesc)
-    if (typeInfo) {
-      return { value: typeInfo.zeroValue as T, ok: false }
+  if (typeof typeInfo === 'string') {
+    const registeredType = typeRegistry.get(typeInfo)
+    if (registeredType && registeredType.zeroValue !== undefined) {
+      return { value: registeredType.zeroValue as T, ok: false }
     }
+  } else if (normalizedType.zeroValue !== undefined) {
+    return { value: normalizedType.zeroValue as T, ok: false }
   }
 
   return { value: null as unknown as T, ok: false }
