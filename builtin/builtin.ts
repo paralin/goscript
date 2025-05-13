@@ -933,6 +933,15 @@ function matchesInterfaceType(value: any, desc: TypeDescription): boolean {
         if (typeof method !== 'function') {
           return false
         }
+        
+        // Check if the method signature matches
+        // For interfaces, we need to verify that the method has the correct signature
+        if (methodSignature.kind === TypeKind.Function) {
+          if (methodSignature.params && method.length < methodSignature.params.length) {
+            return false
+          }
+          
+        }
       }
     }
     

@@ -42,5 +42,5 @@ The enhanced type system will:
 2. Detect type compatibility issues at runtime
 3. Improve debugging by providing more detailed error messages
 
-## Migration
-This change is backward compatible as it enhances existing functionality without breaking existing code.
+## Breaking Changes
+This change prioritizes type safety over backward compatibility, as the GoScript project is still in alpha/experimental stage. Existing code that relies on loose type checking during type assertions may need to be updated.
