@@ -9,21 +9,21 @@ export function main(): void {
 
 	let _typeAssertResult_0 = $.typeAssert<Map<string, number>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'number'})
 	let m = _typeAssertResult_0.value
-let ok = _typeAssertResult_0.ok
-if (ok) {
+let ok_0 = _typeAssertResult_0.ok
+if (ok_0) {
 		console.log("Age:", $.mapGet(m, "age", 0))
 	} else {
 		console.log("Type assertion failed")
 	}
 
 	let _typeAssertResult_1 = $.typeAssert<Map<string, string>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'string'})
-	let ok2 = _typeAssertResult_1.ok
+	let ok2_1 = _typeAssertResult_1.ok
 
 	// This block should not be reached if the assertion fails as expected.
 	// Depending on how Go handles failed assertions with incorrect types,
 	// accessing n["key"] might panic if n is nil.
 	// For safety and clarity, we'll just print a generic message if it passes unexpectedly.
-	if (ok2) {
+	if (ok2_1) {
 		// This block should not be reached if the assertion fails as expected.
 		// Depending on how Go handles failed assertions with incorrect types,
 		// accessing n["key"] might panic if n is nil.
@@ -34,10 +34,10 @@ if (ok) {
 	}
 
 	let _typeAssertResult_2 = $.typeAssert<Map<number, number>>(i, {kind: $.TypeKind.Map, keyType: 'number', elemType: 'number'})
-	let ok3 = _typeAssertResult_2.ok
+	let ok3_2 = _typeAssertResult_2.ok
 
 	// Similar to the above, this block should not be reached.
-	if (ok3) {
+	if (ok3_2) {
 		// Similar to the above, this block should not be reached.
 		console.log("Unexpected success for map[int]int assertion")
 	} else {

@@ -273,6 +273,9 @@ type GoToTSCompiler struct {
 	pkgCompiler *PackageCompiler // Reference to the package compiler for accessing compiler-specific fields
 
 	analysis *Analysis // Holds analysis information for code generation decisions
+	
+	// Map of original variable names to their unique names (for type assertions)
+	varNameMap map[string]string
 }
 
 // WriteGoType is the main dispatcher for translating Go types to their TypeScript
@@ -607,6 +610,7 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, pkgCompiler *Pa
 		pkg:        pkg,
 		pkgCompiler: pkgCompiler,
 		analysis:   analysis,
+		varNameMap: make(map[string]string),
 	}
 }
 
@@ -896,8 +900,14 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
 		obj = c.pkg.TypesInfo.Defs[exp]
 	}
 
-	// Write the identifier name first
-	c.tsw.WriteLiterally(exp.Name)
+	// Check if this identifier has a mapping (for type assertions)
+	if mappedName, ok := c.varNameMap[exp.Name]; ok {
+		// Use the mapped name instead of the original
+		c.tsw.WriteLiterally(mappedName)
+	} else {
+		// Write the original identifier name
+		c.tsw.WriteLiterally(exp.Name)
+	}
 
 	// Determine if we need to access .value based on analysis data
 	if obj != nil && accessBoxedValue && c.analysis.NeedsBoxedAccess(obj) {
@@ -1444,14 +1454,21 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					if _, isType := obj.(*types.TypeName); isType {
 						// Make sure we have exactly one argument
 						if len(exp.Args) == 1 {
+							// Create a temporary variable to hold the function with the __functionType property
+							c.tsw.WriteLiterally("((() => { ")
+							c.tsw.WriteLiterally("const _tmp = ")
+							
 							// Write the argument first
-							c.tsw.WriteLiterally("(")
 							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
 								return fmt.Errorf("failed to write argument for function type cast: %w", err)
 							}
 							
-							// Then use the TypeScript "as" operator with the type name
-							c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
+							// Add the __functionType property to track the function type using type assertion
+							c.tsw.WriteLiterallyf("; ((_tmp as any).__functionType = '%s'); ", funIdent.String())
+							
+							// Return the function with the __functionType property
+							c.tsw.WriteLiterallyf("return _tmp as %s; })())", funIdent.String())
+							
 							return nil // Handled function type cast
 						}
 					}
@@ -5332,6 +5349,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	okIsBlank := false
 	var valueName string
 	var okName string
+	var uniqueOkName string
 
 	if valIdent, ok := lhs[0].(*ast.Ident); ok {
 		if valIdent.Name == "_" {
@@ -5357,6 +5375,21 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	tempVarName := fmt.Sprintf("_typeAssertResult_%d", c.pkgCompiler.TypeAssertCounter)
 	c.pkgCompiler.TypeAssertCounter++
 
+	// For non-define tokens, we need to declare the variables first
+	if tok != token.DEFINE {
+		c.tsw.WriteLiterallyf("let %s\n", tempVarName)
+		
+		// Also declare the ok variable if it's not blank
+		if !okIsBlank {
+			// Generate a unique name for the ok variable
+			if uniqueOkName == "" {
+				uniqueOkName = fmt.Sprintf("%s_%d", okName, c.pkgCompiler.TypeAssertCounter-1)
+				c.varNameMap[okName] = uniqueOkName
+			}
+			c.tsw.WriteLiterallyf("let %s\n", uniqueOkName)
+		}
+	}
+
 	if tok == token.DEFINE {
 		c.tsw.WriteLiterallyf("let %s = ", tempVarName)
 	} else {
@@ -5366,24 +5399,32 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 	// Define variables for the extracted properties if needed
 	extractStatements := []string{}
+	
+	// Generate a unique name for the ok variable to avoid redeclaration issues
+	if !okIsBlank {
+		uniqueOkName = fmt.Sprintf("%s_%d", okName, c.pkgCompiler.TypeAssertCounter-1)
+		c.varNameMap[okName] = uniqueOkName
+	}
+	
 	if tok == token.DEFINE {
 		if !valueIsBlank {
 			extractStatements = append(extractStatements, fmt.Sprintf("let %s = %s.value", valueName, tempVarName))
 		}
 		if !okIsBlank {
-			// Use a unique name for the ok variable to avoid redeclaration issues
-			uniqueOkName := fmt.Sprintf("%s_%d", okName, c.pkgCompiler.TypeAssertCounter-1)
 			extractStatements = append(extractStatements, fmt.Sprintf("let %s = %s.ok", uniqueOkName, tempVarName))
-			// Update the okName to use the unique name in the rest of the code
-			okName = uniqueOkName
 		}
 	} else {
 		if !valueIsBlank {
 			extractStatements = append(extractStatements, fmt.Sprintf("%s = %s.value", valueName, tempVarName))
 		}
 		if !okIsBlank {
-			extractStatements = append(extractStatements, fmt.Sprintf("%s = %s.ok", okName, tempVarName))
+			extractStatements = append(extractStatements, fmt.Sprintf("%s = %s.ok", uniqueOkName, tempVarName))
 		}
+	}
+	
+	// Update the okName to use the unique name in the rest of the code
+	if !okIsBlank {
+		okName = uniqueOkName
 	}
 	c.tsw.WriteLiterally("$.typeAssert<")
 

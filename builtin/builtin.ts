@@ -907,6 +907,32 @@ export const registerInterfaceType = (
 }
 
 /**
+ * Registers a function type with the runtime type system.
+ *
+ * @param name The name of the type.
+ * @param zeroValue The zero value for the type (usually null).
+ * @param params Optional array of parameter types.
+ * @param results Optional array of result types.
+ * @returns The function type information object.
+ */
+export const registerFunctionType = (
+  name: string,
+  zeroValue: any,
+  params?: (string | TypeInfo)[],
+  results?: (string | TypeInfo)[],
+): FunctionTypeInfo => {
+  const typeInfo: FunctionTypeInfo = {
+    name,
+    kind: TypeKind.Function,
+    zeroValue,
+    params,
+    results,
+  }
+  typeRegistry.set(name, typeInfo)
+  return typeInfo
+}
+
+/**
  * Represents the result of a type assertion.
  */
 export interface TypeAssertResult<T> {
@@ -1160,10 +1186,28 @@ function matchesPointerType(value: any, info: TypeInfo): boolean {
  * @param info The function type info to match against.
  * @returns True if the value matches the function type, false otherwise.
  */
-function matchesFunctionType(value: any): boolean {
+function matchesFunctionType(value: any, info: TypeInfo): boolean {
   // For functions, check if the value is a function
-  // TODO: we need to check the type signature in more detail here.
-  return typeof value === 'function'
+  if (typeof value !== 'function' || !isFunctionTypeInfo(info)) {
+    return false
+  }
+  
+  // Check if we're trying to assert to a specific named function type
+  if (info.name) {
+    // Get the function type from the registry
+    const typeInfo = typeRegistry.get(info.name)
+    if (typeInfo && typeInfo.kind === TypeKind.Function) {
+      // Check if the value has a specific property that indicates it was cast to this type
+      if ((value as any).__functionType === info.name) {
+        return true
+      }
+      
+      return false
+    }
+  }
+  
+  // If the type isn't registered, just check if it's a function
+  return true
 }
 
 /**
@@ -1219,7 +1263,7 @@ function matchesType(value: any, info: TypeInfo): boolean {
       return matchesPointerType(value, info)
 
     case TypeKind.Function:
-      return matchesFunctionType(value)
+      return matchesFunctionType(value, info)
 
     case TypeKind.Channel:
       return matchesChannelType(value, info)

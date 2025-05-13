@@ -73,8 +73,8 @@ export function main(): void {
 	rwc = s.clone()
 
 	let _typeAssertResult_0 = $.typeAssert<ReadCloser>(rwc, 'ReadCloser')
-	let ok = _typeAssertResult_0.ok
-if (ok) {
+	let ok_0 = _typeAssertResult_0.ok
+if (ok_0) {
 		console.log("Embedded interface assertion successful")
 	} else {
 		console.log("Embedded interface assertion failed")

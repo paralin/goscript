@@ -5,17 +5,41 @@ import * as $ from "@goscript/builtin";
 
 type Func1 = ((a: number, b: string) => [boolean, $.Error]) | null;
 
+// Register this function type with the runtime type system
+const __Func1_typeInfo = $.registerFunctionType(
+  'Func1',
+  null
+);
+
 let fn1: Func1 = null
 
 type Func2 = ((p0: number, p1: string) => boolean) | null;
+
+// Register this function type with the runtime type system
+const __Func2_typeInfo = $.registerFunctionType(
+  'Func2',
+  null
+);
 
 let fn2: Func2 = null
 
 type Func3 = (() => void) | null;
 
+// Register this function type with the runtime type system
+const __Func3_typeInfo = $.registerFunctionType(
+  'Func3',
+  null
+);
+
 let fn3: Func3 = null
 
 type Func4 = ((a: number, ...b: string[]) => void) | null;
+
+// Register this function type with the runtime type system
+const __Func4_typeInfo = $.registerFunctionType(
+  'Func4',
+  null
+);
 
 let fn4: Func4 = null
 

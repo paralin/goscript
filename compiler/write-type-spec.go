@@ -139,6 +139,23 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		return c.WriteStructTypeSpec(a, t)
 	case *ast.InterfaceType:
 		return c.WriteInterfaceTypeSpec(a, t)
+	case *ast.FuncType:
+		c.tsw.WriteLiterally("type ")
+		if err := c.WriteValueExpr(a.Name); err != nil {
+			return err
+		}
+		c.tsw.WriteLiterally(" = ")
+		c.WriteTypeExpr(a.Type) // The function type
+		c.tsw.WriteLine(";")
+		
+		c.tsw.WriteLine("")
+		c.tsw.WriteLinef("// Register this function type with the runtime type system")
+		c.tsw.WriteLinef("const __%s_typeInfo = $.registerFunctionType(", a.Name.Name)
+		c.tsw.WriteLinef("  '%s',", a.Name.Name)
+		c.tsw.WriteLinef("  null")
+		c.tsw.WriteLinef(");")
+		
+		return nil
 	default:
 		// type alias
 		c.tsw.WriteLiterally("type ")
