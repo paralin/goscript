@@ -6,8 +6,8 @@ import * as $ from "@goscript/builtin";
 export function main(): void {
 	let s = $.arrayToSlice([10, 20, 30])
 	let sum = 0
-	for (let i = 0; i < $.len(s); i++) {
-		const v = s![i]
+	for (let i = 0; i < s.length; i++) {
+		const v = s[i]
 		{
 			sum += v
 			console.log(v)
@@ -17,8 +17,8 @@ export function main(): void {
 
 	let arr = $.arrayToSlice(["a", "b", "c"])
 	let concat = ""
-	for (let i = 0; i < $.len(arr); i++) {
-		const val = arr![i]
+	for (let i = 0; i < arr.length; i++) {
+		const val = arr[i]
 		{
 			concat += val
 			console.log(val)
@@ -30,7 +30,7 @@ export function main(): void {
 	console.log("Ranging with blank identifier for value:")
 	let count = 0
 	// Both key and value are blank identifiers
-	for (let _i = 0; _i < $.len(s); _i++) {
+	for (let _i = 0; _i < s.length; _i++) {
 		{
 			// Both key and value are blank identifiers
 			count++

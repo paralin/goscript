@@ -87,8 +87,8 @@ export function main(): void {
 	// Newline after all strings
 	fn4 = (a: number, ...b: string[]): void => {
 		console.log("fn4 called with: ", a)
-		for (let i = 0; i < $.len(b); i++) {
-			const s = b![i]
+		for (let i = 0; i < b.length; i++) {
+			const s = b[i]
 			{
 				console.log(" ", s)
 			}

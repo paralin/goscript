@@ -7,7 +7,7 @@ export function main(): void {
 	let s = $.arrayToSlice([10, 20, 30])
 	console.log("Looping over slice (no vars):")
 	let count = 0
-	for (let _i = 0; _i < $.len(s); _i++) {
+	for (let _i = 0; _i < s.length; _i++) {
 		{
 			count++
 		}
@@ -17,7 +17,7 @@ export function main(): void {
 	let a = $.arrayToSlice(["alpha", "beta"])
 	console.log("Looping over array (no vars):")
 	let arrCount = 0
-	for (let _i = 0; _i < $.len(a); _i++) {
+	for (let _i = 0; _i < a.length; _i++) {
 		{
 			console.log(a![arrCount])
 			arrCount++

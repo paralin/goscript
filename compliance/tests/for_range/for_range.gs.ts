@@ -6,16 +6,16 @@ import * as $ from "@goscript/builtin";
 export function main(): void {
 	let nums = $.arrayToSlice([2, 3, 4])
 	let sum = 0
-	for (let i = 0; i < $.len(nums); i++) {
-		const num = nums![i]
+	for (let i = 0; i < nums.length; i++) {
+		const num = nums[i]
 		{
 			sum += num
 		}
 	}
 	console.log("sum:", sum)
 
-	for (let i = 0; i < $.len(nums); i++) {
-		const num = nums![i]
+	for (let i = 0; i < nums.length; i++) {
+		const num = nums[i]
 		{
 			console.log("index:", i, "value:", num)
 		}
@@ -23,8 +23,8 @@ export function main(): void {
 
 	// Test ranging over an array
 	let arr = $.arrayToSlice(["a", "b", "c"])
-	for (let i = 0; i < $.len(arr); i++) {
-		const s = arr![i]
+	for (let i = 0; i < arr.length; i++) {
+		const s = arr[i]
 		{
 			console.log("index:", i, "value:", s)
 		}
@@ -46,7 +46,7 @@ export function main(): void {
 
 	// Test ranging over a slice without key or value
 	console.log("Ranging over slice (no key/value):")
-	for (let _i = 0; _i < $.len(nums); _i++) {
+	for (let _i = 0; _i < nums.length; _i++) {
 		{
 			console.log("Iterating slice")
 		}
@@ -54,7 +54,7 @@ export function main(): void {
 
 	// Test ranging over an array without key or value
 	console.log("Ranging over array (no key/value):")
-	for (let _i = 0; _i < $.len(arr); _i++) {
+	for (let _i = 0; _i < arr.length; _i++) {
 		{
 			console.log("Iterating array")
 		}
