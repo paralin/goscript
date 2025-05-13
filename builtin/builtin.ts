@@ -731,8 +731,7 @@ export interface StructTypeInfo extends BaseTypeInfo {
   kind: TypeKind.Struct
   methods: Set<string>
   ctor?: new (...args: any[]) => any
-  fields?: Set<string> // Field names for struct types
-  fieldTypes?: Record<string, TypeInfo | string> // Types for struct fields
+  fields: Record<string, TypeInfo | string> // Field names and types for struct fields
 }
 
 /**
@@ -870,13 +869,15 @@ export const registerStructType = (
   zeroValue: any,
   methods: Set<string>,
   ctor: new (...args: any[]) => any,
+  fields: Record<string, TypeInfo | string> = {},
 ): StructTypeInfo => {
   const typeInfo: StructTypeInfo = {
     name,
     kind: TypeKind.Struct,
     zeroValue,
     methods,
-    ctor: ctor,
+    ctor,
+    fields,
   }
   typeRegistry.set(name, typeInfo)
   return typeInfo
@@ -992,24 +993,30 @@ function matchesStructType(value: any, info: TypeInfo): boolean {
     return true
   }
 
-  if (info.fields && typeof value === 'object') {
-    // For struct type assertions, we need to check that the value has exactly
-    const descFields = Array.from(info.fields as Set<string>)
+  if (info.methods && typeof value === 'object' && value !== null) {
+    const allMethodsMatch = Array.from(info.methods).every(
+      (method) => typeof value[method] === 'function'
+    )
+    if (allMethodsMatch) {
+      return true
+    }
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    const fieldNames = Object.keys(info.fields || {})
     const valueFields = Object.keys(value)
 
-    const condition1 = descFields.every((field) => field in value)
-    const condition2 = valueFields.length === descFields.length
-    const condition3 = valueFields.every((field) => descFields.includes(field))
-
-    console.log('Struct field matching debug:', {
-      descFields,
-      valueFields,
-      allDescFieldsInValue: condition1,
-      sameFieldCount: condition2,
-      allValueFieldsInDesc: condition3,
-    })
-
-    return condition1 && condition2 && condition3
+    const fieldsExist = fieldNames.every((field) => field in value)
+    const sameFieldCount = valueFields.length === fieldNames.length
+    const allFieldsInStruct = valueFields.every((field) => fieldNames.includes(field))
+    
+    if (fieldsExist && sameFieldCount && allFieldsInStruct) {
+      return Object.entries(info.fields).every(([fieldName, fieldType]) => {
+        return matchesType(value[fieldName], normalizeTypeInfo(fieldType as TypeInfo | string))
+      })
+    }
+    
+    return false
   }
 
   return false
@@ -1153,7 +1160,7 @@ function matchesPointerType(value: any, info: TypeInfo): boolean {
  * @param info The function type info to match against.
  * @returns True if the value matches the function type, false otherwise.
  */
-function matchesFunctionType(value: any, info: TypeInfo): boolean {
+function matchesFunctionType(value: any): boolean {
   // For functions, check if the value is a function
   return typeof value === 'function'
 }
@@ -1211,7 +1218,7 @@ function matchesType(value: any, info: TypeInfo): boolean {
       return matchesPointerType(value, info)
 
     case TypeKind.Function:
-      return matchesFunctionType(value, info)
+      return matchesFunctionType(value)
 
     case TypeKind.Channel:
       return matchesChannelType(value, info)
@@ -1232,21 +1239,46 @@ export function typeAssert<T>(
 
   if (
     isStructTypeInfo(normalizedType) &&
+    normalizedType.methods &&
+    typeof value === 'object' &&
+    value !== null
+  ) {
+    // Check if the value implements all methods of the struct type
+    const allMethodsMatch = Array.from(normalizedType.methods).every(
+      (method) => typeof value[method] === 'function'
+    )
+    
+    const hasAnyMethod = Array.from(normalizedType.methods).some(
+      (method) => typeof value[method] === 'function'
+    )
+    
+    if (allMethodsMatch && hasAnyMethod && normalizedType.methods.size > 0) {
+      // For interface-to-concrete type assertions, we just need to check methods
+      return { value: value as T, ok: true }
+    }
+  }
+
+  if (
+    isStructTypeInfo(normalizedType) &&
     normalizedType.fields &&
     typeof value === 'object' &&
     value !== null
   ) {
-    const descFields = Array.from(normalizedType.fields as Set<string>)
+    const fieldNames = Object.keys(normalizedType.fields)
     const valueFields = Object.keys(value)
 
     // For struct type assertions, we need exact field matching
-    const structMatch =
-      descFields.length === valueFields.length &&
-      descFields.every((field: string) => field in value) &&
-      valueFields.every((field) => descFields.includes(field))
+    const structFieldsMatch =
+      fieldNames.length === valueFields.length &&
+      fieldNames.every((field: string) => field in value) &&
+      valueFields.every((field) => fieldNames.includes(field))
 
-    if (structMatch) {
-      return { value: value as T, ok: true }
+    if (structFieldsMatch) {
+      const typesMatch = Object.entries(normalizedType.fields).every(([fieldName, fieldType]) => {
+        return matchesType(value[fieldName], normalizeTypeInfo(fieldType as TypeInfo | string))
+      })
+      
+      return { value: value as T, ok: typesMatch }
     } else {
       return { value: null as unknown as T, ok: false }
     }

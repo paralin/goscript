@@ -5383,17 +5383,26 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		}
 
 		if typeExpr.Fields != nil && typeExpr.Fields.List != nil {
-			c.tsw.WriteLiterally(", fields: new Set([")
+			// Add fields property to provide type information
+			c.tsw.WriteLiterally(", fields: {")
 
-			fields := []string{}
+			hasFields := false
 			for _, field := range typeExpr.Fields.List {
-				for _, name := range field.Names {
-					fields = append(fields, fmt.Sprintf("'%s'", name.Name))
+				if len(field.Names) > 0 {
+					for _, name := range field.Names {
+						if hasFields {
+							c.tsw.WriteLiterally(", ")
+						}
+						c.tsw.WriteLiterally(fmt.Sprintf("'%s': ", name.Name))
+						c.writeTypeDescription(field.Type)
+						hasFields = true
+					}
 				}
 			}
 
-			c.tsw.WriteLiterally(strings.Join(fields, ", "))
-			c.tsw.WriteLiterally("])")
+			c.tsw.WriteLiterally("}")
+		} else {
+			c.tsw.WriteLiterally(", fields: {}")
 		}
 
 		// Add empty methods set to satisfy StructTypeInfo interface
@@ -5545,20 +5554,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 
 		// Add field names and types to the struct type info
 		if t.Fields != nil && t.Fields.List != nil {
-			c.tsw.WriteLiterally("fields: new Set([")
-
-			fields := []string{}
-			for _, field := range t.Fields.List {
-				for _, name := range field.Names {
-					fields = append(fields, fmt.Sprintf("'%s'", name.Name))
-				}
-			}
-
-			c.tsw.WriteLiterally(strings.Join(fields, ", "))
-			c.tsw.WriteLiterally("]), ")
-
-			// Add fieldTypes property to provide type information
-			c.tsw.WriteLiterally("fieldTypes: {")
+			c.tsw.WriteLiterally("fields: {")
 
 			hasFields := false
 			for _, field := range t.Fields.List {
@@ -5576,7 +5572,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 
 			c.tsw.WriteLiterally("}, ")
 		} else {
-			c.tsw.WriteLiterally("fields: new Set(), ")
+			c.tsw.WriteLiterally("fields: {}, ")
 		}
 
 		c.tsw.WriteLiterally("methods: new Set()")
