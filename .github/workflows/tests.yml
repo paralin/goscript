@@ -49,3 +49,11 @@ jobs:
       # WIP not passing yet
       - name: Lint Js
         run: yarn lint:js || true
+        
+      - name: Check for git-dirty files in compliance directory
+        run: |
+          git status --porcelain=v1 compliance/ | grep -q "^" && {
+            echo "Error: Found git-dirty files in compliance/ directory"
+            git status --porcelain=v1 compliance/
+            exit 1
+          } || echo "No git-dirty files found in compliance/ directory"
