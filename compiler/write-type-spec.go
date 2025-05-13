@@ -456,15 +456,30 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		}
 	}
 
-	// Add code to register the type with the runtime system
+	// Add code to register the type with the runtime type system
 	c.tsw.WriteLine("")
 	c.tsw.WriteLinef("// Register this type with the runtime type system")
-	c.tsw.WriteLinef("static __typeInfo = $.registerType(")
+	c.tsw.WriteLinef("static __typeInfo = $.registerStructType(")
 	c.tsw.WriteLinef("  '%s',", className)
-	c.tsw.WriteLinef("  $.TypeKind.Struct,")
 	c.tsw.WriteLinef("  new %s(),", className)
+	c.tsw.WriteLinef("  %s,", className)
+	c.tsw.WriteLinef("  {")
+	c.tsw.Indent(1)
+	// Add field type information dynamically
+	for i := 0; i < underlyingStruct.NumFields(); i++ {
+		field := underlyingStruct.Field(i)
+		var fieldKeyName string
+		if field.Anonymous() {
+			fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
+		} else {
+			fieldKeyName = field.Name()
+		}
+		// Pass the TypeScript type for better type checking during runtime
+		c.tsw.WriteLinef("%s: %s,", fieldKeyName, c.generateTypeInfoForType(field.Type()))
+	}
+	c.tsw.Indent(-1)
+	c.tsw.WriteLinef("  },")
 	c.tsw.WriteLinef("  new Set([%s]),", c.collectMethodNames(className)) // collectMethodNames should ideally consider promoted methods too
-	c.tsw.WriteLinef("  %s", className)
 	c.tsw.WriteLinef(");")
 
 	c.tsw.Indent(-1)
@@ -497,12 +512,15 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 	// Add code to register the interface with the runtime system
 	interfaceName := a.Name.Name
 	c.tsw.WriteLine("")
-	c.tsw.WriteLinef("const %s__typeInfo = $.registerType(", interfaceName)
+	c.tsw.WriteLinef("const %s__typeInfo = $.registerInterfaceType(", interfaceName)
 	c.tsw.WriteLinef("  '%s',", interfaceName)
-	c.tsw.WriteLinef("  $.TypeKind.Interface,")
-	c.tsw.WriteLinef("  null, // Zero value for interface is null")
-	c.tsw.WriteLinef("  new Set([%s]),", c.collectInterfaceMethods(t))
-	c.tsw.WriteLinef("  undefined")
+	c.tsw.WriteLine("  new Map([")
+	c.tsw.Indent(1)
+	// Collect method signatures with their types
+	c.collectInterfaceMethodsWithTypes(t, ifaceType)
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("  ]),")
+	c.tsw.WriteLinef("  null // Zero value for interface is null")
 	c.tsw.WriteLinef(");")
 
 	return nil

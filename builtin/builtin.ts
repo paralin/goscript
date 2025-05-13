@@ -698,7 +698,7 @@ export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
 }
 
 /**
- * Represents the kinds of Go types that can be registered at runtime.
+ * Represents the kinds of Go types that can be type-asserted at runtime.
  */
 export enum TypeKind {
   Struct = 'struct',
@@ -712,58 +712,147 @@ export enum TypeKind {
 }
 
 /**
- * Type description can be either:
- * - A string (type name for registered types)
- * - A TypeInfo object (for dynamic type checking)
- * - A constructor function (for classes/structs)
+ * Base interface containing properties common to all type infos
  */
-export type TypeDescription = string | TypeInfo | (new (...args: any[]) => any);
+export interface BaseTypeInfo {
+  name?: string;
+  kind: TypeKind;
+  zeroValue?: any;
+}
 
 /**
- * Represents type information for a Go type in the runtime.
+ * Type info for struct types
  */
-export interface TypeInfo {
-  name?: string
-  kind: TypeKind
-  zeroValue?: any
-  // For interfaces, the set of methods
-  methods?: Set<string>
-  // For structs, the constructor and fields
-  constructor?: any
-  fields?: {[key: string]: TypeDescription}
-  // For map, the key and element types
-  keyType?: TypeDescription
-  elemType?: TypeDescription
-  // For basic types, the JavaScript type
-  jsType?: string
+export interface StructTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Struct;
+  constructor?: Function | (new (...args: any[]) => any);
+  fields?: {[key: string]: TypeDescription};
+  methods?: Set<string>;
 }
+
+/**
+ * Type info for interface types
+ */
+export interface InterfaceTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Interface;
+  methods: Set<string>;
+}
+
+/**
+ * Type info for basic types (numbers, strings, etc.)
+ */
+export interface BasicTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Basic;
+  jsType: string;
+}
+
+/**
+ * Type info for pointer types
+ */
+export interface PointerTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Pointer;
+  elemType: TypeDescription;
+}
+
+/**
+ * Type info for slice types
+ */
+export interface SliceTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Slice;
+  elemType: TypeDescription;
+}
+
+/**
+ * Type info for map types
+ */
+export interface MapTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Map;
+  keyType: TypeDescription;
+  elemType: TypeDescription;
+}
+
+/**
+ * Type info for channel types
+ */
+export interface ChannelTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Channel;
+  elemType: TypeDescription;
+}
+
+/**
+ * Type info for function types
+ */
+export interface FunctionTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Function;
+  params?: TypeDescription[];
+  results?: TypeDescription[];
+}
+
+/**
+ * Union type representing any kind of type information
+ */
+export type TypeInfo = 
+  | StructTypeInfo 
+  | InterfaceTypeInfo 
+  | BasicTypeInfo 
+  | PointerTypeInfo 
+  | SliceTypeInfo 
+  | MapTypeInfo 
+  | ChannelTypeInfo 
+  | FunctionTypeInfo;
+
+export type TypeDescription = string | TypeInfo | (new (...args: any[]) => any);
 
 // Registry to store runtime type information
 const typeRegistry = new Map<string, TypeInfo>()
 
 /**
- * Registers a type with the runtime type system.
+ * Registers a struct type with the runtime type system.
  *
- * @param name The name of the type.
- * @param kind The kind of the type.
- * @param zeroValue The zero value for the type.
- * @param methods Optional set of method names for interfaces.
- * @param constructor Optional constructor for structs.
- * @returns The type information object for chaining.
+ * @param name The name of the struct type.
+ * @param zeroValue The zero value for the struct type.
+ * @param constructor Optional constructor for the struct.
+ * @param fields Optional field definitions for the struct.
+ * @param methods Optional set of method names implemented by the struct.
+ * @returns The struct type information object for chaining.
  */
-export const registerType = (
+export const registerStructType = (
   name: string,
-  kind: TypeKind,
   zeroValue: any,
+  constructor?: Function | (new (...args: any[]) => any),
+  fields?: {[key: string]: TypeDescription},
   methods?: Set<string>,
-  constructor?: Function
-): TypeInfo => {
-  const typeInfo: TypeInfo = {
+): StructTypeInfo => {
+  const typeInfo: StructTypeInfo = {
     name,
-    kind,
+    kind: TypeKind.Struct,
     zeroValue,
-    methods,
     constructor,
+    fields,
+    methods,
+  }
+  typeRegistry.set(name, typeInfo)
+  return typeInfo
+}
+
+/**
+ * Registers an interface type with the runtime type system.
+ *
+ * @param name The name of the interface type.
+ * @param methods Set of method names required by the interface.
+ * @param zeroValue The zero value for the interface type (usually null).
+ * @returns The interface type information object for chaining.
+ */
+export const registerInterfaceType = (
+  name: string,
+  methods: Set<string>,
+  zeroValue: any = null,
+): InterfaceTypeInfo => {
+  const typeInfo: InterfaceTypeInfo = {
+    name,
+    kind: TypeKind.Interface,
+    methods,
+    zeroValue,
   }
   typeRegistry.set(name, typeInfo)
   return typeInfo
@@ -841,7 +930,7 @@ function normalizeTypeDescription(typeDesc: TypeDescription): TypeInfo {
   if (typeof typeDesc === 'function') {
     return {
       kind: TypeKind.Struct,
-      constructor: typeDesc,
+      constructor: typeDesc as Function,
       fields: {},
       methods: new Set(),
       zeroValue: null
@@ -901,8 +990,15 @@ function matchesType(value: any, typeDesc: TypeDescription): boolean {
       
     case TypeKind.Struct:
       // If constructor is available, check instance
-      if (typeInfo.constructor && value instanceof typeInfo.constructor) {
-        return true;
+      if (typeInfo.constructor && typeof typeInfo.constructor === 'function') {
+        // Use Function.prototype.call to safely check for constructor compatibility
+        try {
+          if (value instanceof (typeInfo.constructor as any)) {
+            return true;
+          }
+        } catch (e) {
+          // Ignore errors from instanceof check with non-constructable functions
+        }
       }
       
       // For anonymous structs or when constructor check fails
@@ -912,12 +1008,13 @@ function matchesType(value: any, typeDesc: TypeDescription): boolean {
           // For structs, check if all required fields exist AND match their expected types
           return Object.keys(typeInfo.fields).every(
             field => {
-              if (!(field in value) || typeof value[field] === 'undefined') {
+              // Check if field exists and is not undefined
+              if (!(field in value) || value[field] === undefined) {
                 return false;
               }
               // Check field type if specified
               const fieldType = typeInfo.fields![field];
-              return fieldType ? matchesType(value[field], fieldType) : true;
+              return matchesType(value[field], fieldType);
             }
           );
         }
@@ -1047,12 +1144,21 @@ export function typeAssert<T>(
     if (typeof value === 'object' && value !== null) {
       // If fields are specified, check that the value has all required fields
       if (typeInfo.fields) {
-        const isValid = Object.keys(typeInfo.fields).every(field => 
-          field in value && typeof value[field] !== 'undefined'
+        const isValid = Object.keys(typeInfo.fields).every(field =>
+          Object.prototype.hasOwnProperty.call(value, field) &&
+          typeof value[field] !== 'undefined'
         );
         
         if (isValid) {
-          return { value: value as T, ok: true };
+          // Also check that the field types match
+          const typesValid = Object.keys(typeInfo.fields).every(field => {
+            const fieldType = typeInfo.fields![field];
+            return matchesType(value[field], fieldType);
+          });
+          
+          if (typesValid) {
+            return { value: value as T, ok: true };
+          }
         }
       }
       
@@ -1067,7 +1173,18 @@ export function typeAssert<T>(
       }
     }
     
-    return { value: zeroValue as T, ok: false };
+    // Create a proper zero value with the expected fields
+    let structZeroValue: any = {};
+    
+    // Initialize fields with their zero values
+    if (typeInfo.fields) {
+      for (const field of Object.keys(typeInfo.fields)) {
+        const fieldTypeInfo = normalizeTypeDescription(typeInfo.fields[field]);
+        structZeroValue[field] = fieldTypeInfo.zeroValue;
+      }
+    }
+    
+    return { value: structZeroValue as T, ok: false };
   }
   else if (typeInfo.kind === TypeKind.Interface && typeInfo.methods) {
     // Check if value implements all methods in the interface

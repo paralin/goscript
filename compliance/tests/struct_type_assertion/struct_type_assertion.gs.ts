@@ -9,7 +9,7 @@ export function main(): void {
 
 	let { value: s, ok: ok } = $.typeAssert<{
 		Name: string
-	}>(i, {kind: $.TypeKind.Struct, fields: {Name: true}})
+	}>(i, {kind: $.TypeKind.Struct, fields: {Name: 'string'}})
 	if (ok) {
 		console.log("Name:", s.Name)
 	} else {
@@ -18,7 +18,7 @@ export function main(): void {
 
 	let { value: j, ok: ok2 } = $.typeAssert<{
 		Age: number
-	}>(i, {kind: $.TypeKind.Struct, fields: {Age: true}})
+	}>(i, {kind: $.TypeKind.Struct, fields: {Age: 'number'}})
 	if (ok2) {
 		console.log("Age:", j.Age)
 	} else {

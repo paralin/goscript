@@ -5448,7 +5448,15 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 			for _, field := range typeExpr.Fields.List {
 				if len(field.Names) > 0 {
 					for _, name := range field.Names {
-						fieldDefs = append(fieldDefs, fmt.Sprintf("%s: true", name.Name))
+						// Get field type as string for better type assertion
+						var typeStr strings.Builder
+						writer := NewTSCodeWriter(&typeStr)
+						tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+						tempCompiler.WriteTypeExpr(field.Type)
+						fieldType := typeStr.String()
+							
+						// Add field with its type as a string
+						fieldDefs = append(fieldDefs, fmt.Sprintf("%s: '%s'", name.Name, fieldType))
 					}
 				} else if field.Type != nil {
 					// Handle embedded field by type name
@@ -5456,9 +5464,31 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 					switch fieldType := field.Type.(type) {
 					case *ast.Ident:
 						fieldName = fieldType.Name
+							
+						// Determine the type of the embedded field
+						var typeStr strings.Builder
+						writer := NewTSCodeWriter(&typeStr)
+						tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+						tempCompiler.WriteTypeExpr(field.Type)
+						embeddedType := typeStr.String()
+							
+						if fieldName != "" {
+							fieldDefs = append(fieldDefs, fmt.Sprintf("%s: '%s'", fieldName, embeddedType))
+						}
 					case *ast.StarExpr:
 						if ident, ok := fieldType.X.(*ast.Ident); ok {
 							fieldName = ident.Name
+								
+							// Get the type of the embedded pointer field
+							var typeStr strings.Builder
+							writer := NewTSCodeWriter(&typeStr)
+							tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+							tempCompiler.WriteTypeExpr(field.Type)
+							embeddedType := typeStr.String()
+								
+							if fieldName != "" {
+								fieldDefs = append(fieldDefs, fmt.Sprintf("%s: '%s'", fieldName, embeddedType))
+							}
 						}
 					case *ast.SelectorExpr:
 						if ident, ok := fieldType.X.(*ast.Ident); ok {
@@ -5466,10 +5496,17 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 						} else {
 							fieldName = fieldType.Sel.Name
 						}
-					}
-
-					if fieldName != "" {
-						fieldDefs = append(fieldDefs, fmt.Sprintf("%s: true", fieldName))
+							
+						// Get the type of the embedded selector field
+						var typeStr strings.Builder
+						writer := NewTSCodeWriter(&typeStr)
+						tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+						tempCompiler.WriteTypeExpr(field.Type)
+						embeddedType := typeStr.String()
+							
+						if fieldName != "" {
+							fieldDefs = append(fieldDefs, fmt.Sprintf("%s: '%s'", fieldName, embeddedType))
+						}
 					}
 				}
 			}
