@@ -16,7 +16,7 @@ export function main(): void {
 	let castedGreeter = (theInlineVar as Greeter)
 
 	// 4. Call that
-	console.log(castedGreeter("Inline World"))
+	console.log(castedGreeter!("Inline World"))
 
 	// Test with a different signature
 	type Adder = ((a: number, b: number) => number) | null;
@@ -25,6 +25,6 @@ export function main(): void {
 	}
 
 	let castedAdder = (theInlineAdder as Adder)
-	console.log(castedAdder(5, 7))
+	console.log(castedAdder!(5, 7))
 }
 

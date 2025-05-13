@@ -1465,6 +1465,15 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
+			
+			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+				if _, ok := funType.Underlying().(*types.Signature); ok {
+					if _, isNamed := funType.(*types.Named); isNamed {
+						c.tsw.WriteLiterally("!")
+					}
+				}
+			}
+			
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
@@ -1481,6 +1490,14 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		// Not an identifier (e.g., method call on a value)
 		if err := c.WriteValueExpr(expFun); err != nil {
 			return fmt.Errorf("failed to write method expression in call: %w", err)
+		}
+		
+		if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+			if _, ok := funType.Underlying().(*types.Signature); ok {
+				if _, isNamed := funType.(*types.Named); isNamed {
+					c.tsw.WriteLiterally("!")
+				}
+			}
 		}
 	}
 	c.tsw.WriteLiterally("(")
