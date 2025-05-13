@@ -806,9 +806,108 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+
+	// Use structured type information for container types
+	switch typeExpr := exp.Type.(type) {
+	case *ast.MapType:
+		// For map types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Map, ")
+
+		// Add key type
+		c.tsw.WriteLiterally("keyType: ")
+		if ident, ok := typeExpr.Key.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(typeExpr.Key)
+		}
+
+		c.tsw.WriteLiterally(", ")
+
+		// Add element type
+		c.tsw.WriteLiterally("elemType: ")
+		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(typeExpr.Value)
+		}
+
+		c.tsw.WriteLiterally("}")
+	case *ast.ArrayType:
+		// For slice types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Slice, ")
+
+		// Add element type
+		c.tsw.WriteLiterally("elemType: ")
+		if ident, ok := typeExpr.Elt.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(typeExpr.Elt)
+		}
+
+		c.tsw.WriteLiterally("}")
+	default:
+		// For other types, use the string name as before
+		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+	}
+
 	c.tsw.WriteLiterally(").value") // Access the value field directly in expression context
 	return nil
+}
+
+// isPrimitiveType returns true if the type name is a primitive type
+func isPrimitiveType(name string) bool {
+	switch name {
+	case "string", "int", "int8", "int16", "int32", "int64",
+		"uint", "uint8", "uint16", "uint32", "uint64",
+		"float32", "float64", "bool", "byte", "rune":
+		return true
+	}
+	return false
+}
+
+// writeTypeDescription writes a TypeScript representation of a Go type description
+func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
+	switch t := typeExpr.(type) {
+	case *ast.Ident:
+		// Simple types like 'string', 'int', etc.
+		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", t.Name))
+	case *ast.SelectorExpr:
+		// Imported types like pkg.Type
+		if ident, ok := t.X.(*ast.Ident); ok {
+			c.tsw.WriteLiterally(fmt.Sprintf("'%s.%s'", ident.Name, t.Sel.Name))
+		} else {
+			c.tsw.WriteLiterally("'unknown'")
+		}
+	case *ast.MapType:
+		// Nested map type
+		c.tsw.WriteLiterally("{kind: $.TypeKind.Map, keyType: ")
+		c.writeTypeDescription(t.Key)
+		c.tsw.WriteLiterally(", elemType: ")
+		c.writeTypeDescription(t.Value)
+		c.tsw.WriteLiterally("}")
+	case *ast.ArrayType:
+		// Nested slice/array type
+		c.tsw.WriteLiterally("{kind: $.TypeKind.Slice, elemType: ")
+		c.writeTypeDescription(t.Elt)
+		c.tsw.WriteLiterally("}")
+	default:
+		// Fallback for other types
+		c.tsw.WriteLiterally("'unknown'")
+	}
 }
 
 // isPointerComparison checks if a binary expression `exp` involves comparing
@@ -844,6 +943,23 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 		if ident, ok := t.X.(*ast.Ident); ok {
 			return fmt.Sprintf("%s.%s", ident.Name, t.Sel.Name)
 		}
+	case *ast.MapType:
+		keyTypeStr := c.getTypeNameString(t.Key)
+		valueTypeStr := c.getTypeNameString(t.Value)
+		return fmt.Sprintf("map[%s]%s", keyTypeStr, valueTypeStr)
+	case *ast.ArrayType:
+		// Handle both arrays and slices
+		elemTypeStr := c.getTypeNameString(t.Elt)
+		if t.Len == nil {
+			// Slice
+			return fmt.Sprintf("[]%s", elemTypeStr)
+		} else {
+			// Array
+			return fmt.Sprintf("array[%s]", elemTypeStr) // Using 'array' prefix to distinguish from slices
+		}
+	case *ast.ChanType:
+		elemTypeStr := c.getTypeNameString(t.Value)
+		return fmt.Sprintf("chan %s", elemTypeStr)
 	}
 	// Default case, use a placeholder for complex types
 	return "unknown"
@@ -5240,9 +5356,6 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		return fmt.Errorf("unhandled LHS expression type for ok in type assertion: %T", lhs[1])
 	}
 
-	// Get the type name string for the asserted type
-	typeName := c.getTypeNameString(assertedType)
-
 	// Generate the destructuring assignment
 	if tok == token.DEFINE {
 		c.tsw.WriteLiterally("let ")
@@ -5272,7 +5385,65 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+
+	// Use structured type information for container types
+	switch typeExpr := assertedType.(type) {
+	case *ast.MapType:
+		// For map types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Map, ")
+
+		// Add key type
+		c.tsw.WriteLiterally("keyType: ")
+		if ident, ok := typeExpr.Key.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(typeExpr.Key)
+		}
+
+		c.tsw.WriteLiterally(", ")
+
+		// Add element type
+		c.tsw.WriteLiterally("elemType: ")
+		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(typeExpr.Value)
+		}
+
+		c.tsw.WriteLiterally("}")
+	case *ast.ArrayType:
+		// For slice types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Slice, ")
+
+		// Add element type
+		c.tsw.WriteLiterally("elemType: ")
+		if ident, ok := typeExpr.Elt.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(typeExpr.Elt)
+		}
+
+		c.tsw.WriteLiterally("}")
+	default:
+		// For other types, use the string name as before
+		typeName := c.getTypeNameString(assertedType)
+		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+	}
+
 	c.tsw.WriteLiterally(")")
 
 	if tok != token.DEFINE {

@@ -709,16 +709,29 @@ export enum TypeKind {
 }
 
 /**
+ * Type description can be either:
+ * - A string (type name for registered types)
+ * - A TypeInfo object (for dynamic type checking)
+ * - A constructor function (for classes/structs)
+ */
+export type TypeDescription = string | TypeInfo | (new (...args: any[]) => any)
+
+/**
  * Represents type information for a Go type in the runtime.
  */
 export interface TypeInfo {
-  name: string
+  name?: string
   kind: TypeKind
-  zeroValue: any
+  zeroValue?: any
   // For interfaces, the set of methods
   methods?: Set<string>
   // For structs, the constructor
-  constructor?: new (...args: any[]) => any
+  constructor?: any
+  // For map, the key and element types
+  keyType?: TypeDescription
+  elemType?: TypeDescription
+  // For basic types, the JavaScript type
+  jsType?: string
 }
 
 // Registry to store runtime type information
@@ -739,7 +752,7 @@ export const registerType = (
   kind: TypeKind,
   zeroValue: any,
   methods?: Set<string>,
-  constructor?: new (...args: any[]) => any,
+  constructor?: Function,
 ): TypeInfo => {
   const typeInfo: TypeInfo = {
     name,
@@ -761,88 +774,144 @@ export interface TypeAssertResult<T> {
 }
 
 /**
- * Performs a type assertion at runtime.
- *
- * @param value The value to assert.
- * @param typeName The name of the target type.
- * @returns An object with the asserted value and whether the assertion succeeded.
+ * Normalizes a type description into a TypeInfo object
  */
-export function typeAssert<T>(
-  value: any,
-  typeName: string,
-): TypeAssertResult<T> {
-  // Get the type information from the registry
-  const typeInfo = typeRegistry.get(typeName)
-  if (!typeInfo) {
-    console.warn(`Type information for '${typeName}' not found in registry.`)
-    return { value: null as unknown as T, ok: false }
+function normalizeTypeDescription(typeDesc: TypeDescription): TypeInfo {
+  // If it's already a TypeInfo object, return it
+  if (typeof typeDesc === 'object' && 'kind' in typeDesc) {
+    return typeDesc
   }
 
-  // If value is null or undefined, assertion fails
-  if (value === null || value === undefined) {
-    return { value: typeInfo.zeroValue as T, ok: false }
-  }
-
-  // Check based on the kind of the target type
-  switch (typeInfo.kind) {
-    case TypeKind.Struct:
-      // For structs, use instanceof with the constructor
-      if (typeInfo.constructor && value instanceof typeInfo.constructor) {
-        return { value: value as T, ok: true }
-      }
-      break
-
-    case TypeKind.Interface:
-      // For interfaces, check if the value has all the required methods
-      if (typeInfo.methods && typeof value === 'object') {
-        const allMethodsPresent = Array.from(typeInfo.methods).every(
-          (method) => typeof (value as any)[method] === 'function',
-        )
-        if (allMethodsPresent) {
-          return { value: value as T, ok: true }
-        }
-      }
-      break
-
-    case TypeKind.Basic: {
-      // For basic types, check if the value matches the expected JavaScript type
-      // This is a simple check for common basic types
-      const basicType = typeof value
-      if (
-        basicType === 'string' ||
-        basicType === 'number' ||
-        basicType === 'boolean'
-      ) {
-        return { value: value as T, ok: true }
-      }
-      break
+  // If it's a string (registered type name), look it up
+  if (typeof typeDesc === 'string') {
+    const registeredType = typeRegistry.get(typeDesc)
+    if (registeredType) {
+      return registeredType
     }
 
-    case TypeKind.Pointer:
-      // For pointers, check if value is not null or undefined
-      // In Go, pointers can be nil which we represent as null/undefined in TS
-      if (value !== null && value !== undefined) {
-        return { value: value as T, ok: true }
-      }
-      break
+    // Handle basic type strings
+    switch (typeDesc) {
+      case 'string':
+        return { kind: TypeKind.Basic, jsType: 'string', zeroValue: '' }
+      case 'number':
+        return { kind: TypeKind.Basic, jsType: 'number', zeroValue: 0 }
+      case 'boolean':
+        return { kind: TypeKind.Basic, jsType: 'boolean', zeroValue: false }
+      case 'bigint':
+        return { kind: TypeKind.Basic, jsType: 'bigint', zeroValue: BigInt(0) }
+      default:
+        // Check if it's a map type descriptor (e.g., "map[string]int")
+        if (typeDesc.startsWith('map[')) {
+          const endKeyIdx = typeDesc.indexOf(']')
+          if (endKeyIdx > 4) {
+            // "map[".length = 4
+            const keyTypeName = typeDesc.substring(4, endKeyIdx)
+            const valueTypeName = typeDesc.substring(endKeyIdx + 1)
 
-    case TypeKind.Slice:
-      // For slices, check if the value is an array
-      if (Array.isArray(value)) {
-        return { value: value as T, ok: true }
-      }
-      break
+            return {
+              kind: TypeKind.Map,
+              keyType: keyTypeName,
+              elemType: valueTypeName,
+              zeroValue: new Map(),
+            }
+          }
+        }
+
+        // Check if it's a slice type descriptor (e.g., "[]int")
+        if (typeDesc.startsWith('[]')) {
+          const elemTypeName = typeDesc.substring(2)
+          return {
+            kind: TypeKind.Slice,
+            elemType: elemTypeName,
+            zeroValue: [],
+          }
+        }
+
+        // Unknown type name
+        console.warn(
+          `Type '${typeDesc}' not found in registry and is not a basic type.`,
+        )
+        return { kind: TypeKind.Basic, jsType: 'any', zeroValue: null }
+    }
+  }
+
+  // If it's a constructor function, create a struct type
+  if (typeof typeDesc === 'function') {
+    return {
+      kind: TypeKind.Struct,
+      constructor: typeDesc,
+      zeroValue: null,
+    }
+  }
+
+  // Fallback
+  return { kind: TypeKind.Basic, jsType: 'any', zeroValue: null }
+}
+
+/**
+ * Checks if a value matches a specified type
+ */
+function matchesType(value: any, typeDesc: TypeDescription): boolean {
+  if (value === null || value === undefined) {
+    return false
+  }
+
+  const typeInfo = normalizeTypeDescription(typeDesc)
+
+  switch (typeInfo.kind) {
+    case TypeKind.Basic:
+      return typeof value === typeInfo.jsType
 
     case TypeKind.Map:
-      // For maps, check if the value is a Map
-      if (value instanceof Map) {
-        return { value: value as T, ok: true }
+      if (!(value instanceof Map)) return false
+
+      // Empty map passes the type check
+      if (value.size === 0) return true
+
+      // For non-empty maps, check a sample of keys and values
+      const sampleSize = Math.min(value.size, 10)
+      let checked = 0
+      for (const [key, val] of value.entries()) {
+        if (
+          !matchesType(key, typeInfo.keyType!) ||
+          !matchesType(val, typeInfo.elemType!)
+        ) {
+          return false
+        }
+        if (++checked >= sampleSize) break
       }
-      break
+      return true
+
+    case TypeKind.Slice:
+      if (!Array.isArray(value)) return false
+
+      // Empty array passes the type check
+      if (value.length === 0) return true
+
+      // For non-empty arrays, check a sample of elements
+      const elemType = typeInfo.elemType!
+      const arraySampleSize = Math.min(value.length, 10)
+      for (let i = 0; i < arraySampleSize; i++) {
+        if (!matchesType(value[i], elemType)) {
+          return false
+        }
+      }
+      return true
+
+    case TypeKind.Struct:
+      return typeInfo.constructor ?
+          value instanceof typeInfo.constructor
+        : false
+
+    case TypeKind.Interface:
+      if (!typeInfo.methods || typeof value !== 'object') return false
+      // Check if value has all required methods
+      return Array.from(typeInfo.methods).every(
+        (method) => typeof (value as any)[method] === 'function',
+      )
 
     case TypeKind.Channel:
-      // For channels, check if the value has the required Channel interface methods
-      if (
+      return (
         typeof value === 'object' &&
         value !== null &&
         'send' in value &&
@@ -851,26 +920,127 @@ export function typeAssert<T>(
         typeof value.send === 'function' &&
         typeof value.receive === 'function' &&
         typeof value.close === 'function'
-      ) {
-        return { value: value as T, ok: true }
-      }
-      break
+      )
 
     case TypeKind.Function:
-      // For functions, check if the value is a function
-      if (typeof value === 'function') {
-        return { value: value as T, ok: true }
-      }
-      break
+      return typeof value === 'function'
+
+    case TypeKind.Pointer:
+      // In TypeScript, we're checking if it's a non-null object
+      return value !== null && typeof value === 'object'
 
     default:
-      console.warn(
-        `Type assertion for kind '${typeInfo.kind}' not implemented.`,
-      )
+      return false
+  }
+}
+
+/**
+ * Performs a type assertion at runtime.
+ *
+ * @param value The value to assert.
+ * @param typeDesc The description of the target type (string name or TypeInfo object).
+ * @returns An object with the asserted value and whether the assertion succeeded.
+ */
+export function typeAssert<T>(
+  value: any,
+  typeDesc: TypeDescription,
+): TypeAssertResult<T> {
+  // Handle null/undefined value case
+  if (value === null || value === undefined) {
+    const typeInfo = normalizeTypeDescription(typeDesc)
+    return { value: typeInfo.zeroValue as T, ok: false }
   }
 
-  // Assertion failed
-  return { value: typeInfo.zeroValue as T, ok: false }
+  // Normalize the type description to get TypeInfo
+  const typeInfo = normalizeTypeDescription(typeDesc)
+
+  // Get the zero value for failure case
+  const zeroValue = typeInfo.zeroValue ?? null
+
+  // Special handling for common container types
+  if (typeInfo.kind === TypeKind.Map) {
+    // Verify it's a Map instance
+    if (!(value instanceof Map)) {
+      return { value: new Map() as unknown as T, ok: false }
+    }
+
+    // Empty maps automatically pass type check
+    if (value.size === 0) {
+      return { value: value as T, ok: true }
+    }
+
+    // For non-empty maps, check key and value types on a sample (for performance)
+    const sampleSize = Math.min(value.size, 10) // Just check up to 10 entries
+    let checked = 0
+
+    for (const [key, val] of value.entries()) {
+      if (
+        !matchesType(key, typeInfo.keyType!) ||
+        !matchesType(val, typeInfo.elemType!)
+      ) {
+        return { value: new Map() as unknown as T, ok: false }
+      }
+
+      if (++checked >= sampleSize) break
+    }
+
+    // All checks passed
+    return { value: value as T, ok: true }
+  } else if (typeInfo.kind === TypeKind.Slice) {
+    // Verify it's an array
+    if (!Array.isArray(value)) {
+      return { value: [] as unknown as T, ok: false }
+    }
+
+    // Empty arrays automatically pass
+    if (value.length === 0) {
+      return { value: value as T, ok: true }
+    }
+
+    // Check element type on a sample (for performance)
+    const elemType = typeInfo.elemType!
+    const sampleSize = Math.min(value.length, 10) // Just check up to 10 elements
+
+    for (let i = 0; i < sampleSize; i++) {
+      if (!matchesType(value[i], elemType)) {
+        return { value: [] as unknown as T, ok: false }
+      }
+    }
+
+    // All checks passed
+    return { value: value as T, ok: true }
+  } else if (typeInfo.kind === TypeKind.Struct && typeInfo.constructor) {
+    // Check if value is an instance of the constructor
+    if (value instanceof typeInfo.constructor) {
+      return { value: value as T, ok: true }
+    }
+    return { value: zeroValue as T, ok: false }
+  } else if (typeInfo.kind === TypeKind.Interface && typeInfo.methods) {
+    // Check if value implements all methods in the interface
+    if (typeof value === 'object' && value !== null) {
+      const allMethodsPresent = Array.from(typeInfo.methods).every(
+        (method) => typeof (value as any)[method] === 'function',
+      )
+      if (allMethodsPresent) {
+        return { value: value as T, ok: true }
+      }
+    }
+    return { value: zeroValue as T, ok: false }
+  } else if (typeInfo.kind === TypeKind.Basic && typeInfo.jsType) {
+    // Check basic type against JavaScript type
+    if (typeof value === typeInfo.jsType) {
+      return { value: value as T, ok: true }
+    }
+    return { value: zeroValue as T, ok: false }
+  }
+
+  // For other types or fallback, use the general matching function
+  const matches = matchesType(value, typeInfo)
+
+  return {
+    value: matches ? (value as T) : (zeroValue as T),
+    ok: matches,
+  }
 }
 
 /**

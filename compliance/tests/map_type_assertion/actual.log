@@ -1,3 +1,0 @@
-Type assertion failed
-Second type assertion (map[string]string) failed as expected
-Third type assertion (map[int]int) failed as expected

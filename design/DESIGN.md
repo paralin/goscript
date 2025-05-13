@@ -40,6 +40,73 @@ The GoScript runtime, located in `builtin/builtin.ts`, provides necessary helper
     *   **Maps:** Translated to TypeScript `Map<K, V>`.
     *   **Channels:** Translated using helper classes/functions from the runtime (`$.Chan<T>`) potentially leveraging async iterators or libraries like `csp-ts`. See `DESIGN_CONCURRENCY.md` (TODO: Create this file).
     *   **Interfaces:** Translated to TypeScript interfaces. Type assertions and type switches require runtime type information or helper functions. See `DESIGN_INTERFACES.md` (TODO: Create this file).
+
+    ### Type Assertions and Type Switches
+
+    Go's type assertion system is translated using runtime type checking with structured type information:
+
+    #### Type Representation
+
+    Types are represented using a structured format:
+
+    ```typescript
+    interface TypeInfo {
+      kind: TypeKind;            // The base kind (struct, interface, map, slice, etc.)
+      name?: string;             // Optional name for named types
+      methods?: Set<string>;     // For interfaces: method names
+      keyType?: TypeDescription; // For maps: type of keys
+      elemType?: TypeDescription; // For maps, slices, arrays, channels: type of elements
+      constructor?: Function;    // For structs: constructor function
+    }
+
+    type TypeDescription = TypeInfo | string | Function;
+    ```
+
+    #### Type Assertion Implementation
+
+    Type assertions (`val, ok := i.(Type)`) are implemented using runtime helpers:
+
+    1. **Basic Type Assertions:** For pre-registered types, the type is checked against a registry.
+    2. **Dynamic Type Checking:** For container types like maps and slices, the system performs runtime checks:
+       - For maps: validates key and value types dynamically
+       - For slices: validates element types
+       - For structs: checks against constructors
+       - For interfaces: validates required method implementations
+    3. **Nested Type Support:** Validates complex nested types like `map[string][]struct{}`
+
+    ```typescript
+    // For m, ok := i.(map[string]int)
+    const { value: m, ok } = $.typeAssert(i, {
+      kind: $.TypeKind.Map,
+      keyType: 'string',
+      elemType: 'number'
+    });
+    ```
+
+    This dynamic system eliminates the need to pre-register every possible combination of container types, making assertions scalable while preserving Go's type safety.
+
+    #### Type Switches
+
+    Go's type switches are implemented using a series of type assertions with the structured type system:
+
+    ```typescript
+    // Go: switch v := i.(type) { case string: ... case int: ... default: ... }
+    // Translated conceptually to:
+    let v: any;
+    let __type = $.getTypeOf(i);
+    if (__type === 'string') {
+      v = i as string;
+      // string case block...
+    } else if (__type === 'number') {
+      v = i as number;
+      // int case block...
+    } else {
+      v = i;
+      // default case block...
+    }
+    ```
+
+    Runtime helpers handle the extraction of type information and perform appropriate checks.
     *   **Pointers:** Translated using a `$.Box<T>` wrapper type from the runtime. See [Boxes and Pointers](#boxes-and-pointers).
 *   **Function Types:** Translated to TypeScript function types.
 
