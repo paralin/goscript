@@ -7,9 +7,9 @@ export function main(): void {
 	let m = $.makeMap<string, number>()
 	$.mapSet(m, "one", 1)
 	console.log("Assigning m[\"one\"] to _, _ (key exists)")
-	;(m.has("one"), m.get("one"))
+	;($.mapHas(m, "one"), $.mapGet(m, "one", null))
 	console.log("Assigning m[\"two\"] to _, _ (key does not exist)")
-	;(m.has("two"), m.get("two"))
+	;($.mapHas(m, "two"), $.mapGet(m, "two", null))
 	console.log("done")
 }
 

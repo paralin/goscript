@@ -17,30 +17,30 @@ export function main(): void {
 	console.log("Map size after adding 3 items: Expected: 3, Actual:", $.len(scores))
 
 	// Access values
-	console.log("Alice's score: Expected: 90, Actual:", scores.get("Alice") ?? 0)
-	console.log("Bob's score: Expected: 85, Actual:", scores.get("Bob") ?? 0)
+	console.log("Alice's score: Expected: 90, Actual:", $.mapGet(scores, "Alice", 0))
+	console.log("Bob's score: Expected: 85, Actual:", $.mapGet(scores, "Bob", 0))
 
 	// Modify a value
 	$.mapSet(scores, "Bob", 88)
-	console.log("Bob's updated score: Expected: 88, Actual:", scores.get("Bob") ?? 0)
+	console.log("Bob's updated score: Expected: 88, Actual:", $.mapGet(scores, "Bob", 0))
 
 	// Check if key exists (comma-ok idiom)
 	let value
 	let exists: boolean
-	exists = scores.has("David")
-	value = scores.get("David") ?? 0
+	exists = $.mapHas(scores, "David")
+	value = $.mapGet(scores, "David", 0)
 	console.log("Does David exist in map? Expected: false, Actual:", exists)
 	console.log("Value for non-existent key: Expected: 0, Actual:", value)
 
 	// Delete a key
 	$.deleteMapEntry(scores, "Charlie")
-	exists = scores.has("Charlie")
+	exists = $.mapHas(scores, "Charlie")
 	console.log("After delete, does Charlie exist? Expected: false, Actual:", exists)
 
 	// Create map with literal syntax
 	let colors = new Map([["red", "#ff0000"], ["green", "#00ff00"], ["blue", "#0000ff"]])
 	console.log("Map literal size: Expected: 3, Actual:", $.len(colors))
-	console.log("Color code for red: Expected: #ff0000, Actual:", colors.get("red") ?? "")
+	console.log("Color code for red: Expected: #ff0000, Actual:", $.mapGet(colors, "red", ""))
 
 	// Iterate over a map with range
 	console.log("Iterating over scores map:")

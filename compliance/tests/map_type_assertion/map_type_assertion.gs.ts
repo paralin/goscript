@@ -9,7 +9,7 @@ export function main(): void {
 
 	let { value: m, ok: ok } = $.typeAssert<Map<string, number>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'number'})
 	if (ok) {
-		console.log("Age:", m.get("age") ?? 0)
+		console.log("Age:", $.mapGet(m, "age", 0))
 	} else {
 		console.log("Type assertion failed")
 	}
