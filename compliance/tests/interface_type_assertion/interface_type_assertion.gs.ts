@@ -69,7 +69,7 @@ export function main(): void {
 	}
 
 	// try a second time since this generates something different when using = and not :=
-	({ ok: ok } = $.typeAssert<$.Box<MyStruct> | null>(i, 'unknown'))
+	({ ok: ok } = $.typeAssert<$.Box<MyStruct> | null>(i, {kind: $.TypeKind.Pointer, elemType: 'MyStruct'}))
 
 	// expected
 	if (ok) {
