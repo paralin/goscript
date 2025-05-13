@@ -3916,9 +3916,95 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 //   - Blank identifiers (`_`) on the LHS are handled by omitting them in TypeScript
 //     destructuring patterns or by skipping the assignment for single assignments.
 //
-// This function does not handle the `let` keyword for declarations or statement
-// termination (newlines/semicolons).
-func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token) error {
+// This function handles all assignment types including:
+// - Pointer dereference assignments (*p = v)
+// - Blank identifier assignments (_ = v)
+func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token, addDeclaration bool) error {
+	// Handle blank identifier (_) on the LHS for single assignments
+	if len(lhs) == 1 && len(rhs) == 1 {
+		if ident, ok := lhs[0].(*ast.Ident); ok && ident.Name == "_" {
+			// Evaluate the RHS expression for side effects, but don't assign it
+			c.tsw.WriteLiterally("/* _ = */ ")
+			if err := c.WriteValueExpr(rhs[0]); err != nil {
+				return err
+			}
+			return nil
+		}
+
+		// Handle the special case of "*p = val" (assignment to dereferenced pointer)
+		if starExpr, ok := lhs[0].(*ast.StarExpr); ok {
+			// For *p = val, we need to set p's .value property
+			// Write "p!.value = " for the underlying value
+			if err := c.WriteValueExpr(starExpr.X); err != nil { // p in *p
+				return err
+			}
+			c.tsw.WriteLiterally("!.value = ") // Add non-null assertion for TS safety
+
+			// Handle the RHS expression (potentially adding .clone() for structs)
+			if shouldApplyClone(c.pkg, rhs[0]) {
+				if err := c.WriteValueExpr(rhs[0]); err != nil {
+					return err
+				}
+				c.tsw.WriteLiterally(".clone()")
+			} else {
+				if err := c.WriteValueExpr(rhs[0]); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+
+		// Special handling for boxed variables in declarations
+		if addDeclaration && tok == token.DEFINE {
+			// Determine if LHS is boxed
+			isLHSBoxed := false
+			var lhsIdent *ast.Ident
+			var lhsObj types.Object
+
+			if ident, ok := lhs[0].(*ast.Ident); ok {
+				lhsIdent = ident
+				// Get the types.Object from the identifier
+				if use, ok := c.pkg.TypesInfo.Uses[ident]; ok {
+					lhsObj = use
+				} else if def, ok := c.pkg.TypesInfo.Defs[ident]; ok {
+					lhsObj = def
+				}
+
+				// Check if this variable needs to be boxed
+				if lhsObj != nil && c.analysis.NeedsBoxed(lhsObj) {
+					isLHSBoxed = true
+				}
+			}
+
+			// Special handling for short declaration of boxed variables
+			if isLHSBoxed && lhsIdent != nil {
+				c.tsw.WriteLiterally("let ")
+				// Just write the identifier name without .value
+				c.tsw.WriteLiterally(lhsIdent.Name)
+
+				// Add type annotation for boxed variables in declarations
+				if lhsObj != nil {
+					c.tsw.WriteLiterally(": ")
+					c.tsw.WriteLiterally("$.Box<")
+					c.WriteGoType(lhsObj.Type())
+					c.tsw.WriteLiterally(">")
+				}
+
+				c.tsw.WriteLiterally(" = ")
+
+				// Box the initializer
+				c.tsw.WriteLiterally("$.box(")
+				if err := c.WriteValueExpr(rhs[0]); err != nil {
+					return err
+				}
+				c.tsw.WriteLiterally(")")
+				return nil
+			}
+
+			c.tsw.WriteLiterally("let ")
+		}
+	}
+
 	// Special case for multi-variable assignment to handle array element swaps
 	if len(lhs) > 1 && len(rhs) > 1 {
 		// Check if this is an array element swap pattern (common pattern a[i], a[j] = a[j], a[i])
@@ -4021,9 +4107,33 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		}
 
 		if !currentIsMapIndex {
-			// Write the LHS expression normally.
-			// Boxed variable assignment (to .value) is handled by the caller (writeSingleAssign).
-			// Here we just write the variable name or expression.
+			// For single assignments, handle boxed variables specially
+			if len(lhs) == 1 && len(rhs) == 1 {
+				lhsExprIdent, lhsExprIsIdent := l.(*ast.Ident)
+				if lhsExprIsIdent {
+					// Determine if LHS is boxed
+					isLHSBoxed := false
+					var lhsObj types.Object
+
+					// Get the types.Object from the identifier
+					if use, ok := c.pkg.TypesInfo.Uses[lhsExprIdent]; ok {
+						lhsObj = use
+					} else if def, ok := c.pkg.TypesInfo.Defs[lhsExprIdent]; ok {
+						lhsObj = def
+					}
+
+					// Check if this variable needs to be boxed
+					if lhsObj != nil && c.analysis.NeedsBoxed(lhsObj) {
+						isLHSBoxed = true
+					}
+
+					// prevent writing .value unless lhs is boxed
+					c.WriteIdent(lhsExprIdent, isLHSBoxed)
+					continue
+				}
+			}
+
+			// Write the LHS expression normally
 			if err := c.WriteValueExpr(l); err != nil {
 				return err
 			}
@@ -4070,23 +4180,30 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			}
 
 			// Important: For struct copying, we need to check if the variable itself is boxed
-			// Not just if it needs boxed access (which is more specific to pointers)
+			// Important: For struct copying, we need to check if the variable needs boxed access
+			// This is more comprehensive than just checking if it's boxed
 			if rhsObj != nil {
-				needsBoxedAccessRHS = c.analysis.NeedsBoxed(rhsObj)
+				needsBoxedAccessRHS = c.analysis.NeedsBoxedAccess(rhsObj)
 			}
 		}
 
 		// Handle different cases for struct cloning
 		if shouldApplyClone(c.pkg, r) {
-			if err := c.WriteValueExpr(r); err != nil { // Write the RHS expression
-				return err
-			}
-
-			// For a boxed struct source, we need to add .value before .clone()
-			// Critical: For case like original.clone() when original is boxed,
-			// we need to generate original.value.clone() instead
-			if needsBoxedAccessRHS {
-				c.tsw.WriteLiterally(".value") // Access the boxed value
+			// For other expressions, we need to handle boxed access differently
+			if _, isIdent := r.(*ast.Ident); isIdent {
+				// For identifiers, WriteValueExpr already adds .value if needed
+				if err := c.WriteValueExpr(r); err != nil {
+					return err
+				}
+			} else {
+				// For non-identifiers, write the expression and add .value if needed
+				if err := c.WriteValueExpr(r); err != nil {
+					return err
+				}
+				// Only add .value for non-identifiers that need boxed access
+				if needsBoxedAccessRHS {
+					c.tsw.WriteLiterally(".value") // Access the boxed value
+				}
 			}
 
 			c.tsw.WriteLiterally(".clone()") // Always add clone for struct values
@@ -4220,12 +4337,12 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 //   - Translates to `await ch_ts.receive();`.
 //
 // 6.  **Single assignment** (e.g., `x = y`, `x := y`, `*p = y`, `x[i] = y`):
-//   - Uses `writeSingleAssign` which handles:
+//   - Uses `writeAssignmentCore` which handles:
 //   - Blank identifier `_` on LHS (evaluates RHS for side effects).
 //   - Assignment to dereferenced pointer `*p = val` -> `p_ts!.value = val_ts`.
 //   - Short declaration `x := y`: `let x = y_ts;`. If `x` is boxed, `let x: $.Box<T> = $.box(y_ts);`.
 //   - Regular assignment `x = y`, including compound assignments like `x += y`.
-//   - Assignment to map index `m[k] = v` is delegated to `writeAssignmentCore` for `$.mapSet`.
+//   - Assignment to map index `m[k] = v` using `$.mapSet`.
 //   - Struct value assignment `s1 = s2` becomes `s1 = s2.clone()` if `s2` is a struct.
 //
 // 7.  **Multi-variable assignment with multiple RHS values** (e.g., `a, b = x, y`):
@@ -4361,147 +4478,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		return nil
 	}
 
-	// writeSingleAssign handles a single assignment pair, including blank identifiers and short declarations.
-	writeSingleAssign := func(lhsExpr, rhsExpr ast.Expr, tok token.Token) error {
-		// Handle blank identifier (_) on the LHS
-		if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name == "_" {
-			// Evaluate the RHS expression for side effects, but don't assign it
-			c.tsw.WriteLiterally("/* _ = */ ")
-			if err := c.WriteValueExpr(rhsExpr); err != nil {
-				return err
-			}
-			c.tsw.WriteLine("")
-			return nil
-		}
 
-		// Handle the special case of "*p = val" (assignment to dereferenced pointer)
-		if starExpr, ok := lhsExpr.(*ast.StarExpr); ok {
-			// For *p = val, we need to set p's .value property
-			// Write "p!.value = " for the underlying value
-			if err := c.WriteValueExpr(starExpr.X); err != nil { // p in *p
-				return err
-			}
-			c.tsw.WriteLiterally("!.value = ") // Add non-null assertion for TS safety
-
-			// Handle the RHS expression (potentially adding .clone() for structs)
-			if shouldApplyClone(c.pkg, rhsExpr) {
-				if err := c.WriteValueExpr(rhsExpr); err != nil {
-					return err
-				}
-				c.tsw.WriteLiterally(".clone()")
-			} else {
-				if err := c.WriteValueExpr(rhsExpr); err != nil {
-					return err
-				}
-			}
-
-			c.tsw.WriteLine("")
-			return nil
-		}
-
-		// For short declaration (:=), emit "let"/"const" declaration
-		isDeclaration := tok == token.DEFINE
-		if isDeclaration {
-			c.tsw.WriteLiterally("let ")
-		}
-
-		// Determine if LHS is boxed
-		isLHSBoxed, isLHSBoxedAssign := false, false
-		var lhsIdent *ast.Ident
-		var lhsObj types.Object
-
-		if ident, ok := lhsExpr.(*ast.Ident); ok {
-			lhsIdent = ident
-			// Get the types.Object from the identifier
-			if use, ok := c.pkg.TypesInfo.Uses[ident]; ok {
-				lhsObj = use
-			} else if def, ok := c.pkg.TypesInfo.Defs[ident]; ok {
-				lhsObj = def
-			}
-
-			// Check if this variable needs to be boxed
-			if lhsObj != nil && c.analysis.NeedsBoxed(lhsObj) {
-				isLHSBoxed = true
-			}
-
-			// Check if we need to use .value when assigning this variable
-			if lhsObj != nil && c.analysis.NeedsBoxedAccess(lhsObj) {
-				isLHSBoxedAssign = true
-				_ = isLHSBoxedAssign // not used
-			}
-		}
-
-		// Special handling for short declaration of boxed variables
-		if isDeclaration && isLHSBoxed && lhsIdent != nil {
-			// Just write the identifier name without .value
-			c.tsw.WriteLiterally(lhsIdent.Name)
-
-			// Add type annotation for boxed variables in declarations
-			if lhsObj != nil {
-				c.tsw.WriteLiterally(": ")
-				c.tsw.WriteLiterally("$.Box<")
-				c.WriteGoType(lhsObj.Type())
-				c.tsw.WriteLiterally(">")
-			}
-
-			c.tsw.WriteLiterally(" = ")
-
-			// Box the initializer
-			c.tsw.WriteLiterally("$.box(")
-			if err := c.WriteValueExpr(rhsExpr); err != nil {
-				return err
-			}
-			c.tsw.WriteLiterally(")")
-
-			c.tsw.WriteLine("")
-			return nil
-		}
-
-		// Handle index expressions differently (special case for map assignments)
-		// Note: We don't use WriteIndexExpr here because we need special handling for map assignments
-		if indexExpr, ok := lhsExpr.(*ast.IndexExpr); ok {
-			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
-				if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
-					// Map assignment already handled by writeAssignmentCore
-					if err := c.writeAssignmentCore([]ast.Expr{lhsExpr}, []ast.Expr{rhsExpr}, tok); err != nil {
-						return err
-					}
-					c.tsw.WriteLine("")
-					return nil
-				}
-			}
-		}
-
-		lhsExprIdent, lhsExprIsIdent := lhsExpr.(*ast.Ident)
-		if lhsExprIsIdent {
-			// prevent writing .value unless lhs is boxed
-			c.WriteIdent(lhsExprIdent, isLHSBoxed)
-		} else {
-			if err := c.WriteValueExpr(lhsExpr); err != nil {
-				return err
-			}
-		}
-
-		c.tsw.WriteLiterally(" ")
-		tokStr, ok := TokenToTs(tok)
-		if !ok {
-			return errors.Errorf("unknown token: %v", tok.String())
-		}
-
-		c.tsw.WriteLiterally(tokStr) // Write the correct operator (e.g., =, +=, -=)
-		c.tsw.WriteLiterally(" ")
-
-		if err := c.WriteValueExpr(rhsExpr); err != nil {
-			return err
-		}
-
-		if shouldApplyClone(c.pkg, rhsExpr) {
-			c.tsw.WriteLiterally(".clone()")
-		}
-
-		c.tsw.WriteLine("")
-		return nil
-	}
 
 	// writeMapLookupWithExists handles the map comma-ok idiom: value, exists := myMap[key]
 	// Note: We don't use WriteIndexExpr here because we need to handle .has() and .get() separately
@@ -4660,18 +4637,21 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		if exp.Tok == token.DEFINE {
 			c.tsw.WriteLiterally("let ") // Use let for multi-variable declarations
 		}
-		if err := c.writeAssignmentCore(exp.Lhs, exp.Rhs, exp.Tok); err != nil {
+		// For multi-variable assignments, we've already added the "let" if needed
+		if err := c.writeAssignmentCore(exp.Lhs, exp.Rhs, exp.Tok, false); err != nil {
 			return err
 		}
 		c.tsw.WriteLine("") // Add newline after the statement
 		return nil
 	}
 
-	// Handle single assignment using writeSingleAssign
+	// Handle single assignment using writeAssignmentCore
 	if len(exp.Lhs) == 1 {
-		if err := writeSingleAssign(exp.Lhs[0], exp.Rhs[0], exp.Tok); err != nil {
+		addDeclaration := exp.Tok == token.DEFINE
+		if err := c.writeAssignmentCore(exp.Lhs, exp.Rhs, exp.Tok, addDeclaration); err != nil {
 			return err
 		}
+		c.tsw.WriteLine("") // Add newline after the statement
 		return nil
 	}
 
@@ -4902,7 +4882,7 @@ func (c *GoToTSCompiler) WriteForInit(stmt ast.Stmt) error {
 				c.tsw.WriteLiterally("let ")
 			}
 			// Use existing assignment core logic
-			if err := c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok); err != nil {
+			if err := c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok, false); err != nil {
 				return err
 			}
 		}
@@ -4968,7 +4948,8 @@ func (c *GoToTSCompiler) WriteForPost(stmt ast.Stmt) error {
 			c.tsw.WriteLiterally("]")
 		} else {
 			// Regular single variable assignment
-			if err := c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok); err != nil {
+			// No declaration handling needed in for loop post statements
+			if err := c.writeAssignmentCore(s.Lhs, s.Rhs, s.Tok, false); err != nil {
 				return err
 			}
 		}
