@@ -1,0 +1,15 @@
+Hello, World
+8
+Hello, Gopher
+30
+Hello, Struct
+15
+Hello, Map
+3
+Hello, Slice
+18
+true
+false
+false
+Nil interface assertion correct
+Wrong function type assertion correct

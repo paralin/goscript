@@ -1162,6 +1162,7 @@ function matchesPointerType(value: any, info: TypeInfo): boolean {
  */
 function matchesFunctionType(value: any): boolean {
   // For functions, check if the value is a function
+  // TODO: we need to check the type signature in more detail here.
   return typeof value === 'function'
 }
 
