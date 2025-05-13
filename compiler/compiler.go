@@ -1431,6 +1431,27 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled byte call with incorrect number of arguments")
 		default:
+			// Check if this is a type conversion to a function type
+			if funIdent != nil {
+				if obj := c.pkg.TypesInfo.Uses[funIdent]; obj != nil {
+					// Check if the object is a type name
+					if _, isType := obj.(*types.TypeName); isType {
+						// Make sure we have exactly one argument
+						if len(exp.Args) == 1 {
+							// Write the argument first
+							c.tsw.WriteLiterally("(")
+							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+								return fmt.Errorf("failed to write argument for function type cast: %w", err)
+							}
+							
+							// Then use the TypeScript "as" operator with the type name
+							c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
+							return nil // Handled function type cast
+						}
+					}
+				}
+			}
+
 			// Check if this is an async function call
 			if funIdent != nil {
 				// Get the object for this function identifier
