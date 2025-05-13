@@ -106,10 +106,11 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 // its TypeScript equivalent. It manages the compilation of individual files
 // within the package and determines the output path for the compiled package.
 type PackageCompiler struct {
-	le           *logrus.Entry
-	compilerConf *Config
-	outputPath   string
-	pkg          *packages.Package
+	le               *logrus.Entry
+	compilerConf     *Config
+	outputPath       string
+	pkg              *packages.Package
+	TypeAssertCounter int // Counter for generating unique variable names in type assertions
 }
 
 // NewPackageCompiler creates a new `PackageCompiler` for a given Go package.
@@ -179,7 +180,7 @@ func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *
 	// Analyze the file before compiling
 	AnalyzeFile(syntax, p.pkg, analysis, cmap)
 
-	fileCompiler, err := NewFileCompiler(p.compilerConf, p.pkg, syntax, name, analysis)
+	fileCompiler, err := NewFileCompiler(p.compilerConf, p.pkg, p, syntax, name, analysis)
 	if err != nil {
 		return err
 	}
@@ -194,6 +195,7 @@ type FileCompiler struct {
 	compilerConfig *Config
 	codeWriter     *TSCodeWriter
 	pkg            *packages.Package
+	pkgCompiler    *PackageCompiler
 	ast            *ast.File
 	fullPath       string
 	Analysis       *Analysis
@@ -206,6 +208,7 @@ type FileCompiler struct {
 func NewFileCompiler(
 	compilerConf *Config,
 	pkg *packages.Package,
+	pkgCompiler *PackageCompiler,
 	astFile *ast.File,
 	fullPath string,
 	analysis *Analysis,
@@ -213,6 +216,7 @@ func NewFileCompiler(
 	return &FileCompiler{
 		compilerConfig: compilerConf,
 		pkg:            pkg,
+		pkgCompiler:    pkgCompiler,
 		ast:            astFile,
 		fullPath:       fullPath,
 		Analysis:       analysis,
@@ -245,7 +249,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	c.codeWriter = NewTSCodeWriter(of)
 
 	// Pass analysis to compiler
-	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg, c.Analysis)
+	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg, c.pkgCompiler, c.Analysis)
 
 	// Add import for the goscript runtime using namespace import and alias
 	c.codeWriter.WriteLine("import * as $ from \"@goscript/builtin\";")
@@ -266,6 +270,7 @@ type GoToTSCompiler struct {
 	tsw *TSCodeWriter
 
 	pkg *packages.Package
+	pkgCompiler *PackageCompiler // Reference to the package compiler for accessing compiler-specific fields
 
 	analysis *Analysis // Holds analysis information for code generation decisions
 }
@@ -596,11 +601,12 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 // It initializes the compiler with a `TSCodeWriter` for output,
 // Go package information (`packages.Package`), and pre-computed
 // analysis results (`Analysis`) to guide the translation process.
-func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analysis) *GoToTSCompiler {
+func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, pkgCompiler *PackageCompiler, analysis *Analysis) *GoToTSCompiler {
 	return &GoToTSCompiler{
-		tsw:      tsw,
-		pkg:      pkg,
-		analysis: analysis,
+		tsw:        tsw,
+		pkg:        pkg,
+		pkgCompiler: pkgCompiler,
+		analysis:   analysis,
 	}
 }
 
@@ -2416,7 +2422,7 @@ func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 func (c *GoToTSCompiler) getTypeString(goType types.Type) string {
 	var typeStr strings.Builder
 	writer := NewTSCodeWriter(&typeStr)
-	tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+	tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.pkgCompiler, c.analysis)
 	tempCompiler.WriteGoType(goType)
 	return typeStr.String()
 }
@@ -2483,7 +2489,7 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 		// Get the type string for regular fields
 		var typeStr strings.Builder
 		writer := NewTSCodeWriter(&typeStr)
-		tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+		tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.pkgCompiler, c.analysis)
 		tempCompiler.WriteGoType(field.Type())
 
 		fieldMap[fieldName] = typeStr.String()
@@ -2504,7 +2510,7 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 			// Get the type string for the field
 			var typeStr strings.Builder
 			writer := NewTSCodeWriter(&typeStr)
-			tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+			tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.pkgCompiler, c.analysis)
 			tempCompiler.WriteGoType(sel.Type())
 
 			fieldMap[fieldName] = typeStr.String()
@@ -5311,6 +5317,7 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 //     expression if needed, though typically assignments are statements.
 //
 // The statement is terminated with a newline.
+
 func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.TypeAssertExpr, tok token.Token) error {
 	interfaceExpr := typeAssertExpr.X
 	assertedType := typeAssertExpr.Type
@@ -5346,27 +5353,35 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		return fmt.Errorf("unhandled LHS expression type for ok in type assertion: %T", lhs[1])
 	}
 
-	// Generate the destructuring assignment
+	// Generate the assignment without destructuring to avoid variable redeclaration issues
+	tempVarName := fmt.Sprintf("_typeAssertResult_%d", c.pkgCompiler.TypeAssertCounter)
+	c.pkgCompiler.TypeAssertCounter++
+
 	if tok == token.DEFINE {
-		c.tsw.WriteLiterally("let ")
+		c.tsw.WriteLiterallyf("let %s = ", tempVarName)
 	} else {
 		// We must wrap in parenthesis.
-		c.tsw.WriteLiterally("(")
+		c.tsw.WriteLiterallyf("(%s = ", tempVarName)
 	}
 
-	c.tsw.WriteLiterally("{ ")
-	// Dynamically build the destructuring pattern
-	parts := []string{}
-	if !valueIsBlank {
-		parts = append(parts, fmt.Sprintf("value: %s", valueName))
+	// Define variables for the extracted properties if needed
+	extractStatements := []string{}
+	if tok == token.DEFINE {
+		if !valueIsBlank {
+			extractStatements = append(extractStatements, fmt.Sprintf("let %s = %s.value", valueName, tempVarName))
+		}
+		if !okIsBlank {
+			extractStatements = append(extractStatements, fmt.Sprintf("let %s = %s.ok", okName, tempVarName))
+		}
+	} else {
+		if !valueIsBlank {
+			extractStatements = append(extractStatements, fmt.Sprintf("%s = %s.value", valueName, tempVarName))
+		}
+		if !okIsBlank {
+			extractStatements = append(extractStatements, fmt.Sprintf("%s = %s.ok", okName, tempVarName))
+		}
 	}
-	if !okIsBlank {
-		// Use the original variable name directly without renaming in the destructuring
-		// This avoids redeclaring 'ok' variables in TypeScript
-		parts = append(parts, fmt.Sprintf("ok: %s", okName))
-	}
-	c.tsw.WriteLiterally(strings.Join(parts, ", "))
-	c.tsw.WriteLiterally(" } = $.typeAssert<")
+	c.tsw.WriteLiterally("$.typeAssert<")
 
 	// Write the asserted type for the generic
 	c.WriteTypeExpr(assertedType)
@@ -5566,6 +5581,11 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	}
 
 	c.tsw.WriteLine("") // Add newline after the statement
+	
+	// Add the extraction statements after the type assertion
+	for _, stmt := range extractStatements {
+		c.tsw.WriteLiterallyf("%s\n", stmt)
+	}
 
 	return nil
 }
