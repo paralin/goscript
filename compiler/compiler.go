@@ -1038,6 +1038,8 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	baseType := c.pkg.TypesInfo.TypeOf(exp.X)
 	if baseType != nil {
 		if _, isInterface := baseType.Underlying().(*types.Interface); isInterface {
+			// This is necessary because TypeScript's type system is more strict than Go's
+			// regarding null/undefined values after type assertions on interface variables
 			c.tsw.WriteLiterally("!")
 		}
 	}
