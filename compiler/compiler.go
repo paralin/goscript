@@ -1705,38 +1705,22 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 	}
 }
 
-// WriteCompositeLit translates a Go composite literal expression (`ast.CompositeLit`)
-// into its TypeScript equivalent. This is used for initializing structs, arrays,
-// slices, and maps.
+// writeBoxedValue translates a Go expression (`ast.Expr`) into its TypeScript equivalent,
+// with particular attention to accessing the value inside boxed variables when needed.
+// It handles several expression types:
+//   - Identifiers (`ast.Ident`): Uses `WriteIdent` to generate `varName` or `varName!.value`
+//     depending on whether the variable is boxed and access to its value is needed.
+//   - Selector expressions (`ast.SelectorExpr`, e.g., `obj.Field`): Delegates to `WriteSelectorExpr`,
+//     which handles field/method access, potentially adding `.value` if the accessed field/method
+//     is inside a boxed variable.
+//   - Star expressions (`ast.StarExpr`, e.g., `*ptr`): Delegates to `WriteStarExpr`,
+//     which handles dereferencing pointers, generating `ptr!.value` or appropriate syntax
+//     based on the pointed-to type.
+//   - Basic literals (`ast.BasicLit`, e.g., `123`, `"hello"`): Delegates to `WriteBasicLit`.
+//   - Other expressions: Falls back to `WriteValueExpr` for general expression handling.
 //
-// Behavior varies by type:
-// - Map literals (`map[K]V{k1: v1, ...}`): Translated to `new Map([[k1_ts, v1_ts], ...])`.
-// - Array literals (`[N]T{idx1: v1, v2, ...}`):
-//   - Translated to a TypeScript array literal `[v1_ts, v2_ts, ...]`.
-//   - If the Go array literal has explicit indices or is sparsely initialized,
-//     the TypeScript array is filled up to the required length (determined by
-//     type information or the maximum index used). Uninitialized elements are
-//     filled with the zero value of the element type using `WriteZeroValueForType`.
-//   - Empty slice literals (`[]T{}`) become `([] as ElementType_ts[])`.
-//
-// - Struct literals (`MyStruct{Field1: v1, ...}` or `&MyStruct{...}`):
-//   - Translated to `new MyStruct_ts({ field1: v1_ts, ... })`.
-//   - Handles direct fields, promoted fields from embedded structs, and explicit
-//     initialization of embedded structs.
-//   - For promoted fields (`Outer{InnerField: val}`), it correctly populates
-//     the `InnerStructName: { InnerField: val_ts }` structure in the TypeScript
-//     constructor argument.
-//   - For explicit embedded struct initialization (`Outer{InnerStructName: InnerStructValue}`),
-//     it populates `InnerStructName: InnerStructValue_ts`. If `InnerStructValue` is
-//     itself a composite literal, its fields are expanded directly.
-//   - Untyped composite literals: Guesses based on element structure (key-value pairs
-//     suggest an object `{...}`, otherwise an array `[...]`). A comment indicates
-//     the guessed type.
-//
-// This function relies heavily on `go/types` (`TypesInfo.TypeOf`) to determine
-// the kind of literal being constructed and to handle types correctly, especially
-// for zero values and struct field resolution.
-// It takes a value expression and writes it to the TypeScript output, handling boxing and method access.
+// This function is used primarily when translating struct literals, map literals,
+// and other composite values where accurate boxed value access is required.
 func (c *GoToTSCompiler) writeBoxedValue(expr ast.Expr) error {
 	if expr == nil {
 		return fmt.Errorf("nil expression passed to writeBoxedValue")
