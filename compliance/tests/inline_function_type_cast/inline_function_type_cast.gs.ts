@@ -19,8 +19,8 @@ export function main(): void {
 	console.log(castedGreeter!("Inline World"))
 
 	// Test with a different signature
-	// unhandled spec in DeclStmt: *ast.TypeSpec
-	let theInlineAdder = (ab: number): number => {
+	type Adder = ((a: number, b: number) => number) | null;
+	let theInlineAdder = (a: number, b: number): number => {
 		return a + b
 	}
 

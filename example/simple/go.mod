@@ -1,6 +1,6 @@
 module example
 
-go 1.24
+go 1.24.3
 
 replace github.com/aperturerobotics/goscript => ../../
 

@@ -3160,11 +3160,24 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 			}
 
 			if isArguments {
-				// For function parameters, write "name: type"
-				c.WriteField(field, true)
-				c.tsw.WriteLiterally(": ")
-				typ := c.pkg.TypesInfo.TypeOf(field.Type)
-				c.WriteGoType(typ) // Use WriteGoType for parameter type
+				// For function parameters with multiple names, write each name with its type
+				if len(field.Names) > 1 {
+					for j, name := range field.Names {
+						if j > 0 {
+							c.tsw.WriteLiterally(", ")
+						}
+						c.tsw.WriteLiterally(name.Name)
+						c.tsw.WriteLiterally(": ")
+						typ := c.pkg.TypesInfo.TypeOf(field.Type)
+						c.WriteGoType(typ)
+					}
+				} else {
+					// For single-name parameters, use the standard WriteField
+					c.WriteField(field, true)
+					c.tsw.WriteLiterally(": ")
+					typ := c.pkg.TypesInfo.TypeOf(field.Type)
+					c.WriteGoType(typ) // Use WriteGoType for parameter type
+				}
 			} else {
 				// For struct fields and other non-argument fields
 				c.WriteField(field, false)
@@ -3210,7 +3223,12 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		return
 	}
 
-	for _, name := range field.Names {
+	for i, name := range field.Names {
+		// For multiple parameter names, add a comma between them
+		if i > 0 && isArguments {
+			c.tsw.WriteLiterally(", ")
+		}
+
 		// argument names: keep original casing, no access modifier
 		if isArguments {
 			c.tsw.WriteLiterally(name.Name)
@@ -3307,6 +3325,11 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
 					if err := c.WriteValueSpec(valueSpec); err != nil {
 						return fmt.Errorf("failed to write value spec in declaration statement: %w", err)
+					}
+				} else if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+					// Type specs within a declaration statement (e.g., inline type declarations)
+					if err := c.WriteTypeSpec(typeSpec); err != nil {
+						return fmt.Errorf("failed to write type spec in declaration statement: %w", err)
 					}
 				} else {
 					c.tsw.WriteCommentLinef("unhandled spec in DeclStmt: %T", spec)

@@ -11,16 +11,16 @@ function greet(name: string): string {
 	return "Hello, " + name
 }
 
-function add(ab: number): number {
+function add(a: number, b: number): number {
 	return a + b
 }
 
 function getGreeter(): null | any {
-	return Greeter(greet)
+	return (greet as Greeter)
 }
 
 function getAdder(): null | any {
-	return Adder(add)
+	return (add as Adder)
 }
 
 class FuncContainer {
@@ -60,18 +60,18 @@ class FuncContainer {
 
 export function main(): void {
 	// 1. Simple function type assertion
-	let i: null | any = Greeter(greet)
+	let i: null | any = (greet as Greeter)
 	let { value: fn, ok: ok } = $.typeAssert<Greeter>(i, 'Greeter')
 	if (ok) {
-		console.log(fn("World"))
+		console.log(fn!("World"))
 	} else {
 		console.log("Simple assertion failed")
 	}
 
-	let j: null | any = Adder(add)
+	let j: null | any = (add as Adder)
 	let { value: addFn, ok: ok } = $.typeAssert<Adder>(j, 'Adder')
 	if (ok) {
-		console.log(addFn(5, 3))
+		console.log(addFn!(5, 3))
 	} else {
 		console.log("Simple adder assertion failed")
 	}
@@ -80,7 +80,7 @@ export function main(): void {
 	let returnedFn = getGreeter()
 	let { value: greetFn, ok: ok } = $.typeAssert<Greeter>(returnedFn, 'Greeter')
 	if (ok) {
-		console.log(greetFn("Gopher"))
+		console.log(greetFn!("Gopher"))
 	} else {
 		console.log("Returned function assertion failed")
 	}
@@ -88,67 +88,67 @@ export function main(): void {
 	let returnedAdder = getAdder()
 	let { value: addFnFromFunc, ok: ok } = $.typeAssert<Adder>(returnedAdder, 'Adder')
 	if (ok) {
-		console.log(addFnFromFunc(10, 20))
+		console.log(addFnFromFunc!(10, 20))
 	} else {
 		console.log("Returned adder assertion failed")
 	}
 
 	// 3. Type assertion of a function in a struct field
-	let container = new FuncContainer({myFunc: Greeter(greet)})
+	let container = new FuncContainer({myFunc: (greet as Greeter)})
 	let { value: structFn, ok: ok } = $.typeAssert<Greeter>(container.myFunc, 'Greeter')
 	if (ok) {
-		console.log(structFn("Struct"))
+		console.log(structFn!("Struct"))
 	} else {
 		console.log("Struct function assertion failed")
 	}
 
-	let adderContainer = new FuncContainer({myFunc: Adder(add)})
+	let adderContainer = new FuncContainer({myFunc: (add as Adder)})
 	let { value: structAdderFn, ok: ok } = $.typeAssert<Adder>(adderContainer.myFunc, 'Adder')
 	if (ok) {
-		console.log(structAdderFn(7, 8))
+		console.log(structAdderFn!(7, 8))
 	} else {
 		console.log("Struct adder assertion failed")
 	}
 
 	// 4. Type assertion of a function in a map
 	let funcMap = $.makeMap<string, null | any>()
-	$.mapSet(funcMap, "greeter", Greeter(greet))
-	$.mapSet(funcMap, "adder", Adder(add))
+	$.mapSet(funcMap, "greeter", (greet as Greeter))
+	$.mapSet(funcMap, "adder", (add as Adder))
 
 	let { value: mapFn, ok: ok } = $.typeAssert<Greeter>($.mapGet(funcMap, "greeter", null), 'Greeter')
 	if (ok) {
-		console.log(mapFn("Map"))
+		console.log(mapFn!("Map"))
 	} else {
 		console.log("Map function assertion failed")
 	}
 
 	let { value: mapAdderFn, ok: ok } = $.typeAssert<Adder>($.mapGet(funcMap, "adder", null), 'Adder')
 	if (ok) {
-		console.log(mapAdderFn(1, 2))
+		console.log(mapAdderFn!(1, 2))
 	} else {
 		console.log("Map adder assertion failed")
 	}
 
 	// 5. Type assertion of a function in a slice
 	let funcSlice = $.makeSlice<null | any>(2)
-	funcSlice![0] = Greeter(greet)
-	funcSlice![1] = Adder(add)
+	funcSlice![0] = (greet as Greeter)
+	funcSlice![1] = (add as Adder)
 
 	let { value: sliceFn, ok: ok } = $.typeAssert<Greeter>(funcSlice![0], 'Greeter')
 	if (ok) {
-		console.log(sliceFn("Slice"))
+		console.log(sliceFn!("Slice"))
 	} else {
 		console.log("Slice function assertion failed")
 	}
 	let { value: sliceAdderFn, ok: ok } = $.typeAssert<Adder>(funcSlice![1], 'Adder')
 	if (ok) {
-		console.log(sliceAdderFn(9, 9))
+		console.log(sliceAdderFn!(9, 9))
 	} else {
 		console.log("Slice adder assertion failed")
 	}
 
 	// 6. Type assertion with ok variable (successful and failing)
-	let k: null | any = Greeter(greet)
+	let k: null | any = (greet as Greeter)
 	let { ok: ok1 } = $.typeAssert<Greeter>(k, 'Greeter')
 	console.log(ok1) // true
 
@@ -179,7 +179,7 @@ export function main(): void {
 	}
 
 	// Test assertion to wrong function type
-	let wrongFnInterface: null | any = Greeter(greet)
+	let wrongFnInterface: null | any = (greet as Greeter)
 	let { value: wrongFn, ok: okWrong } = $.typeAssert<Adder>(wrongFnInterface, 'Adder')
 	if (!okWrong && wrongFn == null) {
 		console.log("Wrong function type assertion correct")
