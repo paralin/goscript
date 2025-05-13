@@ -2541,6 +2541,119 @@ func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceTyp
 	return strings.Join(methodNames, ", ")
 }
 
+// collectStructFieldTypes collects the field types for a struct type and returns
+func (c *GoToTSCompiler) collectStructFieldTypes(structName string, structType *ast.StructType) string {
+	// Get the types.Named for the struct
+	var namedType *types.Named
+	for _, obj := range c.pkg.TypesInfo.Defs {
+		if obj == nil || obj.Name() != structName {
+			continue
+		}
+		if named, ok := obj.Type().(*types.Named); ok {
+			namedType = named
+			break
+		}
+	}
+	
+	if namedType == nil || structType.Fields == nil {
+		return "undefined"
+	}
+
+	// Generate the field types map
+	var fieldMappings []string
+	
+	for _, field := range structType.Fields.List {
+		if len(field.Names) == 0 {
+			// Skip embedded fields for now
+			continue
+		}
+		
+		// Get the TypeScript type string for the field
+		fieldType := c.pkg.TypesInfo.TypeOf(field.Type)
+		if fieldType == nil {
+			continue
+		}
+		
+		fieldTypeStr := c.getTypeString(fieldType)
+		for _, name := range field.Names {
+			fieldMappings = append(fieldMappings, fmt.Sprintf("['%s', '%s']", name.Name, fieldTypeStr))
+		}
+	}
+	
+	if len(fieldMappings) == 0 {
+		return "undefined"
+	}
+	
+	return fmt.Sprintf("new Map([%s])", strings.Join(fieldMappings, ", "))
+}
+
+// collectInterfaceMethodSignatures collects the method signatures for an interface type and returns
+func (c *GoToTSCompiler) collectInterfaceMethodSignatures(
+	interfaceName string,
+	interfaceType *ast.InterfaceType,
+	ifaceType *types.Interface,
+) string {
+	if ifaceType == nil || interfaceType.Methods == nil {
+		return "undefined"
+	}
+
+	// Generate the method signatures map
+	var methodMappings []string
+	
+	// Handle explicit methods in the interface
+	for _, method := range interfaceType.Methods.List {
+		if len(method.Names) == 0 {
+			// Skip embedded interfaces for now
+			continue
+		}
+		
+		methodName := method.Names[0].Name
+		
+		// Find the method in the types.Interface
+		var methodType *types.Signature
+		for i := 0; i < ifaceType.NumMethods(); i++ {
+			if ifaceType.Method(i).Name() == methodName {
+				methodType = ifaceType.Method(i).Type().(*types.Signature)
+				break
+			}
+		}
+		
+		if methodType == nil {
+			continue
+		}
+		
+		// Generate a TypeDescription for the method
+		var paramTypes []string
+		for i := 0; i < methodType.Params().Len(); i++ {
+			param := methodType.Params().At(i)
+			paramTypeStr := c.getTypeString(param.Type())
+			paramTypes = append(paramTypes, fmt.Sprintf("'%s'", paramTypeStr))
+		}
+		
+		var resultTypes []string
+		for i := 0; i < methodType.Results().Len(); i++ {
+			result := methodType.Results().At(i)
+			resultTypeStr := c.getTypeString(result.Type())
+			resultTypes = append(resultTypes, fmt.Sprintf("'%s'", resultTypeStr))
+		}
+		
+		methodMapping := fmt.Sprintf(
+			"['%s', { kind: $.TypeKind.Function, params: [%s], results: [%s] }]",
+			methodName,
+			strings.Join(paramTypes, ", "),
+			strings.Join(resultTypes, ", "),
+		)
+		
+		methodMappings = append(methodMappings, methodMapping)
+	}
+	
+	if len(methodMappings) == 0 {
+		return "undefined"
+	}
+	
+	return fmt.Sprintf("new Map([%s])", strings.Join(methodMappings, ", "))
+}
+
 // WriteFuncDeclAsMethod translates a Go function declaration (`ast.FuncDecl`)
 // that has a receiver (i.e., it's a method) into a TypeScript class method.
 //   - It preserves Go documentation comments (`decl.Doc`).

@@ -464,7 +464,9 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLinef("  $.TypeKind.Struct,")
 	c.tsw.WriteLinef("  new %s(),", className)
 	c.tsw.WriteLinef("  new Set([%s]),", c.collectMethodNames(className)) // collectMethodNames should ideally consider promoted methods too
-	c.tsw.WriteLinef("  %s", className)
+	c.tsw.WriteLinef("  %s,", className)
+	c.tsw.WriteLinef("  undefined, // No method signatures for structs")
+	c.tsw.WriteLinef("  %s", c.collectStructFieldTypes(className, t)) // Add field types
 	c.tsw.WriteLinef(");")
 
 	c.tsw.Indent(-1)
@@ -502,7 +504,9 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 	c.tsw.WriteLinef("  $.TypeKind.Interface,")
 	c.tsw.WriteLinef("  null, // Zero value for interface is null")
 	c.tsw.WriteLinef("  new Set([%s]),", c.collectInterfaceMethods(t))
-	c.tsw.WriteLinef("  undefined")
+	c.tsw.WriteLinef("  undefined, // No constructor for interfaces")
+	c.tsw.WriteLinef("  %s,", c.collectInterfaceMethodSignatures(interfaceName, t, ifaceType))
+	c.tsw.WriteLinef("  undefined // No field types for interfaces")
 	c.tsw.WriteLinef(");")
 
 	return nil

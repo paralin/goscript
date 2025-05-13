@@ -720,7 +720,9 @@ export interface TypeDescription {
   elemType?: string | TypeDescription // For maps, slices, arrays
   // For interfaces and structs
   methods?: Set<string> // Available methods
+  methodSignatures?: Map<string, TypeDescription> // Method signatures for interfaces
   fields?: Set<string> // Field names for struct types
+  fieldTypes?: Map<string, string | TypeDescription> // Field types for struct types
   constructor?: any // Constructor reference for structs
   // For functions
   params?: (string | TypeDescription)[]
@@ -736,8 +738,10 @@ export interface TypeInfo {
   zeroValue: any
   // For interfaces, the set of methods
   methods?: Set<string>
-  // For structs, the constructor
+  methodSignatures?: Map<string, TypeDescription> // Method signatures for interfaces
+  // For structs, the constructor and field types
   constructor?: new (...args: any[]) => any
+  fieldTypes?: Map<string, string | TypeDescription> // Field types for struct types
 }
 
 // Registry to store runtime type information
@@ -751,6 +755,8 @@ const typeRegistry = new Map<string, TypeInfo>()
  * @param zeroValue The zero value for the type.
  * @param methods Optional set of method names for interfaces.
  * @param constructor Optional constructor for structs.
+ * @param methodSignatures Optional map of method names to their signatures for interfaces.
+ * @param fieldTypes Optional map of field names to their types for structs.
  * @returns The type information object for chaining.
  */
 export const registerType = (
@@ -759,13 +765,17 @@ export const registerType = (
   zeroValue: any,
   methods?: Set<string>,
   constructor?: new (...args: any[]) => any,
+  methodSignatures?: Map<string, TypeDescription>,
+  fieldTypes?: Map<string, string | TypeDescription>,
 ): TypeInfo => {
   const typeInfo: TypeInfo = {
     name,
     kind,
     zeroValue,
     methods,
+    methodSignatures,
     constructor,
+    fieldTypes,
   }
   typeRegistry.set(name, typeInfo)
   return typeInfo
@@ -887,6 +897,16 @@ function matchesStructType(value: any, desc: TypeDescription): boolean {
       allValueFieldsInDesc: condition3,
     })
 
+    if (condition1 && condition2 && condition3 && desc.fieldTypes) {
+      for (const [fieldName, fieldType] of desc.fieldTypes.entries()) {
+        if (!(fieldName in value)) continue
+        const fieldValue = value[fieldName]
+        if (!matchesType(fieldValue, normalizeTypeDescription(fieldType))) {
+          return false
+        }
+      }
+    }
+
     return condition1 && condition2 && condition3
   }
 
@@ -903,9 +923,20 @@ function matchesStructType(value: any, desc: TypeDescription): boolean {
 function matchesInterfaceType(value: any, desc: TypeDescription): boolean {
   // For interfaces, check if the value has all the required methods
   if (desc.methods && typeof value === 'object') {
-    return Array.from(desc.methods).every(
+    const hasMethods = Array.from(desc.methods).every(
       (method) => typeof (value as any)[method] === 'function',
     )
+    
+    if (hasMethods && desc.methodSignatures) {
+      for (const [methodName, methodSignature] of desc.methodSignatures.entries()) {
+        const method = (value as any)[methodName]
+        if (typeof method !== 'function') {
+          return false
+        }
+      }
+    }
+    
+    return hasMethods
   }
   return false
 }
