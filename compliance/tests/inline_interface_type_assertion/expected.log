@@ -2,3 +2,4 @@ Greet assertion successful: Hello from Greeter
 NonExistentMethod assertion failed as expected
 Inline String assertion successful: MyStringer implementation
 k.(interface{ String() string }) successful: MyStringer implementation
+l.(*struct{ Name string }) successful, ptr is nil as expected

@@ -1,4 +1,0 @@
-Greet assertion failed
-NonExistentMethod assertion failed as expected
-Inline String assertion failed
-k.(interface{ String() string }) failed

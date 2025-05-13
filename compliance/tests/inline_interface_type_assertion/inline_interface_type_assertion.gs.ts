@@ -25,23 +25,22 @@ class Greeter {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'Greeter',
-	  $.TypeKind.Struct,
 	  new Greeter(),
 	  new Set(['Greet']),
 	  Greeter
 	);
 }
 
-type Stringer = any/* interface: interface{String() string} */
+type Stringer = null | {
+	String(): string
+}
 
-const Stringer__typeInfo = $.registerType(
+$.registerInterfaceType(
   'Stringer',
-  $.TypeKind.Interface,
   null, // Zero value for interface is null
   new Set(['String']),
-  undefined
 );
 
 class MyStringer {
@@ -66,9 +65,8 @@ class MyStringer {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'MyStringer',
-	  $.TypeKind.Struct,
 	  new MyStringer(),
 	  new Set(['String']),
 	  MyStringer
@@ -76,11 +74,13 @@ class MyStringer {
 }
 
 export function main(): void {
-	let i: any/* interface: interface{} */ = null
+	let i: null | any = null
 	i = new Greeter({})
 
 	// Successful type assertion to an inline interface
-	let { value: g, ok: ok } = $.typeAssert<any/* interface: interface{Greet() string} */>(i, 'unknown')
+	let { value: g, ok: ok } = $.typeAssert<null | {
+		Greet(): string
+	}>(i, {kind: $.TypeKind.Interface, methods: new Set(['Greet'])})
 	if (ok) {
 		console.log("Greet assertion successful:", g.Greet())
 	} else {
@@ -88,7 +88,9 @@ export function main(): void {
 	}
 
 	// Failing type assertion to a different inline interface
-	let { value: s, ok: ok2 } = $.typeAssert<any/* interface: interface{NonExistentMethod() int} */>(i, 'unknown')
+	let { value: s, ok: ok2 } = $.typeAssert<null | {
+		NonExistentMethod(): number
+	}>(i, {kind: $.TypeKind.Interface, methods: new Set(['NonExistentMethod'])})
 	if (ok2) {
 		console.log("NonExistentMethod assertion successful (unexpected):", s.NonExistentMethod())
 	} else {
@@ -96,11 +98,13 @@ export function main(): void {
 	}
 
 	// Successful type assertion to a named interface, where the asserted value also implements an inline interface method
-	let j: any/* interface: interface{} */ = null
+	let j: null | any = null
 	j = new MyStringer({})
 
 	// Assert 'j' (which holds MyStringer) to an inline interface that MyStringer satisfies.
-	let { value: inlineMs, ok: ok4 } = $.typeAssert<any/* interface: interface{String() string} */>(j, 'unknown')
+	let { value: inlineMs, ok: ok4 } = $.typeAssert<null | {
+		String(): string
+	}>(j, {kind: $.TypeKind.Interface, methods: new Set(['String'])})
 	if (ok4) {
 		console.log("Inline String assertion successful:", inlineMs.String())
 	} else {
@@ -111,11 +115,28 @@ export function main(): void {
 	let k: Stringer = null
 	k = new MyStringer({})
 
-	let { value: inlineK, ok: ok5 } = $.typeAssert<any/* interface: interface{String() string} */>(k, 'unknown')
+	let { value: inlineK, ok: ok5 } = $.typeAssert<null | {
+		String(): string
+	}>(k, {kind: $.TypeKind.Interface, methods: new Set(['String'])})
 	if (ok5) {
 		console.log("k.(interface{ String() string }) successful:", inlineK.String())
 	} else {
 		console.log("k.(interface{ String() string }) failed")
+	}
+
+	// Test case: nil value of an inline interface type assigned to interface{}
+	let l: any/* unhandled type: *types.Alias */ = (// unhandled value expr: *ast.StructType
+	!.value)(null)
+
+	let { value: ptr, ok: ok6 } = $.typeAssert<$.Box<{ Name?: string }> | null>(l, {kind: $.TypeKind.Pointer})
+	if (ok6) {
+		if (ptr == null) {
+			console.log("l.(*struct{ Name string }) successful, ptr is nil as expected")
+		} else {
+			console.log("l.(*struct{ Name string }) successful, but ptr is not nil (unexpected)")
+		}
+	} else {
+		console.log("l.(*struct{ Name string }) failed (unexpected)")
 	}
 }
 

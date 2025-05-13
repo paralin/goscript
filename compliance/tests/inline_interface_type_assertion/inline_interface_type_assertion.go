@@ -58,4 +58,20 @@ func main() {
 	} else {
 		println("k.(interface{ String() string }) failed")
 	}
+
+	// Test case: nil value of an inline interface type assigned to interface{}
+	var l any = (*struct {
+		Name string
+	})(nil)
+
+	ptr, ok6 := l.(*struct{ Name string })
+	if ok6 {
+		if ptr == nil {
+			println("l.(*struct{ Name string }) successful, ptr is nil as expected")
+		} else {
+			println("l.(*struct{ Name string }) successful, but ptr is not nil (unexpected)")
+		}
+	} else {
+		println("l.(*struct{ Name string }) failed (unexpected)")
+	}
 }
