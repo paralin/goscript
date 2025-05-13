@@ -806,108 +806,9 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-
-	// Use structured type information for container types
-	switch typeExpr := exp.Type.(type) {
-	case *ast.MapType:
-		// For map types, create a type descriptor object
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Map, ")
-
-		// Add key type
-		c.tsw.WriteLiterally("keyType: ")
-		if ident, ok := typeExpr.Key.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
-			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
-			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
-			}
-		} else {
-			c.writeTypeDescription(typeExpr.Key)
-		}
-
-		c.tsw.WriteLiterally(", ")
-
-		// Add element type
-		c.tsw.WriteLiterally("elemType: ")
-		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
-			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
-			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
-			}
-		} else {
-			c.writeTypeDescription(typeExpr.Value)
-		}
-
-		c.tsw.WriteLiterally("}")
-	case *ast.ArrayType:
-		// For slice types, create a type descriptor object
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Slice, ")
-
-		// Add element type
-		c.tsw.WriteLiterally("elemType: ")
-		if ident, ok := typeExpr.Elt.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
-			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
-			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
-			}
-		} else {
-			c.writeTypeDescription(typeExpr.Elt)
-		}
-
-		c.tsw.WriteLiterally("}")
-	default:
-		// For other types, use the string name as before
-		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
-	}
-
+	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
 	c.tsw.WriteLiterally(").value") // Access the value field directly in expression context
 	return nil
-}
-
-// isPrimitiveType returns true if the type name is a primitive type
-func isPrimitiveType(name string) bool {
-	switch name {
-	case "string", "int", "int8", "int16", "int32", "int64",
-		"uint", "uint8", "uint16", "uint32", "uint64",
-		"float32", "float64", "bool", "byte", "rune":
-		return true
-	}
-	return false
-}
-
-// writeTypeDescription writes a TypeScript representation of a Go type description
-func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
-	switch t := typeExpr.(type) {
-	case *ast.Ident:
-		// Simple types like 'string', 'int', etc.
-		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", t.Name))
-	case *ast.SelectorExpr:
-		// Imported types like pkg.Type
-		if ident, ok := t.X.(*ast.Ident); ok {
-			c.tsw.WriteLiterally(fmt.Sprintf("'%s.%s'", ident.Name, t.Sel.Name))
-		} else {
-			c.tsw.WriteLiterally("'unknown'")
-		}
-	case *ast.MapType:
-		// Nested map type
-		c.tsw.WriteLiterally("{kind: $.TypeKind.Map, keyType: ")
-		c.writeTypeDescription(t.Key)
-		c.tsw.WriteLiterally(", elemType: ")
-		c.writeTypeDescription(t.Value)
-		c.tsw.WriteLiterally("}")
-	case *ast.ArrayType:
-		// Nested slice/array type
-		c.tsw.WriteLiterally("{kind: $.TypeKind.Slice, elemType: ")
-		c.writeTypeDescription(t.Elt)
-		c.tsw.WriteLiterally("}")
-	default:
-		// Fallback for other types
-		c.tsw.WriteLiterally("'unknown'")
-	}
 }
 
 // isPointerComparison checks if a binary expression `exp` involves comparing
@@ -943,23 +844,6 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 		if ident, ok := t.X.(*ast.Ident); ok {
 			return fmt.Sprintf("%s.%s", ident.Name, t.Sel.Name)
 		}
-	case *ast.MapType:
-		keyTypeStr := c.getTypeNameString(t.Key)
-		valueTypeStr := c.getTypeNameString(t.Value)
-		return fmt.Sprintf("map[%s]%s", keyTypeStr, valueTypeStr)
-	case *ast.ArrayType:
-		// Handle both arrays and slices
-		elemTypeStr := c.getTypeNameString(t.Elt)
-		if t.Len == nil {
-			// Slice
-			return fmt.Sprintf("[]%s", elemTypeStr)
-		} else {
-			// Array
-			return fmt.Sprintf("array[%s]", elemTypeStr) // Using 'array' prefix to distinguish from slices
-		}
-	case *ast.ChanType:
-		elemTypeStr := c.getTypeNameString(t.Value)
-		return fmt.Sprintf("chan %s", elemTypeStr)
 	}
 	// Default case, use a placeholder for complex types
 	return "unknown"
@@ -2037,28 +1921,35 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 			c.tsw.WriteLiterally(")")
 			return nil
 		} else {
-			// Typed literal, likely a struct: new Type({...})
-			c.tsw.WriteLiterally("new ")
-			c.WriteTypeExpr(exp.Type)
-
 			// Check if this is a struct type
 			var structType *types.Struct
 			isStructLiteral := false
+			isAnonymousStruct := false
+
 			if namedType, ok := litType.(*types.Named); ok {
 				if underlyingStruct, ok := namedType.Underlying().(*types.Struct); ok {
 					structType = underlyingStruct
 					isStructLiteral = true
+					// Named struct, use constructor
+					c.tsw.WriteLiterally("new ")
+					c.WriteTypeExpr(exp.Type)
 				}
 			} else if ptrType, ok := litType.(*types.Pointer); ok {
 				if namedElem, ok := ptrType.Elem().(*types.Named); ok {
 					if underlyingStruct, ok := namedElem.Underlying().(*types.Struct); ok {
 						structType = underlyingStruct
 						isStructLiteral = true // Treat pointer-to-struct literal similarly
+						// Named struct pointer, use constructor
+						c.tsw.WriteLiterally("new ")
+						c.WriteTypeExpr(exp.Type)
 					}
 				}
-			} else if _, ok := litType.Underlying().(*types.Struct); ok {
-				// Handle anonymous struct literals if needed, though less common with embedding
+			} else if underlyingStruct, ok := litType.Underlying().(*types.Struct); ok {
+				// Anonymous struct literal
+				structType = underlyingStruct
 				isStructLiteral = true
+				isAnonymousStruct = true
+				// For anonymous structs, don't use constructor, just create object literal
 			}
 
 			if isStructLiteral && structType != nil {
@@ -2113,6 +2004,12 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						}
 					}
 
+					// For anonymous structs, all fields are direct fields
+					if isAnonymousStruct {
+						directFields[keyName] = kv.Value
+						isDirectField = true
+					}
+
 					// If not a direct field, return an error
 					if !isDirectField {
 						// This field was not found as a direct field in the struct
@@ -2121,8 +2018,41 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					}
 				}
 
-				// Write the nested literal for the constructor argument
-				c.tsw.WriteLiterally("({")
+				// Handle the case where an anonymous struct has values without keys
+				if isAnonymousStruct && len(exp.Elts) > 0 && len(directFields) == 0 && structType != nil {
+					// Check if elements are not key-value pairs
+					hasNonKeyValueElts := false
+					for _, elt := range exp.Elts {
+						if _, isKV := elt.(*ast.KeyValueExpr); !isKV {
+							hasNonKeyValueElts = true
+							break
+						}
+					}
+
+					if hasNonKeyValueElts {
+						// Get the fields from the struct type
+						for i := 0; i < structType.NumFields(); i++ {
+							field := structType.Field(i)
+							// If we have a value for this field position
+							if i < len(exp.Elts) {
+								// Check if it's not a key-value pair
+								if _, isKV := exp.Elts[i].(*ast.KeyValueExpr); !isKV {
+									directFields[field.Name()] = exp.Elts[i]
+								}
+							}
+						}
+					}
+				}
+
+				// Write the object literal
+				if isAnonymousStruct {
+					// For anonymous structs, just write a simple object literal
+					c.tsw.WriteLiterally("{")
+				} else {
+					// For named structs, write the constructor argument
+					c.tsw.WriteLiterally("({")
+				}
+
 				firstFieldWritten := false
 
 				// Write direct fields that aren't embedded struct names
@@ -2222,7 +2152,12 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					firstFieldWritten = true
 				}
 
-				c.tsw.WriteLiterally("})") // Close constructor argument object
+				// Close the object literal
+				if isAnonymousStruct {
+					c.tsw.WriteLiterally("}")
+				} else {
+					c.tsw.WriteLiterally("})")
+				}
 
 			} else {
 				// Non-struct type or anonymous struct, handle normally (or potentially error for anonymous struct literals?)
@@ -5386,14 +5321,12 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	}
 	c.tsw.WriteLiterally(", ")
 
-	// Use structured type information for container types
+	// Use structured type information for all types
 	switch typeExpr := assertedType.(type) {
 	case *ast.MapType:
-		// For map types, create a type descriptor object
 		c.tsw.WriteLiterally("{")
 		c.tsw.WriteLiterally("kind: $.TypeKind.Map, ")
 
-		// Add key type
 		c.tsw.WriteLiterally("keyType: ")
 		if ident, ok := typeExpr.Key.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
 			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
@@ -5421,9 +5354,15 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 		c.tsw.WriteLiterally("}")
 	case *ast.ArrayType:
-		// For slice types, create a type descriptor object
+		// Determine if it's a slice or array
+		typeKind := "$.TypeKind.Slice"
+		if typeExpr.Len != nil {
+			typeKind = "$.TypeKind.Array"
+		}
+
+		// Create a type descriptor object
 		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Slice, ")
+		c.tsw.WriteLiterally(fmt.Sprintf("kind: %s, ", typeKind))
 
 		// Add element type
 		c.tsw.WriteLiterally("elemType: ")
@@ -5438,6 +5377,113 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		}
 
 		c.tsw.WriteLiterally("}")
+	case *ast.StructType:
+		// For struct types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Struct")
+
+		// Get the type name if available
+		typeName := c.getTypeNameString(assertedType)
+		if typeName != "unknown" {
+			c.tsw.WriteLiterally(fmt.Sprintf(", name: '%s'", typeName))
+		}
+
+		if typeExpr.Fields != nil && typeExpr.Fields.List != nil {
+			c.tsw.WriteLiterally(", fields: new Set([")
+
+			fields := []string{}
+			for _, field := range typeExpr.Fields.List {
+				for _, name := range field.Names {
+					fields = append(fields, fmt.Sprintf("'%s'", name.Name))
+				}
+			}
+
+			c.tsw.WriteLiterally(strings.Join(fields, ", "))
+			c.tsw.WriteLiterally("])")
+		}
+
+		c.tsw.WriteLiterally("}")
+	case *ast.InterfaceType:
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Interface")
+
+		// Get the type name if available
+		typeName := c.getTypeNameString(assertedType)
+		if typeName != "unknown" {
+			c.tsw.WriteLiterally(fmt.Sprintf(", name: '%s'", typeName))
+		}
+
+		// Add methods if available
+		if typeExpr.Methods != nil && typeExpr.Methods.List != nil {
+			c.tsw.WriteLiterally(", methods: new Set([")
+
+			methods := []string{}
+			for _, method := range typeExpr.Methods.List {
+				for _, name := range method.Names {
+					methods = append(methods, fmt.Sprintf("'%s'", name.Name))
+				}
+			}
+
+			c.tsw.WriteLiterally(strings.Join(methods, ", "))
+			c.tsw.WriteLiterally("])")
+		}
+
+		c.tsw.WriteLiterally("}")
+	case *ast.StarExpr:
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Pointer")
+
+		// Add element type if it's a named type
+		if ident, ok := typeExpr.X.(*ast.Ident); ok {
+			c.tsw.WriteLiterally(fmt.Sprintf(", elemType: '%s'", ident.Name))
+		}
+
+		c.tsw.WriteLiterally("}")
+	case *ast.ChanType:
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Channel")
+
+		// Add element type
+		c.tsw.WriteLiterally(", elemType: ")
+		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(typeExpr.Value)
+		}
+
+		c.tsw.WriteLiterally("}")
+	case *ast.FuncType:
+		// For function types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Function")
+		c.tsw.WriteLiterally("}")
+	case *ast.Ident:
+		if isPrimitiveType(typeExpr.Name) {
+			c.tsw.WriteLiterally("{")
+			c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
+
+			// Use TypeScript equivalent if available
+			if tsType, ok := GoBuiltinToTypescript(typeExpr.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", typeExpr.Name))
+			}
+
+			c.tsw.WriteLiterally("}")
+		} else {
+			c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeExpr.Name))
+		}
+	case *ast.SelectorExpr:
+		// For imported types like pkg.Type
+		if ident, ok := typeExpr.X.(*ast.Ident); ok {
+			c.tsw.WriteLiterally(fmt.Sprintf("'%s.%s'", ident.Name, typeExpr.Sel.Name))
+		} else {
+			c.tsw.WriteLiterally(fmt.Sprintf("'%s'", c.getTypeNameString(assertedType)))
+		}
 	default:
 		// For other types, use the string name as before
 		typeName := c.getTypeNameString(assertedType)
@@ -5453,6 +5499,59 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	c.tsw.WriteLine("") // Add newline after the statement
 
 	return nil
+}
+
+func isPrimitiveType(name string) bool {
+	_, ok := goToTypescriptPrimitives[name]
+	return ok
+}
+
+// Helper function to write a type description for a type expression
+func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
+	switch t := typeExpr.(type) {
+	case *ast.Ident:
+		if isPrimitiveType(t.Name) {
+			if tsType, ok := GoBuiltinToTypescript(t.Name); ok {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+			} else {
+				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", t.Name))
+			}
+		} else {
+			c.tsw.WriteLiterally(fmt.Sprintf("'%s'", t.Name))
+		}
+	case *ast.SelectorExpr:
+		if ident, ok := t.X.(*ast.Ident); ok {
+			c.tsw.WriteLiterally(fmt.Sprintf("'%s.%s'", ident.Name, t.Sel.Name))
+		}
+	case *ast.ArrayType:
+		typeKind := "$.TypeKind.Slice"
+		if t.Len != nil {
+			typeKind = "$.TypeKind.Array"
+		}
+
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally(fmt.Sprintf("kind: %s, ", typeKind))
+		c.tsw.WriteLiterally("elemType: ")
+		c.writeTypeDescription(t.Elt)
+		c.tsw.WriteLiterally("}")
+	case *ast.MapType:
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Map, ")
+		c.tsw.WriteLiterally("keyType: ")
+		c.writeTypeDescription(t.Key)
+		c.tsw.WriteLiterally(", ")
+		c.tsw.WriteLiterally("elemType: ")
+		c.writeTypeDescription(t.Value)
+		c.tsw.WriteLiterally("}")
+	case *ast.StarExpr:
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Pointer, ")
+		c.tsw.WriteLiterally("elemType: ")
+		c.writeTypeDescription(t.X)
+		c.tsw.WriteLiterally("}")
+	default:
+		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", c.getTypeNameString(typeExpr)))
+	}
 }
 
 // WriteDoc translates a Go comment group (`ast.CommentGroup`) into TypeScript comments,
