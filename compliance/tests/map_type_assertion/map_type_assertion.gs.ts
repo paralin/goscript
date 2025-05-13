@@ -4,17 +4,17 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	let i: any/* interface: interface{} */ = null
+	let i: null | any = null
 	i = new Map([["age", 30]])
 
-	let { value: m, ok: ok } = $.typeAssert<Map<string, number>>(i, 'unknown')
+	let { value: m, ok: ok } = $.typeAssert<Map<string, number>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'number'})
 	if (ok) {
 		console.log("Age:", m.get("age") ?? 0)
 	} else {
 		console.log("Type assertion failed")
 	}
 
-	let { ok: ok2 } = $.typeAssert<Map<string, string>>(i, 'unknown')
+	let { ok: ok2 } = $.typeAssert<Map<string, string>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'string'})
 
 	// This block should not be reached if the assertion fails as expected.
 	// Depending on how Go handles failed assertions with incorrect types,
@@ -30,7 +30,7 @@ export function main(): void {
 		console.log("Second type assertion (map[string]string) failed as expected")
 	}
 
-	let { ok: ok3 } = $.typeAssert<Map<number, number>>(i, 'unknown')
+	let { ok: ok3 } = $.typeAssert<Map<number, number>>(i, {kind: $.TypeKind.Map, keyType: 'number', elemType: 'number'})
 
 	// Similar to the above, this block should not be reached.
 	if (ok3) {
