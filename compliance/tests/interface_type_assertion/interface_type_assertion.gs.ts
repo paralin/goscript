@@ -48,7 +48,7 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set(['Method1']),
+	  new Set(["Method1"]),
 	  MyStruct
 	);
 }

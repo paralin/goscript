@@ -65,11 +65,25 @@ func (w *TSCodeWriter) WriteCommentLine(commentText string) {
 	}
 }
 
+// WriteCommentLinef writes a formatted comment as a // line.
+func (w *TSCodeWriter) WriteCommentLinef(format string, args ...any) {
+	commentText := fmt.Sprintf(format, args...)
+	lines := strings.SplitSeq(commentText, "\n")
+	for line := range lines {
+		w.WriteLinef("// %s", line)
+	}
+}
+
 // WriteCommentInline write a comment within /* */.
 func (w *TSCodeWriter) WriteCommentInline(commentText string) {
 	w.w.Write([]byte("/* "))       //nolint:errcheck
 	w.w.Write([]byte(commentText)) //nolint:errcheck
 	w.w.Write([]byte(" */"))       //nolint:errcheck
+}
+
+// WriteCommentInlinef writes a formatted comment within /* */.
+func (w *TSCodeWriter) WriteCommentInlinef(format string, args ...any) {
+	w.WriteCommentInline(fmt.Sprintf(format, args...))
 }
 
 // WriteLiterally writes something to the output without processing

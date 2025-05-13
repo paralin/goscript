@@ -43,7 +43,7 @@ class MyProcessor {
 	static __typeInfo = $.registerStructType(
 	  'MyProcessor',
 	  new MyProcessor(),
-	  new Set(['Process']),
+	  new Set(["Process"]),
 	  MyProcessor
 	);
 }

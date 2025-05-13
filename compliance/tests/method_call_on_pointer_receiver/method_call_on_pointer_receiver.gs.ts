@@ -49,7 +49,7 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set(['GetMyString']),
+	  new Set(["GetMyString"]),
 	  MyStruct
 	);
 }

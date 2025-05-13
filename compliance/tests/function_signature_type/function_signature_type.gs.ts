@@ -54,7 +54,7 @@ class MyError {
 	static __typeInfo = $.registerStructType(
 	  'MyError',
 	  new MyError(),
-	  new Set(['Error']),
+	  new Set(["Error"]),
 	  MyError
 	);
 }

@@ -48,7 +48,7 @@ class Person {
 	static __typeInfo = $.registerStructType(
 	  'Person',
 	  new Person(),
-	  new Set(['Greet']),
+	  new Set(["Greet"]),
 	  Person
 	);
 }
@@ -161,7 +161,7 @@ class Address {
 	static __typeInfo = $.registerStructType(
 	  'Address',
 	  new Address(),
-	  new Set(['FullAddress']),
+	  new Set(["FullAddress"]),
 	  Address
 	);
 }
@@ -201,7 +201,7 @@ class Contact {
 	static __typeInfo = $.registerStructType(
 	  'Contact',
 	  new Contact(),
-	  new Set(['Call']),
+	  new Set(["Call"]),
 	  Contact
 	);
 }

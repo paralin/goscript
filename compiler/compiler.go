@@ -320,7 +320,7 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
-		c.tsw.WriteCommentInline(fmt.Sprintf("unhandled type: %T", typ))
+		c.tsw.WriteCommentInlinef("unhandled type: %T", typ)
 	}
 }
 
@@ -452,7 +452,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 		if param.Name() != "" {
 			c.tsw.WriteLiterally(param.Name())
 		} else {
-			c.tsw.WriteLiterally(fmt.Sprintf("p%d", i))
+			c.tsw.WriteLiterallyf("p%d", i)
 		}
 		c.tsw.WriteLiterally(": ")
 
@@ -763,7 +763,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	case *ast.FuncLit:
 		return c.WriteFuncLitValue(exp)
 	default:
-		c.tsw.WriteCommentLine(fmt.Sprintf("unhandled value expr: %T", exp))
+		c.tsw.WriteCommentLinef("unhandled value expr: %T", exp)
 		return nil
 	}
 }
@@ -783,7 +783,7 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 				return err
 			}
 			c.tsw.WriteLiterally(", ")
-			
+
 			// Generate the zero value as the default value for mapGet
 			c.WriteZeroValueForType(mapType.Elem())
 			c.tsw.WriteLiterally(")")
@@ -821,7 +821,7 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+	c.tsw.WriteLiterallyf("'%s'", typeName)
 	c.tsw.WriteLiterally(").value") // Access the value field directly in expression context
 	return nil
 }
@@ -1709,10 +1709,10 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 		// Use strconv.UnquoteChar to handle escape sequences correctly.
 		val, _, _, err := strconv.UnquoteChar(exp.Value[1:len(exp.Value)-1], '\'')
 		if err != nil {
-			c.tsw.WriteCommentInline(fmt.Sprintf("error parsing char literal %s: %v", exp.Value, err))
+			c.tsw.WriteCommentInlinef("error parsing char literal %s: %v", exp.Value, err)
 			c.tsw.WriteLiterally("0") // Default to 0 on error
 		} else {
-			c.tsw.WriteLiterally(fmt.Sprintf("%d", val))
+			c.tsw.WriteLiterallyf("%d", val)
 		}
 	} else {
 		// Other literals (INT, FLOAT, STRING, IMAG)
@@ -2362,7 +2362,7 @@ func (c *GoToTSCompiler) collectMethodNames(structName string) string {
 			// Check if the receiver identifier name matches the struct name
 			if ident, ok := recvType.(*ast.Ident); ok && ident.Name == structName {
 				// Found a method for this struct
-				methodNames = append(methodNames, fmt.Sprintf("'%s'", funcDecl.Name.Name))
+				methodNames = append(methodNames, strconv.Quote(funcDecl.Name.Name))
 			}
 		}
 	}
@@ -3120,7 +3120,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		if !isArguments {
 			// write tag comment if any for struct fields
 			if field.Tag != nil {
-				c.tsw.WriteCommentLine(fmt.Sprintf(" // tag: %s", field.Tag.Value))
+				c.tsw.WriteCommentLinef("tag: %s", field.Tag.Value)
 			} else {
 				c.tsw.WriteLine("") // No semicolon
 			}
@@ -3199,7 +3199,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 						return fmt.Errorf("failed to write value spec in declaration statement: %w", err)
 					}
 				} else {
-					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled spec in DeclStmt: %T", spec))
+					c.tsw.WriteCommentLinef("unhandled spec in DeclStmt: %T", spec)
 				}
 			}
 		} else {
@@ -3278,7 +3278,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		case token.CONTINUE:
 			c.tsw.WriteLine("continue") // No semicolon needed
 		default:
-			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled branch statement token: %s", exp.Tok.String()))
+			c.tsw.WriteCommentLinef("unhandled branch statement token: %s", exp.Tok.String())
 		}
 	default:
 		return errors.Errorf("unknown statement: %s\n", a)
@@ -3316,7 +3316,7 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 
 	// Set stack variable based on whether we are in an async function
 	stackVar := "__defer"
-	c.tsw.WriteLiterally(fmt.Sprintf("%s.defer(%s() => {", stackVar, asyncPrefix))
+	c.tsw.WriteLiterallyf("%s.defer(%s() => {", stackVar, asyncPrefix)
 	c.tsw.Indent(1)
 	c.tsw.WriteLine("")
 
@@ -3418,7 +3418,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 			c.tsw.WriteLiterally("{") // Start object literal
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
-			c.tsw.WriteLiterally(fmt.Sprintf("id: %d,", caseID))
+			c.tsw.WriteLiterallyf("id: %d,", caseID)
 			c.tsw.WriteLine("")
 
 			// Handle different types of comm statements
@@ -3437,10 +3437,10 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 						c.tsw.WriteLiterally(",")
 						c.tsw.WriteLine("")
 					} else {
-						c.tsw.WriteCommentLine(fmt.Sprintf("unhandled RHS in select assignment case: %T", comm.Rhs[0]))
+						c.tsw.WriteCommentLinef("unhandled RHS in select assignment case: %T", comm.Rhs[0])
 					}
 				} else {
-					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled RHS count in select assignment case: %d", len(comm.Rhs)))
+					c.tsw.WriteCommentLinef("unhandled RHS count in select assignment case: %d", len(comm.Rhs))
 				}
 			case *ast.ExprStmt:
 				// This is a simple receive: case <-ch:
@@ -3454,7 +3454,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 					c.tsw.WriteLiterally(",")
 					c.tsw.WriteLine("")
 				} else {
-					c.tsw.WriteCommentLine(fmt.Sprintf("unhandled expression in select case: %T", comm.X))
+					c.tsw.WriteCommentLinef("unhandled expression in select case: %T", comm.X)
 				}
 			case *ast.SendStmt:
 				// This is a send operation: case ch <- v:
@@ -3473,7 +3473,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 				c.tsw.WriteLiterally(",")
 				c.tsw.WriteLine("")
 			default:
-				c.tsw.WriteCommentLine(fmt.Sprintf("unhandled comm statement in select case: %T", comm))
+				c.tsw.WriteCommentLinef("unhandled comm statement in select case: %T", comm)
 			}
 
 			// Add the onSelected handler to execute the case body after the select resolves
@@ -3530,14 +3530,14 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 			c.tsw.WriteLine("")
 
 		} else {
-			c.tsw.WriteCommentLine(fmt.Sprintf("unknown statement in select body: %T", stmt))
+			c.tsw.WriteCommentLinef("unknown statement in select body: %T", stmt)
 		}
 	}
 
 	// Close the array literal and the selectStatement call
 	c.tsw.Indent(-1)
 	c.tsw.WriteLiterally("], ")
-	c.tsw.WriteLiterally(fmt.Sprintf("%t", hasDefault))
+	c.tsw.WriteLiterallyf("%t", hasDefault)
 	c.tsw.WriteLiterally(")")
 	c.tsw.WriteLine("")
 
@@ -3591,7 +3591,7 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error {
 				return fmt.Errorf("failed to write case clause in switch statement: %w", err)
 			}
 		} else {
-			c.tsw.WriteCommentLine(fmt.Sprintf("unhandled statement in switch body: %T", stmt))
+			c.tsw.WriteCommentLinef("unhandled statement in switch body: %T", stmt)
 		}
 	}
 
@@ -4588,7 +4588,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		} else if existsIsBlank {
 			// If both are blank, still evaluate for side effects (though .has/.get are usually pure)
 			// We add a ; otherwise TypeScript thinks we are invoking a function.
-			c.tsw.WriteLiterally(";(")                            // Wrap in parens to make it an expression statement
+			c.tsw.WriteLiterally(";(") // Wrap in parens to make it an expression statement
 			c.tsw.WriteLiterally("$.mapHas(")
 			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
 				return err
@@ -4597,7 +4597,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
 				return err
 			}
-			c.tsw.WriteLiterally("), ")                           // Evaluate .has
+			c.tsw.WriteLiterally("), ") // Evaluate .has
 			c.tsw.WriteLiterally("$.mapGet(")
 			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
 				return err
@@ -5077,7 +5077,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 					indexVarName = keyIdent.Name
 				}
 			}
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < _runes.length; %s++) {", indexVarName, indexVarName, indexVarName))
+			c.tsw.WriteLiterallyf("for (let %s = 0; %s < _runes.length; %s++) {", indexVarName, indexVarName, indexVarName)
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			// Declare value if provided and not blank
@@ -5109,11 +5109,11 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				}
 			}
 
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
+			c.tsw.WriteLiterallyf("for (let %s = 0; %s < ", indexVarName, indexVarName)
 			if err := c.WriteValueExpr(exp.X); err != nil { // This is N
 				return fmt.Errorf("failed to write range loop integer expression: %w", err)
 			}
-			c.tsw.WriteLiterally(fmt.Sprintf("; %s++) {", indexVarName))
+			c.tsw.WriteLiterallyf("; %s++) {", indexVarName)
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 
@@ -5144,7 +5144,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		}
 		// If both key and value are provided, use an index loop and assign both
 		if exp.Key != nil && exp.Value != nil {
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName))
+			c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
 			if err := c.WriteValueExpr(exp.X); err != nil { // Write the expression for the iterable
 				return fmt.Errorf("failed to write range loop array/slice expression (key and value): %w", err)
 			}
@@ -5159,7 +5159,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				if err := c.WriteValueExpr(exp.X); err != nil {
 					return fmt.Errorf("failed to write range loop array/slice value expression: %w", err)
 				}
-				c.tsw.WriteLiterally(fmt.Sprintf("![%s]", indexVarName)) // Use indexVarName with not-null assert
+				c.tsw.WriteLiterallyf("![%s]", indexVarName) // Use indexVarName with not-null assert
 				c.tsw.WriteLine("")
 			}
 			if err := c.WriteStmt(exp.Body); err != nil {
@@ -5169,12 +5169,12 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			c.tsw.WriteLine("}")
 			return nil
 		} else if exp.Key != nil && exp.Value == nil { // Only key provided
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName))
+			c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
 			// Write the expression for the iterable
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write expression for the iterable: %w", err)
 			}
-			c.tsw.WriteLiterally(fmt.Sprintf("); %s++) {", indexVarName))
+			c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
@@ -5189,11 +5189,11 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		} else {
 			// Fallback: simple index loop without declaring range variables, use _i
 			indexVarName := "_i"
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName))
+			c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write range loop array/slice length expression (fallback): %w", err)
 			}
-			c.tsw.WriteLiterally(fmt.Sprintf("); %s++) {", indexVarName))
+			c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
@@ -5324,9 +5324,9 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		c.tsw.WriteLiterally("keyType: ")
 		if ident, ok := typeExpr.Key.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
 			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+				c.tsw.WriteLiterallyf("'%s'", tsType)
 			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
 			}
 		} else {
 			c.writeTypeDescription(typeExpr.Key)
@@ -5338,9 +5338,9 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		c.tsw.WriteLiterally("elemType: ")
 		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
 			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+				c.tsw.WriteLiterallyf("'%s'", tsType)
 			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
 			}
 		} else {
 			c.writeTypeDescription(typeExpr.Value)
@@ -5356,15 +5356,15 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 		// Create a type descriptor object
 		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally(fmt.Sprintf("kind: %s, ", typeKind))
+		c.tsw.WriteLiterallyf("kind: %s, ", typeKind)
 
 		// Add element type
 		c.tsw.WriteLiterally("elemType: ")
 		if ident, ok := typeExpr.Elt.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
 			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+				c.tsw.WriteLiterallyf("'%s'", tsType)
 			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
 			}
 		} else {
 			c.writeTypeDescription(typeExpr.Elt)
@@ -5379,7 +5379,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		// Get the type name if available
 		typeName := c.getTypeNameString(assertedType)
 		if typeName != "unknown" {
-			c.tsw.WriteLiterally(fmt.Sprintf(", name: '%s'", typeName))
+			c.tsw.WriteLiterallyf(", name: '%s'", typeName)
 		}
 
 		if typeExpr.Fields != nil && typeExpr.Fields.List != nil {
@@ -5407,7 +5407,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		// Get the type name if available
 		typeName := c.getTypeNameString(assertedType)
 		if typeName != "unknown" {
-			c.tsw.WriteLiterally(fmt.Sprintf(", name: '%s'", typeName))
+			c.tsw.WriteLiterallyf(", name: '%s'", typeName)
 		}
 
 		// Add methods if available
@@ -5432,7 +5432,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 		// Add element type if it's a named type
 		if ident, ok := typeExpr.X.(*ast.Ident); ok {
-			c.tsw.WriteLiterally(fmt.Sprintf(", elemType: '%s'", ident.Name))
+			c.tsw.WriteLiterallyf(", elemType: '%s'", ident.Name)
 		}
 
 		c.tsw.WriteLiterally("}")
@@ -5444,9 +5444,9 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		c.tsw.WriteLiterally(", elemType: ")
 		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
 			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", tsType))
+				c.tsw.WriteLiterallyf("'%s'", tsType)
 			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("'%s'", ident.Name)) // Fallback
+				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
 			}
 		} else {
 			c.writeTypeDescription(typeExpr.Value)
@@ -5465,26 +5465,26 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 			// Use TypeScript equivalent if available
 			if tsType, ok := GoBuiltinToTypescript(typeExpr.Name); ok {
-				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", tsType))
+				c.tsw.WriteLiterallyf("name: '%s'", tsType) // TODO: use %q?
 			} else {
-				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", typeExpr.Name))
+				c.tsw.WriteLiterallyf("name: '%s'", typeExpr.Name)
 			}
 
 			c.tsw.WriteLiterally("}")
 		} else {
-			c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeExpr.Name))
+			c.tsw.WriteLiterallyf("'%s'", typeExpr.Name)
 		}
 	case *ast.SelectorExpr:
 		// For imported types like pkg.Type
 		if ident, ok := typeExpr.X.(*ast.Ident); ok {
-			c.tsw.WriteLiterally(fmt.Sprintf("'%s.%s'", ident.Name, typeExpr.Sel.Name))
+			c.tsw.WriteLiterallyf("'%s.%s'", ident.Name, typeExpr.Sel.Name)
 		} else {
-			c.tsw.WriteLiterally(fmt.Sprintf("'%s'", c.getTypeNameString(assertedType)))
+			c.tsw.WriteLiterallyf("'%s'", c.getTypeNameString(assertedType))
 		}
 	default:
 		// For other types, use the string name as before
 		typeName := c.getTypeNameString(assertedType)
-		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", typeName))
+		c.tsw.WriteLiterallyf("'%s'", typeName)
 	}
 
 	c.tsw.WriteLiterally(")")
@@ -5511,22 +5511,22 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 			if tsType, ok := GoBuiltinToTypescript(t.Name); ok {
 				c.tsw.WriteLiterally("{")
 				c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
-				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", tsType))
+				c.tsw.WriteLiterallyf("name: '%s'", tsType)
 				c.tsw.WriteLiterally("}")
 			} else {
 				// Fallback for other primitive types
 				c.tsw.WriteLiterally("{")
 				c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
-				c.tsw.WriteLiterally(fmt.Sprintf("name: '%s'", t.Name))
+				c.tsw.WriteLiterallyf("name: '%s'", t.Name)
 				c.tsw.WriteLiterally("}")
 			}
 		} else {
 			// For named types, just use the name string
-			c.tsw.WriteLiterally(fmt.Sprintf("'%s'", t.Name))
+			c.tsw.WriteLiterallyf("'%s'", t.Name)
 		}
 	case *ast.SelectorExpr:
 		if ident, ok := t.X.(*ast.Ident); ok {
-			c.tsw.WriteLiterally(fmt.Sprintf("'%s.%s'", ident.Name, t.Sel.Name))
+			c.tsw.WriteLiterallyf("'%s.%s'", ident.Name, t.Sel.Name)
 		}
 	case *ast.ArrayType:
 		typeKind := "$.TypeKind.Slice"
@@ -5535,7 +5535,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		}
 
 		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally(fmt.Sprintf("kind: %s, ", typeKind))
+		c.tsw.WriteLiterallyf("kind: %s, ", typeKind)
 		c.tsw.WriteLiterally("elemType: ")
 		c.writeTypeDescription(t.Elt)
 		c.tsw.WriteLiterally("}")
@@ -5567,7 +5567,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 						if hasFields {
 							c.tsw.WriteLiterally(", ")
 						}
-						c.tsw.WriteLiterally(fmt.Sprintf("'%s': ", name.Name))
+						c.tsw.WriteLiterallyf("'%s': ", name.Name)
 						c.writeTypeDescription(field.Type)
 						hasFields = true
 					}
@@ -5599,7 +5599,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		c.tsw.WriteLiterally("}")
 	default:
 		// For other types, use the string representation
-		c.tsw.WriteLiterally(fmt.Sprintf("'%s'", c.getTypeNameString(typeExpr)))
+		c.tsw.WriteLiterallyf("'%s'", c.getTypeNameString(typeExpr))
 	}
 }
 
