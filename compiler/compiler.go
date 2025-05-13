@@ -774,19 +774,19 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 	if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
 		// Check if it's a map type
 		if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
+			c.tsw.WriteLiterally("$.mapGet(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
 			}
-			c.tsw.WriteLiterally(".get(")
+			c.tsw.WriteLiterally(", ")
 			if err := c.WriteValueExpr(exp.Index); err != nil {
 				return err
 			}
-			// Map.get() returns undefined when key not found, but Go returns zero value
-			// Add nullish coalescing with the appropriate zero value for the map's value type
-			c.tsw.WriteLiterally(") ?? ")
-
-			// Generate the zero value based on the map's value type
+			c.tsw.WriteLiterally(", ")
+			
+			// Generate the zero value as the default value for mapGet
 			c.WriteZeroValueForType(mapType.Elem())
+			c.tsw.WriteLiterally(")")
 			return nil
 		}
 	}
@@ -4547,10 +4547,11 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		if !existsIsBlank {
 			c.tsw.WriteLiterally(existsName)
 			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally("$.mapHas(")
 			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
 				return err
 			}
-			c.tsw.WriteLiterally(".has(")
+			c.tsw.WriteLiterally(", ")
 			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
 				return err
 			}
@@ -4562,14 +4563,15 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		if !valueIsBlank {
 			c.tsw.WriteLiterally(valueName)
 			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally("$.mapGet(")
 			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
 				return err
 			}
-			c.tsw.WriteLiterally(".get(")
+			c.tsw.WriteLiterally(", ")
 			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
 				return err
 			}
-			c.tsw.WriteLiterally(") ?? ")
+			c.tsw.WriteLiterally(", ")
 			// Write the zero value for the map's value type
 			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
 				if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
@@ -4581,27 +4583,30 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			} else {
 				c.tsw.WriteLiterally("null")
 			}
+			c.tsw.WriteLiterally(")")
 			c.tsw.WriteLine("")
 		} else if existsIsBlank {
 			// If both are blank, still evaluate for side effects (though .has/.get are usually pure)
 			// We add a ; otherwise TypeScript thinks we are invoking a function.
 			c.tsw.WriteLiterally(";(")                            // Wrap in parens to make it an expression statement
+			c.tsw.WriteLiterally("$.mapHas(")
 			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
 				return err
 			}
-			c.tsw.WriteLiterally(".has(")
+			c.tsw.WriteLiterally(", ")
 			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
 				return err
 			}
 			c.tsw.WriteLiterally("), ")                           // Evaluate .has
+			c.tsw.WriteLiterally("$.mapGet(")
 			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
 				return err
 			}
-			c.tsw.WriteLiterally(".get(")
+			c.tsw.WriteLiterally(", ")
 			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
 				return err
 			}
-			c.tsw.WriteLiterally("))") // Evaluate .get
+			c.tsw.WriteLiterally(", null))") // Evaluate .get with null as default
 			c.tsw.WriteLine("")
 		}
 
