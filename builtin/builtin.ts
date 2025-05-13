@@ -1133,6 +1133,8 @@ function matchesArrayOrSliceType(value: any, info: TypeInfo): boolean {
  * @returns True if the value matches the pointer type, false otherwise.
  */
 function matchesPointerType(value: any, info: TypeInfo): boolean {
+  // Allow null/undefined values to match pointer types to support nil pointer assertions
+  // This enables Go's nil pointer type assertions like `ptr, ok := i.(*SomeType)` to work correctly
   if (value === null || value === undefined) {
     return true
   }
