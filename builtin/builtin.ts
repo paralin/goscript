@@ -937,8 +937,22 @@ function matchesType(value: any, desc: TypeDescription): boolean {
             return true;
             
         case TypeKind.Pointer:
-            // For pointers, check if value is not null or undefined
-            return value !== null && value !== undefined;
+            // For pointers, check if value is a Box (has a 'value' property)
+            if (value === null || value === undefined) {
+                return false;
+            }
+            
+            // Check if the value is a Box (has a 'value' property)
+            if (typeof value !== 'object' || !('value' in value)) {
+                return false;
+            }
+            
+            if (desc.elemType) {
+                const elemTypeDesc = normalizeTypeDescription(desc.elemType);
+                return matchesType(value.value, elemTypeDesc);
+            }
+            
+            return true;
             
         case TypeKind.Function:
             // For functions, check if the value is a function
