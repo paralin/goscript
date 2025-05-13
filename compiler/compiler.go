@@ -303,20 +303,7 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	case *types.Signature:
 		c.WriteSignatureType(t)
 	case *types.Struct:
-		// Generate an interface with the struct's fields
-		c.tsw.WriteLiterally("{ ")
-		// Add field properties to the interface
-		if t.NumFields() > 0 {
-			for i := 0; i < t.NumFields(); i++ {
-				field := t.Field(i)
-				if i > 0 {
-					c.tsw.WriteLiterally("; ")
-				}
-				c.tsw.WriteLiterally(field.Name() + "?: ")
-				c.WriteGoType(field.Type())
-			}
-		}
-		c.tsw.WriteLiterally(" }")
+		c.WriteStructType(t)
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
@@ -604,51 +591,6 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 	}
 }
 
-// It handles several patterns:
-// 1. (*struct{})(nil) - A nil pointer to an anonymous struct type
-func (c *GoToTSCompiler) isNilPointerToStructType(expr ast.Expr) bool {
-	// Handle ParenExpr: (*struct{})(nil) or (SomeType)(nil)
-	if parenExpr, isParenExpr := expr.(*ast.ParenExpr); isParenExpr {
-		// Check if this is a nil pointer to struct type cast: (*struct{})(nil)
-		if starExpr, isStarExpr := parenExpr.X.(*ast.StarExpr); isStarExpr {
-			if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
-				return true
-			}
-		}
-
-		// Check if this is a type cast with nil: (SomeType)(nil)
-		if ident, isIdent := parenExpr.X.(*ast.Ident); isIdent && ident.Name == "nil" {
-			return true
-		}
-	}
-
-	// Handle CallExpr: (*struct{})(nil)
-	if callExpr, isCallExpr := expr.(*ast.CallExpr); isCallExpr && len(callExpr.Args) == 1 {
-		if nilIdent, isIdent := callExpr.Args[0].(*ast.Ident); isIdent && nilIdent.Name == "nil" {
-			// Handle nil pointer to struct type conversions: (*struct{})(nil)
-			if starExpr, isStarExpr := callExpr.Fun.(*ast.StarExpr); isStarExpr {
-				if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
-					return true
-				}
-			}
-			
-			// Any type conversion with nil argument
-			return true
-		}
-	}
-
-	return false
-}
-
-// handleNilPointerToStructType checks if an expression is a nil pointer to struct type
-func (c *GoToTSCompiler) handleNilPointerToStructType(expr ast.Expr) bool {
-	if c.isNilPointerToStructType(expr) {
-		c.tsw.WriteLiterally("null")
-		return true
-	}
-	return false
-}
-
 // WriteZeroValueForType writes the TypeScript representation of the zero value
 // for a given Go type.
 // It handles `types.Array` by recursively writing zero values for each element
@@ -797,8 +739,17 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		c.tsw.WriteLiterally(")")
 		return nil
 	case *ast.ParenExpr:
-		// Handle nil pointer to struct type cast or type cast with nil
-		if c.handleNilPointerToStructType(exp) {
+		// Check if this is a nil pointer to struct type cast: (*struct{})(nil)
+		if starExpr, isStarExpr := exp.X.(*ast.StarExpr); isStarExpr {
+			if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
+				c.tsw.WriteLiterally("null")
+				return nil
+			}
+		}
+
+		// Check if this is a type cast with nil: (SomeType)(nil)
+		if ident, isIdent := exp.X.(*ast.Ident); isIdent && ident.Name == "nil" {
+			c.tsw.WriteLiterally("null")
 			return nil
 		}
 
@@ -1034,16 +985,6 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
 	}
 
-	// Check if the base expression is an interface type
-	baseType := c.pkg.TypesInfo.TypeOf(exp.X)
-	if baseType != nil {
-		if _, isInterface := baseType.Underlying().(*types.Interface); isInterface {
-			// This is necessary because TypeScript's type system is more strict than Go's
-			// regarding null/undefined values after type assertions on interface variables
-			c.tsw.WriteLiterally("!")
-		}
-	}
-
 	// Add .
 	c.tsw.WriteLiterally(".")
 
@@ -1147,17 +1088,19 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 // `WriteFieldList` to generate the list of field definitions.
 // Note: This is for anonymous struct type literals. Named struct types are usually
 // handled as classes via `WriteTypeSpec`.
-func (c *GoToTSCompiler) WriteStructType(exp *ast.StructType) {
-	if typ := c.pkg.TypesInfo.TypeOf(exp); typ != nil {
-		c.WriteGoType(typ)
-		return
+func (c *GoToTSCompiler) WriteStructType(t *types.Struct) {
+	// Generate an interface with the struct's fields
+	c.tsw.WriteLiterally("{ ")
+	// Add field properties to the interface
+	for i := range t.NumFields() {
+		field := t.Field(i)
+		if i > 0 {
+			c.tsw.WriteLiterally("; ")
+		}
+		c.tsw.WriteLiterally(field.Name() + "?: ")
+		c.WriteGoType(field.Type())
 	}
-
-	if exp.Fields == nil || exp.Fields.NumFields() == 0 {
-		c.tsw.WriteLiterally("{}")
-		return
-	}
-	c.WriteFieldList(exp.Fields, false) // false = not arguments
+	c.tsw.WriteLiterally(" }")
 }
 
 // WriteFuncType translates a Go function type (`ast.FuncType`) into a TypeScript
@@ -1235,9 +1178,20 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
 
-	// Handle nil pointer to struct type cast or type cast with nil
-	if c.handleNilPointerToStructType(exp) {
-		return nil
+	// Handle any type conversion with nil argument
+	if len(exp.Args) == 1 {
+		if nilIdent, isIdent := exp.Args[0].(*ast.Ident); isIdent && nilIdent.Name == "nil" {
+			// Handle nil pointer to struct type conversions: (*struct{})(nil)
+			if starExpr, isStarExpr := expFun.(*ast.StarExpr); isStarExpr {
+				if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
+					c.tsw.WriteLiterally("null")
+					return nil
+				}
+			}
+
+			c.tsw.WriteLiterally("null")
+			return nil
+		}
 	}
 
 	// Handle array type conversions like []rune(string)
@@ -1496,27 +1450,6 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled byte call with incorrect number of arguments")
 		default:
-			// Check if this is a type conversion to a function type
-			if funIdent != nil {
-				if obj := c.pkg.TypesInfo.Uses[funIdent]; obj != nil {
-					// Check if the object is a type name
-					if _, isType := obj.(*types.TypeName); isType {
-						// Make sure we have exactly one argument
-						if len(exp.Args) == 1 {
-							// Write the argument first
-							c.tsw.WriteLiterally("(")
-							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
-								return fmt.Errorf("failed to write argument for function type cast: %w", err)
-							}
-							
-							// Then use the TypeScript "as" operator with the type name
-							c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
-							return nil // Handled function type cast
-						}
-					}
-				}
-			}
-
 			// Check if this is an async function call
 			if funIdent != nil {
 				// Get the object for this function identifier
@@ -1530,15 +1463,6 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
-			
-			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
-				if _, ok := funType.Underlying().(*types.Signature); ok {
-					if _, isNamed := funType.(*types.Named); isNamed {
-						c.tsw.WriteLiterally("!")
-					}
-				}
-			}
-			
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
@@ -1555,14 +1479,6 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		// Not an identifier (e.g., method call on a value)
 		if err := c.WriteValueExpr(expFun); err != nil {
 			return fmt.Errorf("failed to write method expression in call: %w", err)
-		}
-		
-		if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
-			if _, ok := funType.Underlying().(*types.Signature); ok {
-				if _, isNamed := funType.(*types.Named); isNamed {
-					c.tsw.WriteLiterally("!")
-				}
-			}
 		}
 	}
 	c.tsw.WriteLiterally("(")
@@ -2848,10 +2764,18 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		if hasInitializer {
 			initializerExpr = a.Values[0]
 
-			// Handle nil pointer to struct type cast or type cast with nil
+			// Special case for nil pointer to struct type: (*struct{})(nil)
 			if callExpr, isCallExpr := initializerExpr.(*ast.CallExpr); isCallExpr {
-				if c.handleNilPointerToStructType(callExpr) {
-					return nil
+				if starExpr, isStarExpr := callExpr.Fun.(*ast.StarExpr); isStarExpr {
+					if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
+						// Check if the argument is nil
+						if len(callExpr.Args) == 1 {
+							if nilIdent, isIdent := callExpr.Args[0].(*ast.Ident); isIdent && nilIdent.Name == "nil" {
+								c.tsw.WriteLiterally("null")
+								return nil
+							}
+						}
+					}
 				}
 			}
 		}
@@ -3160,24 +3084,11 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 			}
 
 			if isArguments {
-				// For function parameters with multiple names, write each name with its type
-				if len(field.Names) > 1 {
-					for j, name := range field.Names {
-						if j > 0 {
-							c.tsw.WriteLiterally(", ")
-						}
-						c.tsw.WriteLiterally(name.Name)
-						c.tsw.WriteLiterally(": ")
-						typ := c.pkg.TypesInfo.TypeOf(field.Type)
-						c.WriteGoType(typ)
-					}
-				} else {
-					// For single-name parameters, use the standard WriteField
-					c.WriteField(field, true)
-					c.tsw.WriteLiterally(": ")
-					typ := c.pkg.TypesInfo.TypeOf(field.Type)
-					c.WriteGoType(typ) // Use WriteGoType for parameter type
-				}
+				// For function parameters, write "name: type"
+				c.WriteField(field, true)
+				c.tsw.WriteLiterally(": ")
+				typ := c.pkg.TypesInfo.TypeOf(field.Type)
+				c.WriteGoType(typ) // Use WriteGoType for parameter type
 			} else {
 				// For struct fields and other non-argument fields
 				c.WriteField(field, false)
@@ -3223,12 +3134,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		return
 	}
 
-	for i, name := range field.Names {
-		// For multiple parameter names, add a comma between them
-		if i > 0 && isArguments {
-			c.tsw.WriteLiterally(", ")
-		}
-
+	for _, name := range field.Names {
 		// argument names: keep original casing, no access modifier
 		if isArguments {
 			c.tsw.WriteLiterally(name.Name)
@@ -3325,11 +3231,6 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
 					if err := c.WriteValueSpec(valueSpec); err != nil {
 						return fmt.Errorf("failed to write value spec in declaration statement: %w", err)
-					}
-				} else if typeSpec, ok := spec.(*ast.TypeSpec); ok {
-					// Type specs within a declaration statement (e.g., inline type declarations)
-					if err := c.WriteTypeSpec(typeSpec); err != nil {
-						return fmt.Errorf("failed to write type spec in declaration statement: %w", err)
 					}
 				} else {
 					c.tsw.WriteCommentLinef("unhandled spec in DeclStmt: %T", spec)

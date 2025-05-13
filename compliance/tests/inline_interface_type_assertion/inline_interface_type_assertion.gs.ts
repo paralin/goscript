@@ -82,7 +82,7 @@ export function main(): void {
 		Greet(): string
 	}>(i, {kind: $.TypeKind.Interface, methods: new Set(['Greet'])})
 	if (ok) {
-		console.log("Greet assertion successful:", g!.Greet())
+		console.log("Greet assertion successful:", g.Greet())
 	} else {
 		console.log("Greet assertion failed")
 	}
@@ -92,7 +92,7 @@ export function main(): void {
 		NonExistentMethod(): number
 	}>(i, {kind: $.TypeKind.Interface, methods: new Set(['NonExistentMethod'])})
 	if (ok2) {
-		console.log("NonExistentMethod assertion successful (unexpected):", s!.NonExistentMethod())
+		console.log("NonExistentMethod assertion successful (unexpected):", s.NonExistentMethod())
 	} else {
 		console.log("NonExistentMethod assertion failed as expected")
 	}
@@ -106,7 +106,7 @@ export function main(): void {
 		String(): string
 	}>(j, {kind: $.TypeKind.Interface, methods: new Set(['String'])})
 	if (ok4) {
-		console.log("Inline String assertion successful:", inlineMs!.String())
+		console.log("Inline String assertion successful:", inlineMs.String())
 	} else {
 		console.log("Inline String assertion failed")
 	}
@@ -119,13 +119,14 @@ export function main(): void {
 		String(): string
 	}>(k, {kind: $.TypeKind.Interface, methods: new Set(['String'])})
 	if (ok5) {
-		console.log("k.(interface{ String() string }) successful:", inlineK!.String())
+		console.log("k.(interface{ String() string }) successful:", inlineK.String())
 	} else {
 		console.log("k.(interface{ String() string }) failed")
 	}
 
 	// Test case: nil value of an inline interface type assigned to interface{}
 	let l: any/* unhandled type: *types.Alias */ = null
+
 	let { value: ptr, ok: ok6 } = $.typeAssert<$.Box<{ Name?: string }> | null>(l, {kind: $.TypeKind.Pointer, elemType: {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}}, methods: new Set()}})
 	if (ok6) {
 		if (ptr == null) {

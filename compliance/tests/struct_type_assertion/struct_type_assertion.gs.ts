@@ -5,11 +5,11 @@ import * as $ from "@goscript/builtin";
 
 export function main(): void {
 	let i: null | any = null
-	i = {Name: "Alice"}
+	i = {Name: "Alice", Number: 8005553424}
 
-	let { value: s, ok: ok } = $.typeAssert<{ Name?: string }>(i, {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}}, methods: new Set()})
+	let { value: s, ok: ok } = $.typeAssert<{ Name?: string; Number?: number }>(i, {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}, 'Number': {kind: $.TypeKind.Basic, name: 'number'}}, methods: new Set()})
 	if (ok) {
-		console.log("Name:", s.Name)
+		console.log("Name:", s.Name, "Number:", s.Number)
 	} else {
 		console.log("Type assertion failed")
 	}

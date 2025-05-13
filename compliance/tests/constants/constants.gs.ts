@@ -13,6 +13,7 @@ let Truth: boolean = false
 let Greeting: string = "Hello, Constants!"
 
 let Nothing: null | any = null
+
 export function main(): void {
 	console.log(Pi)
 	console.log(Truth)

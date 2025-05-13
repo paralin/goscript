@@ -13,18 +13,18 @@ export function main(): void {
 
 
 	// 3. Use Greeter(theInlineVar) to cast to the Greeter declared function type.
-	let castedGreeter = (theInlineVar as Greeter)
+	let castedGreeter = Greeter(theInlineVar)
 
 	// 4. Call that
-	console.log(castedGreeter!("Inline World"))
+	console.log(castedGreeter("Inline World"))
 
 	// Test with a different signature
-	type Adder = ((a: number, b: number) => number) | null;
-	let theInlineAdder = (a: number, b: number): number => {
+	// unhandled spec in DeclStmt: *ast.TypeSpec
+	let theInlineAdder = (ab: number): number => {
 		return a + b
 	}
 
-	let castedAdder = (theInlineAdder as Adder)
-	console.log(castedAdder!(5, 7))
+	let castedAdder = Adder(theInlineAdder)
+	console.log(castedAdder(5, 7))
 }
 

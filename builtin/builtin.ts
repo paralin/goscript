@@ -1174,7 +1174,8 @@ function matchesFunctionType(value: any): boolean {
  * @param info The channel type info to match against.
  * @returns True if the value matches the channel type, false otherwise.
  */
-function matchesChannelType(value: any, info: TypeInfo): boolean {
+function matchesChannelType(value: any, info: ChannelTypeInfo): boolean {
+  // TODO: match on info.direction, etc.
   return (
     typeof value === 'object' &&
     value !== null &&

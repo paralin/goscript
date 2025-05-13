@@ -97,32 +97,32 @@ export function main(): void {
 	}
 
 
-	let [res1, err1] = fn1!(10, "hello")
+	let [res1, err1] = fn1(10, "hello")
 	console.log("fn1 result 1: ", res1, " ")
 	if (err1 != null) {
-		console.log(err1!.Error())
+		console.log(err1.Error())
 	} else {
 		console.log("nil")
 	}
 
-	let [res1_2, err1_2] = fn1!(-5, "world")
+	let [res1_2, err1_2] = fn1(-5, "world")
 	console.log("fn1 result 2: ", res1_2, " ")
 	if (err1_2 != null) {
-		console.log(err1_2!.Error())
+		console.log(err1_2.Error())
 	} else {
 		console.log("nil")
 	}
 
-	let res2 = fn2!(5, "hello")
+	let res2 = fn2(5, "hello")
 	console.log("fn2 result 1:", res2)
 
-	let res2_2 = fn2!(3, "hey")
+	let res2_2 = fn2(3, "hey")
 	console.log("fn2 result 2:", res2_2)
 
-	fn3!()
+	fn3()
 
-	fn4!(1)
-	fn4!(2, "one")
-	fn4!(3, "two", "three")
+	fn4(1)
+	fn4(2, "one")
+	fn4(3, "two", "three")
 }
 
