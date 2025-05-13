@@ -72,8 +72,9 @@ export function main(): void {
 	let s = new MyStruct({})
 	rwc = s.clone()
 
-	let { ok: ok } = $.typeAssert<ReadCloser>(rwc, 'ReadCloser')
-	if (ok) {
+	let _typeAssertResult_0 = $.typeAssert<ReadCloser>(rwc, 'ReadCloser')
+	let ok = _typeAssertResult_0.ok
+if (ok) {
 		console.log("Embedded interface assertion successful")
 	} else {
 		console.log("Embedded interface assertion failed")

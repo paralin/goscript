@@ -68,8 +68,9 @@ export function main(): void {
 	let s = new MyStruct({Value: 10})
 	i = s.clone()
 
-	let { ok: ok } = $.typeAssert<MyOtherInterface>(i, 'MyOtherInterface')
-	if (ok) {
+	let _typeAssertResult_0 = $.typeAssert<MyOtherInterface>(i, 'MyOtherInterface')
+	let ok = _typeAssertResult_0.ok
+if (ok) {
 		console.log("Type assertion successful")
 	} else {
 		console.log("Type assertion failed")

@@ -7,15 +7,19 @@ export function main(): void {
 	let i: null | any = null
 	i = {Name: "Alice"}
 
-	let { value: s, ok: ok } = $.typeAssert<{ Name?: string }>(i, {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}}, methods: new Set()})
-	if (ok) {
+	let _typeAssertResult_0 = $.typeAssert<{ Name?: string }>(i, {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}}, methods: new Set()})
+	let s = _typeAssertResult_0.value
+let ok = _typeAssertResult_0.ok
+if (ok) {
 		console.log("Name:", s.Name)
 	} else {
 		console.log("Type assertion failed")
 	}
 
-	let { value: j, ok: ok2 } = $.typeAssert<{ Age?: number }>(i, {kind: $.TypeKind.Struct, fields: {'Age': {kind: $.TypeKind.Basic, name: 'number'}}, methods: new Set()})
-	if (ok2) {
+	let _typeAssertResult_1 = $.typeAssert<{ Age?: number }>(i, {kind: $.TypeKind.Struct, fields: {'Age': {kind: $.TypeKind.Basic, name: 'number'}}, methods: new Set()})
+	let j = _typeAssertResult_1.value
+let ok2 = _typeAssertResult_1.ok
+if (ok2) {
 		console.log("Age:", j.Age)
 	} else {
 		console.log("Second type assertion failed as expected")

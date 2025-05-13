@@ -58,15 +58,17 @@ export function main(): void {
 	let s = new MyStruct({Value: 10})
 	i = s.clone()
 
-	let { ok: ok } = $.typeAssert<MyStruct>(i, 'MyStruct')
-	if (ok) {
+	let _typeAssertResult_0 = $.typeAssert<MyStruct>(i, 'MyStruct')
+	let ok = _typeAssertResult_0.ok
+if (ok) {
 		console.log("Type assertion successful")
 	} else {
 		console.log("Type assertion failed")
 	}
 
 	// try a second time since this generates something different when using = and not :=
-	({ ok: ok } = $.typeAssert<$.Box<MyStruct> | null>(i, {kind: $.TypeKind.Pointer, elemType: 'MyStruct'}))
+	(_typeAssertResult_1 = $.typeAssert<$.Box<MyStruct> | null>(i, {kind: $.TypeKind.Pointer, elemType: 'MyStruct'}))
+	ok = _typeAssertResult_1.ok
 
 	// expected
 	if (ok) {
@@ -77,8 +79,10 @@ export function main(): void {
 	}
 
 	// assign result to a variable
-	let { value: val, ok: ok2 } = $.typeAssert<MyStruct>(i, 'MyStruct')
-	if (!ok2) {
+	let _typeAssertResult_2 = $.typeAssert<MyStruct>(i, 'MyStruct')
+	let val = _typeAssertResult_2.value
+let ok2 = _typeAssertResult_2.ok
+if (!ok2) {
 		console.log("type assertion failed")
 	} else {
 		console.log("type assertion success", val.Value)

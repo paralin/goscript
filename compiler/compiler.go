@@ -5371,7 +5371,11 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 			extractStatements = append(extractStatements, fmt.Sprintf("let %s = %s.value", valueName, tempVarName))
 		}
 		if !okIsBlank {
-			extractStatements = append(extractStatements, fmt.Sprintf("let %s = %s.ok", okName, tempVarName))
+			// Use a unique name for the ok variable to avoid redeclaration issues
+			uniqueOkName := fmt.Sprintf("%s_%d", okName, c.pkgCompiler.TypeAssertCounter-1)
+			extractStatements = append(extractStatements, fmt.Sprintf("let %s = %s.ok", uniqueOkName, tempVarName))
+			// Update the okName to use the unique name in the rest of the code
+			okName = uniqueOkName
 		}
 	} else {
 		if !valueIsBlank {

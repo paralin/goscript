@@ -7,14 +7,17 @@ export function main(): void {
 	let i: null | any = null
 	i = new Map([["age", 30]])
 
-	let { value: m, ok: ok } = $.typeAssert<Map<string, number>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'number'})
-	if (ok) {
+	let _typeAssertResult_0 = $.typeAssert<Map<string, number>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'number'})
+	let m = _typeAssertResult_0.value
+let ok = _typeAssertResult_0.ok
+if (ok) {
 		console.log("Age:", $.mapGet(m, "age", 0))
 	} else {
 		console.log("Type assertion failed")
 	}
 
-	let { ok: ok2 } = $.typeAssert<Map<string, string>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'string'})
+	let _typeAssertResult_1 = $.typeAssert<Map<string, string>>(i, {kind: $.TypeKind.Map, keyType: 'string', elemType: 'string'})
+	let ok2 = _typeAssertResult_1.ok
 
 	// This block should not be reached if the assertion fails as expected.
 	// Depending on how Go handles failed assertions with incorrect types,
@@ -30,7 +33,8 @@ export function main(): void {
 		console.log("Second type assertion (map[string]string) failed as expected")
 	}
 
-	let { ok: ok3 } = $.typeAssert<Map<number, number>>(i, {kind: $.TypeKind.Map, keyType: 'number', elemType: 'number'})
+	let _typeAssertResult_2 = $.typeAssert<Map<number, number>>(i, {kind: $.TypeKind.Map, keyType: 'number', elemType: 'number'})
+	let ok3 = _typeAssertResult_2.ok
 
 	// Similar to the above, this block should not be reached.
 	if (ok3) {
