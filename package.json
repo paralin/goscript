@@ -42,7 +42,7 @@
     }
   },
   "scripts": {
-    "build": "tsc",
+    "build": "tsc -p tsconfig.build.json",
     "prepublishOnly": "npm run build",
     "example": "cd ./example/simple && bash run.bash",
     "test": "npm run test:go && npm run test:js",
@@ -71,6 +71,7 @@
     "cmd",
     "compiler",
     "builtin",
+    "!compliance",
     "go.mod",
     "go.sum",
     "LICENSE",
