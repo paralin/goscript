@@ -7,14 +7,18 @@ export function main(): void {
 	let i: null | any = null
 	i = {Name: "Alice"}
 
-	let { value: s, ok: ok } = $.typeAssert<any/* unhandled type: *types.Struct */>(i, {kind: $.TypeKind.Struct, fields: new Set(['Name'])})
+	let { value: s, ok: ok } = $.typeAssert<{
+		Name: string
+	}>(i, {kind: $.TypeKind.Struct, fields: {Name: true}})
 	if (ok) {
 		console.log("Name:", s.Name)
 	} else {
 		console.log("Type assertion failed")
 	}
 
-	let { value: j, ok: ok2 } = $.typeAssert<any/* unhandled type: *types.Struct */>(i, {kind: $.TypeKind.Struct, fields: new Set(['Age'])})
+	let { value: j, ok: ok2 } = $.typeAssert<{
+		Age: number
+	}>(i, {kind: $.TypeKind.Struct, fields: {Age: true}})
 	if (ok2) {
 		console.log("Age:", j.Age)
 	} else {

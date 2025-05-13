@@ -671,7 +671,10 @@ export const mapGet = <K, V>(
  * @param key The key to set.
  * @param value The value to set.
  */
-export const mapSet = <K, V>(map: Map<K, V>, key: K, value: V): void => {
+export const mapSet = <K, V>(map: Map<K, V> | null, key: K, value: V): void => {
+  if (map == null) {
+    throw new Error("panic: set to a null map")
+  }
   map.set(key, value)
 }
 
@@ -698,46 +701,41 @@ export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
  * Represents the kinds of Go types that can be registered at runtime.
  */
 export enum TypeKind {
-  Basic = 'basic',
-  Interface = 'interface',
   Struct = 'struct',
-  Map = 'map',
-  Slice = 'slice',
-  Array = 'array',
+  Interface = 'interface',
+  Basic = 'basic',
   Pointer = 'pointer',
-  Function = 'function',
+  Slice = 'slice',
+  Map = 'map',
   Channel = 'channel',
+  Function = 'function',
 }
 
 /**
- * Type description for runtime type checking.
- * Can be a string (type name) or a structured description.
+ * Type description can be either:
+ * - A string (type name for registered types)
+ * - A TypeInfo object (for dynamic type checking)
+ * - A constructor function (for classes/structs)
  */
-export interface TypeDescription {
-  kind: TypeKind
-  name?: string
-  keyType?: string | TypeDescription // For maps
-  elemType?: string | TypeDescription // For maps, slices, arrays
-  // For interfaces and structs
-  methods?: Set<string> // Available methods
-  fields?: Set<string> // Field names for struct types
-  constructor?: any // Constructor reference for structs
-  // For functions
-  params?: (string | TypeDescription)[]
-  results?: (string | TypeDescription)[]
-}
+export type TypeDescription = string | TypeInfo | (new (...args: any[]) => any);
 
 /**
  * Represents type information for a Go type in the runtime.
  */
 export interface TypeInfo {
-  name: string
+  name?: string
   kind: TypeKind
-  zeroValue: any
+  zeroValue?: any
   // For interfaces, the set of methods
   methods?: Set<string>
-  // For structs, the constructor
-  constructor?: new (...args: any[]) => any
+  // For structs, the constructor and fields
+  constructor?: any
+  fields?: {[key: string]: TypeDescription}
+  // For map, the key and element types
+  keyType?: TypeDescription
+  elemType?: TypeDescription
+  // For basic types, the JavaScript type
+  jsType?: string
 }
 
 // Registry to store runtime type information
@@ -758,7 +756,7 @@ export const registerType = (
   kind: TypeKind,
   zeroValue: any,
   methods?: Set<string>,
-  constructor?: new (...args: any[]) => any,
+  constructor?: Function
 ): TypeInfo => {
   const typeInfo: TypeInfo = {
     name,
@@ -780,394 +778,324 @@ export interface TypeAssertResult<T> {
 }
 
 /**
+ * Normalizes a type description into a TypeInfo object
+ */
+function normalizeTypeDescription(typeDesc: TypeDescription): TypeInfo {
+  // If it's already a TypeInfo object, return it
+  if (typeof typeDesc === 'object' && 'kind' in typeDesc) {
+    return typeDesc;
+  }
+  
+  // If it's a string (registered type name), look it up
+  if (typeof typeDesc === 'string') {
+    const registeredType = typeRegistry.get(typeDesc);
+    if (registeredType) {
+      return registeredType;
+    }
+    
+    // Handle basic type strings
+    switch (typeDesc) {
+      case 'string':
+        return { kind: TypeKind.Basic, jsType: 'string', zeroValue: '' };
+      case 'number':
+      case 'int':
+        return { kind: TypeKind.Basic, jsType: 'number', zeroValue: 0 };
+      case 'boolean':
+        return { kind: TypeKind.Basic, jsType: 'boolean', zeroValue: false };
+      case 'bigint':
+        return { kind: TypeKind.Basic, jsType: 'bigint', zeroValue: BigInt(0) };
+      default:
+        // Check if it's a map type descriptor (e.g., "map[string]int")
+        if (typeDesc.startsWith('map[')) {
+          const endKeyIdx = typeDesc.indexOf(']');
+          if (endKeyIdx > 4) { // "map[".length = 4
+            const keyTypeName = typeDesc.substring(4, endKeyIdx);
+            const valueTypeName = typeDesc.substring(endKeyIdx + 1);
+            
+            return {
+              kind: TypeKind.Map,
+              keyType: keyTypeName,
+              elemType: valueTypeName,
+              zeroValue: new Map()
+            };
+          }
+        }
+        
+        // Check if it's a slice type descriptor (e.g., "[]int")
+        if (typeDesc.startsWith('[]')) {
+          const elemTypeName = typeDesc.substring(2);
+          return {
+            kind: TypeKind.Slice,
+            elemType: elemTypeName,
+            zeroValue: []
+          };
+        }
+        
+        // Unknown type name
+        console.warn(`Type '${typeDesc}' not found in registry and is not a basic type.`);
+        return { kind: TypeKind.Basic, jsType: 'any', zeroValue: null };
+    }
+  }
+  
+  // If it's a constructor function, create a struct type
+  if (typeof typeDesc === 'function') {
+    return {
+      kind: TypeKind.Struct,
+      constructor: typeDesc,
+      fields: {},
+      methods: new Set(),
+      zeroValue: null
+    };
+  }
+  
+  // Fallback
+  return { kind: TypeKind.Basic, jsType: 'any', zeroValue: null };
+}
+
+/**
+ * Checks if a value matches a specified type
+ */
+function matchesType(value: any, typeDesc: TypeDescription): boolean {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  
+  const typeInfo = normalizeTypeDescription(typeDesc);
+  
+  switch (typeInfo.kind) {
+    case TypeKind.Basic:
+      return typeof value === typeInfo.jsType;
+      
+    case TypeKind.Map:
+      if (!(value instanceof Map)) return false;
+      
+      // Empty map passes the type check
+      if (value.size === 0) return true;
+      
+      // For non-empty maps, check a sample of keys and values
+      const sampleSize = Math.min(value.size, 10);
+      let checked = 0;
+      for (const [key, val] of value.entries()) {
+        if (!matchesType(key, typeInfo.keyType!) || !matchesType(val, typeInfo.elemType!)) {
+          return false;
+        }
+        if (++checked >= sampleSize) break;
+      }
+      return true;
+      
+    case TypeKind.Slice:
+      if (!Array.isArray(value)) return false;
+      
+      // Empty array passes the type check
+      if (value.length === 0) return true;
+      
+      // For non-empty arrays, check a sample of elements
+      const elemType = typeInfo.elemType!;
+      const arraySampleSize = Math.min(value.length, 10);
+      for (let i = 0; i < arraySampleSize; i++) {
+        if (!matchesType(value[i], elemType)) {
+          return false;
+        }
+      }
+      return true;
+      
+    case TypeKind.Struct:
+      // If constructor is available, check instance
+      if (typeInfo.constructor && value instanceof typeInfo.constructor) {
+        return true;
+      }
+      
+      // For anonymous structs or when constructor check fails
+      if (typeof value === 'object' && value !== null) {
+        // Check fields if available
+        if (typeInfo.fields) {
+          // For structs, check if all required fields exist AND match their expected types
+          return Object.keys(typeInfo.fields).every(
+            field => {
+              if (!(field in value) || typeof value[field] === 'undefined') {
+                return false;
+              }
+              // Check field type if specified
+              const fieldType = typeInfo.fields![field];
+              return fieldType ? matchesType(value[field], fieldType) : true;
+            }
+          );
+        }
+        
+        // Check methods if available
+        if (typeInfo.methods && typeInfo.methods.size > 0) {
+          return Array.from(typeInfo.methods).every(
+            method => typeof value[method] === 'function'
+          );
+        }
+      }
+      
+      return false;
+      
+    case TypeKind.Interface:
+      if (!typeInfo.methods || typeof value !== 'object') return false;
+      // Check if value has all required methods
+      return Array.from(typeInfo.methods).every(
+        (method) => typeof (value as any)[method] === 'function'
+      );
+      
+    case TypeKind.Channel:
+      return (
+        typeof value === 'object' &&
+        value !== null &&
+        'send' in value &&
+        'receive' in value &&
+        'close' in value &&
+        typeof value.send === 'function' &&
+        typeof value.receive === 'function' &&
+        typeof value.close === 'function'
+      );
+      
+    case TypeKind.Function:
+      return typeof value === 'function';
+      
+    case TypeKind.Pointer:
+      // In TypeScript, we're checking if it's a non-null object
+      return value !== null && typeof value === 'object';
+      
+    default:
+      return false;
+  }
+}
+
+/**
  * Performs a type assertion at runtime.
  *
  * @param value The value to assert.
- * @param typeName The name of the target type.
+ * @param typeDesc The description of the target type (string name or TypeInfo object).
  * @returns An object with the asserted value and whether the assertion succeeded.
  */
-/**
- * Normalizes a type description to a structured TypeDescription object.
- *
- * @param desc The type description or name.
- * @returns A normalized TypeDescription object.
- */
-function normalizeTypeDescription(
-  desc: string | TypeDescription,
-): TypeDescription {
-  if (typeof desc === 'string') {
-    const typeInfo = typeRegistry.get(desc)
-    if (typeInfo) {
-      return {
-        kind: typeInfo.kind,
-        name: typeInfo.name,
-        methods: typeInfo.methods,
-        constructor: typeInfo.constructor,
-      }
-    }
-    return {
-      kind: TypeKind.Basic,
-      name: desc,
-    }
-  }
-
-  return desc
-}
-
-/**
- * Validates that a map key matches the expected type description.
- *
- * @param key The key to validate
- * @param keyTypeDesc The normalized type description for the key
- * @returns True if the key matches the type description, false otherwise
- */
-function validateMapKey(key: any, keyTypeDesc: TypeDescription): boolean {
-  if (keyTypeDesc.kind === TypeKind.Basic) {
-    // For string keys
-    if (keyTypeDesc.name === 'string') {
-      return typeof key === 'string'
-    } else if (
-      keyTypeDesc.name === 'int' ||
-      keyTypeDesc.name === 'float64' ||
-      keyTypeDesc.name === 'number'
-    ) {
-      if (typeof key === 'string') {
-        return /^-?\d+(\.\d+)?$/.test(key)
-      } else {
-        return typeof key === 'number'
-      }
-    }
-  }
-  return false
-}
-
-/**
- * Checks if a value matches a basic type description.
- *
- * @param value The value to check.
- * @param desc The basic type description to match against.
- * @returns True if the value matches the basic type, false otherwise.
- */
-function matchesBasicType(value: any, desc: TypeDescription): boolean {
-  if (desc.name === 'string') return typeof value === 'string'
-  if (desc.name === 'number' || desc.name === 'int' || desc.name === 'float64')
-    return typeof value === 'number'
-  if (desc.name === 'boolean' || desc.name === 'bool')
-    return typeof value === 'boolean'
-  return false
-}
-
-/**
- * Checks if a value matches a struct type description.
- *
- * @param value The value to check.
- * @param desc The struct type description to match against.
- * @returns True if the value matches the struct type, false otherwise.
- */
-function matchesStructType(value: any, desc: TypeDescription): boolean {
-  // For structs, use instanceof with the constructor
-  if (desc.constructor && value instanceof desc.constructor) {
-    return true
-  }
-
-  if (desc.fields && typeof value === 'object') {
-    // For struct type assertions, we need to check that the value has exactly
-    const descFields = Array.from(desc.fields)
-    const valueFields = Object.keys(value)
-
-    const condition1 = descFields.every((field) => field in value)
-    const condition2 = valueFields.length === descFields.length
-    const condition3 = valueFields.every((field) => descFields.includes(field))
-
-    console.log('Struct field matching debug:', {
-      descFields,
-      valueFields,
-      allDescFieldsInValue: condition1,
-      sameFieldCount: condition2,
-      allValueFieldsInDesc: condition3,
-    })
-
-    return condition1 && condition2 && condition3
-  }
-
-  return false
-}
-
-/**
- * Checks if a value matches an interface type description.
- *
- * @param value The value to check.
- * @param desc The interface type description to match against.
- * @returns True if the value matches the interface type, false otherwise.
- */
-function matchesInterfaceType(value: any, desc: TypeDescription): boolean {
-  // For interfaces, check if the value has all the required methods
-  if (desc.methods && typeof value === 'object') {
-    return Array.from(desc.methods).every(
-      (method) => typeof (value as any)[method] === 'function',
-    )
-  }
-  return false
-}
-
-/**
- * Checks if a value matches a map type description.
- *
- * @param value The value to check.
- * @param desc The map type description to match against.
- * @returns True if the value matches the map type, false otherwise.
- */
-function matchesMapType(value: any, desc: TypeDescription): boolean {
-  if (typeof value !== 'object' || value === null) return false
-
-  if (desc.keyType || desc.elemType) {
-    let entries: [any, any][] = []
-
-    if (value instanceof Map) {
-      entries = Array.from(value.entries())
-    } else {
-      entries = Object.entries(value)
-    }
-
-    if (entries.length === 0) return true // Empty map matches any map type
-
-    const sampleSize = Math.min(5, entries.length)
-    for (let i = 0; i < sampleSize; i++) {
-      const [k, v] = entries[i]
-
-      if (desc.keyType) {
-        if (!validateMapKey(k, normalizeTypeDescription(desc.keyType))) {
-          return false
-        }
-      }
-
-      if (
-        desc.elemType &&
-        !matchesType(v, normalizeTypeDescription(desc.elemType))
-      ) {
-        return false
-      }
-    }
-  }
-
-  return true
-}
-
-/**
- * Checks if a value matches an array or slice type description.
- *
- * @param value The value to check.
- * @param desc The array or slice type description to match against.
- * @returns True if the value matches the array or slice type, false otherwise.
- */
-function matchesArrayOrSliceType(value: any, desc: TypeDescription): boolean {
-  // For slices and arrays, check if the value is an array and sample element types
-  if (!Array.isArray(value)) return false
-
-  if (desc.elemType) {
-    const arr = value as any[]
-    if (arr.length === 0) return true // Empty array matches any array type
-
-    const sampleSize = Math.min(5, arr.length)
-    for (let i = 0; i < sampleSize; i++) {
-      if (!matchesType(arr[i], normalizeTypeDescription(desc.elemType))) {
-        return false
-      }
-    }
-  }
-
-  return true
-}
-
-/**
- * Checks if a value matches a pointer type description.
- *
- * @param value The value to check.
- * @param desc The pointer type description to match against.
- * @returns True if the value matches the pointer type, false otherwise.
- */
-function matchesPointerType(value: any, desc: TypeDescription): boolean {
-  // For pointers, check if value is a Box (has a 'value' property)
-  if (value === null || value === undefined) {
-    return false
-  }
-
-  // Check if the value is a Box (has a 'value' property)
-  if (typeof value !== 'object' || !('value' in value)) {
-    return false
-  }
-
-  if (desc.elemType) {
-    const elemTypeDesc = normalizeTypeDescription(desc.elemType)
-    return matchesType(value.value, elemTypeDesc)
-  }
-
-  return true
-}
-
-/**
- * Checks if a value matches a function type description.
- *
- * @param value The value to check.
- * @param desc The function type description to match against.
- * @returns True if the value matches the function type, false otherwise.
- */
-function matchesFunctionType(value: any): boolean {
-  // For functions, check if the value is a function
-  return typeof value === 'function'
-}
-
-/**
- * Checks if a value matches a channel type description.
- *
- * @param value The value to check.
- * @param desc The channel type description to match against.
- * @returns True if the value matches the channel type, false otherwise.
- */
-function matchesChannelType(value: any): boolean {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'send' in value &&
-    'receive' in value &&
-    'close' in value &&
-    typeof value.send === 'function' &&
-    typeof value.receive === 'function' &&
-    typeof value.close === 'function'
-  )
-}
-
-/**
- * Checks if a value matches a type description.
- *
- * @param value The value to check.
- * @param desc The type description to match against.
- * @returns True if the value matches the type description, false otherwise.
- */
-function matchesType(value: any, desc: TypeDescription): boolean {
-  if (value === null || value === undefined) {
-    return false
-  }
-
-  switch (desc.kind) {
-    case TypeKind.Basic:
-      return matchesBasicType(value, desc)
-
-    case TypeKind.Struct:
-      return matchesStructType(value, desc)
-
-    case TypeKind.Interface:
-      return matchesInterfaceType(value, desc)
-
-    case TypeKind.Map:
-      return matchesMapType(value, desc)
-
-    case TypeKind.Slice:
-    case TypeKind.Array:
-      return matchesArrayOrSliceType(value, desc)
-
-    case TypeKind.Pointer:
-      return matchesPointerType(value, desc)
-
-    case TypeKind.Function:
-      return matchesFunctionType(value)
-
-    case TypeKind.Channel:
-      return matchesChannelType(value)
-
-    default:
-      console.warn(`Type matching for kind '${desc.kind}' not implemented.`)
-      return false
-  }
-}
-
 export function typeAssert<T>(
   value: any,
-  typeDesc: string | TypeDescription,
+  typeDesc: TypeDescription,
 ): TypeAssertResult<T> {
-  const normalizedType = normalizeTypeDescription(typeDesc)
-
-  if (
-    normalizedType.kind === TypeKind.Struct &&
-    normalizedType.fields &&
-    typeof value === 'object' &&
-    value !== null
-  ) {
-    const descFields = Array.from(normalizedType.fields)
-    const valueFields = Object.keys(value)
-
-    // For struct type assertions, we need exact field matching
-    const structMatch =
-      descFields.length === valueFields.length &&
-      descFields.every((field) => field in value) &&
-      valueFields.every((field) => descFields.includes(field))
-
-    if (structMatch) {
-      return { value: value as T, ok: true }
-    } else {
-      return { value: null as unknown as T, ok: false }
-    }
+  // Handle null/undefined value case
+  if (value === null || value === undefined) {
+    const typeInfo = normalizeTypeDescription(typeDesc);
+    return { value: typeInfo.zeroValue as T, ok: false };
   }
-
-  if (
-    normalizedType.kind === TypeKind.Map &&
-    typeof value === 'object' &&
-    value !== null
-  ) {
-    if (normalizedType.keyType || normalizedType.elemType) {
-      let entries: [any, any][] = []
-
-      if (value instanceof Map) {
-        entries = Array.from(value.entries())
-      } else {
-        entries = Object.entries(value)
+  
+  // Normalize the type description to get TypeInfo
+  const typeInfo = normalizeTypeDescription(typeDesc);
+  
+  // Get the zero value for failure case
+  const zeroValue = typeInfo.zeroValue ?? null;
+  
+  // Special handling for common container types
+  if (typeInfo.kind === TypeKind.Map) {
+    // Verify it's a Map instance
+    if (!(value instanceof Map)) {
+      return { value: new Map() as unknown as T, ok: false };
+    }
+    
+    // Empty maps automatically pass type check
+    if (value.size === 0) {
+      return { value: value as T, ok: true };
+    }
+    
+    // For non-empty maps, check key and value types on a sample (for performance)
+    const sampleSize = Math.min(value.size, 10); // Just check up to 10 entries
+    let checked = 0;
+    
+    for (const [key, val] of value.entries()) {
+      if (!matchesType(key, typeInfo.keyType!) || !matchesType(val, typeInfo.elemType!)) {
+        return { value: new Map() as unknown as T, ok: false };
       }
-
-      if (entries.length === 0) {
-        return { value: value as T, ok: true }
+      
+      if (++checked >= sampleSize) break;
+    }
+    
+    // All checks passed
+    return { value: value as T, ok: true };
+  }
+  else if (typeInfo.kind === TypeKind.Slice) {
+    // Verify it's an array
+    if (!Array.isArray(value)) {
+      return { value: [] as unknown as T, ok: false };
+    }
+    
+    // Empty arrays automatically pass
+    if (value.length === 0) {
+      return { value: value as T, ok: true };
+    }
+    
+    // Check element type on a sample (for performance)
+    const elemType = typeInfo.elemType!;
+    const sampleSize = Math.min(value.length, 10); // Just check up to 10 elements
+    
+    for (let i = 0; i < sampleSize; i++) {
+      if (!matchesType(value[i], elemType)) {
+        return { value: [] as unknown as T, ok: false };
       }
-
-      const sampleSize = Math.min(5, entries.length)
-      for (let i = 0; i < sampleSize; i++) {
-        const [k, v] = entries[i]
-
-        if (normalizedType.keyType) {
-          if (
-            !validateMapKey(k, normalizeTypeDescription(normalizedType.keyType))
-          ) {
-            return { value: null as unknown as T, ok: false }
-          }
+    }
+    
+    // All checks passed
+    return { value: value as T, ok: true };
+  }
+  else if (typeInfo.kind === TypeKind.Struct) {
+    // Check if it's an instance of the constructor when constructor is available
+    if (typeInfo.constructor && value instanceof typeInfo.constructor) {
+      return { value: value as T, ok: true };
+    }
+    
+    // For anonymous structs or when constructor check fails, validate fields
+    if (typeof value === 'object' && value !== null) {
+      // If fields are specified, check that the value has all required fields
+      if (typeInfo.fields) {
+        const isValid = Object.keys(typeInfo.fields).every(field => 
+          field in value && typeof value[field] !== 'undefined'
+        );
+        
+        if (isValid) {
+          return { value: value as T, ok: true };
         }
-
-        if (normalizedType.elemType) {
-          const elemTypeDesc = normalizeTypeDescription(normalizedType.elemType)
-          if (!matchesType(v, elemTypeDesc)) {
-            return { value: null as unknown as T, ok: false }
-          }
+      }
+      
+      // If methods are specified, check if the value implements all methods
+      if (typeInfo.methods && typeInfo.methods.size > 0) {
+        const allMethodsPresent = Array.from(typeInfo.methods).every(
+          method => typeof value[method] === 'function'
+        );
+        if (allMethodsPresent) {
+          return { value: value as T, ok: true };
         }
       }
-
-      // If we get here, the map type assertion passes
-      return { value: value as T, ok: true }
     }
+    
+    return { value: zeroValue as T, ok: false };
   }
-
-  const matches = matchesType(value, normalizedType)
-
-  if (matches) {
-    return { value: value as T, ok: true }
-  }
-
-  // If we get here, the assertion failed
-  // For registered types, use the zero value from the registry
-  if (typeof typeDesc === 'string') {
-    const typeInfo = typeRegistry.get(typeDesc)
-    if (typeInfo) {
-      return { value: typeInfo.zeroValue as T, ok: false }
+  else if (typeInfo.kind === TypeKind.Interface && typeInfo.methods) {
+    // Check if value implements all methods in the interface
+    if (typeof value === 'object' && value !== null) {
+      const allMethodsPresent = Array.from(typeInfo.methods).every(
+        (method) => typeof (value as any)[method] === 'function'
+      );
+      if (allMethodsPresent) {
+        return { value: value as T, ok: true };
+      }
     }
+    return { value: zeroValue as T, ok: false };
   }
-
-  return { value: null as unknown as T, ok: false }
+  else if (typeInfo.kind === TypeKind.Basic && typeInfo.jsType) {
+    // Check basic type against JavaScript type
+    if (typeof value === typeInfo.jsType) {
+      return { value: value as T, ok: true };
+    }
+    return { value: zeroValue as T, ok: false };
+  }
+  
+  // For other types or fallback, use the general matching function
+  const matches = matchesType(value, typeInfo);
+  
+  return {
+    value: matches ? value as T : zeroValue as T,
+    ok: matches
+  };
 }
 
 /**

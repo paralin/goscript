@@ -1,0 +1,6 @@
+Map size: 2
+Value for true: True value
+Value for false: False value
+Correct type assertion passed: True value
+Incorrect key type assertion correctly failed
+Incorrect value type assertion correctly failed

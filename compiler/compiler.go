@@ -270,12 +270,6 @@ type GoToTSCompiler struct {
 	analysis *Analysis // Holds analysis information for code generation decisions
 }
 
-// WriteGoType is the main dispatcher for translating Go types to their TypeScript
-// equivalents. It examines the type and delegates to more specialized type writer
-// functions based on the specific Go type encountered.
-//
-// It handles nil types as 'any' with a comment, and dispatches to appropriate
-// type-specific writers for all other recognized Go types.
 func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	if typ == nil {
 		c.tsw.WriteLiterally("any")
@@ -302,11 +296,69 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 		c.WriteInterfaceType(t, nil) // No ast.InterfaceType available here
 	case *types.Signature:
 		c.WriteSignatureType(t)
+	case *types.Struct: // Added case
+		c.WriteAnonymousStructType(t) // Call new method
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
 		c.tsw.WriteCommentInline(fmt.Sprintf("unhandled type: %T", typ))
 	}
+}
+
+// WriteAnonymousStructType translates a Go anonymous struct type to its TypeScript
+// equivalent, producing an object type like { field1: type1; field2: type2; }
+func (c *GoToTSCompiler) WriteAnonymousStructType(t *types.Struct) {
+	c.tsw.WriteLiterally("{")
+
+	if t.NumFields() > 0 {
+		c.tsw.WriteLine("")
+		c.tsw.Indent(1)
+
+		for i := 0; i < t.NumFields(); i++ {
+			field := t.Field(i)
+
+			// Skip unexported fields unless they're from the current package
+			if !field.Exported() && field.Pkg() != c.pkg.Types {
+				continue
+			}
+
+			// Handle embedded fields
+			if field.Anonymous() {
+				fieldType := field.Type()
+				var fieldName string
+
+				// For embedded types, use the type name as the property name
+				if ptr, ok := fieldType.(*types.Pointer); ok {
+					fieldType = ptr.Elem()
+				}
+
+				if named, ok := fieldType.(*types.Named); ok {
+					fieldName = named.Obj().Name()
+				} else {
+					// Fallback for unnamed embedded types
+					fieldName = field.Name()
+				}
+
+				c.tsw.WriteLiterally(fieldName)
+			} else {
+				// Regular field
+				c.tsw.WriteLiterally(field.Name())
+			}
+
+			c.tsw.WriteLiterally(": ")
+			c.WriteGoType(field.Type())
+
+			// Add semicolon after each field except the last one
+			if i < t.NumFields()-1 {
+				c.tsw.WriteLiterally(";")
+			}
+			c.tsw.WriteLine("")
+		}
+
+		c.tsw.Indent(-1)
+	}
+
+	c.tsw.WriteLiterally("}")
 }
 
 // WriteBasicType translates a Go basic type (primitives like int, string, bool)
@@ -2011,7 +2063,6 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 				}
 
 				// Handle the case where an anonymous struct has values without keys
-				// Handle the case where an anonymous struct has values without keys.
 				// This block processes non-key-value elements and associates them with struct fields.
 				if isAnonymousStruct && len(exp.Elts) > 0 && len(directFields) == 0 && structType != nil {
 					// Check if any elements in the composite literal are not key-value pairs.
@@ -5353,32 +5404,6 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		}
 
 		c.tsw.WriteLiterally("}")
-	case *ast.StructType:
-		// For struct types, create a type descriptor object
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Struct")
-
-		// Get the type name if available
-		typeName := c.getTypeNameString(assertedType)
-		if typeName != "unknown" {
-			c.tsw.WriteLiterally(fmt.Sprintf(", name: '%s'", typeName))
-		}
-
-		if typeExpr.Fields != nil && typeExpr.Fields.List != nil {
-			c.tsw.WriteLiterally(", fields: new Set([")
-
-			fields := []string{}
-			for _, field := range typeExpr.Fields.List {
-				for _, name := range field.Names {
-					fields = append(fields, fmt.Sprintf("'%s'", name.Name))
-				}
-			}
-
-			c.tsw.WriteLiterally(strings.Join(fields, ", "))
-			c.tsw.WriteLiterally("])")
-		}
-
-		c.tsw.WriteLiterally("}")
 	case *ast.InterfaceType:
 		c.tsw.WriteLiterally("{")
 		c.tsw.WriteLiterally("kind: $.TypeKind.Interface")
@@ -5402,6 +5427,55 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 			c.tsw.WriteLiterally(strings.Join(methods, ", "))
 			c.tsw.WriteLiterally("])")
+		}
+
+		c.tsw.WriteLiterally("}")
+	case *ast.StructType:
+		// For struct types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Struct")
+
+		// Get the type name if available
+		typeName := c.getTypeNameString(assertedType)
+		if typeName != "unknown" {
+			c.tsw.WriteLiterally(fmt.Sprintf(", name: '%s'", typeName))
+		}
+
+		if typeExpr.Fields != nil && typeExpr.Fields.List != nil {
+			c.tsw.WriteLiterally(", fields: {")
+
+			fieldDefs := []string{}
+			for _, field := range typeExpr.Fields.List {
+				if len(field.Names) > 0 {
+					for _, name := range field.Names {
+						fieldDefs = append(fieldDefs, fmt.Sprintf("%s: true", name.Name))
+					}
+				} else if field.Type != nil {
+					// Handle embedded field by type name
+					var fieldName string
+					switch fieldType := field.Type.(type) {
+					case *ast.Ident:
+						fieldName = fieldType.Name
+					case *ast.StarExpr:
+						if ident, ok := fieldType.X.(*ast.Ident); ok {
+							fieldName = ident.Name
+						}
+					case *ast.SelectorExpr:
+						if ident, ok := fieldType.X.(*ast.Ident); ok {
+							fieldName = ident.Name + "." + fieldType.Sel.Name
+						} else {
+							fieldName = fieldType.Sel.Name
+						}
+					}
+
+					if fieldName != "" {
+						fieldDefs = append(fieldDefs, fmt.Sprintf("%s: true", fieldName))
+					}
+				}
+			}
+
+			c.tsw.WriteLiterally(strings.Join(fieldDefs, ", "))
+			c.tsw.WriteLiterally("}")
 		}
 
 		c.tsw.WriteLiterally("}")

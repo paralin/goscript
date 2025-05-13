@@ -1,0 +1,5 @@
+User1 score: Map(2) { 'score' => 95, 'age' => 30 }
+User2 age: Map(2) { 'score' => 85, 'age' => 25 }
+Nested map type assertion passed: Map(2) { 'score' => 95, 'age' => 30 }
+Incorrect inner key type assertion correctly failed
+Incorrect inner value type assertion correctly failed

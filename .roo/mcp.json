@@ -4,7 +4,9 @@
       "url": "http://localhost:8080/sse",
       "description": "Read and write functions from the Go codebase.",
       "alwaysAllow": [
-        "read_godoc"
+        "read_godoc",
+        "write_code",
+        "read_code"
       ]
     }
   }
