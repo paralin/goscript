@@ -1496,6 +1496,27 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled byte call with incorrect number of arguments")
 		default:
+			// Check if this is a type conversion to a function type
+			if funIdent != nil {
+				if obj := c.pkg.TypesInfo.Uses[funIdent]; obj != nil {
+					// Check if the object is a type name
+					if _, isType := obj.(*types.TypeName); isType {
+						// Make sure we have exactly one argument
+						if len(exp.Args) == 1 {
+							// Write the argument first
+							c.tsw.WriteLiterally("(")
+							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+								return fmt.Errorf("failed to write argument for function type cast: %w", err)
+							}
+							
+							// Then use the TypeScript "as" operator with the type name
+							c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
+							return nil // Handled function type cast
+						}
+					}
+				}
+			}
+
 			// Check if this is an async function call
 			if funIdent != nil {
 				// Get the object for this function identifier
@@ -1509,6 +1530,15 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
+			
+			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+				if _, ok := funType.Underlying().(*types.Signature); ok {
+					if _, isNamed := funType.(*types.Named); isNamed {
+						c.tsw.WriteLiterally("!")
+					}
+				}
+			}
+			
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
@@ -1525,6 +1555,14 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		// Not an identifier (e.g., method call on a value)
 		if err := c.WriteValueExpr(expFun); err != nil {
 			return fmt.Errorf("failed to write method expression in call: %w", err)
+		}
+		
+		if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+			if _, ok := funType.Underlying().(*types.Signature); ok {
+				if _, isNamed := funType.(*types.Named); isNamed {
+					c.tsw.WriteLiterally("!")
+				}
+			}
 		}
 	}
 	c.tsw.WriteLiterally("(")
