@@ -1133,9 +1133,8 @@ function matchesArrayOrSliceType(value: any, info: TypeInfo): boolean {
  * @returns True if the value matches the pointer type, false otherwise.
  */
 function matchesPointerType(value: any, info: TypeInfo): boolean {
-  // For pointers, check if value is a Box (has a 'value' property)
   if (value === null || value === undefined) {
-    return false
+    return true
   }
 
   // Check if the value is a Box (has a 'value' property)
@@ -1237,6 +1236,10 @@ export function typeAssert<T>(
   typeInfo: string | TypeInfo,
 ): TypeAssertResult<T> {
   const normalizedType = normalizeTypeInfo(typeInfo)
+  
+  if (isPointerTypeInfo(normalizedType) && value === null) {
+    return { value: null as unknown as T, ok: true }
+  }
 
   if (
     isStructTypeInfo(normalizedType) &&

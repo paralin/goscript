@@ -604,6 +604,51 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 	}
 }
 
+// It handles several patterns:
+// 1. (*struct{})(nil) - A nil pointer to an anonymous struct type
+func (c *GoToTSCompiler) isNilPointerToStructType(expr ast.Expr) bool {
+	// Handle ParenExpr: (*struct{})(nil) or (SomeType)(nil)
+	if parenExpr, isParenExpr := expr.(*ast.ParenExpr); isParenExpr {
+		// Check if this is a nil pointer to struct type cast: (*struct{})(nil)
+		if starExpr, isStarExpr := parenExpr.X.(*ast.StarExpr); isStarExpr {
+			if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
+				return true
+			}
+		}
+
+		// Check if this is a type cast with nil: (SomeType)(nil)
+		if ident, isIdent := parenExpr.X.(*ast.Ident); isIdent && ident.Name == "nil" {
+			return true
+		}
+	}
+
+	// Handle CallExpr: (*struct{})(nil)
+	if callExpr, isCallExpr := expr.(*ast.CallExpr); isCallExpr && len(callExpr.Args) == 1 {
+		if nilIdent, isIdent := callExpr.Args[0].(*ast.Ident); isIdent && nilIdent.Name == "nil" {
+			// Handle nil pointer to struct type conversions: (*struct{})(nil)
+			if starExpr, isStarExpr := callExpr.Fun.(*ast.StarExpr); isStarExpr {
+				if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
+					return true
+				}
+			}
+			
+			// Any type conversion with nil argument
+			return true
+		}
+	}
+
+	return false
+}
+
+// handleNilPointerToStructType checks if an expression is a nil pointer to struct type
+func (c *GoToTSCompiler) handleNilPointerToStructType(expr ast.Expr) bool {
+	if c.isNilPointerToStructType(expr) {
+		c.tsw.WriteLiterally("null")
+		return true
+	}
+	return false
+}
+
 // WriteZeroValueForType writes the TypeScript representation of the zero value
 // for a given Go type.
 // It handles `types.Array` by recursively writing zero values for each element
@@ -752,6 +797,11 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		c.tsw.WriteLiterally(")")
 		return nil
 	case *ast.ParenExpr:
+		// Handle nil pointer to struct type cast or type cast with nil
+		if c.handleNilPointerToStructType(exp) {
+			return nil
+		}
+
 		// Translate (X) to (X)
 		// If we haven't written anything in this statement yet, prepend ;
 		c.tsw.WriteLiterally("(")
@@ -984,6 +1034,14 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
 	}
 
+	// Check if the base expression is an interface type
+	baseType := c.pkg.TypesInfo.TypeOf(exp.X)
+	if baseType != nil {
+		if _, isInterface := baseType.Underlying().(*types.Interface); isInterface {
+			c.tsw.WriteLiterally("!")
+		}
+	}
+
 	// Add .
 	c.tsw.WriteLiterally(".")
 
@@ -1174,6 +1232,11 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 // Arguments are recursively translated using `WriteValueExpr`.
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
+
+	// Handle nil pointer to struct type cast or type cast with nil
+	if c.handleNilPointerToStructType(exp) {
+		return nil
+	}
 
 	// Handle array type conversions like []rune(string)
 	if arrayType, isArrayType := expFun.(*ast.ArrayType); isArrayType {
@@ -2744,6 +2807,13 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		var initializerExpr ast.Expr
 		if hasInitializer {
 			initializerExpr = a.Values[0]
+
+			// Handle nil pointer to struct type cast or type cast with nil
+			if callExpr, isCallExpr := initializerExpr.(*ast.CallExpr); isCallExpr {
+				if c.handleNilPointerToStructType(callExpr) {
+					return nil
+				}
+			}
 		}
 
 		if needsBox {
@@ -5439,8 +5509,11 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		c.tsw.WriteLiterally("{")
 		c.tsw.WriteLiterally("kind: $.TypeKind.Pointer")
 
-		// Add element type if it's a named type
-		if ident, ok := typeExpr.X.(*ast.Ident); ok {
+		// Add element type if it's a struct type or named type
+		if structType, ok := typeExpr.X.(*ast.StructType); ok {
+			c.tsw.WriteLiterally(", elemType: ")
+			c.writeTypeDescription(structType)
+		} else if ident, ok := typeExpr.X.(*ast.Ident); ok {
 			c.tsw.WriteLiterallyf(", elemType: '%s'", ident.Name)
 		}
 

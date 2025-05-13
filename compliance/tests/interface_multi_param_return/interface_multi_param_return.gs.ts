@@ -53,7 +53,7 @@ export function main(): void {
 	processor = new MyProcessor({})
 
 	let data = $.arrayToSlice([1, 2, 3])
-	let [success, ] = processor.Process(data, 5, "unused")
+	let [success, ] = processor!.Process(data, 5, "unused")
 
 	if (success) {
 		console.log("Main: Success reported")
