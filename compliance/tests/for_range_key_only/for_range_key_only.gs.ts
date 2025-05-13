@@ -11,7 +11,7 @@ export function main(): void {
 	// 0
 	// 1
 	// 2
-	for (let i = 0; i < s.length; i++) {
+	for (let i = 0; i < $.len(s); i++) {
 		{
 			console.log(i)
 		}
@@ -23,7 +23,7 @@ export function main(): void {
 	// Expected output:
 	// 0
 	// 1
-	for (let k = 0; k < a.length; k++) {
+	for (let k = 0; k < $.len(a); k++) {
 		{
 			console.log(k)
 		}

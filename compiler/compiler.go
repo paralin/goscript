@@ -5139,11 +5139,11 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		}
 		// If both key and value are provided, use an index loop and assign both
 		if exp.Key != nil && exp.Value != nil {
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
+			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName))
 			if err := c.WriteValueExpr(exp.X); err != nil { // Write the expression for the iterable
 				return fmt.Errorf("failed to write range loop array/slice expression (key and value): %w", err)
 			}
-			c.tsw.WriteLiterally(fmt.Sprintf(".length; %s++) {", indexVarName))
+			c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			// Declare value if not blank
@@ -5154,7 +5154,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				if err := c.WriteValueExpr(exp.X); err != nil {
 					return fmt.Errorf("failed to write range loop array/slice value expression: %w", err)
 				}
-				c.tsw.WriteLiterally(fmt.Sprintf("[%s]", indexVarName)) // Use indexVarName
+				c.tsw.WriteLiterally(fmt.Sprintf("![%s]", indexVarName)) // Use indexVarName with not-null assert
 				c.tsw.WriteLine("")
 			}
 			if err := c.WriteStmt(exp.Body); err != nil {
@@ -5164,12 +5164,12 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			c.tsw.WriteLine("}")
 			return nil
 		} else if exp.Key != nil && exp.Value == nil { // Only key provided
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
+			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName))
 			// Write the expression for the iterable
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write expression for the iterable: %w", err)
 			}
-			c.tsw.WriteLiterally(fmt.Sprintf(".length; %s++) {", indexVarName))
+			c.tsw.WriteLiterally(fmt.Sprintf("); %s++) {", indexVarName))
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
@@ -5184,11 +5184,11 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		} else {
 			// Fallback: simple index loop without declaring range variables, use _i
 			indexVarName := "_i"
-			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < ", indexVarName, indexVarName))
+			c.tsw.WriteLiterally(fmt.Sprintf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName))
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return fmt.Errorf("failed to write range loop array/slice length expression (fallback): %w", err)
 			}
-			c.tsw.WriteLiterally(fmt.Sprintf(".length; %s++) {", indexVarName))
+			c.tsw.WriteLiterally(fmt.Sprintf("); %s++) {", indexVarName))
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
