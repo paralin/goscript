@@ -5361,6 +5361,8 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		parts = append(parts, fmt.Sprintf("value: %s", valueName))
 	}
 	if !okIsBlank {
+		// Use the original variable name directly without renaming in the destructuring
+		// This avoids redeclaring 'ok' variables in TypeScript
 		parts = append(parts, fmt.Sprintf("ok: %s", okName))
 	}
 	c.tsw.WriteLiterally(strings.Join(parts, ", "))
