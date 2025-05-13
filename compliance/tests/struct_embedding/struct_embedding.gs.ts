@@ -45,9 +45,8 @@ class Person {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'Person',
-	  $.TypeKind.Struct,
 	  new Person(),
 	  new Set(['Greet']),
 	  Person
@@ -109,9 +108,8 @@ class Employee {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'Employee',
-	  $.TypeKind.Struct,
 	  new Employee(),
 	  new Set([]),
 	  Employee
@@ -160,9 +158,8 @@ class Address {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'Address',
-	  $.TypeKind.Struct,
 	  new Address(),
 	  new Set(['FullAddress']),
 	  Address
@@ -201,9 +198,8 @@ class Contact {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'Contact',
-	  $.TypeKind.Struct,
 	  new Contact(),
 	  new Set(['Call']),
 	  Contact
@@ -314,9 +310,8 @@ class Manager {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'Manager',
-	  $.TypeKind.Struct,
 	  new Manager(),
 	  new Set([]),
 	  Manager

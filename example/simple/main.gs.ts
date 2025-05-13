@@ -57,15 +57,6 @@ class MyStruct {
 		const m = this
 		return m.myBool
 	}
-
-	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
-	  'MyStruct',
-	  $.TypeKind.Struct,
-	  new MyStruct(),
-	  new Set(['GetMyString', 'GetMyBool']),
-	  MyStruct
-	);
 }
 
 // NewMyStruct creates a new MyStruct instance.

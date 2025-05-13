@@ -51,9 +51,8 @@ class MyError {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'MyError',
-	  $.TypeKind.Struct,
 	  new MyError(),
 	  new Set(['Error']),
 	  MyError

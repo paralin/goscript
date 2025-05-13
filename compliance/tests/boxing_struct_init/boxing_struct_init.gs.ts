@@ -30,9 +30,8 @@ class MyStruct {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'MyStruct',
-	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set([]),
 	  MyStruct

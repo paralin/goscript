@@ -7,12 +7,10 @@ type MyInterface = null | {
 	Method(): void
 }
 
-const MyInterface__typeInfo = $.registerType(
+$.registerInterfaceType(
   'MyInterface',
-  $.TypeKind.Interface,
   null, // Zero value for interface is null
   new Set(['Method']),
-  undefined
 );
 
 class MyStruct {
@@ -52,9 +50,8 @@ class MyStruct {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'MyStruct',
-	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set([]),
 	  MyStruct

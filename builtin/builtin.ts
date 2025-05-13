@@ -728,48 +728,155 @@ export interface TypeDescription {
 }
 
 /**
- * Represents type information for a Go type in the runtime.
+ * Base type information shared by all type kinds
  */
-export interface TypeInfo {
-  name: string
-  kind: TypeKind
-  zeroValue: any
-  // For interfaces, the set of methods
-  methods?: Set<string>
-  // For structs, the constructor
-  constructor?: new (...args: any[]) => any
+export interface BaseTypeInfo {
+  name: string;
+  kind: TypeKind;
+  zeroValue: any;
 }
+
+/**
+ * Type information for struct types
+ */
+export interface StructTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Struct;
+  methods: Set<string>;
+  constructor: new (...args: any[]) => any;
+}
+
+/**
+ * Type information for interface types
+ */
+export interface InterfaceTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Interface;
+  methods: Set<string>;
+}
+
+/**
+ * Type information for basic types (string, number, boolean)
+ */
+export interface BasicTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Basic;
+}
+
+/**
+ * Type information for map types
+ */
+export interface MapTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Map;
+  keyType?: TypeInfo;
+  elemType?: TypeInfo;
+}
+
+/**
+ * Type information for slice types
+ */
+export interface SliceTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Slice;
+  elemType?: TypeInfo;
+}
+
+/**
+ * Type information for array types
+ */
+export interface ArrayTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Array;
+  elemType?: TypeInfo;
+  length: number;
+}
+
+/**
+ * Type information for pointer types
+ */
+export interface PointerTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Pointer;
+  elemType?: TypeInfo;
+}
+
+/**
+ * Type information for function types
+ */
+export interface FunctionTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Function;
+  params?: TypeInfo[];
+  results?: TypeInfo[];
+}
+
+/**
+ * Type information for channel types
+ */
+export interface ChannelTypeInfo extends BaseTypeInfo {
+  kind: TypeKind.Channel;
+  elemType?: TypeInfo;
+  direction?: 'send' | 'receive' | 'both';
+}
+
+/**
+ * Union type representing all possible TypeInfo variants
+ */
+export type TypeInfo = 
+  | StructTypeInfo 
+  | InterfaceTypeInfo 
+  | BasicTypeInfo
+  | MapTypeInfo
+  | SliceTypeInfo
+  | ArrayTypeInfo
+  | PointerTypeInfo
+  | FunctionTypeInfo
+  | ChannelTypeInfo;
 
 // Registry to store runtime type information
 const typeRegistry = new Map<string, TypeInfo>()
 
 /**
- * Registers a type with the runtime type system.
- *
+ * Registers a struct type with the runtime type system.
+ * 
  * @param name The name of the type.
- * @param kind The kind of the type.
  * @param zeroValue The zero value for the type.
- * @param methods Optional set of method names for interfaces.
- * @param constructor Optional constructor for structs.
- * @returns The type information object for chaining.
+ * @param methods Set of method names for the struct.
+ * @param constructor Constructor for the struct.
+ * @returns The struct type information object.
  */
-export const registerType = (
+export const registerStructType = (
   name: string,
-  kind: TypeKind,
   zeroValue: any,
-  methods?: Set<string>,
-  constructor?: new (...args: any[]) => any,
-): TypeInfo => {
-  const typeInfo: TypeInfo = {
+  methods: Set<string>,
+  constructor: new (...args: any[]) => any,
+): StructTypeInfo => {
+  const typeInfo: StructTypeInfo = {
     name,
-    kind,
+    kind: TypeKind.Struct,
     zeroValue,
     methods,
     constructor,
-  }
-  typeRegistry.set(name, typeInfo)
-  return typeInfo
-}
+  };
+  typeRegistry.set(name, typeInfo);
+  return typeInfo;
+};
+
+/**
+ * Registers an interface type with the runtime type system.
+ * 
+ * @param name The name of the type.
+ * @param zeroValue The zero value for the type (usually null).
+ * @param methods Set of method names the interface requires.
+ * @returns The interface type information object.
+ */
+export const registerInterfaceType = (
+  name: string,
+  zeroValue: any,
+  methods: Set<string>,
+): InterfaceTypeInfo => {
+  const typeInfo: InterfaceTypeInfo = {
+    name,
+    kind: TypeKind.Interface,
+    zeroValue,
+    methods,
+  };
+  typeRegistry.set(name, typeInfo);
+  return typeInfo;
+};
 
 /**
  * Represents the result of a type assertion.
@@ -779,13 +886,6 @@ export interface TypeAssertResult<T> {
   ok: boolean
 }
 
-/**
- * Performs a type assertion at runtime.
- *
- * @param value The value to assert.
- * @param typeName The name of the target type.
- * @returns An object with the asserted value and whether the assertion succeeded.
- */
 /**
  * Normalizes a type description to a structured TypeDescription object.
  *
@@ -798,12 +898,40 @@ function normalizeTypeDescription(
   if (typeof desc === 'string') {
     const typeInfo = typeRegistry.get(desc)
     if (typeInfo) {
-      return {
+      // Create a basic TypeDescription with common properties
+      const normalized: TypeDescription = {
         kind: typeInfo.kind,
         name: typeInfo.name,
-        methods: typeInfo.methods,
-        constructor: typeInfo.constructor,
       }
+      
+      // Add kind-specific properties
+      switch (typeInfo.kind) {
+        case TypeKind.Struct:
+          normalized.methods = (typeInfo as StructTypeInfo).methods
+          normalized.constructor = (typeInfo as StructTypeInfo).constructor
+          break
+        case TypeKind.Interface:
+          normalized.methods = (typeInfo as InterfaceTypeInfo).methods
+          break
+        case TypeKind.Map:
+          normalized.keyType = (typeInfo as MapTypeInfo).keyType
+          normalized.elemType = (typeInfo as MapTypeInfo).elemType
+          break
+        case TypeKind.Slice:
+        case TypeKind.Array:
+        case TypeKind.Pointer:
+          normalized.elemType = (typeInfo as SliceTypeInfo | ArrayTypeInfo | PointerTypeInfo).elemType
+          break
+        case TypeKind.Function:
+          normalized.params = (typeInfo as FunctionTypeInfo).params
+          normalized.results = (typeInfo as FunctionTypeInfo).results
+          break
+        case TypeKind.Channel:
+          normalized.elemType = (typeInfo as ChannelTypeInfo).elemType
+          break
+      }
+      
+      return normalized
     }
     return {
       kind: TypeKind.Basic,

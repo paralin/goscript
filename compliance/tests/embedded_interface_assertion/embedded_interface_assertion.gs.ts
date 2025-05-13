@@ -8,34 +8,28 @@ type Reader = null | {
 	Read(_p0: $.Slice<number>): [number, $.Error]
 }
 
-const Reader__typeInfo = $.registerType(
+$.registerInterfaceType(
   'Reader',
-  $.TypeKind.Interface,
   null, // Zero value for interface is null
   new Set(['Read']),
-  undefined
 );
 
 type Closer = null | {
 	Close(): $.Error
 }
 
-const Closer__typeInfo = $.registerType(
+$.registerInterfaceType(
   'Closer',
-  $.TypeKind.Interface,
   null, // Zero value for interface is null
   new Set(['Close']),
-  undefined
 );
 
 type ReadCloser = null | Reader & Closer
 
-const ReadCloser__typeInfo = $.registerType(
+$.registerInterfaceType(
   'ReadCloser',
-  $.TypeKind.Interface,
   null, // Zero value for interface is null
   new Set(['Close', 'Read']),
-  undefined
 );
 
 class MyStruct {
@@ -65,9 +59,8 @@ class MyStruct {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'MyStruct',
-	  $.TypeKind.Struct,
 	  new MyStruct(),
 	  new Set(['Read', 'Close']),
 	  MyStruct

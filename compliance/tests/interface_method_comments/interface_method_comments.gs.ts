@@ -8,12 +8,10 @@ type MyInterface = null | {
 	MyMethod(): void
 }
 
-const MyInterface__typeInfo = $.registerType(
+$.registerInterfaceType(
   'MyInterface',
-  $.TypeKind.Interface,
   null, // Zero value for interface is null
   new Set(['MyMethod']),
-  undefined
 );
 
 export function main(): void {

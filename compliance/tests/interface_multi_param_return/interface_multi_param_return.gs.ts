@@ -7,12 +7,10 @@ type MultiParamReturner = null | {
 	Process(data: $.Slice<number>, count: number, _p2: string): [boolean, $.Error]
 }
 
-const MultiParamReturner__typeInfo = $.registerType(
+$.registerInterfaceType(
   'MultiParamReturner',
-  $.TypeKind.Interface,
   null, // Zero value for interface is null
   new Set(['Process']),
-  undefined
 );
 
 class MyProcessor {
@@ -42,9 +40,8 @@ class MyProcessor {
 	}
 
 	// Register this type with the runtime type system
-	static __typeInfo = $.registerType(
+	static __typeInfo = $.registerStructType(
 	  'MyProcessor',
-	  $.TypeKind.Struct,
 	  new MyProcessor(),
 	  new Set(['Process']),
 	  MyProcessor
