@@ -1481,6 +1481,27 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled byte call with incorrect number of arguments")
 		default:
+			// Check if this is a type conversion to a function type
+			if funIdent != nil {
+				if obj := c.pkg.TypesInfo.Uses[funIdent]; obj != nil {
+					// Check if the object is a type name
+					if _, isType := obj.(*types.TypeName); isType {
+						// Make sure we have exactly one argument
+						if len(exp.Args) == 1 {
+							// Write the argument first
+							c.tsw.WriteLiterally("(")
+							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+								return fmt.Errorf("failed to write argument for function type cast: %w", err)
+							}
+							
+							// Then use the TypeScript "as" operator with the type name
+							c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
+							return nil // Handled function type cast
+						}
+					}
+				}
+			}
+
 			// Check if this is an async function call
 			if funIdent != nil {
 				// Get the object for this function identifier
@@ -1494,6 +1515,15 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
+			
+			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+				if _, ok := funType.Underlying().(*types.Signature); ok {
+					if _, isNamed := funType.(*types.Named); isNamed {
+						c.tsw.WriteLiterally("!")
+					}
+				}
+			}
+			
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
@@ -1510,6 +1540,14 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		// Not an identifier (e.g., method call on a value)
 		if err := c.WriteValueExpr(expFun); err != nil {
 			return fmt.Errorf("failed to write method expression in call: %w", err)
+		}
+		
+		if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+			if _, ok := funType.Underlying().(*types.Signature); ok {
+				if _, isNamed := funType.(*types.Named); isNamed {
+					c.tsw.WriteLiterally("!")
+				}
+			}
 		}
 	}
 	c.tsw.WriteLiterally("(")
@@ -3082,10 +3120,17 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 			if i > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			c.WriteField(field, true)
-			c.tsw.WriteLiterally(": ")
-			typ := c.pkg.TypesInfo.TypeOf(field.Type)
-			c.WriteGoType(typ)
+			
+			// Handle multiple parameter names for the same type
+			for j, name := range field.Names {
+				if j > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.tsw.WriteLiterally(name.Name)
+				c.tsw.WriteLiterally(": ")
+				typ := c.pkg.TypesInfo.TypeOf(field.Type)
+				c.WriteGoType(typ)
+			}
 		}
 
 		// Handle the variadic parameter
@@ -3115,11 +3160,16 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 			}
 
 			if isArguments {
-				// For function parameters, write "name: type"
-				c.WriteField(field, true)
-				c.tsw.WriteLiterally(": ")
-				typ := c.pkg.TypesInfo.TypeOf(field.Type)
-				c.WriteGoType(typ) // Use WriteGoType for parameter type
+				// For function parameters with multiple names, write each with its type
+				for j, name := range field.Names {
+					if j > 0 {
+						c.tsw.WriteLiterally(", ")
+					}
+					c.tsw.WriteLiterally(name.Name)
+					c.tsw.WriteLiterally(": ")
+					typ := c.pkg.TypesInfo.TypeOf(field.Type)
+					c.WriteGoType(typ) // Use WriteGoType for parameter type
+				}
 			} else {
 				// For struct fields and other non-argument fields
 				c.WriteField(field, false)
@@ -3165,7 +3215,11 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		return
 	}
 
-	for _, name := range field.Names {
+	for i, name := range field.Names {
+		if i > 0 && isArguments {
+			c.tsw.WriteLiterally(", ")
+		}
+		
 		// argument names: keep original casing, no access modifier
 		if isArguments {
 			c.tsw.WriteLiterally(name.Name)
@@ -3262,6 +3316,10 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
 					if err := c.WriteValueSpec(valueSpec); err != nil {
 						return fmt.Errorf("failed to write value spec in declaration statement: %w", err)
+					}
+				} else if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+					if err := c.WriteTypeSpec(typeSpec); err != nil {
+						return fmt.Errorf("failed to write type spec in declaration statement: %w", err)
 					}
 				} else {
 					c.tsw.WriteCommentLinef("unhandled spec in DeclStmt: %T", spec)
