@@ -628,6 +628,18 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 		default:
 			c.tsw.WriteLiterally("0")
 		}
+	case *types.Named:
+		// Handle named types, especially struct types
+		if _, isStruct := t.Underlying().(*types.Struct); isStruct {
+			// Initialize struct types with a new instance
+			c.tsw.WriteLiterallyf("new %s()", t.Obj().Name())
+			return
+		}
+		// For other named types, use the zero value of the underlying type
+		c.WriteZeroValueForType(t.Underlying())
+	case *types.Struct:
+		// For anonymous struct types, initialize with {}
+		c.tsw.WriteLiterally("{}")
 	default:
 		c.tsw.WriteLiterally("null")
 	}
@@ -4600,8 +4612,53 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			}
 		}
 
-		// Write the left-hand side as a destructuring pattern
-		// For token.DEFINE, we've already declared any new variables above
+		
+		// First, collect all the selector expressions to identify variables that need to be initialized
+		hasSelectors := false
+		for _, lhsExpr := range lhs {
+			if _, ok := lhsExpr.(*ast.SelectorExpr); ok {
+				hasSelectors = true
+				break
+			}
+		}
+		
+		// If we have selector expressions, we need to ensure variables are initialized
+		// before the destructuring assignment
+		if hasSelectors {
+			// Write a temporary variable to hold the function call result
+			c.tsw.WriteLiterally("const _tmp = ")
+			if err := c.WriteValueExpr(callExpr); err != nil {
+				return fmt.Errorf("failed to write RHS call expression in assignment: %w", err)
+			}
+			c.tsw.WriteLine("")
+			
+			for i, lhsExpr := range lhs {
+				// Skip underscore variables
+				if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name == "_" {
+					continue
+				}
+				
+				// Write the LHS
+				if ident, ok := lhsExpr.(*ast.Ident); ok {
+					c.WriteIdent(ident, false)
+				} else if selectorExpr, ok := lhsExpr.(*ast.SelectorExpr); ok {
+					if err := c.WriteValueExpr(selectorExpr); err != nil {
+						return fmt.Errorf("failed to write selector expression in LHS: %w", err)
+					}
+				} else {
+					return errors.Errorf("unhandled LHS expression in assignment: %T", lhsExpr)
+				}
+				
+				// Write the assignment
+				c.tsw.WriteLiterallyf(" = _tmp[%d]", i)
+				// Always add a newline after each assignment
+				c.tsw.WriteLine("")
+			}
+			
+			return nil
+		}
+		
+		// For simple cases without selector expressions, use array destructuring
 		c.tsw.WriteLiterally("[")
 
 		for i, lhsExpr := range lhs {
@@ -4614,9 +4671,13 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				if ident.Name != "_" {
 					c.WriteIdent(ident, false)
 				}
+			} else if selectorExpr, ok := lhsExpr.(*ast.SelectorExpr); ok {
+				// Handle selector expressions (e.g., a.b) by using WriteValueExpr
+				if err := c.WriteValueExpr(selectorExpr); err != nil {
+					return fmt.Errorf("failed to write selector expression in LHS: %w", err)
+				}
 			} else {
 				// Should not happen for valid Go code in this context, but handle defensively
-				// NOTE: HAPPENS!
 				return errors.Errorf("unhandled LHS expression in destructuring: %T", lhsExpr)
 			}
 		}
