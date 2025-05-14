@@ -1492,12 +1492,12 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 							if _, isFuncType := typeName.Type().Underlying().(*types.Signature); isFuncType {
 								// For function types, we need to add a __goTypeName property
 								c.tsw.WriteLiterally("Object.assign(")
-								
+
 								// Write the argument first
 								if err := c.WriteValueExpr(exp.Args[0]); err != nil {
 									return fmt.Errorf("failed to write argument for function type cast: %w", err)
 								}
-								
+
 								// Add the __goTypeName property with the function type name
 								c.tsw.WriteLiterallyf(", { __goTypeName: '%s' })", funIdent.String())
 								return nil // Handled function type cast
@@ -1507,7 +1507,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 								if err := c.WriteValueExpr(exp.Args[0]); err != nil {
 									return fmt.Errorf("failed to write argument for type cast: %w", err)
 								}
-								
+
 								// Then use the TypeScript "as" operator with the type name
 								c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
 								return nil // Handled non-function type cast
@@ -4610,13 +4610,13 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			}
 
 			if ident, ok := lhsExpr.(*ast.Ident); ok {
-				if ident.Name == "_" {
-					// For underscore variables, use empty slots in destructuring pattern
-				} else {
+				// For underscore variables, use empty slots in destructuring pattern
+				if ident.Name != "_" {
 					c.WriteIdent(ident, false)
 				}
 			} else {
 				// Should not happen for valid Go code in this context, but handle defensively
+				// NOTE: HAPPENS!
 				return errors.Errorf("unhandled LHS expression in destructuring: %T", lhsExpr)
 			}
 		}
@@ -5690,14 +5690,14 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		// For function types, create a type descriptor object with params and results
 		c.tsw.WriteLiterally("{")
 		c.tsw.WriteLiterally("kind: $.TypeKind.Function")
-		
+
 		// Add name if this is a named function type
 		if namedType := c.pkg.TypesInfo.TypeOf(typeExpr); namedType != nil {
 			if named, ok := namedType.(*types.Named); ok {
 				c.tsw.WriteLiterallyf(", name: '%s'", named.Obj().Name())
 			}
 		}
-		
+
 		// Add params if present
 		if typeExpr.Params != nil && len(typeExpr.Params.List) > 0 {
 			c.tsw.WriteLiterally(", params: [")
@@ -5709,7 +5709,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 			}
 			c.tsw.WriteLiterally("]")
 		}
-		
+
 		// Add results if present
 		if typeExpr.Results != nil && len(typeExpr.Results.List) > 0 {
 			c.tsw.WriteLiterally(", results: [")
@@ -5721,7 +5721,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 			}
 			c.tsw.WriteLiterally("]")
 		}
-		
+
 		c.tsw.WriteLiterally("}")
 	case *ast.Ident:
 		if isPrimitiveType(typeExpr.Name) {
@@ -5747,10 +5747,10 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 						c.tsw.WriteLiterally("{")
 						c.tsw.WriteLiterally("kind: $.TypeKind.Function")
 						c.tsw.WriteLiterallyf(", name: '%s'", typeExpr.Name)
-						
+
 						// Get the underlying signature
 						signature := named.Underlying().(*types.Signature)
-						
+
 						// Add params if present
 						params := signature.Params()
 						if params != nil && params.Len() > 0 {
@@ -5763,19 +5763,19 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 								param := params.At(i)
 								c.tsw.WriteLiterally("{")
 								c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
-								
+
 								typeName := param.Type().String()
 								if tsType, ok := GoBuiltinToTypescript(typeName); ok {
 									c.tsw.WriteLiterallyf("name: '%s'", tsType)
 								} else {
 									c.tsw.WriteLiterallyf("name: '%s'", typeName)
 								}
-								
+
 								c.tsw.WriteLiterally("}")
 							}
 							c.tsw.WriteLiterally("]")
 						}
-						
+
 						// Add results if present
 						results := signature.Results()
 						if results != nil && results.Len() > 0 {
@@ -5787,24 +5787,24 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 								result := results.At(i)
 								c.tsw.WriteLiterally("{")
 								c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
-								
+
 								typeName := result.Type().String()
 								if tsType, ok := GoBuiltinToTypescript(typeName); ok {
 									c.tsw.WriteLiterallyf("name: '%s'", tsType)
 								} else {
 									c.tsw.WriteLiterallyf("name: '%s'", typeName)
 								}
-								
+
 								c.tsw.WriteLiterally("}")
 							}
 							c.tsw.WriteLiterally("]")
 						}
-						
+
 						c.tsw.WriteLiterally("}")
 					}
 				}
 			}
-			
+
 			// Default case for non-function named types
 			if !isFunctionType {
 				c.tsw.WriteLiterallyf("'%s'", typeExpr.Name)
@@ -5924,14 +5924,14 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		// For function types, create a type descriptor object with params and results
 		c.tsw.WriteLiterally("{")
 		c.tsw.WriteLiterally("kind: $.TypeKind.Function")
-		
+
 		// Add name if this is a named function type
 		if namedType := c.pkg.TypesInfo.TypeOf(typeExpr); namedType != nil {
 			if named, ok := namedType.(*types.Named); ok {
 				c.tsw.WriteLiterallyf(", name: '%s'", named.Obj().Name())
 			}
 		}
-		
+
 		// Add params if present
 		if t.Params != nil && len(t.Params.List) > 0 {
 			c.tsw.WriteLiterally(", params: [")
@@ -5943,7 +5943,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 			}
 			c.tsw.WriteLiterally("]")
 		}
-		
+
 		// Add results if present
 		if t.Results != nil && len(t.Results.List) > 0 {
 			c.tsw.WriteLiterally(", results: [")
@@ -5955,7 +5955,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 			}
 			c.tsw.WriteLiterally("]")
 		}
-		
+
 		c.tsw.WriteLiterally("}")
 		return
 	case *ast.ChanType:
