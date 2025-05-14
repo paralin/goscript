@@ -10,7 +10,7 @@ export function main(): void {
 	let ch4 = $.makeChannel<{  }>(0, {}, 'both')
 
 	let i: null | any = ch1
-	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'both'})
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(ch1, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'both'})
 		if (ok) {
 			console.log("i is chan int: ok")
 		} else {
@@ -18,7 +18,7 @@ export function main(): void {
 		}
 	}
 	let s: null | any = ch2
-	{let { ok: ok } = $.typeAssert<$.Channel<string>>(s, {kind: $.TypeKind.Channel, elemType: 'string', direction: 'send'})
+	{let { ok: ok } = $.typeAssert<$.Channel<string>>(ch2, {kind: $.TypeKind.Channel, elemType: 'string', direction: 'send'})
 		if (ok) {
 			console.log("s is chan<- string: ok")
 		} else {
@@ -26,7 +26,7 @@ export function main(): void {
 		}
 	}
 	let r: null | any = ch3
-	{let { ok: ok } = $.typeAssert<$.Channel<number>>(r, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(ch3, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
 		if (ok) {
 			console.log("r is <-chan float64: ok")
 		} else {
@@ -34,42 +34,42 @@ export function main(): void {
 		}
 	}
 	let e: null | any = ch4
-	{let { ok: ok } = $.typeAssert<$.Channel<{  }>>(e, {kind: $.TypeKind.Channel, elemType: {kind: $.TypeKind.Struct, fields: {}, methods: new Set()}, direction: 'both'})
+	{let { ok: ok } = $.typeAssert<$.Channel<{  }>>(ch4, {kind: $.TypeKind.Channel, elemType: {kind: $.TypeKind.Struct, fields: {}, methods: new Set()}, direction: 'both'})
 		if (ok) {
 			console.log("e is chan struct{}: ok")
 		} else {
 			console.log("e is chan struct{}: failed")
 		}
 	}
-	{let { ok: ok } = $.typeAssert<$.Channel<string>>(i, {kind: $.TypeKind.Channel, elemType: 'string', direction: 'both'})
+	{let { ok: ok } = $.typeAssert<$.Channel<string>>(ch1, {kind: $.TypeKind.Channel, elemType: 'string', direction: 'both'})
 		if (ok) {
 			console.log("i is chan string: incorrect")
 		} else {
 			console.log("i is chan string: correctly failed")
 		}
 	}
-	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'send'})
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(ch1, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'send'})
 		if (ok) {
 			console.log("i is chan<- int: incorrect")
 		} else {
 			console.log("i is chan<- int: correctly failed")
 		}
 	}
-	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(ch1, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
 		if (ok) {
 			console.log("i is <-chan int: incorrect")
 		} else {
 			console.log("i is <-chan int: correctly failed")
 		}
 	}
-	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'send'})
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(ch1, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'send'})
 		if (ok) {
 			console.log("bidirectional can be used as send-only: ok")
 		} else {
 			console.log("bidirectional can be used as send-only: failed")
 		}
 	}
-	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(ch1, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
 		if (ok) {
 			console.log("bidirectional can be used as receive-only: ok")
 		} else {
