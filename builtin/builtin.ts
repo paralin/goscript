@@ -1166,10 +1166,18 @@ function matchesPointerType(value: any, info: TypeInfo): boolean {
  * @param info The function type info to match against.
  * @returns True if the value matches the function type, false otherwise.
  */
-function matchesFunctionType(value: any): boolean {
-  // For functions, check if the value is a function
-  // TODO: we need to check the type signature in more detail here.
-  return typeof value === 'function'
+function matchesFunctionType(value: any, info: FunctionTypeInfo): boolean {
+  // First check if the value is a function
+  if (typeof value !== 'function') {
+    return false;
+  }
+  
+  // This is important for named function types
+  if (info.name && value.__goTypeName) {
+    return info.name === value.__goTypeName;
+  }
+  
+  return true;
 }
 
 /**
@@ -1264,7 +1272,7 @@ function matchesType(value: any, info: TypeInfo): boolean {
       return matchesPointerType(value, info)
 
     case TypeKind.Function:
-      return matchesFunctionType(value)
+      return matchesFunctionType(value, info as FunctionTypeInfo)
 
     case TypeKind.Channel:
       return matchesChannelType(value, info)
