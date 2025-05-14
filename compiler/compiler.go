@@ -5396,32 +5396,90 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	okIsBlank := false
 	var valueName string
 	var okName string
+	var valueIdent *ast.Ident
+	var okIdent *ast.Ident
 
-	if valIdent, ok := lhs[0].(*ast.Ident); ok {
-		if valIdent.Name == "_" {
+	if valId, ok := lhs[0].(*ast.Ident); ok {
+		valueIdent = valId
+		if valId.Name == "_" {
 			valueIsBlank = true
 		} else {
-			valueName = valIdent.Name
+			valueName = valId.Name
 		}
 	} else {
 		return fmt.Errorf("unhandled LHS expression type for value in type assertion: %T", lhs[0])
 	}
 
-	if okIdent, ok := lhs[1].(*ast.Ident); ok {
-		if okIdent.Name == "_" {
+	if okId, ok := lhs[1].(*ast.Ident); ok {
+		okIdent = okId
+		if okId.Name == "_" {
 			okIsBlank = true
 		} else {
-			okName = okIdent.Name
+			okName = okId.Name
 		}
 	} else {
 		return fmt.Errorf("unhandled LHS expression type for ok in type assertion: %T", lhs[1])
 	}
 
-	// Generate the destructuring assignment
+	// For token.DEFINE (:=), we need to check if any of the variables are already declared
+	// In Go, := can be used for redeclaration if at least one variable is new
 	if tok == token.DEFINE {
-		c.tsw.WriteLiterally("let ")
+		// Identify which variables are new vs existing
+		valueIsNew := true
+		okIsNew := true
+		anyNewVars := false
+		allNewVars := true
+
+		// Check if variables are already in scope
+		if !valueIsBlank {
+			if obj := c.pkg.TypesInfo.Uses[valueIdent]; obj != nil {
+				// If it's in Uses, it's referenced elsewhere, so it exists
+				valueIsNew = false
+				allNewVars = false
+			}
+			if valueIsNew {
+				anyNewVars = true
+			}
+		}
+
+		if !okIsBlank {
+			if obj := c.pkg.TypesInfo.Uses[okIdent]; obj != nil {
+				// If it's in Uses, it's referenced elsewhere, so it exists
+				okIsNew = false
+				allNewVars = false
+			}
+			if okIsNew {
+				anyNewVars = true
+			}
+		}
+
+		if allNewVars && anyNewVars {
+			c.tsw.WriteLiterally("let ")
+		} else if anyNewVars {
+			// If only some variables are new, declare them separately
+			if !valueIsBlank && valueIsNew {
+				c.tsw.WriteLiterally("let ")
+				c.tsw.WriteLiterally(valueName)
+				// Add type annotation if possible
+				if tv, ok := c.pkg.TypesInfo.Types[assertedType]; ok {
+					c.tsw.WriteLiterally(": ")
+					c.WriteGoType(tv.Type)
+				}
+				c.tsw.WriteLine("")
+			}
+			if !okIsBlank && okIsNew {
+				c.tsw.WriteLiterally("let ")
+				c.tsw.WriteLiterally(okName)
+				c.tsw.WriteLiterally(": boolean") // ok is always boolean
+				c.tsw.WriteLine("")
+			}
+			// Use parenthesized destructuring assignment for existing variables
+			c.tsw.WriteLiterally(";(")
+		} else {
+			// All variables exist, use parenthesized destructuring assignment
+			c.tsw.WriteLiterally(";(")
+		}
 	} else {
-		// We must wrap in parenthesis.
 		c.tsw.WriteLiterally("(")
 	}
 
