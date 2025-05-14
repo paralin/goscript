@@ -5430,7 +5430,6 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 	// Write the interface expression or the original channel if available
 	if hasOriginalChannel && originalChannel != nil {
 		// Use the original channel directly for the type assertion
-		c.tsw.WriteLiterally("/* optimized channel type assertion */ ")
 		if err := c.WriteValueExpr(originalChannel); err != nil {
 			return fmt.Errorf("failed to write original channel expression in type assertion call: %w", err)
 		}
