@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
-	let messages = $.makeChannel<string>(0, "")
+	let messages = $.makeChannel<string>(0, "", 'both')
 
 	queueMicrotask(async () => {
 		{

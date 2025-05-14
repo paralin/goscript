@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
 	await using __defer = new $.AsyncDisposableStack();
-	let ch = $.makeChannel<boolean>(1, false)
+	let ch = $.makeChannel<boolean>(1, false, 'both')
 
 	// Wait for signal from main
 	__defer.defer(async () => {

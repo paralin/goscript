@@ -4,55 +4,76 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	let c1: $.Channel<number> = null
-	let c2: $.Channel<number> = null
-	let c3: $.Channel<number> = null
-	let c4: $.Channel<boolean> = null
+	let ch1 = $.makeChannel<number>(0, 0, 'both')
+	let ch2 = $.makeChannel<string>(0, "", 'send')
+	let ch3 = $.makeChannel<number>(0, 0, 'receive')
+	let ch4 = $.makeChannel<{  }>(0, {}, 'both')
 
-	let i: null | any = c1
-	let { ok: ok1 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok1)
-
-	let { ok: ok2 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok2)
-
-	let { ok: ok3 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok3)
-
-	i = c2
-	let { ok: ok5 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok5)
-	let { ok: ok6 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok6)
-	let { ok: ok7 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok7)
-
-	i = c3
-	let { ok: ok8 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok8)
-	let { ok: ok9 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok9)
-	let { ok: ok10 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok10)
-
-	// Test with nil channel
-	let cnil: $.Channel<string> = null
-	i = cnil
-	let { ok: ok11 } = $.typeAssert<$.Channel<string>>(i, {kind: $.TypeKind.Channel, elemType: 'string'})
-	console.log(ok11)
-	let { ok: ok12 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok12)
-
-	// Test with a non-channel type
-	let s: string = "hello"
-	i = s
-	let { ok: ok13 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok13)
-
-	i = c4
-	let { ok: ok14 } = $.typeAssert<$.Channel<boolean>>(i, {kind: $.TypeKind.Channel, elemType: 'boolean'})
-	console.log(ok14)
-	let { ok: ok15 } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number'})
-	console.log(ok15)
-}
+	let i: null | any = ch1
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'both'})
+		if (ok) {
+			console.log("i is chan int: ok")
+		} else {
+			console.log("i is chan int: failed")
+		}
+	}
+	let s: null | any = ch2
+	{let { ok: ok } = $.typeAssert<$.Channel<string>>(s, {kind: $.TypeKind.Channel, elemType: 'string', direction: 'send'})
+		if (ok) {
+			console.log("s is chan<- string: ok")
+		} else {
+			console.log("s is chan<- string: failed")
+		}
+	}
+	let r: null | any = ch3
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(r, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
+		if (ok) {
+			console.log("r is <-chan float64: ok")
+		} else {
+			console.log("r is <-chan float64: failed")
+		}
+	}
+	let e: null | any = ch4
+	{let { ok: ok } = $.typeAssert<$.Channel<{  }>>(e, {kind: $.TypeKind.Channel, elemType: {kind: $.TypeKind.Struct, fields: {}, methods: new Set()}, direction: 'both'})
+		if (ok) {
+			console.log("e is chan struct{}: ok")
+		} else {
+			console.log("e is chan struct{}: failed")
+		}
+	}
+	{let { ok: ok } = $.typeAssert<$.Channel<string>>(i, {kind: $.TypeKind.Channel, elemType: 'string', direction: 'both'})
+		if (ok) {
+			console.log("i is chan string: incorrect")
+		} else {
+			console.log("i is chan string: correctly failed")
+		}
+	}
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'send'})
+		if (ok) {
+			console.log("i is chan<- int: incorrect")
+		} else {
+			console.log("i is chan<- int: correctly failed")
+		}
+	}
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
+		if (ok) {
+			console.log("i is <-chan int: incorrect")
+		} else {
+			console.log("i is <-chan int: correctly failed")
+		}
+	}
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'send'})
+		if (ok) {
+			console.log("bidirectional can be used as send-only: ok")
+		} else {
+			console.log("bidirectional can be used as send-only: failed")
+		}
+	}
+	{let { ok: ok } = $.typeAssert<$.Channel<number>>(i, {kind: $.TypeKind.Channel, elemType: 'number', direction: 'receive'})
+		if (ok) {
+			console.log("bidirectional can be used as receive-only: ok")
+		} else {
+			console.log("bidirectional can be used as receive-only: failed")
+		}
+	}}
 
