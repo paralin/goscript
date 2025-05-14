@@ -1291,6 +1291,22 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					// Write the zero value for the channel's element type
 					c.WriteZeroValueForType(chanType.Elem())
 
+					// Add direction information based on the channel type
+					c.tsw.WriteLiterally(", ")
+					switch chanType.Dir() {
+					case types.SendOnly:
+						c.tsw.WriteLiterally("$.ChannelDirection.SEND_ONLY")
+					case types.RecvOnly:
+						c.tsw.WriteLiterally("$.ChannelDirection.RECEIVE_ONLY")
+					default:
+						c.tsw.WriteLiterally("$.ChannelDirection.BIDIRECTIONAL")
+					}
+
+					// Add element type string for runtime checks
+					c.tsw.WriteLiterally(", ")
+					elemTypeStr := c.getTypeString(chanType.Elem())
+					c.tsw.WriteLiterallyf("'%s'", elemTypeStr)
+
 					c.tsw.WriteLiterally(")")
 					return nil // Handled make for channel
 				}
@@ -5629,6 +5645,36 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		c.tsw.WriteLiterally("kind: $.TypeKind.Pointer, ")
 		c.tsw.WriteLiterally("elemType: ")
 		c.writeTypeDescription(t.X)
+		c.tsw.WriteLiterally("}")
+	case *ast.ChanType:
+		// For channel types, create a type descriptor object
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Channel")
+
+		// Add element type
+		c.tsw.WriteLiterally(", elemType: ")
+		// 't' here is the *ast.ChanType from the switch case
+		if ident, ok := t.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
+			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
+				c.tsw.WriteLiterallyf("'%s'", tsType)
+			} else {
+				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
+			}
+		} else {
+			c.writeTypeDescription(t.Value) // t.Value is the ast.Expr for the element type
+		}
+
+		// Add direction information based on the AST node
+		c.tsw.WriteLiterally(", direction: ")
+		switch t.Dir { // t.Dir is the ast.ChanDir (SEND or RECV)
+		case ast.SEND:
+			c.tsw.WriteLiterally("'send'")
+		case ast.RECV:
+			c.tsw.WriteLiterally("'receive'")
+		default: // Includes bidirectional (ast.SEND | ast.RECV implicitly, or if Dir is 0)
+			c.tsw.WriteLiterally("'both'")
+		}
+
 		c.tsw.WriteLiterally("}")
 	default:
 		// For other types, use the string representation

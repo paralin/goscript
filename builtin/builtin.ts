@@ -1175,17 +1175,59 @@ function matchesFunctionType(value: any): boolean {
  * @returns True if the value matches the channel type, false otherwise.
  */
 function matchesChannelType(value: any, info: ChannelTypeInfo): boolean {
-  // TODO: match on info.direction, etc.
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    'send' in value &&
-    'receive' in value &&
-    'close' in value &&
-    typeof value.send === 'function' &&
-    typeof value.receive === 'function' &&
-    typeof value.close === 'function'
-  )
+  // Basic structure check
+  if (
+    typeof value !== 'object' || 
+    value === null || 
+    !('send' in value) ||
+    !('receive' in value) || 
+    !('close' in value) || 
+    typeof value.send !== 'function' ||
+    typeof value.receive !== 'function' ||
+    typeof value.close !== 'function'
+  ) {
+    return false
+  }
+
+  // Allow nil channels to match any channel type
+  if (value === null) {
+    return true
+  }
+
+  // Element type check if specified
+  if (info.elemType) {
+    // Skip element type check if no elementType property on channel
+    // (for backward compatibility with existing channels)
+    if ('elementType' in value && 
+        value.elementType !== info.elemType && 
+        value.elementType !== 'any' && 
+        info.elemType !== 'any') {
+      return false
+    }
+  }
+
+  // Direction compatibility check
+  if (info.direction && 'direction' in value) {
+    switch (info.direction) {
+      case 'both':
+        // For bidirectional assertion, channel must be exactly bidirectional
+        return value.direction === ChannelDirection.BIDIRECTIONAL
+      case 'send':
+        // For send-only assertion, channel can be bidirectional or send-only
+        return value.direction === ChannelDirection.BIDIRECTIONAL || 
+              value.direction === ChannelDirection.SEND_ONLY
+      case 'receive':
+        // For receive-only assertion, channel can be bidirectional or receive-only
+        return value.direction === ChannelDirection.BIDIRECTIONAL || 
+              value.direction === ChannelDirection.RECEIVE_ONLY
+      default:
+        return false
+    }
+  }
+
+  // If no direction specified, or channel doesn't have direction property,
+  // default to allowing any direction
+  return true
 }
 
 /**
@@ -1241,6 +1283,11 @@ export function typeAssert<T>(
   const normalizedType = normalizeTypeInfo(typeInfo)
   
   if (isPointerTypeInfo(normalizedType) && value === null) {
+    return { value: null as unknown as T, ok: true }
+  }
+
+  // Special case for nil channels
+  if (isChannelTypeInfo(normalizedType) && value === null) {
     return { value: null as unknown as T, ok: true }
   }
 
@@ -1377,6 +1424,15 @@ export interface SelectResult<T> {
 }
 
 /**
+ * Enum representing the direction capabilities of a channel
+ */
+export enum ChannelDirection {
+  SEND_ONLY = "send",
+  RECEIVE_ONLY = "receive",
+  BIDIRECTIONAL = "both"
+}
+
+/**
  * Represents a Go channel in TypeScript.
  * Supports asynchronous sending and receiving of values.
  */
@@ -1438,6 +1494,16 @@ export interface Channel<T> {
    * Used for non-blocking select operations.
    */
   canSendNonBlocking(): boolean
+
+  /**
+   * The direction of the channel (send-only, receive-only, or bidirectional)
+   */
+  readonly direction: ChannelDirection
+
+  /**
+   * The string representation of the element type for runtime type checking
+   */
+  readonly elementType: string
 }
 
 // A simple implementation of buffered channels
@@ -1449,10 +1515,21 @@ class BufferedChannel<T> implements Channel<T> {
   private receivers: Array<(value: T) => void> = [] // Resolvers for blocked receivers
   private receiversWithOk: Array<(result: ChannelReceiveResult<T>) => void> = [] // For receive with ok
   private zeroValue: T // Store the zero value for the element type
+  
+  // Public readonly properties for Channel interface
+  public readonly direction: ChannelDirection
+  public readonly elementType: string
 
-  constructor(capacity: number, zeroValue: T) {
+  constructor(
+    capacity: number, 
+    zeroValue: T, 
+    direction: ChannelDirection = ChannelDirection.BIDIRECTIONAL,
+    elementType: string = 'any'
+  ) {
     this.capacity = capacity
     this.zeroValue = zeroValue
+    this.direction = direction
+    this.elementType = elementType
   }
 
   async send(value: T): Promise<void> {
@@ -1775,13 +1852,17 @@ export async function selectStatement<T>(
  * Creates a new channel with the specified buffer size and zero value.
  * @param bufferSize The size of the channel buffer. If 0, creates an unbuffered channel.
  * @param zeroValue The zero value for the channel's element type.
+ * @param direction The direction of the channel (send-only, receive-only, or bidirectional).
+ * @param elementType The string representation of the element type for runtime checks.
  * @returns A new channel instance.
  */
 export const makeChannel = <T>(
   bufferSize: number,
   zeroValue: T,
+  direction: ChannelDirection = ChannelDirection.BIDIRECTIONAL,
+  elementType: string = 'any'
 ): Channel<T> => {
-  return new BufferedChannel<T>(bufferSize, zeroValue)
+  return new BufferedChannel<T>(bufferSize, zeroValue, direction, elementType)
 }
 
 /**
