@@ -1493,7 +1493,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
 								return fmt.Errorf("failed to write argument for function type cast: %w", err)
 							}
-							
+
 							// Then use the TypeScript "as" operator with the type name
 							c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
 							return nil // Handled function type cast
@@ -1515,7 +1515,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write function expression in call: %w", err)
 			}
-			
+
 			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
 				if _, ok := funType.Underlying().(*types.Signature); ok {
 					if _, isNamed := funType.(*types.Named); isNamed {
@@ -1523,7 +1523,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					}
 				}
 			}
-			
+
 			c.tsw.WriteLiterally("(")
 			for i, arg := range exp.Args {
 				if i != 0 {
@@ -1541,7 +1541,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		if err := c.WriteValueExpr(expFun); err != nil {
 			return fmt.Errorf("failed to write method expression in call: %w", err)
 		}
-		
+
 		if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
 			if _, ok := funType.Underlying().(*types.Signature); ok {
 				if _, isNamed := funType.(*types.Named); isNamed {
@@ -3120,7 +3120,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 			if i > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			
+
 			// Handle multiple parameter names for the same type
 			for j, name := range field.Names {
 				if j > 0 {
@@ -3219,7 +3219,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		if i > 0 && isArguments {
 			c.tsw.WriteLiterally(", ")
 		}
-		
+
 		// argument names: keep original casing, no access modifier
 		if isArguments {
 			c.tsw.WriteLiterally(name.Name)
