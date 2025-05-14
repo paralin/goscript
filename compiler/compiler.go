@@ -5423,6 +5423,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 	// For token.DEFINE (:=), we need to check if any of the variables are already declared
 	// In Go, := can be used for redeclaration if at least one variable is new
+	writeEndParen := false
 	if tok == token.DEFINE {
 		// Identify which variables are new vs existing
 		valueIsNew := true
@@ -5475,9 +5476,11 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 			}
 			// Use parenthesized destructuring assignment for existing variables
 			c.tsw.WriteLiterally(";(")
+			writeEndParen = true
 		} else {
 			// All variables exist, use parenthesized destructuring assignment
 			c.tsw.WriteLiterally(";(")
+			writeEndParen = true
 		}
 	} else {
 		c.tsw.WriteLiterally("(")
@@ -5704,7 +5707,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 
 	c.tsw.WriteLiterally(")")
 
-	if tok != token.DEFINE {
+	if tok != token.DEFINE || writeEndParen {
 		c.tsw.WriteLiterally(")")
 	}
 
