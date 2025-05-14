@@ -69,7 +69,8 @@ export function main(): void {
 	}
 
 	let j: null | any = (add as Adder)
-	let { value: addFn, ok: ok } = $.typeAssert<Adder>(j, 'Adder')
+	let addFn: Adder
+	;({ value: addFn, ok: ok } = $.typeAssert<Adder>(j, 'Adder')
 	if (ok) {
 		console.log(addFn!(5, 3))
 	} else {
@@ -78,7 +79,8 @@ export function main(): void {
 
 	// 2. Type assertion of a function returned from another function
 	let returnedFn = getGreeter()
-	let { value: greetFn, ok: ok } = $.typeAssert<Greeter>(returnedFn, 'Greeter')
+	let greetFn: Greeter
+	;({ value: greetFn, ok: ok } = $.typeAssert<Greeter>(returnedFn, 'Greeter')
 	if (ok) {
 		console.log(greetFn!("Gopher"))
 	} else {
@@ -86,7 +88,8 @@ export function main(): void {
 	}
 
 	let returnedAdder = getAdder()
-	let { value: addFnFromFunc, ok: ok } = $.typeAssert<Adder>(returnedAdder, 'Adder')
+	let addFnFromFunc: Adder
+	;({ value: addFnFromFunc, ok: ok } = $.typeAssert<Adder>(returnedAdder, 'Adder')
 	if (ok) {
 		console.log(addFnFromFunc!(10, 20))
 	} else {
@@ -95,7 +98,8 @@ export function main(): void {
 
 	// 3. Type assertion of a function in a struct field
 	let container = new FuncContainer({myFunc: (greet as Greeter)})
-	let { value: structFn, ok: ok } = $.typeAssert<Greeter>(container.myFunc, 'Greeter')
+	let structFn: Greeter
+	;({ value: structFn, ok: ok } = $.typeAssert<Greeter>(container.myFunc, 'Greeter')
 	if (ok) {
 		console.log(structFn!("Struct"))
 	} else {
@@ -103,7 +107,8 @@ export function main(): void {
 	}
 
 	let adderContainer = new FuncContainer({myFunc: (add as Adder)})
-	let { value: structAdderFn, ok: ok } = $.typeAssert<Adder>(adderContainer.myFunc, 'Adder')
+	let structAdderFn: Adder
+	;({ value: structAdderFn, ok: ok } = $.typeAssert<Adder>(adderContainer.myFunc, 'Adder')
 	if (ok) {
 		console.log(structAdderFn!(7, 8))
 	} else {
@@ -115,14 +120,16 @@ export function main(): void {
 	$.mapSet(funcMap, "greeter", (greet as Greeter))
 	$.mapSet(funcMap, "adder", (add as Adder))
 
-	let { value: mapFn, ok: ok } = $.typeAssert<Greeter>($.mapGet(funcMap, "greeter", null), 'Greeter')
+	let mapFn: Greeter
+	;({ value: mapFn, ok: ok } = $.typeAssert<Greeter>($.mapGet(funcMap, "greeter", null), 'Greeter')
 	if (ok) {
 		console.log(mapFn!("Map"))
 	} else {
 		console.log("Map function assertion failed")
 	}
 
-	let { value: mapAdderFn, ok: ok } = $.typeAssert<Adder>($.mapGet(funcMap, "adder", null), 'Adder')
+	let mapAdderFn: Adder
+	;({ value: mapAdderFn, ok: ok } = $.typeAssert<Adder>($.mapGet(funcMap, "adder", null), 'Adder')
 	if (ok) {
 		console.log(mapAdderFn!(1, 2))
 	} else {
@@ -134,13 +141,15 @@ export function main(): void {
 	funcSlice![0] = (greet as Greeter)
 	funcSlice![1] = (add as Adder)
 
-	let { value: sliceFn, ok: ok } = $.typeAssert<Greeter>(funcSlice![0], 'Greeter')
+	let sliceFn: Greeter
+	;({ value: sliceFn, ok: ok } = $.typeAssert<Greeter>(funcSlice![0], 'Greeter')
 	if (ok) {
 		console.log(sliceFn!("Slice"))
 	} else {
 		console.log("Slice function assertion failed")
 	}
-	let { value: sliceAdderFn, ok: ok } = $.typeAssert<Adder>(funcSlice![1], 'Adder')
+	let sliceAdderFn: Adder
+	;({ value: sliceAdderFn, ok: ok } = $.typeAssert<Adder>(funcSlice![1], 'Adder')
 	if (ok) {
 		console.log(sliceAdderFn!(9, 9))
 	} else {
