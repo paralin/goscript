@@ -5332,38 +5332,26 @@ func (c *GoToTSCompiler) findOriginalChannelForInterface(expr ast.Expr) (ast.Exp
 		return nil, false
 	}
 	
-	// Check if we're in the chan_type_assertion test
-	// Get the current file position to determine if we're in chan_type_assertion.go
-	var filePos token.Pos
-	if len(c.pkg.Syntax) > 0 {
-		filePos = c.pkg.Syntax[0].Pos()
+	// Look through the variable usage info to find sources for this interface variable
+	if c.analysis != nil {
+		if usageInfo, exists := c.analysis.VariableUsage[obj]; exists && len(usageInfo.Sources) > 0 {
+			for _, source := range usageInfo.Sources {
+				if source.Object != nil {
+					sourceType := source.Object.Type()
+					if sourceType != nil {
+						// Check if the source is a channel type
+						if _, isChan := sourceType.Underlying().(*types.Chan); isChan {
+							// Found a channel assignment to this interface
+							// Create an identifier with the same name as the channel
+							return &ast.Ident{Name: source.Object.Name()}, true
+						}
+					}
+				}
+			}
+		}
 	}
 	
-	// Get the file name from the position
-	fileName := c.pkg.Fset.Position(filePos).Filename
-	
-	if !strings.Contains(fileName, "chan_type_assertion") {
-		return nil, false
-	}
-	
-	// This is a simplified approach that only works for the specific test case
-	// A more complete implementation would track variable assignments
-	switch ident.Name {
-	case "i":
-		// Create a new identifier for ch1
-		return &ast.Ident{Name: "ch1"}, true
-	case "s":
-		// Create a new identifier for ch2
-		return &ast.Ident{Name: "ch2"}, true
-	case "r":
-		// Create a new identifier for ch3
-		return &ast.Ident{Name: "ch3"}, true
-	case "e":
-		// Create a new identifier for ch4
-		return &ast.Ident{Name: "ch4"}, true
-	}
-	
-	// For other variables, we don't know the original channel
+	// No channel source found for this interface variable
 	return nil, false
 }
 
