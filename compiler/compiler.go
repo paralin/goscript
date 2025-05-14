@@ -4625,8 +4625,11 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		// If we have selector expressions, we need to ensure variables are initialized
 		// before the destructuring assignment
 		if hasSelectors {
+			c.tsw.WriteLiterally("{")
+			c.tsw.WriteLine("")
+			
 			// Write a temporary variable to hold the function call result
-			c.tsw.WriteLiterally("const _tmp = ")
+			c.tsw.WriteLiterally("  const _tmp = ")
 			if err := c.WriteValueExpr(callExpr); err != nil {
 				return fmt.Errorf("failed to write RHS call expression in assignment: %w", err)
 			}
@@ -4638,7 +4641,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 					continue
 				}
 				
-				// Write the LHS
+				// Write the LHS with indentation
+				c.tsw.WriteLiterally("  ")
 				if ident, ok := lhsExpr.(*ast.Ident); ok {
 					c.WriteIdent(ident, false)
 				} else if selectorExpr, ok := lhsExpr.(*ast.SelectorExpr); ok {
@@ -4654,6 +4658,10 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				// Always add a newline after each assignment
 				c.tsw.WriteLine("")
 			}
+			
+			// Close the block scope
+			c.tsw.WriteLiterally("}")
+			c.tsw.WriteLine("")
 			
 			return nil
 		}

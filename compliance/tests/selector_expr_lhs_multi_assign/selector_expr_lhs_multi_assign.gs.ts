@@ -54,12 +54,13 @@ function getCoords(): [number, number] {
 
 export function main(): void {
 	let p: Point = new Point()
-	// This assignment should trigger the error because p.X and p.Y are *ast.SelectorExpr,
-	// and the current implementation of writeMultiVarAssignFromCall in WriteStmtAssign
-	// expects *ast.Ident for destructuring.
-	const _tmp = getCoords()
-	p.X = _tmp[0]
-	p.Y = _tmp[1]
+	// p.X and p.Y are *ast.SelectorExpr
+	// test writeMultiVarAssignFromCall in WriteStmtAssign
+	{
+	  const _tmp = getCoords()
+	  p.X = _tmp[0]
+	  p.Y = _tmp[1]
+	}
 	console.log(p.X, p.Y)
 }
 
