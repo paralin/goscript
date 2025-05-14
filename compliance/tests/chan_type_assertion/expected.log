@@ -1,14 +1,9 @@
-true
-false
-false
-false
-true
-false
-false
-false
-true
-true
-false
-false
-true
-false
+i is chan int: ok
+s is chan<- string: ok
+r is <-chan float64: ok
+e is chan struct{}: ok
+i is chan string: correctly failed
+i is chan<- int: correctly failed
+i is <-chan int: correctly failed
+bidirectional can be used as send-only: failed
+bidirectional can be used as receive-only: failed

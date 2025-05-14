@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export async function main(): Promise<void> {
-	let ch = $.makeChannel<number>(0, 0)
+	let ch = $.makeChannel<number>(0, 0, 'both')
 	ch.close()
 
 	//nolint:staticcheck
