@@ -1,7 +1,9 @@
 package main
 
-type Greeter func(name string) string
-type Adder func(a, b int) int
+type (
+	Greeter func(name string) string
+	Adder   func(a, b int) int
+)
 
 func greet(name string) string {
 	return "Hello, " + name

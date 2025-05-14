@@ -819,10 +819,10 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-	
+
 	// Write the type description instead of just the type name
 	// This ensures we generate proper type info objects for all types
-	
+
 	// Unwrap parenthesized expressions to handle cases like r.((<-chan T))
 	typeExpr := exp.Type
 	for {
@@ -832,9 +832,9 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 			break
 		}
 	}
-	
+
 	c.writeTypeDescription(typeExpr)
-	
+
 	c.tsw.WriteLiterally(").value") // Access the value field directly in expression context
 	return nil
 }
@@ -1309,7 +1309,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 					// Add direction parameter
 					c.tsw.WriteLiterally(", ")
-					
+
 					// Determine channel direction
 					switch chanType.Dir() {
 					case types.SendRecv:
@@ -5318,7 +5318,7 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.TypeAssertExpr, tok token.Token) error {
 	interfaceExpr := typeAssertExpr.X
 	assertedType := typeAssertExpr.Type
-	
+
 	// Unwrap parenthesized expressions to handle cases like r.((<-chan T))
 	for {
 		if parenExpr, ok := assertedType.(*ast.ParenExpr); ok {
@@ -5687,7 +5687,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		c.tsw.WriteLiterally("{")
 		c.tsw.WriteLiterally("kind: $.TypeKind.Channel, ")
 		c.tsw.WriteLiterally("elemType: ")
-		
+
 		// Add element type
 		if ident, ok := t.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
 			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
@@ -5698,7 +5698,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		} else {
 			c.writeTypeDescription(t.Value)
 		}
-		
+
 		// Add direction
 		c.tsw.WriteLiterally(", direction: ")
 		switch t.Dir {
@@ -5712,7 +5712,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 			// This should not happen, but just in case
 			c.tsw.WriteLiterally("'both'")
 		}
-		
+
 		c.tsw.WriteLiterally("}")
 	default:
 		// For other types, use the string representation

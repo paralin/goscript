@@ -995,7 +995,7 @@ function matchesStructType(value: any, info: TypeInfo): boolean {
 
   if (info.methods && typeof value === 'object' && value !== null) {
     const allMethodsMatch = Array.from(info.methods).every(
-      (method) => typeof value[method] === 'function'
+      (method) => typeof value[method] === 'function',
     )
     if (allMethodsMatch) {
       return true
@@ -1008,14 +1008,19 @@ function matchesStructType(value: any, info: TypeInfo): boolean {
 
     const fieldsExist = fieldNames.every((field) => field in value)
     const sameFieldCount = valueFields.length === fieldNames.length
-    const allFieldsInStruct = valueFields.every((field) => fieldNames.includes(field))
-    
+    const allFieldsInStruct = valueFields.every((field) =>
+      fieldNames.includes(field),
+    )
+
     if (fieldsExist && sameFieldCount && allFieldsInStruct) {
       return Object.entries(info.fields).every(([fieldName, fieldType]) => {
-        return matchesType(value[fieldName], normalizeTypeInfo(fieldType as TypeInfo | string))
+        return matchesType(
+          value[fieldName],
+          normalizeTypeInfo(fieldType as TypeInfo | string),
+        )
       })
     }
-    
+
     return false
   }
 
@@ -1176,17 +1181,14 @@ function matchesFunctionType(value: any): boolean {
  */
 function matchesChannelType(value: any, info: ChannelTypeInfo): boolean {
   // First check if it's a channel or channel reference
-  if (
-    typeof value !== 'object' ||
-    value === null
-  ) {
+  if (typeof value !== 'object' || value === null) {
     return false
   }
 
   // If it's a ChannelRef, get the underlying channel
   let channel = value
   let valueDirection = 'both'
-  
+
   if ('channel' in value && 'direction' in value) {
     channel = value.channel
     valueDirection = value.direction
@@ -1205,11 +1207,19 @@ function matchesChannelType(value: any, info: ChannelTypeInfo): boolean {
   }
 
   if (info.elemType) {
-    if (info.elemType === 'string' && 'zeroValue' in channel && channel.zeroValue !== '') {
+    if (
+      info.elemType === 'string' &&
+      'zeroValue' in channel &&
+      channel.zeroValue !== ''
+    ) {
       return false
     }
-    
-    if (info.elemType === 'number' && 'zeroValue' in channel && typeof channel.zeroValue !== 'number') {
+
+    if (
+      info.elemType === 'number' &&
+      'zeroValue' in channel &&
+      typeof channel.zeroValue !== 'number'
+    ) {
       return false
     }
   }
@@ -1272,7 +1282,7 @@ export function typeAssert<T>(
   typeInfo: string | TypeInfo,
 ): TypeAssertResult<T> {
   const normalizedType = normalizeTypeInfo(typeInfo)
-  
+
   if (isPointerTypeInfo(normalizedType) && value === null) {
     return { value: null as unknown as T, ok: true }
   }
@@ -1285,13 +1295,13 @@ export function typeAssert<T>(
   ) {
     // Check if the value implements all methods of the struct type
     const allMethodsMatch = Array.from(normalizedType.methods).every(
-      (method) => typeof value[method] === 'function'
+      (method) => typeof value[method] === 'function',
     )
-    
+
     const hasAnyMethod = Array.from(normalizedType.methods).some(
-      (method) => typeof value[method] === 'function'
+      (method) => typeof value[method] === 'function',
     )
-    
+
     if (allMethodsMatch && hasAnyMethod && normalizedType.methods.size > 0) {
       // For interface-to-concrete type assertions, we just need to check methods
       return { value: value as T, ok: true }
@@ -1314,10 +1324,15 @@ export function typeAssert<T>(
       valueFields.every((field) => fieldNames.includes(field))
 
     if (structFieldsMatch) {
-      const typesMatch = Object.entries(normalizedType.fields).every(([fieldName, fieldType]) => {
-        return matchesType(value[fieldName], normalizeTypeInfo(fieldType as TypeInfo | string))
-      })
-      
+      const typesMatch = Object.entries(normalizedType.fields).every(
+        ([fieldName, fieldType]) => {
+          return matchesType(
+            value[fieldName],
+            normalizeTypeInfo(fieldType as TypeInfo | string),
+          )
+        },
+      )
+
       return { value: value as T, ok: typesMatch }
     } else {
       return { value: null as unknown as T, ok: false }
@@ -1694,12 +1709,12 @@ export interface ChannelRef<T> {
    * The underlying channel
    */
   channel: Channel<T>
-  
+
   /**
    * The direction of this channel reference
    */
   direction: 'send' | 'receive' | 'both'
-  
+
   // Channel methods
   send(value: T): Promise<void>
   receive(): Promise<T>
@@ -1716,38 +1731,38 @@ export interface ChannelRef<T> {
  */
 export class BidirectionalChannelRef<T> implements ChannelRef<T> {
   direction: 'both' = 'both'
-  
+
   constructor(public channel: Channel<T>) {}
-  
+
   // Delegate all methods to the underlying channel
   send(value: T): Promise<void> {
     return this.channel.send(value)
   }
-  
+
   receive(): Promise<T> {
     return this.channel.receive()
   }
-  
+
   receiveWithOk(): Promise<ChannelReceiveResult<T>> {
     return this.channel.receiveWithOk()
   }
-  
+
   close(): void {
     this.channel.close()
   }
-  
+
   canSendNonBlocking(): boolean {
     return this.channel.canSendNonBlocking()
   }
-  
+
   canReceiveNonBlocking(): boolean {
     return this.channel.canReceiveNonBlocking()
   }
-  
+
   selectSend(value: T, id: number): Promise<SelectResult<boolean>> {
     return this.channel.selectSend(value, id)
   }
-  
+
   selectReceive(id: number): Promise<SelectResult<T>> {
     return this.channel.selectReceive(id)
   }
@@ -1758,40 +1773,40 @@ export class BidirectionalChannelRef<T> implements ChannelRef<T> {
  */
 export class SendOnlyChannelRef<T> implements ChannelRef<T> {
   direction: 'send' = 'send'
-  
+
   constructor(public channel: Channel<T>) {}
-  
+
   // Allow send operations
   send(value: T): Promise<void> {
     return this.channel.send(value)
   }
-  
+
   // Allow close operations
   close(): void {
     this.channel.close()
   }
-  
+
   canSendNonBlocking(): boolean {
     return this.channel.canSendNonBlocking()
   }
-  
+
   selectSend(value: T, id: number): Promise<SelectResult<boolean>> {
     return this.channel.selectSend(value, id)
   }
-  
+
   // Disallow receive operations
   receive(): Promise<T> {
     throw new Error('Cannot receive from send-only channel')
   }
-  
+
   receiveWithOk(): Promise<ChannelReceiveResult<T>> {
     throw new Error('Cannot receive from send-only channel')
   }
-  
+
   canReceiveNonBlocking(): boolean {
     return false
   }
-  
+
   selectReceive(id: number): Promise<SelectResult<T>> {
     throw new Error('Cannot receive from send-only channel')
   }
@@ -1802,40 +1817,40 @@ export class SendOnlyChannelRef<T> implements ChannelRef<T> {
  */
 export class ReceiveOnlyChannelRef<T> implements ChannelRef<T> {
   direction: 'receive' = 'receive'
-  
+
   constructor(public channel: Channel<T>) {}
-  
+
   // Allow receive operations
   receive(): Promise<T> {
     return this.channel.receive()
   }
-  
+
   receiveWithOk(): Promise<ChannelReceiveResult<T>> {
     return this.channel.receiveWithOk()
   }
-  
+
   canReceiveNonBlocking(): boolean {
     return this.channel.canReceiveNonBlocking()
   }
-  
+
   selectReceive(id: number): Promise<SelectResult<T>> {
     return this.channel.selectReceive(id)
   }
-  
+
   // Disallow send operations
   send(value: T): Promise<void> {
     throw new Error('Cannot send to receive-only channel')
   }
-  
+
   // Disallow close operations
   close(): void {
     throw new Error('Cannot close receive-only channel')
   }
-  
+
   canSendNonBlocking(): boolean {
     return false
   }
-  
+
   selectSend(value: T, id: number): Promise<SelectResult<boolean>> {
     throw new Error('Cannot send to receive-only channel')
   }
@@ -1844,7 +1859,10 @@ export class ReceiveOnlyChannelRef<T> implements ChannelRef<T> {
 /**
  * Creates a new channel reference with the specified direction.
  */
-export function makeChannelRef<T>(channel: Channel<T>, direction: 'send' | 'receive' | 'both'): ChannelRef<T> {
+export function makeChannelRef<T>(
+  channel: Channel<T>,
+  direction: 'send' | 'receive' | 'both',
+): ChannelRef<T> {
   switch (direction) {
     case 'send':
       return new SendOnlyChannelRef<T>(channel)
@@ -1983,10 +2001,10 @@ export async function selectStatement<T>(
 export const makeChannel = <T>(
   bufferSize: number,
   zeroValue: T,
-  direction: 'send' | 'receive' | 'both' = 'both'
+  direction: 'send' | 'receive' | 'both' = 'both',
 ): Channel<T> | ChannelRef<T> => {
   const channel = new BufferedChannel<T>(bufferSize, zeroValue)
-  
+
   // Wrap the channel with the appropriate ChannelRef based on direction
   if (direction === 'send') {
     return new SendOnlyChannelRef<T>(channel) as ChannelRef<T>
