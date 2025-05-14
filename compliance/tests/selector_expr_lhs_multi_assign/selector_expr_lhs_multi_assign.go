@@ -11,9 +11,8 @@ func getCoords() (int, int) {
 
 func main() {
 	var p Point
-	// This assignment should trigger the error because p.X and p.Y are *ast.SelectorExpr,
-	// and the current implementation of writeMultiVarAssignFromCall in WriteStmtAssign
-	// expects *ast.Ident for destructuring.
+	// p.X and p.Y are *ast.SelectorExpr
+	// test writeMultiVarAssignFromCall in WriteStmtAssign
 	p.X, p.Y = getCoords()
 	println(p.X, p.Y)
 }

@@ -48,7 +48,7 @@ func TestCompliance(t *testing.T) {
 	}
 
 	// limit concurrency
-	simulLimit := make(chan struct{}, runtime.GOMAXPROCS(-1))
+	simulLimit := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)
 	for range cap(simulLimit) {
 		simulLimit <- struct{}{}
 	}
