@@ -13,7 +13,7 @@ export function main(): void {
 
 
 	// 3. Use Greeter(theInlineVar) to cast to the Greeter declared function type.
-	let castedGreeter = (theInlineVar as Greeter)
+	let castedGreeter = Object.assign(theInlineVar, { __goTypeName: 'Greeter' })
 
 	// 4. Call that
 	console.log(castedGreeter!("Inline World"))
@@ -24,7 +24,7 @@ export function main(): void {
 		return a + b
 	}
 
-	let castedAdder = (theInlineAdder as Adder)
+	let castedAdder = Object.assign(theInlineAdder, { __goTypeName: 'Adder' })
 	console.log(castedAdder!(5, 7))
 }
 
