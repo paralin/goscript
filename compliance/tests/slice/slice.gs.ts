@@ -1,4 +1,4 @@
-// Generated file based on slices.go
+// Generated file based on slice.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin";

@@ -15,12 +15,6 @@ import (
 // NOTE: this is here instead of compliance/compliance_test.go so coverage ends up in this package.
 
 func TestCompliance(t *testing.T) {
-	testsDir := "../compliance/tests"
-	dirs, err := os.ReadDir(testsDir)
-	if err != nil {
-		t.Fatalf("failed to read tests dir: %v", err)
-	}
-
 	// Get workspace directory (project root)
 	workspaceDir, err := os.Getwd()
 	if err != nil {
@@ -29,16 +23,18 @@ func TestCompliance(t *testing.T) {
 	workspaceDir = filepath.Join(workspaceDir, "..")
 
 	// First collect all test paths
+	testsDir := filepath.Join(workspaceDir, "compliance/tests")
+	dirs, err := os.ReadDir(testsDir)
+	if err != nil {
+		t.Fatalf("failed to read tests dir: %v", err)
+	}
+
 	var testPaths []string
 	for _, dir := range dirs {
 		if !dir.IsDir() {
 			continue
 		}
 		testPath := filepath.Join(testsDir, dir.Name())
-		// expectedLogPath := filepath.Join(testPath, "expected.log")
-		// if _, err := os.Stat(expectedLogPath); err != nil {
-		//	continue // skip if no expected.log
-		//}
 		goFiles, err := filepath.Glob(filepath.Join(testPath, "*.go"))
 		if err != nil || len(goFiles) == 0 {
 			t.Errorf("no .go files found in %s", testPath)
@@ -61,6 +57,8 @@ func TestCompliance(t *testing.T) {
 		go func(path string) {
 			defer wg.Done() // runs even if t.Run is skipped
 			t.Run(filepath.Base(path), func(t *testing.T) {
+				t.Helper()
+
 				ranTests.Add(1)
 				// limit how many tests can run simultaneously
 				<-simulLimit
@@ -68,6 +66,11 @@ func TestCompliance(t *testing.T) {
 					simulLimit <- struct{}{}
 				}()
 				compliance.RunGoScriptTestDir(t, workspaceDir, path) // Pass workspaceDir
+
+				// Remove dir if everything passed
+				if !t.Failed() {
+					os.RemoveAll(filepath.Join(path, "run"))
+				}
 			})
 		}(testPath)
 	}

@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin";
 
 type Reader = null | {
 	// Read reads data from the reader.
-	Read(_p0: $.Slice<number>): [number, $.Error]
+	Read(_p0: $.Slice<number>): [number, $.GoError]
 }
 
 $.registerInterfaceType(
@@ -15,7 +15,7 @@ $.registerInterfaceType(
 );
 
 type Closer = null | {
-	Close(): $.Error
+	Close(): $.GoError
 }
 
 $.registerInterfaceType(
@@ -48,12 +48,12 @@ class MyStruct {
 		return cloned
 	}
 
-	public Read(p: $.Slice<number>): [number, $.Error] {
+	public Read(p: $.Slice<number>): [number, $.GoError] {
 		const m = this
 		return [0, null]
 	}
 
-	public Close(): $.Error {
+	public Close(): $.GoError {
 		const m = this
 		return null
 	}

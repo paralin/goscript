@@ -345,12 +345,12 @@ func (c *GoToTSCompiler) WriteBasicType(t *types.Basic) {
 }
 
 // WriteNamedType translates a Go named type to its TypeScript equivalent.
-// It specially handles the error interface as $.Error, and uses the original
+// It specially handles the error interface as $.GoError, and uses the original
 // type name for other named types.
 func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 	// Check if the named type is the error interface
 	if iface, ok := t.Underlying().(*types.Interface); ok && iface.String() == "interface{Error() string}" {
-		c.tsw.WriteLiterally("$.Error")
+		c.tsw.WriteLiterally("$.GoError")
 	} else {
 		// Use Obj().Name() for the original defined name
 		c.tsw.WriteLiterally(t.Obj().Name())
@@ -400,13 +400,13 @@ func (c *GoToTSCompiler) WriteChannelType(t *types.Chan) {
 }
 
 // WriteInterfaceType translates a Go interface type to its TypeScript equivalent.
-// It specially handles the error interface as $.Error, and delegates to
+// It specially handles the error interface as $.GoError, and delegates to
 // writeInterfaceStructure for other interface types, prepending "null | ".
 // If astNode is provided (e.g., from a type spec), comments for methods will be included.
 func (c *GoToTSCompiler) WriteInterfaceType(t *types.Interface, astNode *ast.InterfaceType) {
 	// Handle the built-in error interface specifically
 	if t.String() == "interface{Error() string}" {
-		c.tsw.WriteLiterally("$.Error")
+		c.tsw.WriteLiterally("$.GoError")
 		return
 	}
 

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin";
 
-type Func1 = ((a: number, b: string) => [boolean, $.Error]) | null;
+type Func1 = ((a: number, b: string) => [boolean, $.GoError]) | null;
 
 let fn1: Func1 = null
 
@@ -64,7 +64,7 @@ export function NewMyError(text: string): $.Box<MyError> | null {
 }
 
 export function main(): void {
-	fn1 = (a: number, b: string): [boolean, $.Error] => {
+	fn1 = (a: number, b: string): [boolean, $.GoError] => {
 		console.log("fn1 called with:", a, b)
 		if (a > 0) {
 			return [true, null]

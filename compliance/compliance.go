@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt" // Added for Sprintf
 	"io"
+	"maps" // Added for maps.Clone
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -15,6 +16,18 @@ import (
 	"github.com/aperturerobotics/goscript/compiler"
 	"github.com/sirupsen/logrus"
 )
+
+// baseTsConfig is the base tsconfig.json content.
+var baseTsConfig = map[string]any{
+	"compilerOptions": map[string]any{
+		"lib":                        []string{"es2020", "DOM"},
+		"module":                     "nodenext",
+		"moduleResolution":           "nodenext",
+		"allowImportingTsExtensions": true,
+		"noEmit":                     true,
+		"sourceMap":                  true,
+	},
+}
 
 // TestCase defines a single Go-to-TypeScript compliance test.
 type TestCase struct {
@@ -26,36 +39,28 @@ type TestCase struct {
 // PrepareTempTestDir creates a temp dir, copies .go files, and writes go.mod. Returns tempDir path.
 func PrepareTempTestDir(t *testing.T, testDir string) string {
 	t.Helper()
-	tempDir, err := os.MkdirTemp("", "goscript-test-")
-	if err != nil {
-		t.Fatalf("failed to create temp dir: %v", err)
-	}
 
-	goModPath := filepath.Join(tempDir, "go.mod")
-	goModContent := []byte("module tempmod\n\ngo 1.24\n")
+	// Construct the target run directory path
+	tempDir := filepath.Join(testDir, "run")
+	testName := filepath.Base(testDir)
+
+	// Remove the directory if it already exists to ensure a clean state.
+	if err := os.RemoveAll(tempDir); err != nil {
+		t.Fatalf("failed to remove existing test run directory %s: %v", tempDir, err)
+	}
+	if err := os.MkdirAll(tempDir, 0o755); err != nil {
+		t.Fatalf("failed to create test run directory %s: %v", tempDir, err)
+	}
+	t.Logf("Test run directory: %s", tempDir)
+
+	// create a module so Go ignores this path
+	goModPath := filepath.Join(testDir, "go.mod")
+	goModContent := []byte(fmt.Sprintf("module %s\n\ngo 1.24\n", testName))
 	if err := os.WriteFile(goModPath, goModContent, 0o644); err != nil {
-		os.RemoveAll(tempDir) //nolint:errcheck
+		// No os.RemoveAll(tempDir) here as we want to keep the dir for debugging
 		t.Fatalf("failed to write go.mod: %v", err)
 	}
 
-	goFiles, err := filepath.Glob(filepath.Join(testDir, "*.go"))
-	if err != nil || len(goFiles) == 0 {
-		os.RemoveAll(tempDir) //nolint:errcheck
-		t.Fatalf("no .go files found in %s", testDir)
-	}
-	for _, src := range goFiles {
-		base := filepath.Base(src)
-		dst := filepath.Join(tempDir, base)
-		data, err := os.ReadFile(src)
-		if err != nil {
-			os.RemoveAll(tempDir) //nolint:errcheck
-			t.Fatalf("failed to read %s: %v", src, err)
-		}
-		if err := os.WriteFile(dst, data, 0o644); err != nil {
-			os.RemoveAll(tempDir) //nolint:errcheck
-			t.Fatalf("failed to write %s: %v", dst, err)
-		}
-	}
 	return tempDir
 }
 
@@ -72,8 +77,9 @@ func ReadExpectedLog(t *testing.T, testDir string) string {
 
 func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le *logrus.Entry) {
 	t.Helper()
+	testName := filepath.Base(testDir)
 	conf := &compiler.Config{
-		Dir:            tempDir,
+		Dir:            testDir,
 		OutputPathRoot: outputDir,
 	}
 	if err := conf.Validate(); err != nil {
@@ -81,18 +87,22 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 	}
 
 	// Log each .go file and its mapped .gs.ts output file and contents
-	goFiles, err := filepath.Glob(filepath.Join(tempDir, "*.go"))
+	goFiles, err := filepath.Glob(filepath.Join(testDir, "*.go"))
 	if err != nil || len(goFiles) == 0 {
-		t.Fatalf("no .go files found in %s: %v", tempDir, err)
+		t.Fatalf("no .go files found in %s: %v", testDir, err)
 	}
 	for _, src := range goFiles {
 		base := filepath.Base(src)
-		out := filepath.Join(outputDir, compiler.TranslateGoFilePathToTypescriptFilePath("tempmod", base))
-		t.Logf("Compiling Go file: %s => %s", src, out)
+		out := compiler.TranslateGoFilePathToTypescriptFilePath(testName, base)
+		srcRel, err := filepath.Rel(testDir, src)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		t.Logf("Compiling Go file: %s => %s", srcRel, out)
 		if data, err := os.ReadFile(src); err == nil {
-			t.Logf("Source %s:\n%s", src, string(data))
+			t.Logf("Source %s:\n%s", srcRel, string(data))
 		} else {
-			t.Logf("could not read source %s: %v", src, err)
+			t.Fatalf("could not read source %s: %v", src, err)
 		}
 	}
 
@@ -118,7 +128,7 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 				t.Logf("failed to get relative path for %s: %v", path, err)
 				return nil // Continue walking
 			}
-			// relPath is like "@goscript/tempmod/file.gs.ts", so extract the base file name
+			// relPath is like "@goscript/testname/file.gs.ts", so extract the base file name
 			parts := strings.Split(relPath, string(filepath.Separator))
 			if len(parts) < 3 {
 				t.Logf("unexpected path structure for %s", path)
@@ -161,13 +171,13 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 }
 
 // WriteTypeScriptRunner writes a runner.ts file to tempDir.
-func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
+func WriteTypeScriptRunner(t *testing.T, testDir, tempDir string) string {
 	t.Helper()
 
 	// Find the Go source file in the temp directory
-	goFiles, err := filepath.Glob(filepath.Join(tempDir, "*.go"))
+	goFiles, err := filepath.Glob(filepath.Join(testDir, "*.go"))
 	if err != nil || len(goFiles) == 0 {
-		t.Fatalf("could not find Go source file in temp dir %s: %v", tempDir, err)
+		t.Fatalf("could not find Go source file in test dir %s: %v", testDir, err)
 	}
 	if len(goFiles) > 1 {
 		// For simplicity, assume only one relevant Go file per test case for now.
@@ -175,11 +185,13 @@ func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
 	}
 	goSourceBase := filepath.Base(goFiles[0])
 	tsFileName := strings.TrimSuffix(goSourceBase, ".go") + ".gs.ts"
-	tsImportPath := fmt.Sprintf("./output/@goscript/tempmod/%s", tsFileName)
+	testName := filepath.Base(testDir)
+	tsImportPath := fmt.Sprintf("./output/@goscript/%s/%s", testName, tsFileName)
+
+	// Import the main function from the compiled code
+	runnerContent := fmt.Sprintf(runnerContentTemplate, tsImportPath)
 
 	tsRunner := filepath.Join(tempDir, "runner.ts")
-	// Import the goscript runtime and the main function from the compiled code
-	runnerContent := fmt.Sprintf("import { goscript } from \"./goscript\";\nimport { main } from %q;\nmain();\n", tsImportPath) // Use dynamic path
 	if err := os.WriteFile(tsRunner, []byte(runnerContent), 0o644); err != nil {
 		t.Fatalf("failed to write runner: %v", err)
 	}
@@ -274,14 +286,14 @@ func WriteTypeCheckConfig(t *testing.T, workspaceDir, testDir string) string {
 	relWorkspacePathForJSON := filepath.ToSlash(relWorkspacePath)
 	rootTsConfigPath := filepath.ToSlash(filepath.Join(relWorkspacePathForJSON, "tsconfig.json"))
 
-	// Create tsconfig.json content
-	tsconfig := map[string]interface{}{
-		"extends": rootTsConfigPath,
-		"include": includes,
-		"compilerOptions": map[string]interface{}{
-			"noEmit": true,
-		},
-	}
+	// Create tsconfig.json content by cloning the base config
+	tsconfig := maps.Clone(baseTsConfig)
+	tsconfig["extends"] = rootTsConfigPath
+	tsconfig["include"] = includes
+	// Add noEmit to compilerOptions
+	compilerOptions := maps.Clone(tsconfig["compilerOptions"].(map[string]interface{}))
+	compilerOptions["noEmit"] = true
+	tsconfig["compilerOptions"] = compilerOptions
 
 	tsconfigContentBytes, err := json.MarshalIndent(tsconfig, "", "  ")
 	if err != nil {
@@ -290,7 +302,7 @@ func WriteTypeCheckConfig(t *testing.T, workspaceDir, testDir string) string {
 
 	// Write tsconfig.json to the test directory
 	tsconfigPath := filepath.Join(testDir, "tsconfig.json")
-	if err := os.WriteFile(tsconfigPath, tsconfigContentBytes, 0o644); err != nil {
+	if err := os.WriteFile(tsconfigPath, append(tsconfigContentBytes, '\n'), 0o644); err != nil {
 		t.Fatalf("failed to write tsconfig.json to test dir: %v", err)
 	}
 
@@ -324,6 +336,15 @@ func RunTypeScriptTypeCheck(t *testing.T, workspaceDir, testDir string, tsconfig
 	})
 }
 
+// runner.ts template for WriteTypeScriptRunner
+const runnerContentTemplate = `import { main } from %q;
+// NOTE: To debug: add a breakpoint, open a JavaScript Debug Terminal, and tsx runner.ts
+await (async () => {
+  await main();
+  await new Promise(resolve => setTimeout(resolve, 100));
+})();
+`
+
 // RunGoScriptTestDir compiles all .go files in testDir, runs the generated TypeScript, and compares output to expected.log.
 func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	t.Helper()
@@ -343,23 +364,36 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	}
 
 	tempDir := PrepareTempTestDir(t, testDir)
-	defer os.RemoveAll(tempDir) //nolint:errcheck
 
 	// Create tsconfig.json in the temporary directory for path aliases
 	builtinTsPath := filepath.Join(workspaceDir, "builtin", "builtin.ts") // Use passed workspaceDir
 	// Ensure the path uses forward slashes for JSON compatibility, even on Windows
 	builtinTsPathForJSON := filepath.ToSlash(builtinTsPath)
-	tsconfigContent := fmt.Sprintf(`{
-	 "compilerOptions": {
-	   "baseUrl": ".",
-	   "paths": {
-	     "@goscript/builtin": ["%s"]
-	   }
-	 }
-	}`, builtinTsPathForJSON) // Use dynamic path
+
+	// Create tsconfig.json content by cloning the base config
+	tsconfig := maps.Clone(baseTsConfig)
+	compilerOptions := maps.Clone(tsconfig["compilerOptions"].(map[string]interface{}))
+	compilerOptions["baseUrl"] = "."
+	compilerOptions["paths"] = map[string][]string{
+		"@goscript/builtin": {builtinTsPathForJSON},
+	}
+	tsconfig["compilerOptions"] = compilerOptions
+
+	tsconfigContentBytes, err := json.MarshalIndent(tsconfig, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal tsconfig to JSON: %v", err)
+	}
+	// Add a newline to the end of the JSON content
 	tsconfigPath := filepath.Join(tempDir, "tsconfig.json")
-	if err := os.WriteFile(tsconfigPath, []byte(tsconfigContent), 0o644); err != nil {
+	if err := os.WriteFile(tsconfigPath, tsconfigContentBytes, 0o644); err != nil {
 		t.Fatalf("failed to write tsconfig.json to temp dir: %v", err)
+	}
+
+	// Create package.json in the temporary directory to set type: module
+	packageJsonContent := `{"type": "module"}` + "\n"
+	packageJsonPath := filepath.Join(tempDir, "package.json")
+	if err := os.WriteFile(packageJsonPath, []byte(packageJsonContent), 0o644); err != nil {
+		t.Fatalf("failed to write package.json to temp dir: %v", err)
 	}
 
 	outputDir := filepath.Join(tempDir, "output")
@@ -376,7 +410,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 			t.Fatalf("failed to copy goscript runtime file: %v", err)
 		}
 
-		tsRunner = WriteTypeScriptRunner(t, tempDir)
+		tsRunner = WriteTypeScriptRunner(t, testDir, tempDir)
 	})
 
 	// Check for expect-fail file

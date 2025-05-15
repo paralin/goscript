@@ -1,3 +1,6 @@
 # WIP.md
 /gobyexample
 tests/*/tsconfig.json
+tests/*/run
+tests/*/go.mod
+tests/*/go.sum

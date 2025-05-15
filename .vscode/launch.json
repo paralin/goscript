@@ -5,10 +5,9 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch file",
-            "type": "go",
+            "name": "Launch typescript file",
+            "type": "node",
             "request": "launch",
-            "mode": "debug",
             "program": "${file}"
         },
         {

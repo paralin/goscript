@@ -7,9 +7,7 @@ export async function main(): Promise<void> {
 	let messages = $.makeChannel<string>(0, "", 'both')
 
 	queueMicrotask(async () => {
-		{
-			await messages.send("ping")
-		}
+		await messages.send("ping")
 	})
 
 	let msg = await messages.receive()

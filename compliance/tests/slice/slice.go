@@ -1,9 +1,5 @@
 package main
 
-/* not currently working correctly */
-/* @ts-ignore */
-/* eslint-disable-file */
-
 func main() {
 	// --- Original Tests ---
 	println("--- Original Tests ---")
