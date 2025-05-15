@@ -95,4 +95,5 @@ func main() {
 	for _, msg := range allMessages {
 		println(msg.priority, msg.text)
 	}
+	println("done")
 }

@@ -3396,6 +3396,29 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			// This happens during analysis in analysisVisitor.Visit for FuncLit nodes
 			isAsync := c.analysis.IsFuncLitAsync(funcLit)
 			if isAsync {
+				c.tsw.WriteLiterally("queueMicrotask(async () => ")
+			} else {
+				c.tsw.WriteLiterally("queueMicrotask(() => ")
+			}
+
+			// Compile the function literal's body directly
+			if err := c.WriteStmtBlock(funcLit.Body, true); err != nil {
+				return fmt.Errorf("failed to write goroutine function literal body: %w", err)
+			}
+
+			c.tsw.WriteLine(")") // Close the queueMicrotask statement
+
+		} else if ident, ok := callExpr.Fun.(*ast.Ident); ok {
+			// Handle named functions: go namedFunc(args)
+			// Get the object for this function
+			obj := c.pkg.TypesInfo.Uses[ident]
+			if obj == nil {
+				return errors.Errorf("could not find object for function: %s", ident.Name)
+			}
+
+			// Check if the function is async
+			isAsync := c.analysis.IsAsyncFunc(obj)
+			if isAsync {
 				c.tsw.WriteLiterally("queueMicrotask(async () => {")
 			} else {
 				c.tsw.WriteLiterally("queueMicrotask(() => {")
@@ -3404,14 +3427,29 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			c.tsw.Indent(1)
 			c.tsw.WriteLine("")
 
-			// Compile the function literal's body directly
-			if err := c.WriteStmt(funcLit.Body); err != nil {
-				return fmt.Errorf("failed to write goroutine function literal body: %w", err)
+			// Write the function call, using await if the function is async
+			if isAsync {
+				c.tsw.WriteLiterally("await ")
 			}
+
+			// Write the function name
+			c.tsw.WriteLiterally(ident.Name)
+
+			// Write the function arguments
+			c.tsw.WriteLiterally("(")
+			for i, arg := range callExpr.Args {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				if err := c.WriteValueExpr(arg); err != nil {
+					return fmt.Errorf("failed to write argument %d in goroutine function call: %w", i, err)
+				}
+			}
+			c.tsw.WriteLiterally(")")
+			c.tsw.WriteLine("")
 
 			c.tsw.Indent(-1)
 			c.tsw.WriteLine("})") // Close the queueMicrotask callback and the statement
-
 		} else {
 			return errors.Errorf("unhandled goroutine function type: %T", callExpr.Fun)
 		}

@@ -3,29 +3,124 @@
 
 import * as $ from "@goscript/builtin";
 
-let done: $.Channel<boolean> = $.makeChannel<boolean>(0, false, 'both')
+class Message {
+	public get priority(): number {
+		return this._fields.priority.value
+	}
+	public set priority(value: number) {
+		this._fields.priority.value = value
+	}
+
+	public get text(): string {
+		return this._fields.text.value
+	}
+	public set text(value: string) {
+		this._fields.text.value = value
+	}
+
+	public _fields: {
+		priority: $.Box<number>;
+		text: $.Box<string>;
+	}
+
+	constructor(init?: Partial<{priority?: number, text?: string}>) {
+		this._fields = {
+			priority: $.box(init?.priority ?? 0),
+			text: $.box(init?.text ?? "")
+		}
+	}
+
+	public clone(): Message {
+		const cloned = new Message()
+		cloned._fields = {
+			priority: $.box(this._fields.priority.value),
+			text: $.box(this._fields.text.value)
+		}
+		return cloned
+	}
+
+	// Register this type with the runtime type system
+	static __typeInfo = $.registerStructType(
+	  'Message',
+	  new Message(),
+	  new Set([]),
+	  Message
+	);
+}
+
+let messages: $.Channel<Message> = $.makeChannel<Message>(0, new Message(), 'both')
+
+let doneCount: number = 0
+
+let totalMessages: number = 8
 
 // A worker function that will be called as a goroutine
 async function worker(id: number): Promise<void> {
-	console.log("Worker", id, "starting")
-	console.log("Worker", id, "done")
-	await done.send(true)
+	// Send worker starting message
+	await messages.send(new Message({priority: 10 + id, text: "Worker " + String.fromCharCode(48 + id) + " starting"}))
+
+	// Send worker done message
+	await messages.send(new Message({priority: 20 + id, text: "Worker " + String.fromCharCode(48 + id) + " done"}))
 }
 
 // Another worker function to test multiple different goroutines
 async function anotherWorker(name: string): Promise<void> {
-	console.log("Another worker:", name)
-	await done.send(true)
+	await messages.send(new Message({priority: 40, text: "Another worker: " + name}))
 }
 
 export async function main(): Promise<void> {
-	console.log("Main: Starting workers")
+	// Create a slice to collect all messages
+	let allMessages = $.makeSlice<Message>(0, totalMessages + 3)
 
-	// Count of goroutines to wait for
-	let totalGoroutines = 5
+	// Add initial message
+	allMessages = $.append(allMessages, new Message({priority: 0, text: "Main: Starting workers"}))
 
-	// This will cause the error because we're using a named function
-	// instead of an inline function literal
+	// Start 3 worker goroutines
 
-	// This will trigger the error with *ast.Ident
+	// This will trigger a past error with *ast.Ident
 	for (let i = 0; i < 3; i++) {
+		queueMicrotask(async () => {
+			await worker(i)
+		})
+	}
+
+	// Start another worker goroutine
+	queueMicrotask(async () => {
+		await anotherWorker("test")
+	})
+
+	// Start an anonymous function worker
+	queueMicrotask(async () => {
+		await messages.send(new Message({priority: 50, text: "Anonymous function worker"}))
+	})
+
+	// Add status message
+	allMessages = $.append(allMessages, new Message({priority: 1, text: "Main: Workers started"}))
+
+	// Collect all messages from goroutines
+	for (let i = 0; i < totalMessages; i++) {
+		allMessages = $.append(allMessages, await messages.receive())
+	}
+
+	// Add final message
+	allMessages = $.append(allMessages, new Message({priority: 100, text: "Main: All workers completed"}))
+
+	// Sort messages by priority for deterministic order
+	for (let i = 0; i < $.len(allMessages); i++) {
+		for (let j = i + 1; j < $.len(allMessages); j++) {
+			if (allMessages![i].priority > allMessages![j].priority) {
+				[allMessages![i], allMessages![j]] = [allMessages![j], allMessages![i]]
+			}
+		}
+	}
+
+	// Print all messages in deterministic order
+	for (let i = 0; i < $.len(allMessages); i++) {
+		const msg = allMessages![i]
+		{
+			console.log(msg.priority, msg.text)
+		}
+	}
+	console.log("done")
+}
+
