@@ -405,7 +405,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	compilerOptions := maps.Clone(tsconfig["compilerOptions"].(map[string]interface{}))
 	compilerOptions["baseUrl"] = "."
 	compilerOptions["paths"] = map[string][]string{
-		"@goscript/*":       {"./output/@goscript"},
+		"@goscript/*":       {"./output/@goscript/*"}, // generated code
 		"@goscript/builtin": {builtinTsPathForJSON},
 	}
 	tsconfig["compilerOptions"] = compilerOptions
