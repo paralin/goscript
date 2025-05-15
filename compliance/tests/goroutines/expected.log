@@ -1,11 +1,10 @@
 Main: Starting workers
 Main: Workers started
-Anonymous function worker
 Worker 0 starting
 Worker 0 done
 Worker 1 starting
 Worker 1 done
-Another worker: test
 Worker 2 starting
 Worker 2 done
-Main: All workers completed
+Another worker: test
+Anonymous function worker

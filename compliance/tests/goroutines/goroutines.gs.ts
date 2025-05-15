@@ -29,3 +29,31 @@ export async function main(): Promise<void> {
 
 	// This will trigger the error with *ast.Ident
 	for (let i = 0; i < 3; i++) {
+		queueMicrotask(async () => {
+			await worker(i)
+		})
+	}
+
+	// Try calling another worker function as a goroutine
+	queueMicrotask(async () => {
+		await anotherWorker("test")
+	})
+
+	// This works in the current implementation because it's a function literal
+	queueMicrotask(async () => {
+		{
+			console.log("Anonymous function worker")
+			await done.send(true)
+		}
+	})
+
+	console.log("Main: Workers started")
+
+	// Use channels to wait for all goroutines to complete
+	for (let i = 0; i < totalGoroutines; i++) {
+		await done.receive()
+	}
+
+	console.log("Main: All workers completed")
+}
+
