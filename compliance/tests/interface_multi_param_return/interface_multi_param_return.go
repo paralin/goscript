@@ -17,12 +17,19 @@ func (p MyProcessor) Process(data []byte, count int, _ string) (bool, error) {
 }
 
 func main() {
-	var processor MultiParamReturner
-	processor = MyProcessor{}
+	var processor MultiParamReturner = MyProcessor{}
 
 	data := []byte{1, 2, 3}
 	success, _ := processor.Process(data, 5, "unused")
 
+	if success {
+		println("Main: Success reported")
+	} else {
+		println("Main: Failure reported")
+	}
+
+	// test case: re-use success variable, ignore second variable
+	success, _ = processor.Process(data, 5, "unused")
 	if success {
 		println("Main: Success reported")
 	} else {

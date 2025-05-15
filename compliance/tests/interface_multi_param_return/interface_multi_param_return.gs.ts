@@ -49,12 +49,19 @@ class MyProcessor {
 }
 
 export function main(): void {
-	let processor: MultiParamReturner = null
-	processor = new MyProcessor({})
+	let processor: MultiParamReturner = new MyProcessor({})
 
 	let data = $.arrayToSlice([1, 2, 3])
 	let [success, ] = processor.Process(data, 5, "unused")
 
+	if (success) {
+		console.log("Main: Success reported")
+	} else {
+		console.log("Main: Failure reported")
+	}
+
+	// test case: re-use success variable, ignore second variable
+	[success, ] = processor.Process(data, 5, "unused")
 	if (success) {
 		console.log("Main: Success reported")
 	} else {
