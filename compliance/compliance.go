@@ -179,7 +179,7 @@ func WriteTypeScriptRunner(t *testing.T, tempDir string) string {
 
 	tsRunner := filepath.Join(tempDir, "runner.ts")
 	// Import the goscript runtime and the main function from the compiled code
-	runnerContent := fmt.Sprintf("import { goscript } from \"./goscript\";\nimport { main } from %q;\nmain();\n", tsImportPath) // Use dynamic path
+	runnerContent := fmt.Sprintf("import { goscript } from \"./goscript\";\nimport { main } from %q;\n(async () => {\n  await main();\n  // Add a small delay to ensure all microtasks have completed\n  await new Promise(resolve => setTimeout(resolve, 100));\n})();\n", tsImportPath) // Use dynamic path
 	if err := os.WriteFile(tsRunner, []byte(runnerContent), 0o644); err != nil {
 		t.Fatalf("failed to write runner: %v", err)
 	}
