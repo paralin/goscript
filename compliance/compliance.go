@@ -77,7 +77,6 @@ func ReadExpectedLog(t *testing.T, testDir string) string {
 
 func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le *logrus.Entry) {
 	t.Helper()
-	testName := filepath.Base(testDir)
 	conf := &compiler.Config{
 		Dir:            testDir,
 		OutputPathRoot: outputDir,
@@ -87,32 +86,63 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 	}
 
 	// Log each .go file and its mapped .gs.ts output file and contents
-	goFiles, err := filepath.Glob(filepath.Join(testDir, "*.go"))
-	if err != nil || len(goFiles) == 0 {
-		t.Fatalf("no .go files found in %s: %v", testDir, err)
+	var goFiles []string
+	err := filepath.WalkDir(testDir, func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() && d.Name() == "run" {
+			return filepath.SkipDir
+		}
+		if !d.IsDir() && strings.HasSuffix(d.Name(), ".go") {
+			goFiles = append(goFiles, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("failed to walk directory %s: %v", testDir, err)
 	}
+	if len(goFiles) == 0 {
+		t.Fatalf("no .go files found in %s", testDir)
+	}
+
 	for _, src := range goFiles {
-		base := filepath.Base(src)
-		out := compiler.TranslateGoFilePathToTypescriptFilePath(testName, base)
 		srcRel, err := filepath.Rel(testDir, src)
 		if err != nil {
 			t.Fatal(err.Error())
 		}
-		t.Logf("Compiling Go file: %s => %s", srcRel, out)
-		if data, err := os.ReadFile(src); err == nil {
-			t.Logf("Source %s:\n%s", srcRel, string(data))
-		} else {
-			t.Fatalf("could not read source %s: %v", src, err)
-		}
+		t.Logf("Found Go file: %s", srcRel)
 	}
 
 	comp, err := compiler.NewCompiler(conf, le, nil)
 	if err != nil {
 		t.Fatalf("failed to create compiler: %v", err)
 	}
-	cmpErr := comp.CompilePackages(context.Background(), ".")
+
+	// Collect unique package paths relative to testDir
+	packagePaths := make(map[string]struct{})
+	for _, src := range goFiles {
+		relPath, err := filepath.Rel(testDir, src)
+		if err != nil {
+			t.Fatal(err.Error())
+		}
+		pkgPath := filepath.Dir(relPath)
+		if pkgPath == "." {
+			pkgPath = ""
+		}
+		packagePaths[pkgPath] = struct{}{}
+	}
+
+	// Convert map keys to a slice
+	var pkgsToCompile []string
+	for pkg := range packagePaths {
+		pkgsToCompile = append(pkgsToCompile, "./"+pkg)
+	}
+
+	t.Logf("Compiling packages: %v", pkgsToCompile)
+	cmpErr := comp.CompilePackages(context.Background(), pkgsToCompile...)
 	if cmpErr != nil {
-		t.Errorf("compilation failed: %v", err)
+		t.Errorf("compilation failed: %v", cmpErr)
 	}
 
 	// Log generated TypeScript files and copy them back to testDir
@@ -375,6 +405,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	compilerOptions := maps.Clone(tsconfig["compilerOptions"].(map[string]interface{}))
 	compilerOptions["baseUrl"] = "."
 	compilerOptions["paths"] = map[string][]string{
+		"@goscript/*":       {"./output/@goscript"},
 		"@goscript/builtin": {builtinTsPathForJSON},
 	}
 	tsconfig["compilerOptions"] = compilerOptions
