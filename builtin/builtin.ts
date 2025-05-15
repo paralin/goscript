@@ -1169,15 +1169,15 @@ function matchesPointerType(value: any, info: TypeInfo): boolean {
 function matchesFunctionType(value: any, info: FunctionTypeInfo): boolean {
   // First check if the value is a function
   if (typeof value !== 'function') {
-    return false;
+    return false
   }
-  
+
   // This is important for named function types
   if (info.name && value.__goTypeName) {
-    return info.name === value.__goTypeName;
+    return info.name === value.__goTypeName
   }
-  
-  return true;
+
+  return true
 }
 
 /**

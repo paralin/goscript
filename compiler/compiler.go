@@ -4612,7 +4612,6 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			}
 		}
 
-		
 		// First, collect all the selector expressions to identify variables that need to be initialized
 		hasSelectors := false
 		for _, lhsExpr := range lhs {
@@ -4621,26 +4620,26 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				break
 			}
 		}
-		
+
 		// If we have selector expressions, we need to ensure variables are initialized
 		// before the destructuring assignment
 		if hasSelectors {
 			c.tsw.WriteLiterally("{")
 			c.tsw.WriteLine("")
-			
+
 			// Write a temporary variable to hold the function call result
 			c.tsw.WriteLiterally("  const _tmp = ")
 			if err := c.WriteValueExpr(callExpr); err != nil {
 				return fmt.Errorf("failed to write RHS call expression in assignment: %w", err)
 			}
 			c.tsw.WriteLine("")
-			
+
 			for i, lhsExpr := range lhs {
 				// Skip underscore variables
 				if ident, ok := lhsExpr.(*ast.Ident); ok && ident.Name == "_" {
 					continue
 				}
-				
+
 				// Write the LHS with indentation
 				c.tsw.WriteLiterally("  ")
 				if ident, ok := lhsExpr.(*ast.Ident); ok {
@@ -4652,20 +4651,20 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				} else {
 					return errors.Errorf("unhandled LHS expression in assignment: %T", lhsExpr)
 				}
-				
+
 				// Write the assignment
 				c.tsw.WriteLiterallyf(" = _tmp[%d]", i)
 				// Always add a newline after each assignment
 				c.tsw.WriteLine("")
 			}
-			
+
 			// Close the block scope
 			c.tsw.WriteLiterally("}")
 			c.tsw.WriteLine("")
-			
+
 			return nil
 		}
-		
+
 		// For simple cases without selector expressions, use array destructuring
 		c.tsw.WriteLiterally("[")
 

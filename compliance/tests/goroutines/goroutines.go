@@ -1,49 +1,98 @@
 // Package main tests goroutine handling with named functions
 package main
 
-// A channel to synchronize goroutines
-var done = make(chan bool)
+// Message struct with priority and text for deterministic ordering
+type Message struct {
+	priority int
+	text     string
+}
+
+// Channel to collect messages from all goroutines
+var messages = make(chan Message)
+
+// Counter to track how many goroutines are running
+var doneCount = 0
+
+// Total number of messages we expect to receive
+const totalMessages = 8
 
 // A worker function that will be called as a goroutine
 func worker(id int) {
-	println("Worker", id, "starting")
-	println("Worker", id, "done")
-	done <- true
+	// Send worker starting message
+	messages <- Message{
+		priority: 10 + id,
+		text:     "Worker " + string(rune('0'+id)) + " starting",
+	}
+
+	// Send worker done message
+	messages <- Message{
+		priority: 20 + id,
+		text:     "Worker " + string(rune('0'+id)) + " done",
+	}
 }
 
 // Another worker function to test multiple different goroutines
 func anotherWorker(name string) {
-	println("Another worker:", name)
-	done <- true
+	messages <- Message{
+		priority: 40,
+		text:     "Another worker: " + name,
+	}
 }
 
 func main() {
-	println("Main: Starting workers")
+	// Create a slice to collect all messages
+	allMessages := make([]Message, 0, totalMessages+3) // +3 for main thread messages
 
-	// Count of goroutines to wait for
-	totalGoroutines := 5 // 3 workers + 1 anotherWorker + 1 anonymous function
-	
-	// This will cause the error because we're using a named function
-	// instead of an inline function literal
+	// Add initial message
+	allMessages = append(allMessages, Message{
+		priority: 0,
+		text:     "Main: Starting workers",
+	})
+
+	// Start 3 worker goroutines
 	for i := 0; i < 3; i++ {
-		go worker(i) // This will trigger the error with *ast.Ident
+		go worker(i) // This will trigger a past error with *ast.Ident
 	}
 
-	// Try calling another worker function as a goroutine
+	// Start another worker goroutine
 	go anotherWorker("test")
 
-	// This works in the current implementation because it's a function literal
+	// Start an anonymous function worker
 	go func() {
-		println("Anonymous function worker")
-		done <- true
+		messages <- Message{
+			priority: 50,
+			text:     "Anonymous function worker",
+		}
 	}()
 
-	println("Main: Workers started")
-	
-	// Use channels to wait for all goroutines to complete
-	for i := 0; i < totalGoroutines; i++ {
-		<-done
+	// Add status message
+	allMessages = append(allMessages, Message{
+		priority: 1,
+		text:     "Main: Workers started",
+	})
+
+	// Collect all messages from goroutines
+	for i := 0; i < totalMessages; i++ {
+		allMessages = append(allMessages, <-messages)
 	}
-	
-	println("Main: All workers completed")
+
+	// Add final message
+	allMessages = append(allMessages, Message{
+		priority: 100,
+		text:     "Main: All workers completed",
+	})
+
+	// Sort messages by priority for deterministic order
+	for i := 0; i < len(allMessages); i++ {
+		for j := i + 1; j < len(allMessages); j++ {
+			if allMessages[i].priority > allMessages[j].priority {
+				allMessages[i], allMessages[j] = allMessages[j], allMessages[i]
+			}
+		}
+	}
+
+	// Print all messages in deterministic order
+	for _, msg := range allMessages {
+		println(msg.priority, msg.text)
+	}
 }
