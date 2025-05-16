@@ -8,7 +8,7 @@ import (
 
 // ComputeModulePath computes the root of the output typescript module.
 func ComputeModulePath(outputRoot, goPkg string) string {
-	return filepath.Join(outputRoot, goPkg)
+	return filepath.Join(outputRoot, translateGoPathToTypescriptPath(goPkg))
 }
 
 var typeScriptGoStubPrefix = "@ts/"

@@ -86,7 +86,7 @@ Based on the existing tests, GoScript aims to support the following Go features:
 *   `struct` definitions (including exported/unexported fields).
     *   Struct Embedding.
     *   Composite Literals for structs (`MyStruct{...}`).
-    *   Interfaces (`interface{}`) - Definition and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions and embedded interfaces using the `extends` keyword.
+    *   Interfaces (`interface{}`) - definition and type assertions (`v.(T)`) are now compliant, including interface-to-interface type assertions and embedded interfaces using the `extends` keyword.
 *   **Functions & Methods:**
     *   Function definition (`func`).
     *   Function Literals (`func() { ... }`)

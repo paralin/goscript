@@ -132,9 +132,14 @@ func NewPackageCompiler(
 }
 
 // Compile orchestrates the compilation of all Go files within the package.
+//
 // It iterates through each syntax file (`ast.File`) of the package,
 // determines its relative path for logging, and then invokes `CompileFile`
 // to handle the compilation of that specific file.
+//
+// After compiling all files, it generates an index.ts file that re-exports
+// all exported symbols, allowing the package to be imported correctly.
+//
 // The working directory (`wd`) is used to make file paths in logs more readable.
 func (c *PackageCompiler) Compile(ctx context.Context) error {
 	wd := c.compilerConf.Dir
@@ -146,6 +151,9 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 		}
 	}
 
+	// Track all compiled files for later generating the index.ts
+	compiledFiles := make([]string, 0, len(c.pkg.CompiledGoFiles))
+
 	// Compile the files in the package one at a time
 	for i, f := range c.pkg.Syntax {
 		fileName := c.pkg.CompiledGoFiles[i]
@@ -156,6 +164,42 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 
 		c.le.WithField("file", relWdFileName).Debug("compiling file")
 		if err := c.CompileFile(ctx, fileName, f); err != nil {
+			return err
+		}
+
+		// Add the base filename to our list for the index.ts generation
+		baseFileName := filepath.Base(fileName)
+		// Strip .go extension and add .gs
+		gsFileName := strings.TrimSuffix(baseFileName, ".go") + ".gs"
+		compiledFiles = append(compiledFiles, gsFileName)
+	}
+
+	// After compiling all files, generate the index.ts file
+	if err := c.generateIndexFile(compiledFiles); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// generateIndexFile creates an index.ts file in the package output directory
+// that re-exports all symbols from the compiled TypeScript files.
+// This ensures the package can be imported correctly by TypeScript modules.
+func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
+	indexFilePath := filepath.Join(c.outputPath, "index.ts")
+
+	// Open the file for writing
+	indexFile, err := os.OpenFile(indexFilePath, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return err
+	}
+	defer indexFile.Close() //nolint:errcheck
+
+	// Write the re-export statements for each compiled file
+	for _, fileName := range compiledFiles {
+		// Create the re-export line: export * from "./file.gs.js"
+		exportLine := fmt.Sprintf("export * from \"./%s.js\"\n", fileName)
+		if _, err := indexFile.WriteString(exportLine); err != nil {
 			return err
 		}
 	}
@@ -2982,12 +3026,15 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 
 // WriteImportSpec translates a Go import specification (`ast.ImportSpec`)
 // into a TypeScript import statement.
+//
 // It extracts the Go import path (e.g., `"path/to/pkg"`) and determines the
 // import alias/name for TypeScript. If the Go import has an explicit name
 // (e.g., `alias "path/to/pkg"`), that alias is used. Otherwise, the package
 // name is derived from the Go path.
+//
 // The Go path is then translated to a TypeScript module path using
 // `translateGoPathToTypescriptPath`.
+//
 // Finally, it writes a TypeScript import statement like `import * as alias from "typescript/path/to/pkg";`
 // and records the import details in `c.analysis.Imports` for later use (e.g.,
 // resolving qualified identifiers).
@@ -3011,7 +3058,7 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 		importVars: make(map[string]struct{}),
 	}
 
-	c.tsw.WriteImport(impName, importPath)
+	c.tsw.WriteImport(impName, importPath+"/index.js")
 }
 
 // WriteDecls iterates through a slice of Go top-level declarations (`ast.Decl`)

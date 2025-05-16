@@ -146,27 +146,31 @@ func CompileGoToTypeScript(t *testing.T, testDir, tempDir, outputDir string, le 
 	}
 
 	// Log generated TypeScript files and copy them back to testDir
+	testName := filepath.Base(testDir)
+	stripPathPrefix := "@goscript/" + testName + "/"
 	if err := filepath.WalkDir(outputDir, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			t.Logf("error walking path %s: %v", path, err)
 			return nil
 		}
-		if strings.HasSuffix(path, ".gs.ts") { // Look specifically for .gs.ts files
-			// Determine the destination path in the original testDir
-			relPath, err := filepath.Rel(outputDir, path)
-			if err != nil {
-				t.Logf("failed to get relative path for %s: %v", path, err)
-				return nil // Continue walking
-			}
-			// relPath is like "@goscript/testname/file.gs.ts", so extract the base file name
-			parts := strings.Split(relPath, string(filepath.Separator))
-			if len(parts) < 3 {
-				t.Logf("unexpected path structure for %s", path)
-				return nil // Continue walking
-			}
-			fileName := parts[len(parts)-1]
-			destPath := filepath.Join(testDir, fileName)
+		// Determine the destination path in the original testDir
+		relPath, err := filepath.Rel(outputDir, path)
+		if err != nil {
+			t.Logf("failed to get relative path for %s: %v", path, err)
+			return nil // Continue walking
+		}
+		fileName := filepath.Base(relPath)
 
+		// relPath is like "@goscript/testname/file.gs.ts"
+		if !strings.HasPrefix(relPath, stripPathPrefix) {
+			return nil
+		}
+		destPath := filepath.Join(testDir, strings.TrimPrefix(relPath, stripPathPrefix))
+
+		if fileName == "index.ts" {
+			// copy index.ts as is
+			copyFile(path, destPath)
+		} else if strings.HasSuffix(fileName, ".gs.ts") { // Look specifically for .gs.ts files
 			// Read the generated content
 			generatedContent, err := os.ReadFile(path)
 			if err != nil {
@@ -320,9 +324,15 @@ func WriteTypeCheckConfig(t *testing.T, workspaceDir, testDir string) string {
 	tsconfig := maps.Clone(baseTsConfig)
 	tsconfig["extends"] = rootTsConfigPath
 	tsconfig["include"] = includes
-	// Add noEmit to compilerOptions
+
+	testName := filepath.Base(testDir)
 	compilerOptions := maps.Clone(tsconfig["compilerOptions"].(map[string]interface{}))
-	compilerOptions["noEmit"] = true
+	compilerOptions["baseUrl"] = "."
+	builtinTsPathForJSON := filepath.ToSlash(filepath.Join(relWorkspacePathForJSON, "builtin", "builtin.ts"))
+	compilerOptions["paths"] = map[string][]string{
+		fmt.Sprintf("@goscript/%s/*", testName): {"./*"}, // generated code
+		"@goscript/builtin":                     {builtinTsPathForJSON},
+	}
 	tsconfig["compilerOptions"] = compilerOptions
 
 	tsconfigContentBytes, err := json.MarshalIndent(tsconfig, "", "  ")
