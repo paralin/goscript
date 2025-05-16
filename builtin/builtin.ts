@@ -1498,182 +1498,182 @@ export interface Channel<T> {
 
 // A simple implementation of buffered channels
 class BufferedChannel<T> implements Channel<T> {
-  private buffer: T[] = [];
-  private closed: boolean = false;
-  private capacity: number;
-  public zeroValue: T; // Made public for access by ChannelRef or for type inference
+  private buffer: T[] = []
+  private closed: boolean = false
+  private capacity: number
+  public zeroValue: T // Made public for access by ChannelRef or for type inference
 
   // Senders queue: stores { value, resolve for send, reject for send }
   private senders: Array<{
-    value: T;
-    resolveSend: () => void;
-    rejectSend: (e: Error) => void;
-  }> = [];
+    value: T
+    resolveSend: () => void
+    rejectSend: (e: Error) => void
+  }> = []
 
   // Receivers queue for receive(): stores { resolve for receive, reject for receive }
   private receivers: Array<{
-    resolveReceive: (value: T) => void;
-    rejectReceive: (e: Error) => void;
-  }> = [];
+    resolveReceive: (value: T) => void
+    rejectReceive: (e: Error) => void
+  }> = []
 
   // Receivers queue for receiveWithOk(): stores { resolve for receiveWithOk }
   private receiversWithOk: Array<{
-    resolveReceive: (result: ChannelReceiveResult<T>) => void;
-  }> = [];
+    resolveReceive: (result: ChannelReceiveResult<T>) => void
+  }> = []
 
   constructor(capacity: number, zeroValue: T) {
     if (capacity < 0) {
-      throw new Error('Channel capacity cannot be negative');
+      throw new Error('Channel capacity cannot be negative')
     }
-    this.capacity = capacity;
-    this.zeroValue = zeroValue;
+    this.capacity = capacity
+    this.zeroValue = zeroValue
   }
 
   async send(value: T): Promise<void> {
     if (this.closed) {
-      throw new Error('send on closed channel');
+      throw new Error('send on closed channel')
     }
 
     // Attempt to hand off to a waiting receiver (rendezvous)
     if (this.receivers.length > 0) {
-      const receiverTask = this.receivers.shift()!;
-      queueMicrotask(() => receiverTask.resolveReceive(value));
-      return;
+      const receiverTask = this.receivers.shift()!
+      queueMicrotask(() => receiverTask.resolveReceive(value))
+      return
     }
     if (this.receiversWithOk.length > 0) {
-      const receiverTask = this.receiversWithOk.shift()!;
-      queueMicrotask(() => receiverTask.resolveReceive({ value, ok: true }));
-      return;
+      const receiverTask = this.receiversWithOk.shift()!
+      queueMicrotask(() => receiverTask.resolveReceive({ value, ok: true }))
+      return
     }
 
     // If no waiting receivers, try to buffer if space is available
     if (this.buffer.length < this.capacity) {
-      this.buffer.push(value);
-      return;
+      this.buffer.push(value)
+      return
     }
 
     // Buffer is full (or capacity is 0 and no receivers are waiting). Sender must block.
     return new Promise<void>((resolve, reject) => {
-      this.senders.push({ value, resolveSend: resolve, rejectSend: reject });
-    });
+      this.senders.push({ value, resolveSend: resolve, rejectSend: reject })
+    })
   }
 
   async receive(): Promise<T> {
     // Attempt to get from buffer first
     if (this.buffer.length > 0) {
-      const value = this.buffer.shift()!;
+      const value = this.buffer.shift()!
       // If a sender was waiting because the buffer was full, unblock it.
       if (this.senders.length > 0) {
-        const senderTask = this.senders.shift()!;
-        this.buffer.push(senderTask.value); // Sender's value now goes into buffer
-        queueMicrotask(() => senderTask.resolveSend()); // Unblock sender
+        const senderTask = this.senders.shift()!
+        this.buffer.push(senderTask.value) // Sender's value now goes into buffer
+        queueMicrotask(() => senderTask.resolveSend()) // Unblock sender
       }
-      return value;
+      return value
     }
 
     // Buffer is empty.
     // If channel is closed (and buffer is empty), subsequent receives panic.
     if (this.closed) {
-      throw new Error('receive on closed channel');
+      throw new Error('receive on closed channel')
     }
 
     // Buffer is empty, channel is open.
     // Attempt to rendezvous with a waiting sender.
     if (this.senders.length > 0) {
-      const senderTask = this.senders.shift()!;
-      queueMicrotask(() => senderTask.resolveSend()); // Unblock the sender
-      return senderTask.value; // Return the value from sender
+      const senderTask = this.senders.shift()!
+      queueMicrotask(() => senderTask.resolveSend()) // Unblock the sender
+      return senderTask.value // Return the value from sender
     }
 
     // Buffer is empty, channel is open, no waiting senders. Receiver must block.
     return new Promise<T>((resolve, reject) => {
-      this.receivers.push({ resolveReceive: resolve, rejectReceive: reject });
-    });
+      this.receivers.push({ resolveReceive: resolve, rejectReceive: reject })
+    })
   }
 
   async receiveWithOk(): Promise<ChannelReceiveResult<T>> {
     // Attempt to get from buffer first
     if (this.buffer.length > 0) {
-      const value = this.buffer.shift()!;
+      const value = this.buffer.shift()!
       if (this.senders.length > 0) {
-        const senderTask = this.senders.shift()!;
-        this.buffer.push(senderTask.value);
-        queueMicrotask(() => senderTask.resolveSend());
+        const senderTask = this.senders.shift()!
+        this.buffer.push(senderTask.value)
+        queueMicrotask(() => senderTask.resolveSend())
       }
-      return { value, ok: true };
+      return { value, ok: true }
     }
 
     // Buffer is empty.
     // Attempt to rendezvous with a waiting sender.
     if (this.senders.length > 0) {
-      const senderTask = this.senders.shift()!;
-      queueMicrotask(() => senderTask.resolveSend());
-      return { value: senderTask.value, ok: true };
+      const senderTask = this.senders.shift()!
+      queueMicrotask(() => senderTask.resolveSend())
+      return { value: senderTask.value, ok: true }
     }
 
     // Buffer is empty, no waiting senders.
     // If channel is closed, return zero value with ok: false.
     if (this.closed) {
-      return { value: this.zeroValue, ok: false };
+      return { value: this.zeroValue, ok: false }
     }
 
     // Buffer is empty, channel is open, no waiting senders. Receiver must block.
     return new Promise<ChannelReceiveResult<T>>((resolve) => {
-      this.receiversWithOk.push({ resolveReceive: resolve });
-    });
+      this.receiversWithOk.push({ resolveReceive: resolve })
+    })
   }
 
   async selectReceive(id: number): Promise<SelectResult<T>> {
     if (this.buffer.length > 0) {
-      const value = this.buffer.shift()!;
+      const value = this.buffer.shift()!
       if (this.senders.length > 0) {
-        const senderTask = this.senders.shift()!;
-        this.buffer.push(senderTask.value);
-        queueMicrotask(() => senderTask.resolveSend());
+        const senderTask = this.senders.shift()!
+        this.buffer.push(senderTask.value)
+        queueMicrotask(() => senderTask.resolveSend())
       }
-      return { value, ok: true, id };
+      return { value, ok: true, id }
     }
 
     if (this.senders.length > 0) {
-      const senderTask = this.senders.shift()!;
-      queueMicrotask(() => senderTask.resolveSend());
-      return { value: senderTask.value, ok: true, id };
+      const senderTask = this.senders.shift()!
+      queueMicrotask(() => senderTask.resolveSend())
+      return { value: senderTask.value, ok: true, id }
     }
 
     if (this.closed) {
-      return { value: this.zeroValue, ok: false, id };
+      return { value: this.zeroValue, ok: false, id }
     }
 
     return new Promise<SelectResult<T>>((resolve) => {
       this.receiversWithOk.push({
         resolveReceive: (result: ChannelReceiveResult<T>) => {
-          resolve({ ...result, id });
+          resolve({ ...result, id })
         },
-      });
-    });
+      })
+    })
   }
 
   async selectSend(value: T, id: number): Promise<SelectResult<boolean>> {
     if (this.closed) {
       // A select case sending on a closed channel panics in Go.
       // This will cause Promise.race in selectStatement to reject.
-      throw new Error('send on closed channel');
+      throw new Error('send on closed channel')
     }
 
     if (this.receivers.length > 0) {
-      const receiverTask = this.receivers.shift()!;
-      queueMicrotask(() => receiverTask.resolveReceive(value));
-      return { value: true, ok: true, id };
+      const receiverTask = this.receivers.shift()!
+      queueMicrotask(() => receiverTask.resolveReceive(value))
+      return { value: true, ok: true, id }
     }
     if (this.receiversWithOk.length > 0) {
-      const receiverTask = this.receiversWithOk.shift()!;
-      queueMicrotask(() => receiverTask.resolveReceive({ value, ok: true }));
-      return { value: true, ok: true, id };
+      const receiverTask = this.receiversWithOk.shift()!
+      queueMicrotask(() => receiverTask.resolveReceive({ value, ok: true }))
+      return { value: true, ok: true, id }
     }
 
     if (this.buffer.length < this.capacity) {
-      this.buffer.push(value);
-      return { value: true, ok: true, id };
+      this.buffer.push(value)
+      return { value: true, ok: true, id }
     }
 
     return new Promise<SelectResult<boolean>>((resolve, reject) => {
@@ -1681,48 +1681,54 @@ class BufferedChannel<T> implements Channel<T> {
         value,
         resolveSend: () => resolve({ value: true, ok: true, id }),
         rejectSend: (e) => reject(e), // Propagate error if channel closes
-      });
-    });
+      })
+    })
   }
 
   close(): void {
     if (this.closed) {
-      throw new Error('close of closed channel');
+      throw new Error('close of closed channel')
     }
-    this.closed = true;
+    this.closed = true
 
-    const sendersToNotify = [...this.senders]; // Shallow copy for iteration
-    this.senders = [];
+    const sendersToNotify = [...this.senders] // Shallow copy for iteration
+    this.senders = []
     for (const senderTask of sendersToNotify) {
-      queueMicrotask(() => senderTask.rejectSend(new Error('send on closed channel')));
+      queueMicrotask(() =>
+        senderTask.rejectSend(new Error('send on closed channel')),
+      )
     }
 
-    const receiversToNotify = [...this.receivers];
-    this.receivers = [];
+    const receiversToNotify = [...this.receivers]
+    this.receivers = []
     for (const receiverTask of receiversToNotify) {
-      queueMicrotask(() => receiverTask.rejectReceive(new Error('receive on closed channel')));
+      queueMicrotask(() =>
+        receiverTask.rejectReceive(new Error('receive on closed channel')),
+      )
     }
 
-    const receiversWithOkToNotify = [...this.receiversWithOk];
-    this.receiversWithOk = [];
+    const receiversWithOkToNotify = [...this.receiversWithOk]
+    this.receiversWithOk = []
     for (const receiverTask of receiversWithOkToNotify) {
-      queueMicrotask(() => receiverTask.resolveReceive({ value: this.zeroValue, ok: false }));
+      queueMicrotask(() =>
+        receiverTask.resolveReceive({ value: this.zeroValue, ok: false }),
+      )
     }
   }
 
   canReceiveNonBlocking(): boolean {
-    return this.buffer.length > 0 || this.senders.length > 0 || this.closed;
+    return this.buffer.length > 0 || this.senders.length > 0 || this.closed
   }
 
   canSendNonBlocking(): boolean {
     if (this.closed) {
-      return true; // Ready to panic
+      return true // Ready to panic
     }
     return (
       this.buffer.length < this.capacity ||
       this.receivers.length > 0 ||
       this.receiversWithOk.length > 0
-    );
+    )
   }
 }
 
