@@ -17,6 +17,9 @@ type Config struct {
 	OutputPathRoot string
 	// BuildFlags are the Go build flags (tags) to use during analysis.
 	BuildFlags []string
+	// AllDependencies controls whether to compile all dependencies of the requested packages.
+	// If true, all dependencies will be compiled; if false, only the requested packages are compiled.
+	AllDependencies bool
 }
 
 // Validate checks the config.

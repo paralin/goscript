@@ -145,8 +145,9 @@ func CompileGoToTypeScript(t *testing.T, parentModulePath, testDir, tempDir, out
 		t.Fatalf("failed to get absolute path for temp directory %s: %v", tempDir, err)
 	}
 	conf := &compiler.Config{
-		Dir:            testDir,
-		OutputPathRoot: outputDir,
+		Dir:             testDir,
+		OutputPathRoot:  outputDir,
+		AllDependencies: true,
 	}
 	if err := conf.Validate(); err != nil {
 		t.Fatalf("invalid compiler config: %v", err)

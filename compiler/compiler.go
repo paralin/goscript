@@ -79,23 +79,84 @@ func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compil
 // cancellation and applies the compiler's configured options during package loading.
 // For each successfully loaded package, it creates a `PackageCompiler` and
 // invokes its `Compile` method.
+// If c.config.AllDependencies is true, it will also compile all dependencies
+// of the requested packages, including standard library dependencies.
 func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) error {
 	opts := c.opts
 	opts.Context = ctx
 
+	// First, load the initial packages with NeedImports to get all dependencies
+	opts.Mode |= packages.NeedImports
 	pkgs, err := packages.Load(&opts, patterns...)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to load packages: %w", err)
 	}
 
+	// If AllDependencies is true, we need to collect all dependencies
+	if c.config.AllDependencies {
+		// Create a set to track processed packages by their ID
+		processed := make(map[string]bool)
+		var allPkgs []*packages.Package
+
+		// Visit all packages and their dependencies
+		var visit func(pkg *packages.Package)
+		visit = func(pkg *packages.Package) {
+			if pkg == nil || processed[pkg.ID] {
+				return
+			}
+			processed[pkg.ID] = true
+			allPkgs = append(allPkgs, pkg)
+
+			// Visit all imports, including standard library packages
+			for _, imp := range pkg.Imports {
+				visit(imp)
+			}
+		}
+
+		// Start visiting from the initial packages
+		for _, pkg := range pkgs {
+			visit(pkg)
+		}
+
+		// Replace pkgs with all packages
+		pkgs = allPkgs
+
+		/*
+			// Now load all packages with full mode to get complete type information
+			var pkgPaths []string
+			for _, pkg := range pkgs {
+				if pkg.PkgPath != "" {
+					pkgPaths = append(pkgPaths, pkg.PkgPath)
+				}
+			}
+
+			// Reload all packages with full mode
+			// TODO: Can we get rid of this? This would be very slow!
+			fullOpts := c.opts
+			fullOpts.Context = ctx
+			fullOpts.Mode = packages.LoadAllSyntax
+			pkgs, err = packages.Load(&fullOpts, pkgPaths...)
+			if err != nil {
+				return fmt.Errorf("failed to reload packages with full mode: %w", err)
+			}
+		*/
+	}
+
+	// Compile all packages
 	for _, pkg := range pkgs {
+		// Skip packages that failed to load
+		if len(pkg.Errors) > 0 {
+			c.le.WithError(pkg.Errors[0]).Warnf("Skipping package %s due to errors", pkg.PkgPath)
+			continue
+		}
+
 		pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkg)
 		if err != nil {
-			return err
+			return fmt.Errorf("failed to create package compiler for %s: %w", pkg.PkgPath, err)
 		}
 
 		if err := pkgCompiler.Compile(ctx); err != nil {
-			return err
+			return fmt.Errorf("failed to compile package %s: %w", pkg.PkgPath, err)
 		}
 	}
 
