@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	let s = $.arrayToSlice([10, 20, 30])
+	let s = $.arrayToSlice<number>([10, 20, 30])
 	console.log("Looping over slice (no vars):")
 	let count = 0
 	for (let _i = 0; _i < $.len(s); _i++) {
@@ -14,7 +14,7 @@ export function main(): void {
 	}
 	console.log(count) // Expected output: 3
 
-	let a = $.arrayToSlice(["alpha", "beta"])
+	let a = $.arrayToSlice<string>(["alpha", "beta"])
 	console.log("Looping over array (no vars):")
 	let arrCount = 0
 	for (let _i = 0; _i < $.len(a); _i++) {

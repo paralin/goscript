@@ -10,9 +10,6 @@ type Message struct {
 // Channel to collect messages from all goroutines
 var messages = make(chan Message)
 
-// Counter to track how many goroutines are running
-var doneCount = 0
-
 // Total number of messages we expect to receive
 const totalMessages = 8
 
@@ -83,7 +80,7 @@ func main() {
 	})
 
 	// Sort messages by priority for deterministic order
-	for i := 0; i < len(allMessages); i++ {
+	for i := range allMessages {
 		for j := i + 1; j < len(allMessages); j++ {
 			if allMessages[i].priority > allMessages[j].priority {
 				allMessages[i], allMessages[j] = allMessages[j], allMessages[i]

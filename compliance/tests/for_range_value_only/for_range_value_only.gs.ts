@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	let s = $.arrayToSlice([10, 20, 30])
+	let s = $.arrayToSlice<number>([10, 20, 30])
 	let sum = 0
 	for (let i = 0; i < $.len(s); i++) {
 		const v = s![i]
@@ -15,7 +15,7 @@ export function main(): void {
 	}
 	console.log(sum)
 
-	let arr = $.arrayToSlice(["a", "b", "c"])
+	let arr = $.arrayToSlice<string>(["a", "b", "c"])
 	let concat = ""
 	for (let i = 0; i < $.len(arr); i++) {
 		const val = arr![i]

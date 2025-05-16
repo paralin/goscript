@@ -2006,16 +2006,6 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 		// Handle array literals
 		if arrType, isArrayType := exp.Type.(*ast.ArrayType); isArrayType {
-			// Special case: empty slice literal
-			if len(exp.Elts) == 0 {
-				// Generate: $.arrayToSlice([], 1)
-				c.tsw.WriteLiterally("$.arrayToSlice([] as ")
-				// Write the element type using the existing function
-				c.WriteTypeExpr(arrType.Elt)
-				c.tsw.WriteLiterally("[], 1)") // Close the type assertion and arrayToSlice call
-				return nil                     // Handled empty slice literal
-			}
-
 			// Check if this is a slice of slices (multi-dimensional array)
 			isMultiDimensional := false
 			if _, ok := arrType.Elt.(*ast.ArrayType); ok {
@@ -2024,7 +2014,16 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 				// We'll handle this with depth parameter to arrayToSlice
 			}
 
-			c.tsw.WriteLiterally("$.arrayToSlice([")
+			c.tsw.WriteLiterally("$.arrayToSlice")
+
+			// write the type annotation
+			c.tsw.WriteLiterally("<")
+			// Write the element type using the existing function
+			c.WriteTypeExpr(arrType.Elt)
+			c.tsw.WriteLiterally(">")
+
+			c.tsw.WriteLiterally("([")
+
 			// Use type info to get array length and element type
 			var arrayLen int
 			var elemType ast.Expr

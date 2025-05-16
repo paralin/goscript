@@ -51,7 +51,7 @@ class MyProcessor {
 export function main(): void {
 	let processor: MultiParamReturner = new MyProcessor({})
 
-	let data = $.arrayToSlice([1, 2, 3])
+	let data = $.arrayToSlice<number>([1, 2, 3])
 	let [success, ] = processor.Process(data, 5, "unused")
 
 	if (success) {

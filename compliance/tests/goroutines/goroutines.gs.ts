@@ -107,9 +107,11 @@ export async function main(): Promise<void> {
 
 	// Sort messages by priority for deterministic order
 	for (let i = 0; i < $.len(allMessages); i++) {
-		for (let j = i + 1; j < $.len(allMessages); j++) {
-			if (allMessages![i].priority > allMessages![j].priority) {
-				[allMessages![i], allMessages![j]] = [allMessages![j], allMessages![i]]
+		{
+			for (let j = i + 1; j < $.len(allMessages); j++) {
+				if (allMessages![i].priority > allMessages![j].priority) {
+					[allMessages![i], allMessages![j]] = [allMessages![j], allMessages![i]]
+				}
 			}
 		}
 	}

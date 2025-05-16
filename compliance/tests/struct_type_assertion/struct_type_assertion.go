@@ -1,8 +1,7 @@
 package main
 
 func main() {
-	var i interface{}
-	i = struct {
+	var i any = struct {
 		Name   string
 		Number int
 	}{"Alice", 8005553424}

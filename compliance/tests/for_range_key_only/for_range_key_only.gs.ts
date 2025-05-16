@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	let s = $.arrayToSlice([10, 20, 30])
+	let s = $.arrayToSlice<number>([10, 20, 30])
 	console.log("Looping over slice (key only):")
 
 	// Expected output:
@@ -17,7 +17,7 @@ export function main(): void {
 		}
 	}
 
-	let a = $.arrayToSlice(["alpha", "beta"])
+	let a = $.arrayToSlice<string>(["alpha", "beta"])
 	console.log("Looping over array (key only):")
 
 	// Expected output:

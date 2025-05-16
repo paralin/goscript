@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	let nums = $.arrayToSlice([2, 3, 4])
+	let nums = $.arrayToSlice<number>([2, 3, 4])
 	let sum = 0
 	for (let i = 0; i < $.len(nums); i++) {
 		const num = nums![i]
@@ -22,7 +22,7 @@ export function main(): void {
 	}
 
 	// Test ranging over an array
-	let arr = $.arrayToSlice(["a", "b", "c"])
+	let arr = $.arrayToSlice<string>(["a", "b", "c"])
 	for (let i = 0; i < $.len(arr); i++) {
 		const s = arr![i]
 		{

@@ -24,11 +24,11 @@ export function main(): void {
 	console.log(s3)
 
 	// === string([]rune) Conversion ===
-	let myRunes = $.arrayToSlice([71, 111, 83, 99, 114, 105, 112, 116])
+	let myRunes = $.arrayToSlice<number>([71, 111, 83, 99, 114, 105, 112, 116])
 	let myStringFromRunes = $.runesToString(myRunes)
 	console.log(myStringFromRunes)
 
-	let emptyRunes = $.arrayToSlice([] as number[], 1)
+	let emptyRunes = $.arrayToSlice<number>([])
 	let emptyStringFromRunes = $.runesToString(emptyRunes)
 	console.log(emptyStringFromRunes)
 

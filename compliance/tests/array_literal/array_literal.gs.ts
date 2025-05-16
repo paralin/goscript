@@ -6,15 +6,15 @@ import * as $ from "@goscript/builtin";
 export function main(): void {
 	// Test basic array literal
 	//nolint:staticcheck
-	let a: number[] = $.arrayToSlice([1, 2, 3])
+	let a: number[] = $.arrayToSlice<number>([1, 2, 3])
 	console.log(a![0], a![1], a![2])
 
 	// Test array literal with inferred length
-	let b = $.arrayToSlice(["hello", "world"])
+	let b = $.arrayToSlice<string>(["hello", "world"])
 	console.log(b![0], b![1])
 
 	// Test array literal with specific element initialization
-	let c = $.arrayToSlice([0, 10, 0, 30, 0])
+	let c = $.arrayToSlice<number>([0, 10, 0, 30, 0])
 	console.log(c![0], c![1], c![2], c![3], c![4])
 }
 
