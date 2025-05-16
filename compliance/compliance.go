@@ -446,8 +446,11 @@ func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir 
 		if err != nil {
 			return err
 		}
-		if !d.IsDir() && strings.HasSuffix(d.Name(), ".gs.ts") {
+		if !d.IsDir() && (strings.HasSuffix(d.Name(), ".gs.ts") || d.Name() == "index.ts") {
 			gsTsFiles = append(gsTsFiles, path)
+		}
+		if d.IsDir() && d.Name() == "run" {
+			return filepath.SkipDir
 		}
 		return nil
 	})
@@ -466,12 +469,6 @@ func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir 
 			t.Fatalf("failed to get relative path for %s from %s: %v", file, testDir, errRel)
 		}
 		includes = append(includes, filepath.ToSlash(relFile)) // Ensure forward slashes for JSON
-	}
-	// Also include any index.ts files that might have been copied back
-	indexTsFiles, _ := filepath.Glob(filepath.Join(testDir, "**", "index.ts"))
-	for _, file := range indexTsFiles {
-		relFile, _ := filepath.Rel(testDir, file)
-		includes = append(includes, filepath.ToSlash(relFile))
 	}
 
 	absTestDir, err := filepath.Abs(testDir)
@@ -629,8 +626,8 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	runnerCompilerOptions := maps.Clone(runnerTsConfig["compilerOptions"].(map[string]interface{}))
 	runnerCompilerOptions["baseUrl"] = "." // tempDir is baseUrl
 	runnerCompilerOptions["paths"] = map[string][]string{
-		"@goscript/*":       {"./output/@goscript/*"},     // Maps to tempDir/output/@goscript/*
-		"@goscript/builtin": {"../../builtin/builtin.ts"}, // Maps to workspace/builtin/builtin.ts
+		"@goscript/*":       {"./output/@goscript/*"},           // Maps to tempDir/output/@goscript/*
+		"@goscript/builtin": {"../../../../builtin/builtin.ts"}, // Maps to workspace/builtin/builtin.ts
 	}
 	runnerTsConfig["compilerOptions"] = runnerCompilerOptions
 
