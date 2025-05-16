@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin";
 
-import * as subpkg from "@goscript/package_import/subpkg/index.js"
+import * as subpkg from "@goscript/github.com/aperturerobotics/goscript/compliance/tests/package_import/subpkg/index.js"
 
 export function main(): void {
 	console.log(subpkg.Greet("world"))

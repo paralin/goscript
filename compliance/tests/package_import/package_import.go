@@ -1,7 +1,7 @@
 package main
 
 import (
-	"package_import/subpkg"
+	"github.com/aperturerobotics/goscript/compliance/tests/package_import/subpkg"
 )
 
 func main() {

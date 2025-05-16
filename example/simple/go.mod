@@ -11,7 +11,7 @@ require (
 
 require (
 	github.com/aperturerobotics/cli v1.0.0 // indirect
-	github.com/aperturerobotics/common v0.21.2 // indirect
+	github.com/aperturerobotics/common v0.22.1 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/xrash/smetrics v0.0.0-20240521201337-686a1a2994c1 // indirect
 	golang.org/x/mod v0.24.0 // indirect

@@ -4,8 +4,7 @@
 import * as $ from "@goscript/builtin";
 
 export function main(): void {
-	let i: null | any = null
-	i = {Name: "Alice", Number: 8005553424}
+	let i: any/* unhandled type: *types.Alias */ = {Name: "Alice", Number: 8005553424}
 
 	let { value: s, ok: ok } = $.typeAssert<{ Name?: string; Number?: number }>(i, {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}, 'Number': {kind: $.TypeKind.Basic, name: 'number'}}, methods: new Set()})
 	if (ok) {

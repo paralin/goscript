@@ -50,8 +50,6 @@ class Message {
 
 let messages: $.Channel<Message> = $.makeChannel<Message>(0, new Message(), 'both')
 
-let doneCount: number = 0
-
 let totalMessages: number = 8
 
 // A worker function that will be called as a goroutine
