@@ -49,7 +49,8 @@ class Person {
 	  'Person',
 	  new Person(),
 	  new Set(["Greet"]),
-	  Person
+	  Person,
+	  {Name: "string", Age: "number"}
 	);
 }
 
@@ -112,7 +113,8 @@ class Employee {
 	  'Employee',
 	  new Employee(),
 	  new Set([]),
-	  Employee
+	  Employee,
+	  {Person: "Person", ID: "number"}
 	);
 }
 
@@ -162,7 +164,8 @@ class Address {
 	  'Address',
 	  new Address(),
 	  new Set(["FullAddress"]),
-	  Address
+	  Address,
+	  {Street: "string", City: "string"}
 	);
 }
 
@@ -202,7 +205,8 @@ class Contact {
 	  'Contact',
 	  new Contact(),
 	  new Set(["Call"]),
-	  Contact
+	  Contact,
+	  {Phone: "string"}
 	);
 }
 
@@ -314,7 +318,8 @@ class Manager {
 	  'Manager',
 	  new Manager(),
 	  new Set([]),
-	  Manager
+	  Manager,
+	  {Person: "Person", Address: "Address", Contact: "Contact", Level: "number"}
 	);
 }
 

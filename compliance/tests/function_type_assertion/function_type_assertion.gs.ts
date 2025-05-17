@@ -54,7 +54,8 @@ class FuncContainer {
 	  'FuncContainer',
 	  new FuncContainer(),
 	  new Set([]),
-	  FuncContainer
+	  FuncContainer,
+	  {myFunc: "null | any"}
 	);
 }
 

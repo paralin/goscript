@@ -34,7 +34,8 @@ class MyStruct {
 	  'MyStruct',
 	  new MyStruct(),
 	  new Set([]),
-	  MyStruct
+	  MyStruct,
+	  {Val: "number"}
 	);
 }
 

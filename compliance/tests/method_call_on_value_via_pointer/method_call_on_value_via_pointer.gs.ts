@@ -40,7 +40,8 @@ class MyStruct {
 	  'MyStruct',
 	  new MyStruct(),
 	  new Set(["GetValue"]),
-	  MyStruct
+	  MyStruct,
+	  {MyInt: "number"}
 	);
 }
 

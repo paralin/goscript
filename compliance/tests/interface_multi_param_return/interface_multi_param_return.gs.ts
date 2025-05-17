@@ -44,7 +44,8 @@ class MyProcessor {
 	  'MyProcessor',
 	  new MyProcessor(),
 	  new Set(["Process"]),
-	  MyProcessor
+	  MyProcessor,
+	  {}
 	);
 }
 

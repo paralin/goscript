@@ -44,7 +44,8 @@ class Point {
 	  'Point',
 	  new Point(),
 	  new Set([]),
-	  Point
+	  Point,
+	  {X: "number", Y: "number"}
 	);
 }
 

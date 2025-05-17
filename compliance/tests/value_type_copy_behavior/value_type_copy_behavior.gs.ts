@@ -44,7 +44,8 @@ class MyStruct {
 	  'MyStruct',
 	  new MyStruct(),
 	  new Set([]),
-	  MyStruct
+	  MyStruct,
+	  {MyInt: "number", MyString: "string"}
 	);
 }
 
@@ -89,7 +90,8 @@ class NestedStruct {
 	  'NestedStruct',
 	  new NestedStruct(),
 	  new Set([]),
-	  NestedStruct
+	  NestedStruct,
+	  {Value: "number", InnerStruct: "MyStruct"}
 	);
 }
 

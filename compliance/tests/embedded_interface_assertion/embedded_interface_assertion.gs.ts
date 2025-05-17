@@ -63,7 +63,8 @@ class MyStruct {
 	  'MyStruct',
 	  new MyStruct(),
 	  new Set(["Read", "Close"]),
-	  MyStruct
+	  MyStruct,
+	  {}
 	);
 }
 

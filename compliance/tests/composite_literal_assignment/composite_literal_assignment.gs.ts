@@ -55,7 +55,8 @@ class MyStruct {
 	  'MyStruct',
 	  new MyStruct(),
 	  new Set([]),
-	  MyStruct
+	  MyStruct,
+	  {MyInt: "number", MyString: "string", myBool: "boolean"}
 	);
 }
 

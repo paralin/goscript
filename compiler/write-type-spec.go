@@ -456,14 +456,34 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		}
 	}
 
-	// Add code to register the type with the runtime system
+	// Add code to register the type with the runtime type system
 	c.tsw.WriteLine("")
 	c.tsw.WriteLinef("// Register this type with the runtime type system")
 	c.tsw.WriteLinef("static __typeInfo = $.registerStructType(")
 	c.tsw.WriteLinef("  '%s',", className)
 	c.tsw.WriteLinef("  new %s(),", className)
 	c.tsw.WriteLinef("  new Set([%s]),", c.collectMethodNames(className)) // collectMethodNames should ideally consider promoted methods too
-	c.tsw.WriteLinef("  %s", className)
+	c.tsw.WriteLinef("  %s,", className)
+	// Add field type information for type assertions
+	c.tsw.WriteLiterally("  {")
+	first := true
+	for i := 0; i < underlyingStruct.NumFields(); i++ {
+		field := underlyingStruct.Field(i)
+		var fieldKeyName string
+		if field.Anonymous() {
+			fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
+		} else {
+			fieldKeyName = field.Name()
+		}
+		fieldTsType := c.getTypeString(field.Type())
+		if !first {
+			c.tsw.WriteLiterally(", ")
+		}
+		first = false
+		c.tsw.WriteLiterally(fmt.Sprintf("%s: \"%s\"", fieldKeyName, fieldTsType))
+	}
+	c.tsw.WriteLiterally("}")
+	c.tsw.WriteLine("")
 	c.tsw.WriteLinef(");")
 
 	c.tsw.Indent(-1)

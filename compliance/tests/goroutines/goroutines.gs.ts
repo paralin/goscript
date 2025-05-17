@@ -44,7 +44,8 @@ class Message {
 	  'Message',
 	  new Message(),
 	  new Set([]),
-	  Message
+	  Message,
+	  {priority: "number", text: "string"}
 	);
 }
 

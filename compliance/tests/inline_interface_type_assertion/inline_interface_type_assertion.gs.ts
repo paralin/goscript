@@ -29,7 +29,8 @@ class Greeter {
 	  'Greeter',
 	  new Greeter(),
 	  new Set(["Greet"]),
-	  Greeter
+	  Greeter,
+	  {}
 	);
 }
 
@@ -69,7 +70,8 @@ class MyStringer {
 	  'MyStringer',
 	  new MyStringer(),
 	  new Set(["String"]),
-	  MyStringer
+	  MyStringer,
+	  {}
 	);
 }
 

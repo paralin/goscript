@@ -46,7 +46,8 @@ class TestStruct {
 	  'TestStruct',
 	  new TestStruct(),
 	  new Set([]),
-	  TestStruct
+	  TestStruct,
+	  {IntField: "number", StringField: "string"}
 	);
 }
 

@@ -55,7 +55,8 @@ class MyError {
 	  'MyError',
 	  new MyError(),
 	  new Set(["Error"]),
-	  MyError
+	  MyError,
+	  {s: "string"}
 	);
 }
 
