@@ -247,31 +247,35 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLine("")
 	c.tsw.WriteLinef("constructor(init?: Partial<%s>) {", flattenedInitType)
 	c.tsw.Indent(1)
-	c.tsw.WriteLine("this._fields = {")
-	c.tsw.Indent(1)
+	c.tsw.WriteLiterally("this._fields = {")
 
 	numFields := underlyingStruct.NumFields()
-	for i := 0; i < numFields; i++ {
-		field := underlyingStruct.Field(i)
-		fieldType := field.Type()
-		var fieldKeyName string
-		if field.Anonymous() {
-			fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
-		} else {
-			fieldKeyName = field.Name()
-		}
+	if numFields != 0 {
+		c.tsw.WriteLine("")
+		c.tsw.Indent(1)
 
-		c.writeBoxedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+		for i := 0; i < numFields; i++ {
+			field := underlyingStruct.Field(i)
+			fieldType := field.Type()
+			var fieldKeyName string
+			if field.Anonymous() {
+				fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
+			} else {
+				fieldKeyName = field.Name()
+			}
 
-		if i < numFields-1 {
-			c.tsw.WriteLine(",")
-		} else {
-			c.tsw.WriteLine("")
+			c.writeBoxedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+
+			if i < numFields-1 {
+				c.tsw.WriteLine(",")
+			} else {
+				c.tsw.WriteLine("")
+			}
 		}
+		c.tsw.Indent(-1)
 	}
-
-	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
+
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
 	c.tsw.WriteLine("")
@@ -615,7 +619,7 @@ func (c *GoToTSCompiler) writeTypeInfoObject(typ types.Type) {
 		}
 		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Basic, name: %q }", tsTypeName)
 	// Note: The original 'case *types.Named:' here for 'underlying' is intentionally omitted.
-	// If typ.Underlying() is *types.Named (e.g. type T1 MyInt; type T2 T1;), 
+	// If typ.Underlying() is *types.Named (e.g. type T1 MyInt; type T2 T1;),
 	// then writeTypeInfoObject(typ.Underlying()) would be called in some contexts,
 	// and that call would handle it via the top-level *types.Named check.
 	case *types.Pointer:
@@ -720,9 +724,6 @@ func (c *GoToTSCompiler) writeMethodSignatures(methods []*types.Func, isInterfac
 			c.tsw.WriteLiterally(" }")
 		}
 		c.tsw.WriteLiterally("] }")
-		if !isInterface || !firstMethod { // Add newline for readability unless it's the very first item in an empty list
-			c.tsw.WriteLine("")
-		}
 	}
 }
 

@@ -10,8 +10,7 @@ type MyInterface = null | {
 $.registerInterfaceType(
   'MyInterface',
   null, // Zero value for interface is null
-  [{ name: "Method", args: [], returns: [] }
-]
+  [{ name: "Method", args: [], returns: [] }]
 );
 
 class MyStruct {

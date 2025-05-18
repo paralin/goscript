@@ -10,8 +10,7 @@ type A = null | {
 $.registerInterfaceType(
   'A',
   null, // Zero value for interface is null
-  [{ name: "MethodA", args: [{ name: "a", type: "A" }], returns: [] }
-]
+  [{ name: "MethodA", args: [{ name: "a", type: "A" }], returns: [] }]
 );
 
 class B {
@@ -19,8 +18,7 @@ class B {
 	}
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {
-		}
+		this._fields = {}
 	}
 
 	public clone(): B {
@@ -38,8 +36,7 @@ class B {
 	static __typeInfo = $.registerStructType(
 	  'B',
 	  new B(),
-	  [{ name: "MethodB", args: [{ name: "valB", type: { kind: $.TypeKind.Pointer, elemType: "B" } }], returns: [] }
-	],
+	  [{ name: "MethodB", args: [{ name: "valB", type: { kind: $.TypeKind.Pointer, elemType: "B" } }], returns: [] }],
 	  B,
 	  {}
 	);
@@ -52,8 +49,7 @@ type C = null | {
 $.registerInterfaceType(
   'C',
   null, // Zero value for interface is null
-  [{ name: "MethodC", args: [{ name: "d", type: "D" }], returns: [] }
-]
+  [{ name: "MethodC", args: [{ name: "d", type: "D" }], returns: [] }]
 );
 
 type D = null | {
@@ -63,8 +59,7 @@ type D = null | {
 $.registerInterfaceType(
   'D',
   null, // Zero value for interface is null
-  [{ name: "MethodD", args: [{ name: "c", type: "C" }], returns: [] }
-]
+  [{ name: "MethodD", args: [{ name: "c", type: "C" }], returns: [] }]
 );
 
 export function main(): void {

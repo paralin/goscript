@@ -8,8 +8,7 @@ class Greeter {
 	}
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {
-		}
+		this._fields = {}
 	}
 
 	public clone(): Greeter {
@@ -28,8 +27,7 @@ class Greeter {
 	static __typeInfo = $.registerStructType(
 	  'Greeter',
 	  new Greeter(),
-	  [{ name: "Greet", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
-	],
+	  [{ name: "Greet", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }],
 	  Greeter,
 	  {}
 	);
@@ -42,8 +40,7 @@ type Stringer = null | {
 $.registerInterfaceType(
   'Stringer',
   null, // Zero value for interface is null
-  [{ name: "String", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
-]
+  [{ name: "String", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }]
 );
 
 class MyStringer {
@@ -51,8 +48,7 @@ class MyStringer {
 	}
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {
-		}
+		this._fields = {}
 	}
 
 	public clone(): MyStringer {
@@ -71,8 +67,7 @@ class MyStringer {
 	static __typeInfo = $.registerStructType(
 	  'MyStringer',
 	  new MyStringer(),
-	  [{ name: "String", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
-	],
+	  [{ name: "String", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }],
 	  MyStringer,
 	  {}
 	);

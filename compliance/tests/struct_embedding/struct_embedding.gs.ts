@@ -48,8 +48,7 @@ class Person {
 	static __typeInfo = $.registerStructType(
 	  'Person',
 	  new Person(),
-	  [{ name: "Greet", args: [], returns: [] }
-	],
+	  [{ name: "Greet", args: [], returns: [] }],
 	  Person,
 	  {"Name": { kind: $.TypeKind.Basic, name: "string" }, "Age": { kind: $.TypeKind.Basic, name: "number" }}
 	);
@@ -164,8 +163,7 @@ class Address {
 	static __typeInfo = $.registerStructType(
 	  'Address',
 	  new Address(),
-	  [{ name: "FullAddress", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
-	],
+	  [{ name: "FullAddress", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }],
 	  Address,
 	  {"Street": { kind: $.TypeKind.Basic, name: "string" }, "City": { kind: $.TypeKind.Basic, name: "string" }}
 	);
@@ -206,8 +204,7 @@ class Contact {
 	static __typeInfo = $.registerStructType(
 	  'Contact',
 	  new Contact(),
-	  [{ name: "Call", args: [], returns: [] }
-	],
+	  [{ name: "Call", args: [], returns: [] }],
 	  Contact,
 	  {"Phone": { kind: $.TypeKind.Basic, name: "string" }}
 	);
