@@ -115,7 +115,7 @@ class Employee {
 	  new Employee(),
 	  [],
 	  Employee,
-	  {"Person": { kind: $.TypeKind.Struct, fields: {"Name": { kind: $.TypeKind.Basic, name: "string" }, "Age": { kind: $.TypeKind.Basic, name: "number" }}, methods: [] }, "ID": { kind: $.TypeKind.Basic, name: "number" }}
+	  {"Person": "Person", "ID": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 
@@ -322,7 +322,7 @@ class Manager {
 	  new Manager(),
 	  [],
 	  Manager,
-	  {"Person": { kind: $.TypeKind.Struct, fields: {"Name": { kind: $.TypeKind.Basic, name: "string" }, "Age": { kind: $.TypeKind.Basic, name: "number" }}, methods: [] }, "Address": { kind: $.TypeKind.Struct, fields: {"Street": { kind: $.TypeKind.Basic, name: "string" }, "City": { kind: $.TypeKind.Basic, name: "string" }}, methods: [] }, "Contact": { kind: $.TypeKind.Struct, fields: {"Phone": { kind: $.TypeKind.Basic, name: "string" }}, methods: [] }, "Level": { kind: $.TypeKind.Basic, name: "number" }}
+	  {"Person": "Person", "Address": "Address", "Contact": "Contact", "Level": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 

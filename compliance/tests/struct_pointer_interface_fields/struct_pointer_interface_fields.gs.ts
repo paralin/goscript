@@ -56,8 +56,7 @@ class MyStruct {
 	  new MyStruct(),
 	  [],
 	  MyStruct,
-	  {"PointerField": { kind: $.TypeKind.Pointer, elemType: { kind: $.TypeKind.Basic, name: "number" } }, "interfaceField": { kind: $.TypeKind.Interface, methods: [{ name: "Method", args: [], returns: [] }
-	] }}
+	  {"PointerField": { kind: $.TypeKind.Pointer, elemType: { kind: $.TypeKind.Basic, name: "number" } }, "interfaceField": "MyInterface"}
 	);
 }
 

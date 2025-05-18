@@ -91,7 +91,7 @@ class NestedStruct {
 	  new NestedStruct(),
 	  [],
 	  NestedStruct,
-	  {"Value": { kind: $.TypeKind.Basic, name: "number" }, "InnerStruct": { kind: $.TypeKind.Struct, fields: {"MyInt": { kind: $.TypeKind.Basic, name: "number" }, "MyString": { kind: $.TypeKind.Basic, name: "string" }}, methods: [] }}
+	  {"Value": { kind: $.TypeKind.Basic, name: "number" }, "InnerStruct": "MyStruct"}
 	);
 }
 

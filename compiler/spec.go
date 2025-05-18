@@ -592,8 +592,21 @@ func (c *GoToTSCompiler) writeTypeInfoObject(typ types.Type) {
 		return
 	}
 
-	underlying := typ.Underlying()
+	// If typ is a *types.Named, handle it by reference to break recursion.
+	if namedType, ok := typ.(*types.Named); ok {
+		if namedType.Obj().Name() == "error" && namedType.Obj().Pkg() == nil { // Check for builtin error
+			c.tsw.WriteLiterally("{ kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] }")
+		} else {
+			// For all other named types, output their name as a string literal.
+			// This relies on the type being registered elsewhere (e.g., via registerStructType or registerInterfaceType)
+			// so the TypeScript runtime can resolve the reference.
+			c.tsw.WriteLiterallyf("%q", namedType.Obj().Name())
+		}
+		return // Return after handling the named type by reference.
+	}
 
+	// If typ is not *types.Named, process its underlying structure.
+	underlying := typ.Underlying()
 	switch t := underlying.(type) {
 	case *types.Basic:
 		tsTypeName, _ := GoBuiltinToTypescript(t.Name())
@@ -601,33 +614,27 @@ func (c *GoToTSCompiler) writeTypeInfoObject(typ types.Type) {
 			tsTypeName = t.Name() // Fallback
 		}
 		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Basic, name: %q }", tsTypeName)
-	case *types.Named:
-		// For named types, we refer to them by name, assuming they are registered.
-		// If it's an alias for a basic type, we might want the basic type info.
-		// For now, treat named types by their name, which implies they should be registered.
-		// If it's the error interface, handle specifically.
-		if t.Obj().Name() == "error" && t.Obj().Pkg() == nil { // Check for builtin error
-			c.tsw.WriteLiterally("{ kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] }")
-		} else {
-			c.tsw.WriteLiterallyf("%q", t.Obj().Name()) // Output as string, to be resolved by typeRegistry
-		}
+	// Note: The original 'case *types.Named:' here for 'underlying' is intentionally omitted.
+	// If typ.Underlying() is *types.Named (e.g. type T1 MyInt; type T2 T1;), 
+	// then writeTypeInfoObject(typ.Underlying()) would be called in some contexts,
+	// and that call would handle it via the top-level *types.Named check.
 	case *types.Pointer:
 		c.tsw.WriteLiterally("{ kind: $.TypeKind.Pointer, elemType: ")
-		c.writeTypeInfoObject(t.Elem())
+		c.writeTypeInfoObject(t.Elem()) // Recursive call
 		c.tsw.WriteLiterally(" }")
 	case *types.Slice:
 		c.tsw.WriteLiterally("{ kind: $.TypeKind.Slice, elemType: ")
-		c.writeTypeInfoObject(t.Elem())
+		c.writeTypeInfoObject(t.Elem()) // Recursive call
 		c.tsw.WriteLiterally(" }")
 	case *types.Array:
 		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Array, length: %d, elemType: ", t.Len())
-		c.writeTypeInfoObject(t.Elem())
+		c.writeTypeInfoObject(t.Elem()) // Recursive call
 		c.tsw.WriteLiterally(" }")
 	case *types.Map:
 		c.tsw.WriteLiterally("{ kind: $.TypeKind.Map, keyType: ")
-		c.writeTypeInfoObject(t.Key())
+		c.writeTypeInfoObject(t.Key()) // Recursive call
 		c.tsw.WriteLiterally(", elemType: ")
-		c.writeTypeInfoObject(t.Elem())
+		c.writeTypeInfoObject(t.Elem()) // Recursive call
 		c.tsw.WriteLiterally(" }")
 	case *types.Chan:
 		dir := "both"
@@ -637,38 +644,34 @@ func (c *GoToTSCompiler) writeTypeInfoObject(typ types.Type) {
 			dir = "receive"
 		}
 		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Channel, direction: %q, elemType: ", dir)
-		c.writeTypeInfoObject(t.Elem())
+		c.writeTypeInfoObject(t.Elem()) // Recursive call
 		c.tsw.WriteLiterally(" }")
-	case *types.Interface:
-		// For anonymous interfaces, we might need to describe their structure.
-		// For now, if it's a named interface, it should have been handled by types.Named.
-		// This case is for anonymous interface literals.
+	case *types.Interface: // Anonymous interface or underlying of a non-named type alias
 		c.tsw.WriteLiterally("{ kind: $.TypeKind.Interface, methods: [")
 		var methods []*types.Func
 		for i := 0; i < t.NumExplicitMethods(); i++ {
 			methods = append(methods, t.ExplicitMethod(i))
 		}
 		// TODO: Handle embedded methods for anonymous interfaces if needed.
-		c.writeMethodSignatures(methods, true)
+		c.writeMethodSignatures(methods, true) // Calls writeMethodSignatures -> writeTypeInfoObject
 		c.tsw.WriteLiterally("] }")
-	case *types.Signature:
+	case *types.Signature: // Anonymous func type or underlying of a non-named type alias
 		c.tsw.WriteLiterally("{ kind: $.TypeKind.Function, params: [")
 		for i := 0; i < t.Params().Len(); i++ {
 			if i > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			c.writeTypeInfoObject(t.Params().At(i).Type())
+			c.writeTypeInfoObject(t.Params().At(i).Type()) // Recursive call
 		}
 		c.tsw.WriteLiterally("], results: [")
 		for i := 0; i < t.Results().Len(); i++ {
 			if i > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			c.writeTypeInfoObject(t.Results().At(i).Type())
+			c.writeTypeInfoObject(t.Results().At(i).Type()) // Recursive call
 		}
 		c.tsw.WriteLiterally("] }")
-	case *types.Struct:
-		// For anonymous structs. Named structs are handled by types.Named.
+	case *types.Struct: // Anonymous struct or underlying of a non-named type alias
 		c.tsw.WriteLiterally("{ kind: $.TypeKind.Struct, fields: {")
 		for i := 0; i < t.NumFields(); i++ {
 			if i > 0 {
@@ -676,11 +679,12 @@ func (c *GoToTSCompiler) writeTypeInfoObject(typ types.Type) {
 			}
 			field := t.Field(i)
 			c.tsw.WriteLiterallyf("%q: ", field.Name())
-			c.writeTypeInfoObject(field.Type())
+			c.writeTypeInfoObject(field.Type()) // Recursive call
 		}
 		c.tsw.WriteLiterally("}, methods: [] }") // Anonymous structs don't have methods in this context
 	default:
-		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Basic, name: %q }", typ.String()) // Fallback
+		// Fallback, e.g. for types whose underlying isn't one of the above like *types.Tuple or other complex cases.
+		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Basic, name: %q }", typ.String()) // Fallback using the type's string representation
 	}
 }
 
