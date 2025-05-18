@@ -43,6 +43,62 @@ func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) error {
 	return nil
 }
 
+// WriteFuncDeclAsFunction translates a Go function declaration (`ast.FuncDecl`)
+// that does not have a receiver (i.e., it's a regular function, not a method)
+// into a TypeScript function.
+//   - Go documentation comments (`decl.Doc`) are preserved.
+//   - If the Go function is exported (name starts with an uppercase letter) or is
+//     the `main` function, the `export` keyword is added to the TypeScript output.
+//   - If the `Analysis` data indicates the function is asynchronous, the `async`
+//     keyword is prepended.
+//   - The function signature (parameters and return type) is translated using `WriteFuncType`,
+//     passing the `isAsync` status.
+//   - The function body (`decl.Body`) is translated using `WriteStmt`.
+//
+// This function specifically handles top-level functions; methods are generated
+// by `WriteFuncDeclAsMethod` within the context of their type definition.
+func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
+	if decl.Recv != nil {
+		// This function should not be called for methods.
+		// Methods are handled by WriteFuncDeclAsMethod within WriteTypeSpec.
+		return nil
+	}
+
+	if decl.Doc != nil {
+		c.WriteDoc(decl.Doc)
+	}
+
+	// Exported functions start with uppercase in Go, or special-case "main" entry point
+	isExported := decl.Name.IsExported() || decl.Name.Name == "main"
+	if isExported {
+		c.tsw.WriteLiterally("export ")
+	}
+
+	// Check if this function is async using the analysis data
+	var isAsync bool
+	if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
+		isAsync = c.analysis.IsAsyncFunc(obj)
+	}
+	if isAsync {
+		c.tsw.WriteLiterally("async ")
+	}
+
+	c.tsw.WriteLiterally("function ")
+	if err := c.WriteValueExpr(decl.Name); err != nil { // Function name is a value identifier
+		return fmt.Errorf("failed to write function name: %w", err)
+	}
+
+	// WriteFuncType needs to be aware if the function is async
+	c.WriteFuncType(decl.Type, isAsync) // Write signature (params, return type)
+	c.tsw.WriteLiterally(" ")
+
+	if err := c.WriteStmt(decl.Body); err != nil {
+		return fmt.Errorf("failed to write function body: %w", err)
+	}
+
+	return nil
+}
+
 // WriteFuncDeclAsMethod translates a Go function declaration (`ast.FuncDecl`)
 // that has a receiver (i.e., it's a method) into a TypeScript class method.
 //   - It preserves Go documentation comments (`decl.Doc`).
