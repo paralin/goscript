@@ -1,20 +1,21 @@
 {
   "compilerOptions": {
-    "target": "ES2022", // Target modern ECMAScript features
-    "module": "ESNext", // Use modern ES modules
-    "moduleResolution": "bundler", // Use the 'bundler' resolution strategy
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["es2022", "esnext.disposable", "dom"],
     "outDir": "./dist",
     "rootDir": "./",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "declaration": true, // Generate .d.ts files
-    "sourceMap": true, // Generate source maps for debugging
+    "declaration": true,
+    "sourceMap": true,
     "paths": {
       "@goscript/builtin": ["./builtin/builtin.ts"]
     }
   },
   "include": ["compiler", "builtin", "compliance"],
-  "exclude": ["node_modules", "dist", "**/*.test.ts"] // Exclude tests from build output
+  "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
