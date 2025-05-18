@@ -346,16 +346,19 @@ func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
 // The function aims to produce idiomatic TypeScript `if/else if/else` structures.
 func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 	if exp.Init != nil {
-		s.tsw.WriteLiterally("{")
-		s.tsw.Indent(1)
+		s.tsw.WriteLiterally("{") // Write opening brace
+		s.tsw.WriteLine("")       // Add newline immediately after opening brace
+		s.tsw.Indent(1)           // Indent for the initializer
 
-		if err := s.WriteStmt(exp.Init); err != nil {
+		if err := s.WriteStmt(exp.Init); err != nil { // Write the initializer
 			return err
 		}
 
+		// This defer handles closing the synthetic block for the initializer
 		defer func() {
 			s.tsw.Indent(-1)
-			s.tsw.WriteLiterally("}")
+			s.tsw.WriteLiterally("}") // Write the closing brace at the now-correct indent level
+			s.tsw.WriteLine("")       // Ensure a newline *after* this '}', critical for preventing '}}'
 		}()
 	}
 
@@ -696,6 +699,7 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 		if err := c.WriteValueExpr(exp.Call); err != nil {
 			return fmt.Errorf("failed to write deferred call: %w", err)
 		}
+		c.tsw.WriteLine("")
 	}
 
 	c.tsw.Indent(-1)
