@@ -807,6 +807,7 @@ export interface FunctionTypeInfo extends BaseTypeInfo {
   kind: TypeKind.Function
   params?: (string | TypeInfo)[]
   results?: (string | TypeInfo)[]
+  isVariadic?: boolean // True if the function is variadic (e.g., ...T)
 }
 
 /**
@@ -951,6 +952,147 @@ function normalizeTypeInfo(info: string | TypeInfo): TypeInfo {
   }
 
   return info
+}
+
+function compareOptionalTypeInfo(
+  type1?: string | TypeInfo,
+  type2?: string | TypeInfo,
+): boolean {
+  if (type1 === undefined && type2 === undefined) return true
+  if (type1 === undefined || type2 === undefined) return false
+  // Assuming areTypeInfosIdentical will handle normalization if needed, 
+  // but type1 and type2 here are expected to be direct fields from TypeInfo objects.
+  return areTypeInfosIdentical(type1, type2)
+}
+
+function areFuncParamOrResultArraysIdentical(
+  arr1?: (string | TypeInfo)[],
+  arr2?: (string | TypeInfo)[]
+): boolean {
+  if (arr1 === undefined && arr2 === undefined) return true
+  if (arr1 === undefined || arr2 === undefined) return false
+  if (arr1.length !== arr2.length) return false
+  for (let i = 0; i < arr1.length; i++) {
+    if (!areTypeInfosIdentical(arr1[i], arr2[i])) {
+      return false
+    }
+  }
+  return true
+}
+
+function areFuncSignaturesIdentical(
+  func1: FunctionTypeInfo,
+  func2: FunctionTypeInfo,
+): boolean {
+  if ((func1.isVariadic || false) !== (func2.isVariadic || false)) {
+    return false
+  }
+  return (
+    areFuncParamOrResultArraysIdentical(func1.params, func2.params) &&
+    areFuncParamOrResultArraysIdentical(func1.results, func2.results)
+  )
+}
+
+function areMethodArgsArraysIdentical(
+  args1?: MethodArg[],
+  args2?: MethodArg[],
+): boolean {
+  if (args1 === undefined && args2 === undefined) return true
+  if (args1 === undefined || args2 === undefined) return false
+  if (args1.length !== args2.length) return false
+  for (let i = 0; i < args1.length; i++) {
+    // Compare based on type only, names of args/results don't affect signature identity here.
+    if (!areTypeInfosIdentical(args1[i].type, args2[i].type)) {
+      return false
+    }
+  }
+  return true
+}
+
+export function areTypeInfosIdentical(
+  type1InfoOrName: string | TypeInfo,
+  type2InfoOrName: string | TypeInfo,
+): boolean {
+  const t1Norm = normalizeTypeInfo(type1InfoOrName)
+  const t2Norm = normalizeTypeInfo(type2InfoOrName)
+
+  if (t1Norm === t2Norm) return true // Object identity
+  if (t1Norm.kind !== t2Norm.kind) return false
+
+  // If types have names, the names must match for identity.
+  // If one has a name and the other doesn't, they are not identical.
+  if (t1Norm.name !== t2Norm.name) return false
+
+  // If both are named and names match, for Basic, Struct, Interface, this is sufficient for identity.
+  if (t1Norm.name !== undefined /* && t2Norm.name is also defined and equal */) {
+    if (
+      t1Norm.kind === TypeKind.Basic ||
+      t1Norm.kind === TypeKind.Struct ||
+      t1Norm.kind === TypeKind.Interface
+    ) {
+      return true
+    }
+  }
+  // For other types (Pointer, Slice, etc.), or if both are anonymous (name is undefined),
+  // structural comparison is needed.
+
+  switch (t1Norm.kind) {
+    case TypeKind.Basic:
+      // Names matched if they were defined, or both undefined (which means true by t1Norm.name !== t2Norm.name being false)
+      return true
+    case TypeKind.Pointer:
+      return compareOptionalTypeInfo(
+        (t1Norm as PointerTypeInfo).elemType,
+        (t2Norm as PointerTypeInfo).elemType,
+      )
+    case TypeKind.Slice:
+      return compareOptionalTypeInfo(
+        (t1Norm as SliceTypeInfo).elemType,
+        (t2Norm as SliceTypeInfo).elemType,
+      )
+    case TypeKind.Array:
+      return (
+        (t1Norm as ArrayTypeInfo).length === (t2Norm as ArrayTypeInfo).length &&
+        compareOptionalTypeInfo(
+          (t1Norm as ArrayTypeInfo).elemType,
+          (t2Norm as ArrayTypeInfo).elemType,
+        )
+      )
+    case TypeKind.Map:
+      return (
+        compareOptionalTypeInfo(
+          (t1Norm as MapTypeInfo).keyType,
+          (t2Norm as MapTypeInfo).keyType,
+        ) &&
+        compareOptionalTypeInfo(
+          (t1Norm as MapTypeInfo).elemType,
+          (t2Norm as MapTypeInfo).elemType,
+        )
+      )
+    case TypeKind.Channel:
+      return (
+        // Ensure direction property exists before comparing, or handle undefined if it can be
+        ((t1Norm as ChannelTypeInfo).direction || 'both') === ((t2Norm as ChannelTypeInfo).direction || 'both') &&
+        compareOptionalTypeInfo(
+          (t1Norm as ChannelTypeInfo).elemType,
+          (t2Norm as ChannelTypeInfo).elemType,
+        )
+      )
+    case TypeKind.Function:
+      return areFuncSignaturesIdentical(
+        t1Norm as FunctionTypeInfo,
+        t2Norm as FunctionTypeInfo,
+      )
+    case TypeKind.Struct:
+    case TypeKind.Interface:
+      // If we reach here, names were undefined (both anonymous) or names matched but was not Basic/Struct/Interface.
+      // For anonymous Struct/Interface, strict identity means full structural comparison.
+      // For now, we consider anonymous types not identical unless they are the same object (caught above).
+      // If they were named and matched, 'return true' was hit earlier for these kinds.
+      return false
+    default:
+      return false
+  }
 }
 
 /**
@@ -1408,8 +1550,29 @@ export function typeAssert<T>(
       if (typeof actualMethod !== 'function') {
         return false;
       }
-      // TODO: Implement full signature comparison if 'value' also has TypeInfo
-      // For now, presence and function type is checked by matchesStructType/matchesInterfaceType
+      const valueTypeInfoVal = (value as any).$typeInfo
+      if (valueTypeInfoVal) {
+        const normalizedValueType = normalizeTypeInfo(valueTypeInfoVal)
+        if (isStructTypeInfo(normalizedValueType) || isInterfaceTypeInfo(normalizedValueType)) {
+          const actualValueMethodSig = normalizedValueType.methods.find(m => m.name === requiredMethodSig.name)
+          if (actualValueMethodSig) {
+            // Perform full signature comparison using MethodSignatures
+            const paramsMatch = areMethodArgsArraysIdentical(requiredMethodSig.args, actualValueMethodSig.args)
+            const resultsMatch = areMethodArgsArraysIdentical(requiredMethodSig.returns, actualValueMethodSig.returns)
+            return paramsMatch && resultsMatch
+          } else {
+            // Value has TypeInfo listing methods, but this specific method isn't listed.
+            // This implies a mismatch for strict signature check based on TypeInfo.
+            return false
+          }
+        }
+      }
+
+      // Fallback: Original behavior if value has no TypeInfo that lists methods,
+      // or if the method wasn't found in its TypeInfo (covered by 'else' returning false above).
+      // The original comment was: "For now, presence and function type is checked by matchesStructType/matchesInterfaceType"
+      // This 'return true' implies that if we couldn't do a full signature check via TypeInfo,
+      // we still consider it a match if the function simply exists on the object.
       return true;
     });
 
