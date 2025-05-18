@@ -18,7 +18,5 @@ type D interface {
 }
 
 func main() {
-	// This code is not meant to be run,
-	// but to test the type definition generation.
-	// println("recursive type definition test") // Commented out for type-checking only test
+	println("recursive type definition test")
 }

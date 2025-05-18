@@ -1,4 +1,4 @@
-// Generated file based on source.go
+// Generated file based on recursive_type_definition.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin";
@@ -68,8 +68,6 @@ $.registerInterfaceType(
 );
 
 export function main(): void {
-	// This code is not meant to be run,
-	// but to test the type definition generation.
-	// println("recursive type definition test") // Commented out for type-checking only test
+	console.log("recursive type definition test")
 }
 
