@@ -30,6 +30,19 @@
                 "--package",
                 "."
             ]
+        },
+        {
+            "name": "Compile buildtarget program",
+            "type": "go",
+            "request": "launch",
+            "mode": "debug",
+            "program": "${workspaceFolder}/cmd/goscript",
+            "cwd": "${workspaceFolder}/buildtarget",
+            "args": [
+                "compile",
+                "--package",
+                "github.com/aperturerobotics/hydra/unixfs"
+            ]
         }
     ]
 }
