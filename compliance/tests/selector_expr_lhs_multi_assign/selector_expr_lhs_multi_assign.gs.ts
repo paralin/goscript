@@ -43,9 +43,9 @@ class Point {
 	static __typeInfo = $.registerStructType(
 	  'Point',
 	  new Point(),
-	  new Set([]),
+	  [],
 	  Point,
-	  {X: "number", Y: "number"}
+	  {"X": { kind: $.TypeKind.Basic, name: "number" }, "Y": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 

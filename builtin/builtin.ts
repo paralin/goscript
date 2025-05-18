@@ -725,11 +725,28 @@ export interface BaseTypeInfo {
 }
 
 /**
+ * Represents an argument or a return value of a method.
+ */
+export interface MethodArg {
+  name?: string; // Name of the argument/return value, if available
+  type: TypeInfo | string; // TypeInfo object or string name of the type
+}
+
+/**
+ * Represents the signature of a method, including its name, arguments, and return types.
+ */
+export interface MethodSignature {
+  name: string;
+  args: MethodArg[];
+  returns: MethodArg[];
+}
+
+/**
  * Type information for struct types
  */
 export interface StructTypeInfo extends BaseTypeInfo {
   kind: TypeKind.Struct
-  methods: Set<string>
+  methods: MethodSignature[] // Array of method signatures
   ctor?: new (...args: any[]) => any
   fields: Record<string, TypeInfo | string> // Field names and types for struct fields
 }
@@ -739,7 +756,7 @@ export interface StructTypeInfo extends BaseTypeInfo {
  */
 export interface InterfaceTypeInfo extends BaseTypeInfo {
   kind: TypeKind.Interface
-  methods: Set<string>
+  methods: MethodSignature[] // Array of method signatures
 }
 
 /**
@@ -860,14 +877,15 @@ const typeRegistry = new Map<string, TypeInfo>()
  *
  * @param name The name of the type.
  * @param zeroValue The zero value for the type.
- * @param methods Set of method names for the struct.
+ * @param methods Array of method signatures for the struct.
  * @param ctor Constructor for the struct.
+ * @param fields Record of field names and their types.
  * @returns The struct type information object.
  */
 export const registerStructType = (
   name: string,
   zeroValue: any,
-  methods: Set<string>,
+  methods: MethodSignature[],
   ctor: new (...args: any[]) => any,
   fields: Record<string, TypeInfo | string> = {},
 ): StructTypeInfo => {
@@ -888,13 +906,13 @@ export const registerStructType = (
  *
  * @param name The name of the type.
  * @param zeroValue The zero value for the type (usually null).
- * @param methods Set of method names the interface requires.
+ * @param methods Array of method signatures for the interface.
  * @returns The interface type information object.
  */
 export const registerInterfaceType = (
   name: string,
   zeroValue: any,
-  methods: Set<string>,
+  methods: MethodSignature[],
 ): InterfaceTypeInfo => {
   const typeInfo: InterfaceTypeInfo = {
     name,
@@ -993,16 +1011,20 @@ function matchesStructType(value: any, info: TypeInfo): boolean {
     return true
   }
 
+  // Check if the value has all methods defined in the struct's TypeInfo
+  // This is a structural check, not a signature check here.
+  // Signature checks are more relevant for interface satisfaction.
   if (info.methods && typeof value === 'object' && value !== null) {
-    const allMethodsMatch = Array.from(info.methods).every(
-      (method) => typeof value[method] === 'function',
+    const allMethodsExist = info.methods.every(
+      (methodSig) => typeof (value as any)[methodSig.name] === 'function',
     )
-    if (allMethodsMatch) {
-      return true
+    if (!allMethodsExist) {
+      return false
     }
+    // Further signature checking could be added here if needed for struct-to-struct assignability
   }
 
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === 'object' && value !== null && info.fields) {
     const fieldNames = Object.keys(info.fields || {})
     const valueFields = Object.keys(value)
 
@@ -1034,19 +1056,96 @@ function matchesStructType(value: any, info: TypeInfo): boolean {
  * @param info The interface type info to match against.
  * @returns True if the value matches the interface type, false otherwise.
  */
+/**
+ * Checks if a value matches an interface type info by verifying it implements
+ * all required methods with compatible signatures.
+ *
+ * @param value The value to check.
+ * @param info The interface type info to match against.
+ * @returns True if the value matches the interface type, false otherwise.
+ */
 function matchesInterfaceType(value: any, info: TypeInfo): boolean {
-  // For interfaces, check if the value has all the required methods
-  if (
-    isInterfaceTypeInfo(info) &&
-    info.methods &&
-    typeof value === 'object' &&
-    value !== null
-  ) {
-    return Array.from(info.methods).every(
-      (method) => typeof (value as any)[method] === 'function',
-    )
+  // Check basic conditions first
+  if (!isInterfaceTypeInfo(info) || typeof value !== 'object' || value === null) {
+    return false
   }
-  return false
+
+  // For interfaces, check if the value has all the required methods with compatible signatures
+  return info.methods.every((requiredMethodSig) => {
+    const actualMethod = (value as any)[requiredMethodSig.name]
+    
+    // Method must exist and be a function
+    if (typeof actualMethod !== 'function') {
+      return false
+    }
+
+    // Check parameter count (basic arity check)
+    // Note: This is a simplified check as JavaScript functions can have optional/rest parameters
+    const declaredParamCount = actualMethod.length
+    const requiredParamCount = requiredMethodSig.args.length
+    
+    // Strict arity checking can be problematic in JS, so we'll be lenient
+    // A method with fewer params than required is definitely incompatible
+    if (declaredParamCount < requiredParamCount) {
+      return false
+    }
+    
+    // Check return types if we can determine them
+    // This is challenging in JavaScript without runtime type information
+    
+    // If the value has a __goTypeName property, it might be a registered type
+    // with more type information available
+    if (value.__goTypeName) {
+      const valueTypeInfo = typeRegistry.get(value.__goTypeName)
+      if (valueTypeInfo && isStructTypeInfo(valueTypeInfo)) {
+        // Find the matching method in the value's type info
+        const valueMethodSig = valueTypeInfo.methods.find(
+          m => m.name === requiredMethodSig.name
+        )
+        
+        if (valueMethodSig) {
+          // Compare return types
+          if (valueMethodSig.returns.length !== requiredMethodSig.returns.length) {
+            return false
+          }
+          
+          // Compare each return type for compatibility
+          for (let i = 0; i < requiredMethodSig.returns.length; i++) {
+            const requiredReturnType = normalizeTypeInfo(
+              requiredMethodSig.returns[i].type
+            )
+            const valueReturnType = normalizeTypeInfo(
+              valueMethodSig.returns[i].type
+            )
+            
+            // For interface return types, we need to check if the value's return type
+            // implements the required interface
+            if (isInterfaceTypeInfo(requiredReturnType)) {
+              // This would be a recursive check, but we'll simplify for now
+              // by just checking if the types are the same or if the value type
+              // is registered as implementing the interface
+              if (requiredReturnType.name !== valueReturnType.name) {
+                // Check if valueReturnType implements requiredReturnType
+                // This would require additional implementation tracking
+                return false
+              }
+            } 
+            // For non-interface types, check direct type compatibility
+            else if (requiredReturnType.name !== valueReturnType.name) {
+              return false
+            }
+          }
+          
+          // Similarly, we could check parameter types for compatibility
+          // but we'll skip that for brevity
+        }
+      }
+    }
+    
+    // If we can't determine detailed type information, we'll accept the method
+    // as long as it exists with a compatible arity
+    return true
+  })
 }
 
 /**
@@ -1297,22 +1396,25 @@ export function typeAssert<T>(
 
   if (
     isStructTypeInfo(normalizedType) &&
-    normalizedType.methods &&
+    normalizedType.methods && normalizedType.methods.length > 0 &&
     typeof value === 'object' &&
     value !== null
   ) {
-    // Check if the value implements all methods of the struct type
-    const allMethodsMatch = Array.from(normalizedType.methods).every(
-      (method) => typeof value[method] === 'function',
-    )
+    // Check if the value implements all methods of the struct type with compatible signatures.
+    // This is more for interface satisfaction by a struct.
+    // For struct-to-struct assertion, usually instanceof or field checks are primary.
+    const allMethodsMatch = normalizedType.methods.every((requiredMethodSig) => {
+      const actualMethod = (value as any)[requiredMethodSig.name];
+      if (typeof actualMethod !== 'function') {
+        return false;
+      }
+      // TODO: Implement full signature comparison if 'value' also has TypeInfo
+      // For now, presence and function type is checked by matchesStructType/matchesInterfaceType
+      return true;
+    });
 
-    const hasAnyMethod = Array.from(normalizedType.methods).some(
-      (method) => typeof value[method] === 'function',
-    )
-
-    if (allMethodsMatch && hasAnyMethod && normalizedType.methods.size > 0) {
-      // For interface-to-concrete type assertions, we just need to check methods
-      return { value: value as T, ok: true }
+    if (allMethodsMatch) {
+      return { value: value as T, ok: true };
     }
   }
 

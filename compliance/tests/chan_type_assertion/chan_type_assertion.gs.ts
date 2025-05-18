@@ -34,7 +34,7 @@ export function main(): void {
 		}
 	}
 	let e: null | any = ch4
-	{let { ok: ok } = $.typeAssert<$.Channel<{  }>>(e, {kind: $.TypeKind.Channel, elemType: {kind: $.TypeKind.Struct, fields: {}, methods: new Set()}, direction: 'both'})
+	{let { ok: ok } = $.typeAssert<$.Channel<{  }>>(e, {kind: $.TypeKind.Channel, elemType: {kind: $.TypeKind.Struct, fields: {}, methods: []}, direction: 'both'})
 		if (ok) {
 			console.log("e is chan struct{}: ok")
 		} else {

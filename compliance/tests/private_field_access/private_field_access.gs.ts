@@ -43,9 +43,9 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set([]),
+	  [],
 	  MyStruct,
-	  {publicField: "string", privateField: "number"}
+	  {"publicField": { kind: $.TypeKind.Basic, name: "string" }, "privateField": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 

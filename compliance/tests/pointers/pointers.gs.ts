@@ -33,9 +33,9 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set([]),
+	  [],
 	  MyStruct,
-	  {Val: "number"}
+	  {"Val": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 

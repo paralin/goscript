@@ -11,7 +11,9 @@ type Reader = null | {
 $.registerInterfaceType(
   'Reader',
   null, // Zero value for interface is null
-  new Set(['Read']),
+  [{ name: "Read", args: [{ name: "", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }, { type: { kind: $.TypeKind.Interface, methods: [{ name: "Error", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+] } }] }
+]
 );
 
 type Closer = null | {
@@ -21,7 +23,9 @@ type Closer = null | {
 $.registerInterfaceType(
   'Closer',
   null, // Zero value for interface is null
-  new Set(['Close']),
+  [{ name: "Close", args: [], returns: [{ type: { kind: $.TypeKind.Interface, methods: [{ name: "Error", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+] } }] }
+]
 );
 
 type ReadCloser = null | Reader & Closer
@@ -29,7 +33,7 @@ type ReadCloser = null | Reader & Closer
 $.registerInterfaceType(
   'ReadCloser',
   null, // Zero value for interface is null
-  new Set(['Close', 'Read']),
+  []
 );
 
 class MyStruct {
@@ -62,7 +66,11 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set(["Read", "Close"]),
+	  [{ name: "Read", args: [{ name: "p", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }, { type: { kind: $.TypeKind.Interface, methods: [{ name: "Error", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+	] } }] }
+	, { name: "Close", args: [], returns: [{ type: { kind: $.TypeKind.Interface, methods: [{ name: "Error", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+	] } }] }
+	],
 	  MyStruct,
 	  {}
 	);

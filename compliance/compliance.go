@@ -24,7 +24,8 @@ import (
 // generated during testing, such as for running the compiled code and for type-checking.
 var baseTsConfig = map[string]any{
 	"compilerOptions": map[string]any{
-		"lib":                        []string{"es2020", "DOM"},
+		"target":                     "es2022",
+		"lib":                        []string{"es2022", "esnext.disposable", "dom"},
 		"module":                     "nodenext",
 		"moduleResolution":           "nodenext",
 		"allowImportingTsExtensions": true,

@@ -43,9 +43,9 @@ class Message {
 	static __typeInfo = $.registerStructType(
 	  'Message',
 	  new Message(),
-	  new Set([]),
+	  [],
 	  Message,
-	  {priority: "number", text: "string"}
+	  {"priority": { kind: $.TypeKind.Basic, name: "number" }, "text": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
 

@@ -54,9 +54,10 @@ class MyError {
 	static __typeInfo = $.registerStructType(
 	  'MyError',
 	  new MyError(),
-	  new Set(["Error"]),
+	  [{ name: "Error", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+	],
 	  MyError,
-	  {s: "string"}
+	  {"s": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
 

@@ -462,11 +462,30 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLinef("static __typeInfo = $.registerStructType(")
 	c.tsw.WriteLinef("  '%s',", className)
 	c.tsw.WriteLinef("  new %s(),", className)
-	c.tsw.WriteLinef("  new Set([%s]),", c.collectMethodNames(className)) // collectMethodNames should ideally consider promoted methods too
+	c.tsw.WriteLiterally("  [")
+	// Collect methods for the struct type
+	var structMethods []*types.Func
+	for i := 0; i < goStructType.NumMethods(); i++ {
+		method := goStructType.Method(i)
+		// Ensure it's a method directly on this type (not promoted here, promotion handled separately)
+		// Check if receiver is *T or T where T is goStructType
+		sig := method.Type().(*types.Signature)
+		recv := sig.Recv().Type()
+		if ptr, ok := recv.(*types.Pointer); ok {
+			recv = ptr.Elem()
+		}
+		if namedRecv, ok := recv.(*types.Named); ok && namedRecv.Obj() == goStructType.Obj() {
+			structMethods = append(structMethods, method)
+		}
+	}
+	c.writeMethodSignatures(structMethods, false)
+	c.tsw.WriteLiterally("],")
+	c.tsw.WriteLine("")
+
 	c.tsw.WriteLinef("  %s,", className)
 	// Add field type information for type assertions
 	c.tsw.WriteLiterally("  {")
-	first := true
+	firstField := true
 	for i := 0; i < underlyingStruct.NumFields(); i++ {
 		field := underlyingStruct.Field(i)
 		var fieldKeyName string
@@ -475,12 +494,13 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		} else {
 			fieldKeyName = field.Name()
 		}
-		fieldTsType := c.getTypeString(field.Type())
-		if !first {
+		// fieldTsType := c.getTypeString(field.Type())
+		if !firstField {
 			c.tsw.WriteLiterally(", ")
 		}
-		first = false
-		c.tsw.WriteLiterally(fmt.Sprintf("%s: \"%s\"", fieldKeyName, fieldTsType))
+		firstField = false
+		c.tsw.WriteLiterallyf("%q: ", fieldKeyName)
+		c.writeTypeInfoObject(field.Type()) // Use writeTypeInfoObject for field types
 	}
 	c.tsw.WriteLiterally("}")
 	c.tsw.WriteLine("")
@@ -519,8 +539,159 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 	c.tsw.WriteLinef("$.registerInterfaceType(")
 	c.tsw.WriteLinef("  '%s',", interfaceName)
 	c.tsw.WriteLinef("  null, // Zero value for interface is null")
-	c.tsw.WriteLinef("  new Set([%s]),", c.collectInterfaceMethods(t))
+
+	// Collect methods for the interface type
+	var interfaceMethods []*types.Func
+	if ifaceType != nil { // ifaceType is *types.Interface
+		for i := 0; i < ifaceType.NumExplicitMethods(); i++ {
+			interfaceMethods = append(interfaceMethods, ifaceType.ExplicitMethod(i))
+		}
+		// TODO: Handle embedded interface methods if necessary for full signature collection.
+		// For now, explicit methods are covered.
+	}
+	c.tsw.WriteLiterally("  [")
+	c.writeMethodSignatures(interfaceMethods, true)
+	c.tsw.WriteLiterally("]")
+	c.tsw.WriteLine("")
+
 	c.tsw.WriteLinef(");")
 
 	return nil
+}
+
+// writeTypeInfoObject writes a TypeScript TypeInfo object literal for a given Go type.
+func (c *GoToTSCompiler) writeTypeInfoObject(typ types.Type) {
+	if typ == nil {
+		c.tsw.WriteLiterally("{ kind: $.TypeKind.Basic, name: 'any' }") // Or handle as error
+		return
+	}
+
+	underlying := typ.Underlying()
+
+	switch t := underlying.(type) {
+	case *types.Basic:
+		tsTypeName, _ := GoBuiltinToTypescript(t.Name())
+		if tsTypeName == "" {
+			tsTypeName = t.Name() // Fallback
+		}
+		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Basic, name: %q }", tsTypeName)
+	case *types.Named:
+		// For named types, we refer to them by name, assuming they are registered.
+		// If it's an alias for a basic type, we might want the basic type info.
+		// For now, treat named types by their name, which implies they should be registered.
+		// If it's the error interface, handle specifically.
+		if t.Obj().Name() == "error" && t.Obj().Pkg() == nil { // Check for builtin error
+			c.tsw.WriteLiterally("{ kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] }")
+		} else {
+			c.tsw.WriteLiterallyf("%q", t.Obj().Name()) // Output as string, to be resolved by typeRegistry
+		}
+	case *types.Pointer:
+		c.tsw.WriteLiterally("{ kind: $.TypeKind.Pointer, elemType: ")
+		c.writeTypeInfoObject(t.Elem())
+		c.tsw.WriteLiterally(" }")
+	case *types.Slice:
+		c.tsw.WriteLiterally("{ kind: $.TypeKind.Slice, elemType: ")
+		c.writeTypeInfoObject(t.Elem())
+		c.tsw.WriteLiterally(" }")
+	case *types.Array:
+		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Array, length: %d, elemType: ", t.Len())
+		c.writeTypeInfoObject(t.Elem())
+		c.tsw.WriteLiterally(" }")
+	case *types.Map:
+		c.tsw.WriteLiterally("{ kind: $.TypeKind.Map, keyType: ")
+		c.writeTypeInfoObject(t.Key())
+		c.tsw.WriteLiterally(", elemType: ")
+		c.writeTypeInfoObject(t.Elem())
+		c.tsw.WriteLiterally(" }")
+	case *types.Chan:
+		dir := "both"
+		if t.Dir() == types.SendOnly {
+			dir = "send"
+		} else if t.Dir() == types.RecvOnly {
+			dir = "receive"
+		}
+		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Channel, direction: %q, elemType: ", dir)
+		c.writeTypeInfoObject(t.Elem())
+		c.tsw.WriteLiterally(" }")
+	case *types.Interface:
+		// For anonymous interfaces, we might need to describe their structure.
+		// For now, if it's a named interface, it should have been handled by types.Named.
+		// This case is for anonymous interface literals.
+		c.tsw.WriteLiterally("{ kind: $.TypeKind.Interface, methods: [")
+		var methods []*types.Func
+		for i := 0; i < t.NumExplicitMethods(); i++ {
+			methods = append(methods, t.ExplicitMethod(i))
+		}
+		// TODO: Handle embedded methods for anonymous interfaces if needed.
+		c.writeMethodSignatures(methods, true)
+		c.tsw.WriteLiterally("] }")
+	case *types.Signature:
+		c.tsw.WriteLiterally("{ kind: $.TypeKind.Function, params: [")
+		for i := 0; i < t.Params().Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.writeTypeInfoObject(t.Params().At(i).Type())
+		}
+		c.tsw.WriteLiterally("], results: [")
+		for i := 0; i < t.Results().Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.writeTypeInfoObject(t.Results().At(i).Type())
+		}
+		c.tsw.WriteLiterally("] }")
+	case *types.Struct:
+		// For anonymous structs. Named structs are handled by types.Named.
+		c.tsw.WriteLiterally("{ kind: $.TypeKind.Struct, fields: {")
+		for i := 0; i < t.NumFields(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			field := t.Field(i)
+			c.tsw.WriteLiterallyf("%q: ", field.Name())
+			c.writeTypeInfoObject(field.Type())
+		}
+		c.tsw.WriteLiterally("}, methods: [] }") // Anonymous structs don't have methods in this context
+	default:
+		c.tsw.WriteLiterallyf("{ kind: $.TypeKind.Basic, name: %q }", typ.String()) // Fallback
+	}
+}
+
+// writeMethodSignatures writes an array of TypeScript MethodSignature objects.
+func (c *GoToTSCompiler) writeMethodSignatures(methods []*types.Func, isInterface bool) {
+	firstMethod := true
+	for _, method := range methods {
+		if !firstMethod {
+			c.tsw.WriteLiterally(", ")
+		}
+		firstMethod = false
+
+		sig := method.Type().(*types.Signature)
+		c.tsw.WriteLiterallyf("{ name: %q, args: [", method.Name())
+		for i := 0; i < sig.Params().Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			param := sig.Params().At(i)
+			c.tsw.WriteLiterallyf("{ name: %q, type: ", param.Name())
+			c.writeTypeInfoObject(param.Type())
+			c.tsw.WriteLiterally(" }")
+		}
+		c.tsw.WriteLiterally("], returns: [")
+		for i := 0; i < sig.Results().Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			result := sig.Results().At(i)
+			// Return parameters in Go often don't have names that are relevant for TS signature matching
+			c.tsw.WriteLiterally("{ type: ")
+			c.writeTypeInfoObject(result.Type())
+			c.tsw.WriteLiterally(" }")
+		}
+		c.tsw.WriteLiterally("] }")
+		if !isInterface || !firstMethod { // Add newline for readability unless it's the very first item in an empty list
+			c.tsw.WriteLine("")
+		}
+	}
 }

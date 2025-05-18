@@ -5,6 +5,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -42,6 +43,9 @@ func TestCompliance(t *testing.T) {
 		}
 		testPaths = append(testPaths, testPath)
 	}
+
+	// sort testPaths
+	slices.Sort(testPaths)
 
 	// limit concurrency
 	simulLimit := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)

@@ -409,6 +409,8 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 		c.WriteSignatureType(t)
 	case *types.Struct:
 		c.WriteStructType(t)
+	case *types.Alias:
+		c.WriteGoType(t.Underlying())
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
@@ -2554,41 +2556,6 @@ func (c *GoToTSCompiler) WriteSpec(a ast.Spec) error {
 	return nil
 }
 
-// collectMethodNames scans all files in the current package (`c.pkg.Syntax`)
-// to find all method declarations associated with a given `structName`.
-// It identifies methods by checking `ast.FuncDecl` nodes for receivers
-// whose type (or underlying type if it's a pointer receiver) matches `structName`.
-// Returns a comma-separated string of quoted method names (e.g., "'MethodA', 'MethodB'"),
-// suitable for use in generating metadata like the `$.IMetamethods` list for a struct class.
-func (c *GoToTSCompiler) collectMethodNames(structName string) string {
-	var methodNames []string
-
-	for _, fileSyntax := range c.pkg.Syntax {
-		for _, decl := range fileSyntax.Decls {
-			funcDecl, isFunc := decl.(*ast.FuncDecl)
-			if !isFunc || funcDecl.Recv == nil || len(funcDecl.Recv.List) == 0 {
-				continue // Skip non-functions or functions without receivers
-			}
-
-			// Check if the receiver type matches the struct name
-			recvField := funcDecl.Recv.List[0]
-			recvType := recvField.Type
-			// Handle pointer receivers (*MyStruct) and value receivers (MyStruct)
-			if starExpr, ok := recvType.(*ast.StarExpr); ok {
-				recvType = starExpr.X // Get the type being pointed to
-			}
-
-			// Check if the receiver identifier name matches the struct name
-			if ident, ok := recvType.(*ast.Ident); ok && ident.Name == structName {
-				// Found a method for this struct
-				methodNames = append(methodNames, strconv.Quote(funcDecl.Name.Name))
-			}
-		}
-	}
-
-	return strings.Join(methodNames, ", ")
-}
-
 // getTypeString is a utility function that converts a Go `types.Type` into its
 // TypeScript type string representation. It achieves this by creating a temporary
 // `GoToTSCompiler` and `TSCodeWriter` (writing to a `strings.Builder`) and then
@@ -2622,9 +2589,8 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 
 	// Use a map to collect unique field names and their types
 	fieldMap := make(map[string]string)
-	embeddedTypeMap := make(map[string]string)
+	embeddedTypeMap := make(map[string]string) // Stores TS type string for embedded struct initializers
 
-	// Iterate over the struct's fields directly
 	underlying, ok := structType.Underlying().(*types.Struct)
 	if !ok {
 		return "{}"
@@ -2635,69 +2601,57 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 		field := underlying.Field(i)
 		fieldName := field.Name()
 
-		// Skip unexported fields
 		if !field.Exported() && field.Pkg() != c.pkg.Types {
 			continue
 		}
 
-		// Special handling for embedded fields
 		if field.Anonymous() {
-			// For embedded types, add them to a separate map
 			fieldType := field.Type()
-
-			// Unwrap pointer if needed
+			isPtr := false
 			if ptr, ok := fieldType.(*types.Pointer); ok {
 				fieldType = ptr.Elem()
+				isPtr = true
 			}
 
-			// Get the embedded type name
 			if named, ok := fieldType.(*types.Named); ok {
 				embeddedName := named.Obj().Name()
-
-				// Generate the type string for the embedded field using ConstructorParameters
-				// e.g., Person?: ConstructorParameters<typeof Person>[0]
-				embeddedTypeMap[embeddedName] = fmt.Sprintf("ConstructorParameters<typeof %s>[0]", embeddedName)
+				// For embedded structs, the init type should allow providing fields of the embedded struct,
+				// or the embedded struct itself.
+				// We generate Partial<EmbeddedStructFields> | EmbeddedStructType
+				// This is complex. For now, let's use ConstructorParameters as before for simplicity,
+				// or allow the embedded struct type itself.
+				// The example `Person?: ConstructorParameters<typeof Person>[0]` is for the fields.
+				// Let's try to generate a type that allows either the embedded struct instance or its fields.
+				// This might be: `Partial<FlattenedInitType<EmbeddedName>> | EmbeddedName`
+				// For now, stick to the simpler `ConstructorParameters<typeof %s>[0]` which implies field-based init.
+				// Or, more simply, the type of the embedded struct itself if it's a pointer.
+				if isPtr {
+					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type()) // MyEmbeddedType | null
+				} else {
+					// For value-type embedded structs, allow initializing with its fields.
+					// This requires getting the flattened init type for the embedded struct.
+					// This could lead to recursion if not handled carefully.
+					// A simpler approach for now: use the embedded struct's own type.
+					// embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type())
+					// Or, using ConstructorParameters to allow field-based initialization:
+					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
+				}
 			}
 			continue
 		}
-
-		// Get the type string for regular fields
-		var typeStr strings.Builder
-		writer := NewTSCodeWriter(&typeStr)
-		tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
-		tempCompiler.WriteGoType(field.Type())
-
-		fieldMap[fieldName] = typeStr.String()
+		fieldMap[fieldName] = c.getTypeString(field.Type())
 	}
 
-	// Then check for promoted fields via the method set
-	mset := types.NewMethodSet(structType)
-	for i := 0; i < mset.Len(); i++ {
-		sel := mset.At(i)
-		// Check if the selection is a field (not a method)
-		if obj, ok := sel.Obj().(*types.Var); ok && obj.IsField() {
-			fieldName := obj.Name()
-			// Skip if already added or unexported
-			if _, exists := fieldMap[fieldName]; exists || (!obj.Exported() && obj.Pkg() != c.pkg.Types) {
-				continue
-			}
+	// Promoted fields (handled by Go's embedding, init should use direct/embedded names)
+	// The current logic for `generateFlattenedInitTypeString` seems to focus on top-level
+	// settable properties in the constructor. Promoted fields are accessed via `this.promotedField`,
+	// not typically set directly in `init?` unless the embedded struct itself is named in `init?`.
 
-			// Get the type string for the field
-			var typeStr strings.Builder
-			writer := NewTSCodeWriter(&typeStr)
-			tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
-			tempCompiler.WriteGoType(sel.Type())
-
-			fieldMap[fieldName] = typeStr.String()
-		}
+	// Add embedded types to the field map (these are the names of the embedded structs themselves)
+	for embeddedName, embeddedTSType := range embeddedTypeMap {
+		fieldMap[embeddedName] = embeddedTSType
 	}
 
-	// Add embedded types to the field map
-	for embeddedName, embeddedType := range embeddedTypeMap {
-		fieldMap[embeddedName] = embeddedType
-	}
-
-	// Sort keys for deterministic output
 	var fieldNames []string
 	for name := range fieldMap {
 		fieldNames = append(fieldNames, name)
@@ -2710,69 +2664,6 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 	}
 
 	return "{" + strings.Join(fieldDefs, ", ") + "}"
-}
-
-// collectInterfaceMethods scans a Go interface type (`ast.InterfaceType`) and
-// its embedded interfaces to gather a unique list of all method names it defines.
-//   - For explicitly named methods in `interfaceType.Methods`, their names are added.
-//   - For embedded interfaces, it resolves the embedded type using `go/types` information
-//     (`c.pkg.TypesInfo.Types`). If resolved to a `types.Interface`, it iterates
-//     through the methods of that underlying interface and adds their names.
-//
-// The collected method names are then sorted and returned as a comma-separated
-// string of quoted names (e.g., "'MethodA', 'MethodB'"). This is used for
-// generating metadata, such as the `$.IMetamethods` list for an interface type helper.
-// If an embedded interface cannot be fully resolved, a comment is written to the
-// output, but the process continues with available information.
-func (c *GoToTSCompiler) collectInterfaceMethods(interfaceType *ast.InterfaceType) string {
-	// Use a map to ensure uniqueness of method names
-	methodNamesMap := make(map[string]struct{})
-
-	if interfaceType.Methods != nil {
-		for _, method := range interfaceType.Methods.List {
-			if len(method.Names) > 0 {
-				// Named method
-				methodNamesMap[method.Names[0].Name] = struct{}{}
-			} else {
-				// Embedded interface - resolve it and collect its methods
-				embeddedType := method.Type
-
-				// Resolve the embedded interface using type information
-				if tv, ok := c.pkg.TypesInfo.Types[embeddedType]; ok && tv.Type != nil {
-					// Get the underlying interface type
-					var ifaceType *types.Interface
-					if named, ok := tv.Type.(*types.Named); ok {
-						if underlying, ok := named.Underlying().(*types.Interface); ok {
-							ifaceType = underlying
-						}
-					} else if underlying, ok := tv.Type.(*types.Interface); ok {
-						ifaceType = underlying
-					}
-
-					// Collect methods from the interface
-					if ifaceType != nil {
-						for i := 0; i < ifaceType.NumMethods(); i++ {
-							methodNamesMap[ifaceType.Method(i).Name()] = struct{}{}
-						}
-					}
-				} else {
-					// Couldn't resolve the embedded interface
-					c.tsw.WriteCommentLine("// Note: Some embedded interface methods may not be fully resolved")
-				}
-			}
-		}
-	}
-
-	// Convert the map to a slice for a deterministic output order
-	var methodNames []string
-	for name := range methodNamesMap {
-		methodNames = append(methodNames, fmt.Sprintf("'%s'", name))
-	}
-
-	// Sort for deterministic output
-	sort.Strings(methodNames)
-
-	return strings.Join(methodNames, ", ")
 }
 
 // WriteFuncDeclAsMethod translates a Go function declaration (`ast.FuncDecl`)
@@ -5827,7 +5718,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		}
 
 		// Add empty methods set to satisfy StructTypeInfo interface
-		c.tsw.WriteLiterally(", methods: new Set()")
+		c.tsw.WriteLiterally(", methods: []")
 
 		c.tsw.WriteLiterally("}")
 	case *ast.InterfaceType:
@@ -5841,19 +5732,7 @@ func (c *GoToTSCompiler) writeTypeAssertion(lhs []ast.Expr, typeAssertExpr *ast.
 		}
 
 		// Add methods if available
-		if typeExpr.Methods != nil && typeExpr.Methods.List != nil {
-			c.tsw.WriteLiterally(", methods: new Set([")
-
-			methods := []string{}
-			for _, method := range typeExpr.Methods.List {
-				for _, name := range method.Names {
-					methods = append(methods, fmt.Sprintf("'%s'", name.Name))
-				}
-			}
-
-			c.tsw.WriteLiterally(strings.Join(methods, ", "))
-			c.tsw.WriteLiterally("])")
-		}
+		c.tsw.WriteLiterally(", methods: []")
 
 		c.tsw.WriteLiterally("}")
 	case *ast.StarExpr:
@@ -6115,7 +5994,7 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 			c.tsw.WriteLiterally("fields: {}, ")
 		}
 
-		c.tsw.WriteLiterally("methods: new Set()")
+		c.tsw.WriteLiterally("methods: []")
 
 		c.tsw.WriteLiterally("}")
 	case *ast.MapType:

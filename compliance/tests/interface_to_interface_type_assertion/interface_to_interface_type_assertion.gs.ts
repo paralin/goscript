@@ -10,7 +10,8 @@ type MyInterface = null | {
 $.registerInterfaceType(
   'MyInterface',
   null, // Zero value for interface is null
-  new Set(['Method1']),
+  [{ name: "Method1", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }
+]
 );
 
 class MyStruct {
@@ -48,9 +49,10 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set(["Method1"]),
+	  [{ name: "Method1", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }
+	],
 	  MyStruct,
-	  {Value: "number"}
+	  {"Value": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 
@@ -61,7 +63,8 @@ type MyOtherInterface = null | {
 $.registerInterfaceType(
   'MyOtherInterface',
   null, // Zero value for interface is null
-  new Set(['Method1']),
+  [{ name: "Method1", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }
+]
 );
 
 export function main(): void {

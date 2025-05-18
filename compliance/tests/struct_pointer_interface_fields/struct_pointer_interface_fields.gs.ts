@@ -10,7 +10,8 @@ type MyInterface = null | {
 $.registerInterfaceType(
   'MyInterface',
   null, // Zero value for interface is null
-  new Set(['Method']),
+  [{ name: "Method", args: [], returns: [] }
+]
 );
 
 class MyStruct {
@@ -53,9 +54,10 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set([]),
+	  [],
 	  MyStruct,
-	  {PointerField: "$.Box<number> | null", interfaceField: "MyInterface"}
+	  {"PointerField": { kind: $.TypeKind.Pointer, elemType: { kind: $.TypeKind.Basic, name: "number" } }, "interfaceField": { kind: $.TypeKind.Interface, methods: [{ name: "Method", args: [], returns: [] }
+	] }}
 	);
 }
 

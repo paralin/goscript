@@ -43,9 +43,9 @@ class MyStruct {
 	static __typeInfo = $.registerStructType(
 	  'MyStruct',
 	  new MyStruct(),
-	  new Set([]),
+	  [],
 	  MyStruct,
-	  {MyInt: "number", MyString: "string"}
+	  {"MyInt": { kind: $.TypeKind.Basic, name: "number" }, "MyString": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
 
@@ -89,9 +89,9 @@ class NestedStruct {
 	static __typeInfo = $.registerStructType(
 	  'NestedStruct',
 	  new NestedStruct(),
-	  new Set([]),
+	  [],
 	  NestedStruct,
-	  {Value: "number", InnerStruct: "MyStruct"}
+	  {"Value": { kind: $.TypeKind.Basic, name: "number" }, "InnerStruct": { kind: $.TypeKind.Struct, fields: {"MyInt": { kind: $.TypeKind.Basic, name: "number" }, "MyString": { kind: $.TypeKind.Basic, name: "string" }}, methods: [] }}
 	);
 }
 

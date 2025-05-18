@@ -11,7 +11,8 @@ type MyInterface = null | {
 $.registerInterfaceType(
   'MyInterface',
   null, // Zero value for interface is null
-  new Set(['MyMethod']),
+  [{ name: "MyMethod", args: [], returns: [] }
+]
 );
 
 export function main(): void {

@@ -48,9 +48,10 @@ class Person {
 	static __typeInfo = $.registerStructType(
 	  'Person',
 	  new Person(),
-	  new Set(["Greet"]),
+	  [{ name: "Greet", args: [], returns: [] }
+	],
 	  Person,
-	  {Name: "string", Age: "number"}
+	  {"Name": { kind: $.TypeKind.Basic, name: "string" }, "Age": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 
@@ -74,7 +75,7 @@ class Employee {
 		ID: $.Box<number>;
 	}
 
-	constructor(init?: Partial<{ID?: number, Person?: ConstructorParameters<typeof Person>[0]}>) {
+	constructor(init?: Partial<{ID?: number, Person?: Partial<ConstructorParameters<typeof Person>[0]>}>) {
 		this._fields = {
 			Person: $.box(new Person(init?.Person)),
 			ID: $.box(init?.ID ?? 0)
@@ -112,9 +113,9 @@ class Employee {
 	static __typeInfo = $.registerStructType(
 	  'Employee',
 	  new Employee(),
-	  new Set([]),
+	  [],
 	  Employee,
-	  {Person: "Person", ID: "number"}
+	  {"Person": { kind: $.TypeKind.Struct, fields: {"Name": { kind: $.TypeKind.Basic, name: "string" }, "Age": { kind: $.TypeKind.Basic, name: "number" }}, methods: [] }, "ID": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 
@@ -163,9 +164,10 @@ class Address {
 	static __typeInfo = $.registerStructType(
 	  'Address',
 	  new Address(),
-	  new Set(["FullAddress"]),
+	  [{ name: "FullAddress", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+	],
 	  Address,
-	  {Street: "string", City: "string"}
+	  {"Street": { kind: $.TypeKind.Basic, name: "string" }, "City": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
 
@@ -204,9 +206,10 @@ class Contact {
 	static __typeInfo = $.registerStructType(
 	  'Contact',
 	  new Contact(),
-	  new Set(["Call"]),
+	  [{ name: "Call", args: [], returns: [] }
+	],
 	  Contact,
-	  {Phone: "string"}
+	  {"Phone": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
 
@@ -246,7 +249,7 @@ class Manager {
 		Level: $.Box<number>;
 	}
 
-	constructor(init?: Partial<{Address?: ConstructorParameters<typeof Address>[0], Contact?: ConstructorParameters<typeof Contact>[0], Level?: number, Person?: ConstructorParameters<typeof Person>[0]}>) {
+	constructor(init?: Partial<{Address?: Partial<ConstructorParameters<typeof Address>[0]>, Contact?: Partial<ConstructorParameters<typeof Contact>[0]>, Level?: number, Person?: Partial<ConstructorParameters<typeof Person>[0]>}>) {
 		this._fields = {
 			Person: $.box(new Person(init?.Person)),
 			Address: $.box(new Address(init?.Address)),
@@ -317,9 +320,9 @@ class Manager {
 	static __typeInfo = $.registerStructType(
 	  'Manager',
 	  new Manager(),
-	  new Set([]),
+	  [],
 	  Manager,
-	  {Person: "Person", Address: "Address", Contact: "Contact", Level: "number"}
+	  {"Person": { kind: $.TypeKind.Struct, fields: {"Name": { kind: $.TypeKind.Basic, name: "string" }, "Age": { kind: $.TypeKind.Basic, name: "number" }}, methods: [] }, "Address": { kind: $.TypeKind.Struct, fields: {"Street": { kind: $.TypeKind.Basic, name: "string" }, "City": { kind: $.TypeKind.Basic, name: "string" }}, methods: [] }, "Contact": { kind: $.TypeKind.Struct, fields: {"Phone": { kind: $.TypeKind.Basic, name: "string" }}, methods: [] }, "Level": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 

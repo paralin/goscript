@@ -53,9 +53,9 @@ class FuncContainer {
 	static __typeInfo = $.registerStructType(
 	  'FuncContainer',
 	  new FuncContainer(),
-	  new Set([]),
+	  [],
 	  FuncContainer,
-	  {myFunc: "null | any"}
+	  {"myFunc": { kind: $.TypeKind.Interface, methods: [] }}
 	);
 }
 

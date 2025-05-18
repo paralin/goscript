@@ -1,6 +1,7 @@
 import * as $ from "@goscript/builtin";
 
 class MyStruct {
+	// MyInt is a public integer field, initialized to zero.
 	public get MyInt(): number {
 		return this._fields.MyInt.value
 	}
@@ -8,6 +9,7 @@ class MyStruct {
 		this._fields.MyInt.value = value
 	}
 
+	// MyString is a public string field, initialized to empty string.
 	public get MyString(): string {
 		return this._fields.MyString.value
 	}
@@ -15,6 +17,7 @@ class MyStruct {
 		this._fields.MyString.value = value
 	}
 
+	// myBool is a private boolean field, initialized to false.
 	public get myBool(): boolean {
 		return this._fields.myBool.value
 	}
@@ -57,6 +60,15 @@ class MyStruct {
 		const m = this
 		return m.myBool
 	}
+
+	// Register this type with the runtime type system
+	static __typeInfo = $.registerStructType(
+	  'MyStruct',
+	  new MyStruct(),
+	  new Set(["GetMyString", "GetMyBool"]),
+	  MyStruct,
+	  {MyInt: "number", MyString: "string", myBool: "boolean"}
+	);
 }
 
 // NewMyStruct creates a new MyStruct instance.
@@ -95,11 +107,11 @@ export async function main(): Promise<void> {
 	console.log("string(0x221A):", s3)
 
 	// Arrays
-	let arr = $.arrayToSlice([1, 2, 3])
+	let arr = $.arrayToSlice<number>([1, 2, 3])
 	console.log("Array elements:", arr![0], arr![1], arr![2])
 
 	// Slices - Basic initialization and access
-	let slice = $.arrayToSlice([4, 5, 6])
+	let slice = $.arrayToSlice<number>([4, 5, 6])
 	console.log("Slice elements:", slice![0], slice![1], slice![2])
 	console.log("Slice length:", $.len(slice), "capacity:", $.cap(slice))
 
@@ -117,7 +129,7 @@ export async function main(): Promise<void> {
 	}
 
 	console.log("\nSlicing operations and shared backing arrays:")
-	let original = $.arrayToSlice([10, 20, 30, 40, 50])
+	let original = $.arrayToSlice<number>([10, 20, 30, 40, 50])
 	console.log("Original slice - Length:", $.len(original), "Capacity:", $.cap(original))
 
 	let slice1 = $.goSlice(original, 1, 3)
@@ -134,8 +146,8 @@ export async function main(): Promise<void> {
 	console.log("original[1]:", original![1], "slice1[0]:", slice1![0], "slice2[0]:", slice2![0])
 
 	let sum = 0
-	for (let idx = 0; idx < slice.length; idx++) {
-		const val = slice[idx]
+	for (let idx = 0; idx < $.len(slice); idx++) {
+		const val = slice![idx]
 		{
 			sum += val
 			console.log("Range idx:", idx, "val:", val)
@@ -198,12 +210,10 @@ export async function main(): Promise<void> {
 
 	// Goroutines and Channels
 	console.log("\nGoroutines and Channels:")
-	let ch = $.makeChannel<string>(0, "")
+	let ch = $.makeChannel<string>(0, "", 'both')
 	queueMicrotask(async () => {
-		{
-			console.log("Goroutine: Sending message")
-			await ch.send("Hello from goroutine!")
-		}
+		console.log("Goroutine: Sending message")
+		await ch.send("Hello from goroutine!")
 	})
 
 	let msg = await ch.receive()
@@ -211,13 +221,11 @@ export async function main(): Promise<void> {
 
 	// Select statement
 	console.log("\nSelect statement:")
-	let selectCh = $.makeChannel<string>(0, "")
+	let selectCh = $.makeChannel<string>(0, "", 'both')
 	queueMicrotask(async () => {
-		{
-			await selectCh.send("Message from select goroutine!")
-		}
+		await selectCh.send("Message from select goroutine!")
 	})
-	let anotherCh = $.makeChannel<string>(0, "")
+	let anotherCh = $.makeChannel<string>(0, "", 'both')
 
 	// Add another case
 	await $.selectStatement([
@@ -243,7 +251,7 @@ export async function main(): Promise<void> {
 
 	// Function Literals
 	console.log("\nFunction Literals:")
-	let add = (xy: number): number => {
+	let add = (x: number, y: number): number => {
 		return x + y
 	}
 

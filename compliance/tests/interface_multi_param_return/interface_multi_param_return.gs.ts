@@ -10,7 +10,9 @@ type MultiParamReturner = null | {
 $.registerInterfaceType(
   'MultiParamReturner',
   null, // Zero value for interface is null
-  new Set(['Process']),
+  [{ name: "Process", args: [{ name: "data", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }, { name: "count", type: { kind: $.TypeKind.Basic, name: "number" } }, { name: "_", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }, { type: { kind: $.TypeKind.Interface, methods: [{ name: "Error", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+] } }] }
+]
 );
 
 class MyProcessor {
@@ -43,7 +45,9 @@ class MyProcessor {
 	static __typeInfo = $.registerStructType(
 	  'MyProcessor',
 	  new MyProcessor(),
-	  new Set(["Process"]),
+	  [{ name: "Process", args: [{ name: "data", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }, { name: "count", type: { kind: $.TypeKind.Basic, name: "number" } }, { name: "_", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }, { type: { kind: $.TypeKind.Interface, methods: [{ name: "Error", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }
+	] } }] }
+	],
 	  MyProcessor,
 	  {}
 	);

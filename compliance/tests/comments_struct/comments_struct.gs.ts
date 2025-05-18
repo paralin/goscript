@@ -45,9 +45,9 @@ class TestStruct {
 	static __typeInfo = $.registerStructType(
 	  'TestStruct',
 	  new TestStruct(),
-	  new Set([]),
+	  [],
 	  TestStruct,
-	  {IntField: "number", StringField: "string"}
+	  {"IntField": { kind: $.TypeKind.Basic, name: "number" }, "StringField": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
 
