@@ -172,17 +172,17 @@ func (c *GoToTSCompiler) WriteStmtBranch(stmt *ast.BranchStmt) error {
 }
 
 // WriteStmtGo translates a Go statement (`ast.GoStmt`) into its TypeScript equivalent.
-// It handles `go func(){...}()` and `go namedFunc(args)`.
+// It handles `go func(){...}()`, `go namedFunc(args)`, and `go x.Method(args)`.
 func (c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error {
 	// Handle goroutine statement
 	// Translate 'go func() { ... }()' to 'queueMicrotask(() => { ... compiled body ... })'
-
-	// The call expression's function is the function literal
 	callExpr := exp.Call
-	if funcLit, ok := callExpr.Fun.(*ast.FuncLit); ok {
+
+	switch fun := callExpr.Fun.(type) {
+	case *ast.FuncLit:
 		// For function literals, we need to check if the function literal itself is async
 		// This happens during analysis in analysisVisitor.Visit for FuncLit nodes
-		isAsync := c.analysis.IsFuncLitAsync(funcLit)
+		isAsync := c.analysis.IsFuncLitAsync(fun)
 		if isAsync {
 			c.tsw.WriteLiterally("queueMicrotask(async () => ")
 		} else {
@@ -190,18 +190,18 @@ func (c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error {
 		}
 
 		// Compile the function literal's body directly
-		if err := c.WriteStmtBlock(funcLit.Body, true); err != nil {
+		if err := c.WriteStmtBlock(fun.Body, true); err != nil {
 			return fmt.Errorf("failed to write goroutine function literal body: %w", err)
 		}
 
 		c.tsw.WriteLine(")") // Close the queueMicrotask statement
 
-	} else if ident, ok := callExpr.Fun.(*ast.Ident); ok {
+	case *ast.Ident:
 		// Handle named functions: go namedFunc(args)
 		// Get the object for this function
-		obj := c.pkg.TypesInfo.Uses[ident]
+		obj := c.pkg.TypesInfo.Uses[fun]
 		if obj == nil {
-			return errors.Errorf("could not find object for function: %s", ident.Name)
+			return errors.Errorf("could not find object for function: %s", fun.Name)
 		}
 
 		// Check if the function is async
@@ -221,7 +221,7 @@ func (c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error {
 		}
 
 		// Write the function name
-		c.tsw.WriteLiterally(ident.Name)
+		c.tsw.WriteLiterally(fun.Name)
 
 		// Write the function arguments
 		c.tsw.WriteLiterally("(")
@@ -238,7 +238,52 @@ func (c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error {
 
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("})") // Close the queueMicrotask callback and the statement
-	} else {
+	case *ast.SelectorExpr:
+		// Handle selector expressions: go x.Method(args)
+		// Get the object for the selected method
+		obj := c.pkg.TypesInfo.Uses[fun.Sel]
+		if obj == nil {
+			return errors.Errorf("could not find object for selected method: %s", fun.Sel.Name)
+		}
+
+		// Check if the function is async
+		isAsync := c.analysis.IsAsyncFunc(obj)
+		if isAsync {
+			c.tsw.WriteLiterally("queueMicrotask(async () => {")
+		} else {
+			c.tsw.WriteLiterally("queueMicrotask(() => {")
+		}
+
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+
+		// Write the function call, using await if the function is async
+		if isAsync {
+			c.tsw.WriteLiterally("await ")
+		}
+
+		// Write the selector expression (e.g., f.Bar)
+		// Note: callExpr.Fun is the *ast.SelectorExpr itself
+		if err := c.WriteValueExpr(callExpr.Fun); err != nil {
+			return fmt.Errorf("failed to write selector expression in goroutine: %w", err)
+		}
+
+		// Write the function arguments
+		c.tsw.WriteLiterally("(")
+		for i, arg := range callExpr.Args {
+			if i != 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			if err := c.WriteValueExpr(arg); err != nil {
+				return fmt.Errorf("failed to write argument %d in goroutine selector function call: %w", i, err)
+			}
+		}
+		c.tsw.WriteLiterally(")")
+		c.tsw.WriteLine("")
+
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("})") // Close the queueMicrotask callback and the statement
+	default:
 		return errors.Errorf("unhandled goroutine function type: %T", callExpr.Fun)
 	}
 	return nil

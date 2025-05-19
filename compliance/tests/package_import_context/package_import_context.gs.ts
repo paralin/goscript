@@ -1,7 +1,7 @@
 // Generated file based on package_import_context.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 import * as context from "@goscript/context/index.js"
 
@@ -10,7 +10,8 @@ export async function main(): Promise<void> {
 	let ctx = context.Background()
 	let [sctx, sctxCancel] = context.WithCancel(ctx)
 	__defer.defer(() => {
-		sctxCancel!()});
+		sctxCancel!()
+	});
 
 	let myCh = $.makeChannel<{  }>(0, {}, 'both')
 
