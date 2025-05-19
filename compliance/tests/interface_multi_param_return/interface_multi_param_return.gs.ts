@@ -1,7 +1,7 @@
 // Generated file based on interface_multi_param_return.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 type MultiParamReturner = null | {
 	Process(data: $.Slice<number>, count: number, _p2: string): [boolean, $.GoError]

@@ -1,7 +1,7 @@
 // Generated file based on boxing_pointers.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
 	// x is boxed as p1 takes the address

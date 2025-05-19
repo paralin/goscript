@@ -437,7 +437,7 @@ func copyFile(src, dst string) error {
 // It includes all "*.gs.ts" and "index.ts" files found recursively within testDir.
 // It sets up "paths" aliases for:
 //   - The test's own generated package: "@goscript/PARENT_MODULE/compliance/tests/TEST_NAME/*" -> "./*"
-//   - The goscript builtin types: "@goscript/builtin" -> relative path to "workspaceDir/builtin/builtin.ts"
+//   - The goscript builtin types: "@goscript/builtin" -> relative path to "workspaceDir/gs/builtin/builtin.ts"
 //
 // Returns the path to the generated "tsconfig.json" file.
 func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir string) string {
@@ -500,16 +500,12 @@ func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir 
 	compilerOptions := maps.Clone(tsconfig["compilerOptions"].(map[string]interface{}))
 	compilerOptions["baseUrl"] = "." // testDir is baseUrl
 
-	// For paths in tsconfig, it's often better to use relative paths from baseUrl if possible,
-	// but for @goscript/builtin, pointing to the canonical one is important.
-	// It needs to be relative from testDir (baseUrl) to workspaceDir/builtin/builtin.ts
-	builtinTsRelPath := filepath.ToSlash(filepath.Join(relWorkspacePath, "builtin", "builtin.ts"))
-
 	// Alias for this test's own generated packages
+	builtinTsRelPath := filepath.ToSlash(filepath.Join(relWorkspacePath, "gs", "*"))
 	testPkgGoPathPrefix := fmt.Sprintf("%s/compliance/tests/%s", parentModulePath, testName)
 	compilerOptions["paths"] = map[string][]string{
-		fmt.Sprintf("@goscript/%s/*", testPkgGoPathPrefix): {"./*"}, // Maps to files in testDir/*
-		"@goscript/builtin": {builtinTsRelPath},
+		fmt.Sprintf("@goscript/%s/*", testPkgGoPathPrefix): {"./*"},
+		"@goscript/*": {builtinTsRelPath},
 	}
 	tsconfig["compilerOptions"] = compilerOptions
 
@@ -623,13 +619,20 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 
 	tempDir := PrepareTestRunDir(t, testDir)
 
+	// Calculate the relative path from tempDir to the workspace's gs/builtin/builtin.ts
+	gsBuiltinPath := filepath.Join(workspaceDir, "gs", "*")
+	relGsBuiltinPath, err := filepath.Rel(tempDir, gsBuiltinPath)
+	if err != nil {
+		t.Fatalf("failed to calculate relative path from tempDir (%s) to gs/builtin/builtin.ts (%s): %v", tempDir, gsBuiltinPath, err)
+	}
+	relGsBuiltinPath = filepath.ToSlash(relGsBuiltinPath) // Ensure forward slashes for tsconfig
+
 	// tsconfig.json for the runner execution in tempDir
 	runnerTsConfig := maps.Clone(baseTsConfig)
 	runnerCompilerOptions := maps.Clone(runnerTsConfig["compilerOptions"].(map[string]interface{}))
 	runnerCompilerOptions["baseUrl"] = "." // tempDir is baseUrl
 	runnerCompilerOptions["paths"] = map[string][]string{
-		"@goscript/*":       {"./output/@goscript/*"},           // Maps to tempDir/output/@goscript/*
-		"@goscript/builtin": {"../../../../builtin/builtin.ts"}, // Maps to workspace/builtin/builtin.ts
+		"@goscript/*": {"./output/@goscript/*", relGsBuiltinPath},
 	}
 	runnerTsConfig["compilerOptions"] = runnerCompilerOptions
 

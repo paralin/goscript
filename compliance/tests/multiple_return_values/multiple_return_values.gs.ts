@@ -1,7 +1,7 @@
 // Generated file based on multiple_return_values.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 function multipleReturnValues(): [number, string, boolean] {
 	return [42, "hello", true]

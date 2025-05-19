@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	gs "github.com/aperturerobotics/goscript"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/tools/go/packages"
 )
@@ -140,6 +141,16 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 
 	// Compile all packages
 	for _, pkg := range pkgs {
+		// Check if the package has a handwritten equivalent
+		_, gsErr := gs.GsOverrides.ReadDir("gs/" + pkg.PkgPath)
+		if gsErr != nil && !os.IsNotExist(gsErr) {
+			return gsErr
+		}
+		if gsErr == nil {
+			c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
+			continue
+		}
+
 		// Skip packages that failed to load
 		if len(pkg.Errors) > 0 {
 			c.le.WithError(pkg.Errors[0]).Warnf("Skipping package %s due to errors", pkg.PkgPath)
@@ -328,8 +339,8 @@ func NewFileCompiler(
 // top-level declarations in the Go file.
 func (c *FileCompiler) Compile(ctx context.Context) error {
 	f := c.ast
-
 	pkgPath := c.pkg.PkgPath
+
 	outputFilePath := TranslateGoFilePathToTypescriptFilePath(pkgPath, filepath.Base(c.fullPath))
 	outputFilePathAbs := filepath.Join(c.compilerConfig.OutputPathRoot, outputFilePath)
 
@@ -349,7 +360,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg, c.Analysis)
 
 	// Add import for the goscript runtime using namespace import and alias
-	c.codeWriter.WriteLine("import * as $ from \"@goscript/builtin\";")
+	c.codeWriter.WriteLinef("import * as $ from %q;", "@goscript/builtin/builtin.js")
 	c.codeWriter.WriteLine("") // Add a newline after the import
 
 	if err := goWriter.WriteDecls(f.Decls); err != nil {
@@ -368,7 +379,7 @@ type GoToTSCompiler struct {
 
 	pkg *packages.Package
 
-	analysis *Analysis // Holds analysis information for code generation decisions
+	analysis *Analysis
 }
 
 // It initializes the compiler with a `TSCodeWriter` for output,

@@ -1,7 +1,7 @@
 // Generated file based on flag_bitwise_op.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
 	let O_WRONLY: number = 0x1

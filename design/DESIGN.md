@@ -4,8 +4,6 @@
 
 GoScript translates Go code to TypeScript. This document outlines the design principles, translation strategies, and known divergences from Go semantics. The goal is to produce idiomatic, readable, and maintainable TypeScript code that preserves the core logic and type safety of the original Go code where possible.
 
-The GoScript runtime, located in `builtin/builtin.ts`, provides necessary helper functions and types (like `int`, `error`, Box types) and is imported in generated code using the `@goscript/builtin` alias.
-
 ## Core Principles
 
 1.  **AST Mapping:** Aim for a close mapping between the Go AST (`go/ast`) and the TypeScript AST, simplifying the compiler logic.

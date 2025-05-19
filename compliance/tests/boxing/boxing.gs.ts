@@ -1,7 +1,7 @@
 // Generated file based on boxing.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
 	console.log("setting x to 10")

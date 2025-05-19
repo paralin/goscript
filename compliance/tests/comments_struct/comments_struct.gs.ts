@@ -1,7 +1,7 @@
 // Generated file based on comments_struct.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 class TestStruct {
 	// IntField is a commented integer field.

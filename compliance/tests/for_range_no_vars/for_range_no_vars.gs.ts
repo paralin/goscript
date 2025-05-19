@@ -1,7 +1,7 @@
 // Generated file based on for_range_no_vars.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
 	let s = $.arrayToSlice<number>([10, 20, 30])

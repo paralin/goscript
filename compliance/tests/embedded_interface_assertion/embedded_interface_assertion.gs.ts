@@ -1,7 +1,7 @@
 // Generated file based on embedded_interface_assertion.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 type Reader = null | {
 	// Read reads data from the reader.

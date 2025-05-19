@@ -1,7 +1,7 @@
 // Generated file based on for_init_exprstmt.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 function init_func(): void {
 	console.log("init_func called")

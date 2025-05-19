@@ -6,8 +6,7 @@
     "jsx": "react",
     "baseUrl": "./",
     "paths": {
-      "@goscript/*": ["output/@goscript/*"],
-      "@goscript/builtin": ["../../builtin/builtin.ts"]
+      "@goscript/*": ["output/@goscript/*", "../../gs/*"],
     },
     "allowSyntheticDefaultImports": true,
     "declaration": true,
@@ -20,9 +19,5 @@
     "strict": true,
     "lib": ["webworker", "dom", "ES6"]
   },
-  "exclude": ["node_modules", "vendor", "dist"],
-  "ts-node": {
-    "esm": true,
-    "experimentalSpecifierResolution": true
-  }
+  "exclude": ["node_modules", "vendor", "dist"]
 }

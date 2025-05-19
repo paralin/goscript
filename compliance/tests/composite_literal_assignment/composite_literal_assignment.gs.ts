@@ -1,7 +1,7 @@
 // Generated file based on composite_literal_assignment.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 class MyStruct {
 	public get MyInt(): number {

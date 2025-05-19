@@ -1,7 +1,7 @@
 // Generated file based on switch_statement.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
 	let i = 2

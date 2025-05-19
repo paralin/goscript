@@ -9,8 +9,8 @@ import (
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 
-	// _ ensure we include the builtin package
-	_ "github.com/aperturerobotics/goscript/builtin"
+	// _ ensure we include the gs package
+	_ "github.com/aperturerobotics/goscript"
 )
 
 var (

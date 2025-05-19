@@ -1,7 +1,7 @@
 // Generated file based on boxing_deref_set.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
 	// y is boxed because p1 takes its address

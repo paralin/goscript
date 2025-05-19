@@ -253,11 +253,20 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 		impName = a.Name.Name
 	}
 
-	importPath := translateGoPathToTypescriptPath(goPath)
+	// All Go package imports are mapped to the @goscript/ scope.
+	// The TypeScript compiler will resolve these using tsconfig paths to either
+	// handwritten versions (in .goscript-assets) or transpiled versions (in goscript).
+	var tsImportPath string
+	if goPath == "github.com/aperturerobotics/goscript/builtin" {
+		tsImportPath = "@goscript/builtin/builtin.js"
+	} else {
+		tsImportPath = "@goscript/" + goPath
+	}
+
 	c.analysis.Imports[impName] = &fileImport{
-		importPath: importPath,
+		importPath: tsImportPath,
 		importVars: make(map[string]struct{}),
 	}
 
-	c.tsw.WriteImport(impName, importPath+"/index.js")
+	c.tsw.WriteImport(impName, tsImportPath+"/index.js")
 }

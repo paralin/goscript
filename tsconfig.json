@@ -14,7 +14,7 @@
     "declaration": true,
     "sourceMap": true,
     "paths": {
-      "@goscript/builtin": ["./builtin/builtin.ts"]
+      "@goscript/*": ["./gs/*"]
     }
   },
   "include": ["compiler", "builtin", "compliance"],

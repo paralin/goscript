@@ -1,7 +1,7 @@
 // Generated file based on struct_value_init_clone.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 class Point {
 	public get X(): number {

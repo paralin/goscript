@@ -1,7 +1,7 @@
 // Generated file based on async_defer_statement.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 export async function main(): Promise<void> {
 	await using __defer = new $.AsyncDisposableStack();

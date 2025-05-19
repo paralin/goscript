@@ -1,7 +1,7 @@
 // Generated file based on function_signature_type.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 type Func1 = ((a: number, b: string) => [boolean, $.GoError]) | null;
 

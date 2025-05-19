@@ -1,7 +1,7 @@
 // Generated file based on for_post_exprstmt.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin";
+import * as $ from "@goscript/builtin/builtin.js";
 
 let counter: number = 0
 
