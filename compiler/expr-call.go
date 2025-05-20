@@ -93,56 +93,27 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
 		switch funIdent.String() {
 		case "panic":
-			c.tsw.WriteLiterally("$.panic(")
+			c.tsw.WriteLiterally("$.panic")
 		case "println":
-			c.tsw.WriteLiterally("console.log(")
-			for i, arg := range exp.Args {
-				if i != 0 {
-					c.tsw.WriteLiterally(", ")
-				}
-				if err := c.WriteValueExpr(arg); err != nil {
-					return err
-				}
-			}
-			c.tsw.WriteLiterally(")")
-			return nil
+			c.tsw.WriteLiterally("console.log")
 		case "len":
 			// Translate len(arg) to $.len(arg)
-			if len(exp.Args) == 1 {
-				c.tsw.WriteLiterally("$.len(")
-				if err := c.WriteValueExpr(exp.Args[0]); err != nil {
-					return err
-				}
-				c.tsw.WriteLiterally(")")
-				return nil // Handled len
+			if len(exp.Args) != 1 {
+				return errors.Errorf("unhandled len call with incorrect number of arguments: %d != 1", len(exp.Args))
 			}
-			return errors.New("unhandled len call with incorrect number of arguments")
+			c.tsw.WriteLiterally("$.len")
 		case "cap":
 			// Translate cap(arg) to $.cap(arg)
-			if len(exp.Args) == 1 {
-				c.tsw.WriteLiterally("$.cap(")
-				if err := c.WriteValueExpr(exp.Args[0]); err != nil {
-					return err
-				}
-				c.tsw.WriteLiterally(")")
-				return nil // Handled cap
+			if len(exp.Args) != 1 {
+				return errors.Errorf("unhandled cap call with incorrect number of arguments: %d != 1", len(exp.Args))
 			}
-			return errors.New("unhandled cap call with incorrect number of arguments")
+			c.tsw.WriteLiterally("$.cap")
 		case "delete":
 			// Translate delete(map, key) to $.deleteMapEntry(map, key)
-			if len(exp.Args) == 2 {
-				c.tsw.WriteLiterally("$.deleteMapEntry(")
-				if err := c.WriteValueExpr(exp.Args[0]); err != nil { // Map
-					return err
-				}
-				c.tsw.WriteLiterally(", ")
-				if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Key
-					return err
-				}
-				c.tsw.WriteLiterally(")")
-				return nil // Handled delete
+			if len(exp.Args) != 2 {
+				return errors.Errorf("unhandled delete call with incorrect number of arguments: %d != 2", len(exp.Args))
 			}
-			return errors.New("unhandled delete call with incorrect number of arguments")
+			c.tsw.WriteLiterally("$.deleteMapEntry")
 		case "make":
 			// First check if we have a channel type
 			if typ := c.pkg.TypesInfo.TypeOf(exp.Args[0]); typ != nil {
