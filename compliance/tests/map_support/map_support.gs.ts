@@ -73,8 +73,8 @@ export function main(): void {
 		}
 	}
 
-	for (let i = 0; i < $.len(scoreResults); i++) {
-		const result = scoreResults![i]
+	for (let _i = 0; _i < $.len(scoreResults); _i++) {
+		const result = scoreResults![_i]
 		{
 			console.log(result)
 		}

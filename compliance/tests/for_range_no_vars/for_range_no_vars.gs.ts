@@ -28,9 +28,7 @@ export function main(): void {
 	console.log("Ranging over number (no vars):")
 	let numCount = 0
 	for (let _i = 0; _i < 5; _i++) {
-		{
-			numCount++
-		}
+		numCount++
 	}
 	console.log(numCount) // Expected output: 5
 }

@@ -116,8 +116,8 @@ export async function main(): Promise<void> {
 	}
 
 	// Print all messages in deterministic order
-	for (let i = 0; i < $.len(allMessages); i++) {
-		const msg = allMessages![i]
+	for (let _i = 0; _i < $.len(allMessages); _i++) {
+		const msg = allMessages![_i]
 		{
 			console.log(msg.priority, msg.text)
 		}

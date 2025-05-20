@@ -128,6 +128,11 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			c.tsw.WriteLine("}")
 			return nil
 		} else if basic.Info()&types.IsInteger != 0 {
+			// The value variable is not allowed ranging over an integer.
+			if exp.Value != nil {
+				return errors.Errorf("ranging over an integer supports key variable only (not value variable): %v", exp)
+			}
+
 			// Handle ranging over an integer (Go 1.22+)
 			// Determine the index variable name for the generated loop
 			indexVarName := "_i" // Default name
@@ -141,20 +146,13 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			if err := c.WriteValueExpr(exp.X); err != nil { // This is N
 				return fmt.Errorf("failed to write range loop integer expression: %w", err)
 			}
-			c.tsw.WriteLiterallyf("; %s++) {", indexVarName)
-			c.tsw.Indent(1)
-			c.tsw.WriteLine("")
+			c.tsw.WriteLiterallyf("; %s++) ", indexVarName)
 
-			// The value variable is not allowed ranging over an integer.
-			if exp.Value != nil {
-				return errors.Errorf("ranging over an integer supports key variable only (not value variable): %v", exp)
-			}
-
+			// write body
 			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
 				return fmt.Errorf("failed to write range loop integer body: %w", err)
 			}
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
+
 			return nil
 		}
 	}
@@ -164,7 +162,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	_, isArray := underlying.(*types.Array)
 	if isArray || isSlice {
 		// Determine the index variable name for the generated loop
-		indexVarName := "i" // Default name
+		indexVarName := "_i" // Default name
 		if exp.Key != nil {
 			if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
 				indexVarName = keyIdent.Name

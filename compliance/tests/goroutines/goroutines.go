@@ -47,7 +47,7 @@ func main() {
 	})
 
 	// Start 3 worker goroutines
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		go worker(i) // This will trigger a past error with *ast.Ident
 	}
 

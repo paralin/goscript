@@ -6,8 +6,8 @@ import * as $ from "@goscript/builtin/builtin.js";
 export function main(): void {
 	let s = $.arrayToSlice<number>([10, 20, 30])
 	let sum = 0
-	for (let i = 0; i < $.len(s); i++) {
-		const v = s![i]
+	for (let _i = 0; _i < $.len(s); _i++) {
+		const v = s![_i]
 		{
 			sum += v
 			console.log(v)
@@ -17,8 +17,8 @@ export function main(): void {
 
 	let arr = $.arrayToSlice<string>(["a", "b", "c"])
 	let concat = ""
-	for (let i = 0; i < $.len(arr); i++) {
-		const val = arr![i]
+	for (let _i = 0; _i < $.len(arr); _i++) {
+		const val = arr![_i]
 		{
 			concat += val
 			console.log(val)
