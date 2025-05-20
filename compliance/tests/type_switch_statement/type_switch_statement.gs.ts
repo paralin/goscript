@@ -6,70 +6,49 @@ import * as $ from "@goscript/builtin/builtin.js";
 export function main(): void {
 	// Basic type switch with variable and default case
 	let i: null | any = "hello"
-	{
-		const subject = i
-		if ($.typeAssert<number>(subject, {kind: $.TypeKind.Basic, name: 'number'}).ok) {
-			const v = $.typeAssert<number>(subject, {kind: $.TypeKind.Basic, name: 'number'}).value
-
-			console.log("int", v)
-		} else if ($.typeAssert<string>(subject, {kind: $.TypeKind.Basic, name: 'string'}).ok) {
-			const v = $.typeAssert<string>(subject, {kind: $.TypeKind.Basic, name: 'string'}).value
-
-			console.log("string", v)
-		} else {
-			console.log("unknown")
-		}
-	}
+	$.typeSwitch(i, [{ types: [{kind: $.TypeKind.Basic, name: 'number'}], body: (v) => {
+		console.log("int", v)
+	}},
+	{ types: [{kind: $.TypeKind.Basic, name: 'string'}], body: (v) => {
+		console.log("string", v)
+	}}], () => {
+		console.log("unknown")
+	})
 
 	// Type switch without variable
 	let x: null | any = 123
-	{
-		const subject = x
-		if ($.typeAssert<boolean>(subject, {kind: $.TypeKind.Basic, name: 'boolean'}).ok) {
-			console.log("bool")
-		} else if ($.typeAssert<number>(subject, {kind: $.TypeKind.Basic, name: 'number'}).ok) {
-			console.log("int")
-		}
-	}
+	$.typeSwitch(x, [{ types: [{kind: $.TypeKind.Basic, name: 'boolean'}], body: () => {
+		console.log("bool")
+	}},
+	{ types: [{kind: $.TypeKind.Basic, name: 'number'}], body: () => {
+		console.log("int")
+	}}])
 
 	// Type switch with multiple types in a case
 	let y: null | any = true
-	{
-		const subject = y
-		if ($.is(subject, {kind: $.TypeKind.Basic, name: 'number'}) || $.is(subject, {kind: $.TypeKind.Basic, name: 'number'})) {
-			const v = subject
-
-			console.log("number", v)
-		} else if ($.is(subject, {kind: $.TypeKind.Basic, name: 'string'}) || $.is(subject, {kind: $.TypeKind.Basic, name: 'boolean'})) {
-			const v = subject
-
-			console.log("string or bool", v)
-		}
-	}
+	$.typeSwitch(y, [{ types: [{kind: $.TypeKind.Basic, name: 'number'}, {kind: $.TypeKind.Basic, name: 'number'}], body: (v) => {
+		console.log("number", v)
+	}},
+	{ types: [{kind: $.TypeKind.Basic, name: 'string'}, {kind: $.TypeKind.Basic, name: 'boolean'}], body: (v) => {
+		console.log("string or bool", v)
+	}}])
 
 	// Type switch with initialization statement
 	{
 		let z = getInterface()
-		if (true) {
-			{
-				const subject = z
-				if ($.typeAssert<number>(subject, {kind: $.TypeKind.Basic, name: 'number'}).ok) {
-					const v = $.typeAssert<number>(subject, {kind: $.TypeKind.Basic, name: 'number'}).value
-
-					console.log("z is int", v)
-				}
-			}
-		}
+		$.typeSwitch(z, [{ types: [{kind: $.TypeKind.Basic, name: 'number'}], body: (v) => {
+			console.log("z is int", v)
+		}}])
 	}
 
 	// Default-only type switch
 	let w: null | any = "test"
-	{
-		const subject = w
-		{ // Default only case
-			console.log("default only")
-		}
-	}
+	$.typeSwitch(w, [], () => {
+		console.log("default only")
+	})
+	$.typeSwitch(w, [], () => {
+		console.log("default only, value is", $.mustTypeAssert<string>(w, {kind: $.TypeKind.Basic, name: 'string'}))
+	})
 }
 
 function getInterface(): null | any {

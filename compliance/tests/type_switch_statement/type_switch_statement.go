@@ -20,7 +20,7 @@ func main() {
 	case int:
 		println("int")
 	}
-	
+
 	// Type switch with multiple types in a case
 	var y interface{} = true
 	switch v := y.(type) {
@@ -29,20 +29,22 @@ func main() {
 	case string, bool:
 		println("string or bool", v)
 	}
-	
+
 	// Type switch with initialization statement
-	if z := getInterface(); true {
-		switch v := z.(type) {
-		case int:
-			println("z is int", v)
-		}
+	switch z := getInterface(); v := z.(type) {
+	case int:
+		println("z is int", v)
 	}
-	
+
 	// Default-only type switch
 	var w interface{} = "test"
 	switch w.(type) {
 	default:
 		println("default only")
+	}
+	switch w.(type) {
+	default:
+		println("default only, value is", w.(string))
 	}
 }
 

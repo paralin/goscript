@@ -1009,18 +1009,6 @@ function areMethodArgsArraysIdentical(
   return true
 }
 
-/**
- * Checks if a value is of a specific type.
- * Similar to typeAssert but only returns a boolean without extracting the value.
- * 
- * @param value The value to check
- * @param typeInfo The type information to check against
- * @returns True if the value matches the type, false otherwise
- */
-export function is(value: any, typeInfo: string | TypeInfo): boolean {
-  return matchesType(value, normalizeTypeInfo(typeInfo))
-}
-
 export function areTypeInfosIdentical(
   type1InfoOrName: string | TypeInfo,
   type2InfoOrName: string | TypeInfo,
@@ -1537,7 +1525,15 @@ function matchesType(value: any, info: TypeInfo): boolean {
       return false
   }
 }
-
+/**
+ * Performs a type assertion on a value against a specified type.
+ * Returns an object containing the value (cast to type T) and a boolean indicating success.
+ * This is used to implement Go's type assertion with comma-ok idiom: value, ok := x.(Type)
+ * 
+ * @param value The value to check against the type
+ * @param typeInfo The type information to check against (can be a string name or TypeInfo object)
+ * @returns An object with the asserted value and a boolean indicating if the assertion succeeded
+ */
 export function typeAssert<T>(
   value: any,
   typeInfo: string | TypeInfo,
@@ -1693,11 +1689,64 @@ export function typeAssert<T>(
 }
 
 /**
- * Represents the result of a channel receive operation with 'ok' value
+ * Performs a type assertion on a value against a specified type.
+ * Returns the value (cast to type T) if the assertion is successful,
+ * otherwise throws a runtime error.
+ * This is used to implement Go's single-value type assertion: value := x.(Type)
+ *
+ * @param value The value to check against the type
+ * @param typeInfo The type information to check against (can be a string name or TypeInfo object)
+ * @returns The asserted value if the assertion succeeded
+ * @throws Error if the type assertion fails
  */
+export function mustTypeAssert<T>(
+  value: any,
+  typeInfo: string | TypeInfo,
+): T {
+  const { value: assertedValue, ok } = typeAssert<T>(value, typeInfo)
+  if (!ok) {
+    const targetTypeName = typeof typeInfo === 'string' ? typeInfo : typeInfo.name || JSON.stringify(typeInfo)
+    let valueTypeName: string | "nil" = typeof value
+    if (value && value.constructor && value.constructor.name) {
+      valueTypeName = value.constructor.name
+    }
+    if (value === null) {
+      valueTypeName = "nil"
+    }
+    throw new Error(
+      `inline type conversion panic: value is ${valueTypeName}, not ${targetTypeName}`,
+    )
+  }
+  return assertedValue
+}
+
+/**
+ * Checks if a value is of a specific type.
+ * Similar to typeAssert but only returns a boolean without extracting the value.
+ * 
+ * @param value The value to check
+ * @param typeInfo The type information to check against
+ * @returns True if the value matches the type, false otherwise
+ */
+export function is(value: any, typeInfo: string | TypeInfo): boolean {
+  return matchesType(value, normalizeTypeInfo(typeInfo))
+}
+
+/**
+ * Represents a case in a type switch statement.
+ * Each case matches against one or more types and contains a body function to execute when matched.
+ */
+export interface TypeSwitchCase {
+ types: (string | TypeInfo)[]; // Array of types for this case (e.g., case int, string:)
+ body: (value?: any) => void; // Function representing the case body. 'value' is the asserted value if applicable.
+}
+
+/**
+* Represents the result of a channel receive operation with 'ok' value
+*/
 export interface ChannelReceiveResult<T> {
-  value: T // Should be T | ZeroValue<T>
-  ok: boolean
+ value: T // Should be T | ZeroValue<T>
+ ok: boolean
 }
 
 /**
@@ -1772,6 +1821,48 @@ export interface Channel<T> {
    */
   canSendNonBlocking(): boolean
 }
+
+/**
+ * Helper for Go's type switch statement.
+ * Executes the body of the first case whose type matches the value.
+ *
+ * @param value The value being switched upon.
+ * @param cases An array of TypeSwitchCase objects.
+ * @param defaultCase Optional function for the default case.
+ */
+export function typeSwitch(
+  value: any,
+  cases: TypeSwitchCase[],
+  defaultCase?: () => void,
+): void {
+  for (const caseObj of cases) {
+    // For cases with multiple types (case T1, T2:), use $.is
+    if (caseObj.types.length > 1) {
+      const matchesAny = caseObj.types.some(typeInfo => is(value, typeInfo));
+      if (matchesAny) {
+        // For multi-type cases, the case variable (if any) gets the original value
+        caseObj.body(value);
+        return; // Found a match, exit switch
+      }
+    } else if (caseObj.types.length === 1) {
+      // For single-type cases (case T:), use $.typeAssert to get the typed value and ok status
+      const typeInfo = caseObj.types[0];
+      const { value: assertedValue, ok } = typeAssert(value, typeInfo);
+      if (ok) {
+        // Pass the asserted value to the case body function
+        caseObj.body(assertedValue);
+        return; // Found a match, exit switch
+      }
+    }
+    // Note: Cases with 0 types are not valid in Go type switches
+  }
+
+  // If no case matched and a default case exists, execute it
+  if (defaultCase) {
+    defaultCase();
+  }
+}
+
 
 // A simple implementation of buffered channels
 class BufferedChannel<T> implements Channel<T> {

@@ -52,16 +52,13 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 // by the runtime for error messages.
 func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 	// Generate a call to $.typeAssert
-	c.tsw.WriteLiterally("$.typeAssert<")
+	c.tsw.WriteLiterally("$.mustTypeAssert<")
 	c.WriteTypeExpr(exp.Type) // Write the asserted type for the generic
 	c.tsw.WriteLiterally(">(")
 	if err := c.WriteValueExpr(exp.X); err != nil { // The interface expression
 		return fmt.Errorf("failed to write interface expression in type assertion expression: %w", err)
 	}
 	c.tsw.WriteLiterally(", ")
-
-	// Write the type description instead of just the type name
-	// This ensures we generate proper type info objects for all types
 
 	// Unwrap parenthesized expressions to handle cases like r.((<-chan T))
 	typeExpr := exp.Type
@@ -75,7 +72,8 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 
 	c.writeTypeDescription(typeExpr)
 
-	c.tsw.WriteLiterally(")") // Just close the parenthesis, don't access .value directly
+	c.tsw.WriteLiterally(")")
+
 	return nil
 }
 
