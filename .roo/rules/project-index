@@ -126,6 +126,7 @@ The following is an overview of the functions within the `compiler` package.
 
 ## spec-struct.go
 - `(c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType) error`
+- `(c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named) string`
 
 ## spec-value.go
 - `(c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error`
@@ -176,7 +177,6 @@ The following is an overview of the functions within the `compiler` package.
 - `(c *GoToTSCompiler) WriteSignatureType(t *types.Signature)`
 - `(c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode *ast.InterfaceType)`
 - `(c *GoToTSCompiler) getTypeString(goType types.Type) string`
-- `(c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named) string`
 - `(c *GoToTSCompiler) WriteStructType(t *types.Struct)`
 
 ## type-assert.go

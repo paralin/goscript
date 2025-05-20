@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/types"
-	"sort"
 	"strings"
 )
 
@@ -435,103 +434,6 @@ func (c *GoToTSCompiler) getTypeString(goType types.Type) string {
 	tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
 	tempCompiler.WriteGoType(goType)
 	return typeStr.String()
-}
-
-// generateFlattenedInitTypeString generates a TypeScript type string for the
-// initialization object passed to a Go struct's constructor (`_init` method in TypeScript).
-// The generated type is a `Partial`-like structure, `"{ Field1?: Type1, Field2?: Type2, ... }"`,
-// including all direct and promoted fields of the `structType`.
-//   - It iterates through the direct fields of the `structType`. Exported fields
-//     are included with their TypeScript types (obtained via `WriteGoType`).
-//   - For anonymous (embedded) fields, it generates a type like `EmbeddedName?: ConstructorParameters<typeof EmbeddedName>[0]`,
-//     allowing initialization of the embedded struct's fields directly within the outer struct's initializer.
-//   - It then uses `types.NewMethodSet` and checks for `types.Var` objects that are fields
-//     to find promoted fields from embedded structs, adding them to the type string if not already present.
-//
-// The resulting string is sorted by field name for deterministic output and represents
-// the shape of the object expected by the struct's TypeScript constructor.
-func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named) string {
-	if structType == nil {
-		return "{}"
-	}
-
-	// Use a map to collect unique field names and their types
-	fieldMap := make(map[string]string)
-	embeddedTypeMap := make(map[string]string) // Stores TS type string for embedded struct initializers
-
-	underlying, ok := structType.Underlying().(*types.Struct)
-	if !ok {
-		return "{}"
-	}
-
-	// First add the direct fields and track embedded types
-	for i := 0; i < underlying.NumFields(); i++ {
-		field := underlying.Field(i)
-		fieldName := field.Name()
-
-		if !field.Exported() && field.Pkg() != c.pkg.Types {
-			continue
-		}
-
-		if field.Anonymous() {
-			fieldType := field.Type()
-			isPtr := false
-			if ptr, ok := fieldType.(*types.Pointer); ok {
-				fieldType = ptr.Elem()
-				isPtr = true
-			}
-
-			if named, ok := fieldType.(*types.Named); ok {
-				embeddedName := named.Obj().Name()
-				// For embedded structs, the init type should allow providing fields of the embedded struct,
-				// or the embedded struct itself.
-				// We generate Partial<EmbeddedStructFields> | EmbeddedStructType
-				// This is complex. For now, let's use ConstructorParameters as before for simplicity,
-				// or allow the embedded struct type itself.
-				// The example `Person?: ConstructorParameters<typeof Person>[0]` is for the fields.
-				// Let's try to generate a type that allows either the embedded struct instance or its fields.
-				// This might be: `Partial<FlattenedInitType<EmbeddedName>> | EmbeddedName`
-				// For now, stick to the simpler `ConstructorParameters<typeof %s>[0]` which implies field-based init.
-				// Or, more simply, the type of the embedded struct itself if it's a pointer.
-				if isPtr {
-					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type()) // MyEmbeddedType | null
-				} else {
-					// For value-type embedded structs, allow initializing with its fields.
-					// This requires getting the flattened init type for the embedded struct.
-					// This could lead to recursion if not handled carefully.
-					// A simpler approach for now: use the embedded struct's own type.
-					// embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type())
-					// Or, using ConstructorParameters to allow field-based initialization:
-					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
-				}
-			}
-			continue
-		}
-		fieldMap[fieldName] = c.getTypeString(field.Type())
-	}
-
-	// Promoted fields (handled by Go's embedding, init should use direct/embedded names)
-	// The current logic for `generateFlattenedInitTypeString` seems to focus on top-level
-	// settable properties in the constructor. Promoted fields are accessed via `this.promotedField`,
-	// not typically set directly in `init?` unless the embedded struct itself is named in `init?`.
-
-	// Add embedded types to the field map (these are the names of the embedded structs themselves)
-	for embeddedName, embeddedTSType := range embeddedTypeMap {
-		fieldMap[embeddedName] = embeddedTSType
-	}
-
-	var fieldNames []string
-	for name := range fieldMap {
-		fieldNames = append(fieldNames, name)
-	}
-	sort.Strings(fieldNames)
-
-	var fieldDefs []string
-	for _, fieldName := range fieldNames {
-		fieldDefs = append(fieldDefs, fmt.Sprintf("%s?: %s", fieldName, fieldMap[fieldName]))
-	}
-
-	return "{" + strings.Join(fieldDefs, ", ") + "}"
 }
 
 // WriteStructType translates a Go struct type definition (`ast.StructType`)
