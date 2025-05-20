@@ -1,6 +1,8 @@
 package compiler
 
-import "go/ast"
+import (
+	"go/ast"
+)
 
 // WriteValueExpr translates a Go abstract syntax tree (AST) expression (`ast.Expr`)
 // that represents a value into its TypeScript value equivalent.
@@ -51,42 +53,7 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 	case *ast.IndexExpr:
 		return c.WriteIndexExpr(exp)
 	case *ast.SliceExpr:
-		// Translate Go slice expression to $.goSlice(x, low, high, max)
-		c.tsw.WriteLiterally("$.goSlice(")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return err
-		}
-		// low argument
-		c.tsw.WriteLiterally(", ")
-		if exp.Low != nil {
-			if err := c.WriteValueExpr(exp.Low); err != nil {
-				return err
-			}
-		} else {
-			c.tsw.WriteLiterally("undefined")
-		}
-		// high argument
-		c.tsw.WriteLiterally(", ")
-		if exp.High != nil {
-			if err := c.WriteValueExpr(exp.High); err != nil {
-				return err
-			}
-		} else {
-			c.tsw.WriteLiterally("undefined")
-		}
-		// max argument (only for full slice expressions)
-		if exp.Slice3 {
-			c.tsw.WriteLiterally(", ")
-			if exp.Max != nil {
-				if err := c.WriteValueExpr(exp.Max); err != nil {
-					return err
-				}
-			} else {
-				c.tsw.WriteLiterally("undefined")
-			}
-		}
-		c.tsw.WriteLiterally(")")
-		return nil
+		return c.WriteSliceExpr(exp)
 	case *ast.ParenExpr:
 		// Check if this is a nil pointer to struct type cast: (*struct{})(nil)
 		if starExpr, isStarExpr := exp.X.(*ast.StarExpr); isStarExpr {

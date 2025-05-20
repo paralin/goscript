@@ -13,8 +13,9 @@ import (
 func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 	// Handle map access: use Map.get() instead of brackets for reading values
 	if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
+		underlyingType := tv.Type.Underlying()
 		// Check if it's a map type
-		if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
+		if mapType, isMap := underlyingType.(*types.Map); isMap {
 			c.tsw.WriteLiterally("$.mapGet(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
@@ -27,6 +28,20 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 
 			// Generate the zero value as the default value for mapGet
 			c.WriteZeroValueForType(mapType.Elem())
+			c.tsw.WriteLiterally(")")
+			return nil
+		}
+
+		// Check if it's a string type
+		if basicType, isBasic := underlyingType.(*types.Basic); isBasic && (basicType.Info()&types.IsString) != 0 {
+			c.tsw.WriteLiterally("$.indexString(")
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return err
+			}
+			c.tsw.WriteLiterally(", ")
+			if err := c.WriteValueExpr(exp.Index); err != nil {
+				return err
+			}
 			c.tsw.WriteLiterally(")")
 			return nil
 		}
@@ -332,6 +347,84 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 		}
 	}
 
+	return nil
+}
+
+// WriteSliceExpr translates a Go slice expression (e.g., `s[low:high:max]`) to its TypeScript equivalent.
+// If `s` is a string and it's not a 3-index slice, it uses `s.substring(low, high)`.
+// Otherwise, it falls back to the `$.goSlice(s, low, high, max)` runtime helper.
+func (c *GoToTSCompiler) WriteSliceExpr(exp *ast.SliceExpr) error {
+	// Check if the expression being sliced is a string
+	tv := c.pkg.TypesInfo.TypeOf(exp.X)
+	isString := false
+	if tv != nil {
+		if basicType, isBasic := tv.Underlying().(*types.Basic); isBasic && (basicType.Info()&types.IsString) != 0 {
+			isString = true
+		}
+	}
+
+	if isString && !exp.Slice3 {
+		// Use $.sliceString for byte-correct string slicing
+		c.tsw.WriteLiterally("$.sliceString(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return err
+		}
+		c.tsw.WriteLiterally(", ")
+		if exp.Low != nil {
+			if err := c.WriteValueExpr(exp.Low); err != nil {
+				return err
+			}
+		} else {
+			// Go's default low for string[:high] is 0.
+			// $.sliceString can handle undefined for low as 0.
+			c.tsw.WriteLiterally("undefined")
+		}
+		c.tsw.WriteLiterally(", ")
+		if exp.High != nil {
+			if err := c.WriteValueExpr(exp.High); err != nil {
+				return err
+			}
+		} else {
+			// Go's default high for string[low:] means to the end.
+			// $.sliceString can handle undefined for high as end of string.
+			c.tsw.WriteLiterally("undefined")
+		}
+		c.tsw.WriteLiterally(")")
+	} else {
+		// Fallback to $.goSlice for actual slices (arrays) or 3-index string slices (which are rare and might need $.goSlice's complexity)
+		// Or if it's a string but has Slice3, it's not handled by simple substring.
+		c.tsw.WriteLiterally("$.goSlice(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return err
+		}
+		c.tsw.WriteLiterally(", ")
+		if exp.Low != nil {
+			if err := c.WriteValueExpr(exp.Low); err != nil {
+				return err
+			}
+		} else {
+			c.tsw.WriteLiterally("undefined")
+		}
+		c.tsw.WriteLiterally(", ")
+		if exp.High != nil {
+			if err := c.WriteValueExpr(exp.High); err != nil {
+				return err
+			}
+		} else {
+			c.tsw.WriteLiterally("undefined")
+		}
+		if exp.Slice3 {
+			c.tsw.WriteLiterally(", ")
+			if exp.Max != nil {
+				if err := c.WriteValueExpr(exp.Max); err != nil {
+					return err
+				}
+			} else {
+				c.tsw.WriteLiterally("undefined")
+			}
+		}
+		c.tsw.WriteLiterally(")")
+	}
 	return nil
 }
 

@@ -22,7 +22,6 @@ func main() {
 	numWorkers := 5
 	wg.Add(numWorkers)
 
-
 	// Function that will be run by each worker
 	worker := func(id int) {
 		defer wg.Done()

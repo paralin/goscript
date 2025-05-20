@@ -34,10 +34,10 @@
         "default": "./dist/compiler/index.js"
       }
     },
-    "./builtin": {
+    "./gs/builtin": {
       "import": {
-        "types": "./dist/builtin/builtin.d.ts",
-        "default": "./dist/builtin/builtin.js"
+        "types": "./dist/gs/builtin/builtin.d.ts",
+        "default": "./dist/gs/builtin/builtin.js"
       }
     }
   },
@@ -52,7 +52,7 @@
     "format": "npm run format:go && npm run format:js && npm run format:config",
     "format:config": "prettier --write tsconfig.json package.json",
     "format:go": "gofumpt -w .",
-    "format:js": "prettier --write './{src,builtin,example}/**/(*.ts|*.tsx|*.html|*.css|*.scss)'",
+    "format:js": "prettier --write './{src,gs,example}/**/(*.ts|*.tsx|*.html|*.css|*.scss)'",
     "release": "npm run release:version && npm run release:commit",
     "release:minor": "npm run release:version:minor && npm run release:commit",
     "release:version": "npm version patch -m \"release: v%s\" --no-git-tag-version",

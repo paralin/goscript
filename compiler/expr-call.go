@@ -71,6 +71,23 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				}
 			}
 		}
+		// Check if it's a []byte type and the argument is a string
+		if eltIdent, ok := arrayType.Elt.(*ast.Ident); ok && eltIdent.Name == "byte" && arrayType.Len == nil {
+			if len(exp.Args) == 1 {
+				arg := exp.Args[0]
+				// Ensure TypesInfo is available and the argument type can be determined
+				if tv, typeOk := c.pkg.TypesInfo.Types[arg]; typeOk && tv.Type != nil {
+					if basicArgType, isBasic := tv.Type.Underlying().(*types.Basic); isBasic && (basicArgType.Info()&types.IsString) != 0 {
+						c.tsw.WriteLiterally("$.stringToBytes(")
+						if err := c.WriteValueExpr(arg); err != nil {
+							return fmt.Errorf("failed to write argument for []byte(string) conversion: %w", err)
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled []byte(string)
+					}
+				}
+			}
+		}
 	}
 
 	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
@@ -256,7 +273,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				// Handle direct string(int32) conversion
 				// This assumes 'rune' is int32
 				if tv, ok := c.pkg.TypesInfo.Types[arg]; ok {
-					if basic, isBasic := tv.Type.Underlying().(*types.Basic); isBasic && basic.Kind() == types.Int32 {
+					if basic, isBasic := tv.Type.Underlying().(*types.Basic); isBasic && (basic.Kind() == types.Int32 || basic.Kind() == types.UntypedRune) {
 						// Translate string(rune_val) to String.fromCharCode(rune_val)
 						c.tsw.WriteLiterally("String.fromCharCode(")
 						if err := c.WriteValueExpr(arg); err != nil {

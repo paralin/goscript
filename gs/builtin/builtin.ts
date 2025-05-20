@@ -11,7 +11,7 @@ export function println(...args: any[]): void {
  * @param args Arguments passed to panic
  */
 export function panic(...args: any[]): void {
-  throw new Error(`panic: ${args.map(arg => String(arg)).join(' ')}`);
+  throw new Error(`panic: ${args.map((arg) => String(arg)).join(' ')}`)
 }
 
 /**
@@ -379,7 +379,7 @@ export const len = <T = unknown, V = unknown>(
   }
 
   if (typeof obj === 'string') {
-    return obj.length
+    return stringLen(obj) // Call new stringLen for strings
   }
 
   if (obj instanceof Map || obj instanceof Set) {
@@ -641,6 +641,119 @@ export const byte = (n: number): number => {
   return n & 0xff // Bitwise AND with 255 ensures we get a value in the range 0-255
 }
 
+/**
+ * Accesses the byte value at a specific index of a UTF-8 encoded string.
+ * Mimics Go's string indexing behavior: `myString[index]`
+ * @param str The string to access.
+ * @param index The byte index.
+ * @returns The byte value (0-255) at the specified index.
+ * @throws Error if index is out of bounds.
+ */
+export const indexString = (str: string, index: number): number => {
+  const bytes = new TextEncoder().encode(str)
+  if (index < 0 || index >= bytes.length) {
+    throw new Error(
+      `runtime error: index out of range [${index}] with length ${bytes.length}`,
+    )
+  }
+  return bytes[index]
+}
+
+/**
+ * Returns the byte length of a string.
+ * Mimics Go's `len(string)` behavior.
+ * @param str The string.
+ * @returns The number of bytes in the UTF-8 representation of the string.
+ */
+export const stringLen = (str: string): number => {
+  return new TextEncoder().encode(str).length
+}
+
+
+
+/**
+ * Slices a string based on byte indices.
+ * Mimics Go's string slicing behavior: `myString[low:high]` for valid UTF-8 slices only.
+ * @param str The string to slice.
+ * @param low The starting byte index (inclusive). Defaults to 0.
+ * @param high The ending byte index (exclusive). Defaults to string byte length.
+ * @returns The sliced string.
+ * @throws Error if the slice would create invalid UTF-8.
+ */
+export const sliceString = (
+  str: string,
+  low?: number,
+  high?: number,
+): string => {
+  const bytes = new TextEncoder().encode(str)
+  const actualLow = low === undefined ? 0 : low
+  const actualHigh = high === undefined ? bytes.length : high
+
+  if (actualLow < 0 || actualHigh < actualLow || actualHigh > bytes.length) {
+    // Go's behavior for out-of-bounds slice on string is a panic.
+    // For simple slices like s[len(s):len(s)], it should produce an empty string.
+    // For s[len(s)+1:], it panics.
+    // Let's ensure high <= bytes.length and low <= high.
+    // If low == high, it's an empty string.
+    if (
+      actualLow === actualHigh &&
+      actualLow >= 0 &&
+      actualLow <= bytes.length
+    ) {
+      return ''
+    }
+    throw new Error(
+      `runtime error: slice bounds out of range [${actualLow}:${actualHigh}] with length ${bytes.length}`,
+    )
+  }
+
+  const slicedBytes = bytes.subarray(actualLow, actualHigh)
+  
+  try {
+    // Attempt to decode with strict UTF-8 validation
+    const result = new TextDecoder('utf-8', { fatal: true }).decode(slicedBytes)
+    return result
+  } catch (e) {
+    // If we get here, the slice would create invalid UTF-8
+    // This is a fundamental limitation of JavaScript string handling
+    throw new Error(
+      `Cannot slice string at byte indices [${actualLow}:${actualHigh}] because it would create invalid UTF-8. ` +
+      `This is a limitation of JavaScript's string handling.`
+    )
+  }
+}
+
+/**
+ * Converts a Slice<number> (byte array) to a string using TextDecoder.
+ * @param bytes The Slice<number> to convert.
+ * @returns The resulting string.
+ */
+export const bytesToString = (bytes: Slice<number>): string => {
+  if (bytes === null) return ''
+  // Ensure we get a plain number[] for Uint8Array.from
+  let byteArray: number[]
+  if (isComplexSlice(bytes)) {
+    // For complex slices, extract the relevant part of the backing array
+    byteArray = bytes.__meta__.backing.slice(
+      bytes.__meta__.offset,
+      bytes.__meta__.offset + bytes.__meta__.length,
+    )
+  } else {
+    // For simple T[] slices
+    byteArray = bytes
+  }
+  return new TextDecoder().decode(Uint8Array.from(byteArray))
+}
+
+/**
+ * Converts a string to a Uint8Array (byte slice).
+ * @param s The input string.
+ * @returns A Uint8Array representing the UTF-8 bytes of the string.
+ */
+export function stringToBytes(s: string): Uint8Array {
+  return new TextEncoder().encode(s)
+}
+
 /** Box represents a Go variable which can be referred to by other variables.
  *
  * For example:
@@ -744,17 +857,17 @@ export interface BaseTypeInfo {
  * Represents an argument or a return value of a method.
  */
 export interface MethodArg {
-  name?: string; // Name of the argument/return value, if available
-  type: TypeInfo | string; // TypeInfo object or string name of the type
+  name?: string // Name of the argument/return value, if available
+  type: TypeInfo | string // TypeInfo object or string name of the type
 }
 
 /**
  * Represents the signature of a method, including its name, arguments, and return types.
  */
 export interface MethodSignature {
-  name: string;
-  args: MethodArg[];
-  returns: MethodArg[];
+  name: string
+  args: MethodArg[]
+  returns: MethodArg[]
 }
 
 /**
@@ -976,14 +1089,14 @@ function compareOptionalTypeInfo(
 ): boolean {
   if (type1 === undefined && type2 === undefined) return true
   if (type1 === undefined || type2 === undefined) return false
-  // Assuming areTypeInfosIdentical will handle normalization if needed, 
+  // Assuming areTypeInfosIdentical will handle normalization if needed,
   // but type1 and type2 here are expected to be direct fields from TypeInfo objects.
   return areTypeInfosIdentical(type1, type2)
 }
 
 function areFuncParamOrResultArraysIdentical(
   arr1?: (string | TypeInfo)[],
-  arr2?: (string | TypeInfo)[]
+  arr2?: (string | TypeInfo)[],
 ): boolean {
   if (arr1 === undefined && arr2 === undefined) return true
   if (arr1 === undefined || arr2 === undefined) return false
@@ -1040,7 +1153,9 @@ export function areTypeInfosIdentical(
   if (t1Norm.name !== t2Norm.name) return false
 
   // If both are named and names match, for Basic, Struct, Interface, this is sufficient for identity.
-  if (t1Norm.name !== undefined /* && t2Norm.name is also defined and equal */) {
+  if (
+    t1Norm.name !== undefined /* && t2Norm.name is also defined and equal */
+  ) {
     if (
       t1Norm.kind === TypeKind.Basic ||
       t1Norm.kind === TypeKind.Struct ||
@@ -1088,7 +1203,8 @@ export function areTypeInfosIdentical(
     case TypeKind.Channel:
       return (
         // Ensure direction property exists before comparing, or handle undefined if it can be
-        ((t1Norm as ChannelTypeInfo).direction || 'both') === ((t2Norm as ChannelTypeInfo).direction || 'both') &&
+        ((t1Norm as ChannelTypeInfo).direction || 'both') ===
+          ((t2Norm as ChannelTypeInfo).direction || 'both') &&
         compareOptionalTypeInfo(
           (t1Norm as ChannelTypeInfo).elemType,
           (t2Norm as ChannelTypeInfo).elemType,
@@ -1224,14 +1340,18 @@ function matchesStructType(value: any, info: TypeInfo): boolean {
  */
 function matchesInterfaceType(value: any, info: TypeInfo): boolean {
   // Check basic conditions first
-  if (!isInterfaceTypeInfo(info) || typeof value !== 'object' || value === null) {
+  if (
+    !isInterfaceTypeInfo(info) ||
+    typeof value !== 'object' ||
+    value === null
+  ) {
     return false
   }
 
   // For interfaces, check if the value has all the required methods with compatible signatures
   return info.methods.every((requiredMethodSig) => {
     const actualMethod = (value as any)[requiredMethodSig.name]
-    
+
     // Method must exist and be a function
     if (typeof actualMethod !== 'function') {
       return false
@@ -1241,16 +1361,16 @@ function matchesInterfaceType(value: any, info: TypeInfo): boolean {
     // Note: This is a simplified check as JavaScript functions can have optional/rest parameters
     const declaredParamCount = actualMethod.length
     const requiredParamCount = requiredMethodSig.args.length
-    
+
     // Strict arity checking can be problematic in JS, so we'll be lenient
     // A method with fewer params than required is definitely incompatible
     if (declaredParamCount < requiredParamCount) {
       return false
     }
-    
+
     // Check return types if we can determine them
     // This is challenging in JavaScript without runtime type information
-    
+
     // If the value has a __goTypeName property, it might be a registered type
     // with more type information available
     if (value.__goTypeName) {
@@ -1258,24 +1378,26 @@ function matchesInterfaceType(value: any, info: TypeInfo): boolean {
       if (valueTypeInfo && isStructTypeInfo(valueTypeInfo)) {
         // Find the matching method in the value's type info
         const valueMethodSig = valueTypeInfo.methods.find(
-          m => m.name === requiredMethodSig.name
+          (m) => m.name === requiredMethodSig.name,
         )
-        
+
         if (valueMethodSig) {
           // Compare return types
-          if (valueMethodSig.returns.length !== requiredMethodSig.returns.length) {
+          if (
+            valueMethodSig.returns.length !== requiredMethodSig.returns.length
+          ) {
             return false
           }
-          
+
           // Compare each return type for compatibility
           for (let i = 0; i < requiredMethodSig.returns.length; i++) {
             const requiredReturnType = normalizeTypeInfo(
-              requiredMethodSig.returns[i].type
+              requiredMethodSig.returns[i].type,
             )
             const valueReturnType = normalizeTypeInfo(
-              valueMethodSig.returns[i].type
+              valueMethodSig.returns[i].type,
             )
-            
+
             // For interface return types, we need to check if the value's return type
             // implements the required interface
             if (isInterfaceTypeInfo(requiredReturnType)) {
@@ -1287,19 +1409,19 @@ function matchesInterfaceType(value: any, info: TypeInfo): boolean {
                 // This would require additional implementation tracking
                 return false
               }
-            } 
+            }
             // For non-interface types, check direct type compatibility
             else if (requiredReturnType.name !== valueReturnType.name) {
               return false
             }
           }
-          
+
           // Similarly, we could check parameter types for compatibility
           // but we'll skip that for brevity
         }
       }
     }
-    
+
     // If we can't determine detailed type information, we'll accept the method
     // as long as it exists with a compatible arity
     return true
@@ -1545,7 +1667,7 @@ function matchesType(value: any, info: TypeInfo): boolean {
  * Performs a type assertion on a value against a specified type.
  * Returns an object containing the value (cast to type T) and a boolean indicating success.
  * This is used to implement Go's type assertion with comma-ok idiom: value, ok := x.(Type)
- * 
+ *
  * @param value The value to check against the type
  * @param typeInfo The type information to check against (can be a string name or TypeInfo object)
  * @returns An object with the asserted value and a boolean indicating if the assertion succeeded
@@ -1562,46 +1684,60 @@ export function typeAssert<T>(
 
   if (
     isStructTypeInfo(normalizedType) &&
-    normalizedType.methods && normalizedType.methods.length > 0 &&
+    normalizedType.methods &&
+    normalizedType.methods.length > 0 &&
     typeof value === 'object' &&
     value !== null
   ) {
     // Check if the value implements all methods of the struct type with compatible signatures.
     // This is more for interface satisfaction by a struct.
     // For struct-to-struct assertion, usually instanceof or field checks are primary.
-    const allMethodsMatch = normalizedType.methods.every((requiredMethodSig) => {
-      const actualMethod = (value as any)[requiredMethodSig.name];
-      if (typeof actualMethod !== 'function') {
-        return false;
-      }
-      const valueTypeInfoVal = (value as any).$typeInfo
-      if (valueTypeInfoVal) {
-        const normalizedValueType = normalizeTypeInfo(valueTypeInfoVal)
-        if (isStructTypeInfo(normalizedValueType) || isInterfaceTypeInfo(normalizedValueType)) {
-          const actualValueMethodSig = normalizedValueType.methods.find(m => m.name === requiredMethodSig.name)
-          if (actualValueMethodSig) {
-            // Perform full signature comparison using MethodSignatures
-            const paramsMatch = areMethodArgsArraysIdentical(requiredMethodSig.args, actualValueMethodSig.args)
-            const resultsMatch = areMethodArgsArraysIdentical(requiredMethodSig.returns, actualValueMethodSig.returns)
-            return paramsMatch && resultsMatch
-          } else {
-            // Value has TypeInfo listing methods, but this specific method isn't listed.
-            // This implies a mismatch for strict signature check based on TypeInfo.
-            return false
+    const allMethodsMatch = normalizedType.methods.every(
+      (requiredMethodSig) => {
+        const actualMethod = (value as any)[requiredMethodSig.name]
+        if (typeof actualMethod !== 'function') {
+          return false
+        }
+        const valueTypeInfoVal = (value as any).$typeInfo
+        if (valueTypeInfoVal) {
+          const normalizedValueType = normalizeTypeInfo(valueTypeInfoVal)
+          if (
+            isStructTypeInfo(normalizedValueType) ||
+            isInterfaceTypeInfo(normalizedValueType)
+          ) {
+            const actualValueMethodSig = normalizedValueType.methods.find(
+              (m) => m.name === requiredMethodSig.name,
+            )
+            if (actualValueMethodSig) {
+              // Perform full signature comparison using MethodSignatures
+              const paramsMatch = areMethodArgsArraysIdentical(
+                requiredMethodSig.args,
+                actualValueMethodSig.args,
+              )
+              const resultsMatch = areMethodArgsArraysIdentical(
+                requiredMethodSig.returns,
+                actualValueMethodSig.returns,
+              )
+              return paramsMatch && resultsMatch
+            } else {
+              // Value has TypeInfo listing methods, but this specific method isn't listed.
+              // This implies a mismatch for strict signature check based on TypeInfo.
+              return false
+            }
           }
         }
-      }
 
-      // Fallback: Original behavior if value has no TypeInfo that lists methods,
-      // or if the method wasn't found in its TypeInfo (covered by 'else' returning false above).
-      // The original comment was: "For now, presence and function type is checked by matchesStructType/matchesInterfaceType"
-      // This 'return true' implies that if we couldn't do a full signature check via TypeInfo,
-      // we still consider it a match if the function simply exists on the object.
-      return true;
-    });
+        // Fallback: Original behavior if value has no TypeInfo that lists methods,
+        // or if the method wasn't found in its TypeInfo (covered by 'else' returning false above).
+        // The original comment was: "For now, presence and function type is checked by matchesStructType/matchesInterfaceType"
+        // This 'return true' implies that if we couldn't do a full signature check via TypeInfo,
+        // we still consider it a match if the function simply exists on the object.
+        return true
+      },
+    )
 
     if (allMethodsMatch) {
-      return { value: value as T, ok: true };
+      return { value: value as T, ok: true }
     }
   }
 
@@ -1715,19 +1851,19 @@ export function typeAssert<T>(
  * @returns The asserted value if the assertion succeeded
  * @throws Error if the type assertion fails
  */
-export function mustTypeAssert<T>(
-  value: any,
-  typeInfo: string | TypeInfo,
-): T {
+export function mustTypeAssert<T>(value: any, typeInfo: string | TypeInfo): T {
   const { value: assertedValue, ok } = typeAssert<T>(value, typeInfo)
   if (!ok) {
-    const targetTypeName = typeof typeInfo === 'string' ? typeInfo : typeInfo.name || JSON.stringify(typeInfo)
-    let valueTypeName: string | "nil" = typeof value
+    const targetTypeName =
+      typeof typeInfo === 'string' ? typeInfo : (
+        typeInfo.name || JSON.stringify(typeInfo)
+      )
+    let valueTypeName: string | 'nil' = typeof value
     if (value && value.constructor && value.constructor.name) {
       valueTypeName = value.constructor.name
     }
     if (value === null) {
-      valueTypeName = "nil"
+      valueTypeName = 'nil'
     }
     throw new Error(
       `inline type conversion panic: value is ${valueTypeName}, not ${targetTypeName}`,
@@ -1739,7 +1875,7 @@ export function mustTypeAssert<T>(
 /**
  * Checks if a value is of a specific type.
  * Similar to typeAssert but only returns a boolean without extracting the value.
- * 
+ *
  * @param value The value to check
  * @param typeInfo The type information to check against
  * @returns True if the value matches the type, false otherwise
@@ -1753,16 +1889,16 @@ export function is(value: any, typeInfo: string | TypeInfo): boolean {
  * Each case matches against one or more types and contains a body function to execute when matched.
  */
 export interface TypeSwitchCase {
- types: (string | TypeInfo)[]; // Array of types for this case (e.g., case int, string:)
- body: (value?: any) => void; // Function representing the case body. 'value' is the asserted value if applicable.
+  types: (string | TypeInfo)[] // Array of types for this case (e.g., case int, string:)
+  body: (value?: any) => void // Function representing the case body. 'value' is the asserted value if applicable.
 }
 
 /**
-* Represents the result of a channel receive operation with 'ok' value
-*/
+ * Represents the result of a channel receive operation with 'ok' value
+ */
 export interface ChannelReceiveResult<T> {
- value: T // Should be T | ZeroValue<T>
- ok: boolean
+  value: T // Should be T | ZeroValue<T>
+  ok: boolean
 }
 
 /**
@@ -1854,20 +1990,20 @@ export function typeSwitch(
   for (const caseObj of cases) {
     // For cases with multiple types (case T1, T2:), use $.is
     if (caseObj.types.length > 1) {
-      const matchesAny = caseObj.types.some(typeInfo => is(value, typeInfo));
+      const matchesAny = caseObj.types.some((typeInfo) => is(value, typeInfo))
       if (matchesAny) {
         // For multi-type cases, the case variable (if any) gets the original value
-        caseObj.body(value);
-        return; // Found a match, exit switch
+        caseObj.body(value)
+        return // Found a match, exit switch
       }
     } else if (caseObj.types.length === 1) {
       // For single-type cases (case T:), use $.typeAssert to get the typed value and ok status
-      const typeInfo = caseObj.types[0];
-      const { value: assertedValue, ok } = typeAssert(value, typeInfo);
+      const typeInfo = caseObj.types[0]
+      const { value: assertedValue, ok } = typeAssert(value, typeInfo)
       if (ok) {
         // Pass the asserted value to the case body function
-        caseObj.body(assertedValue);
-        return; // Found a match, exit switch
+        caseObj.body(assertedValue)
+        return // Found a match, exit switch
       }
     }
     // Note: Cases with 0 types are not valid in Go type switches
@@ -1875,10 +2011,9 @@ export function typeSwitch(
 
   // If no case matched and a default case exists, execute it
   if (defaultCase) {
-    defaultCase();
+    defaultCase()
   }
 }
-
 
 // A simple implementation of buffered channels
 class BufferedChannel<T> implements Channel<T> {

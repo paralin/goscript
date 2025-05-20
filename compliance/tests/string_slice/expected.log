@@ -1,0 +1,17 @@
+myStr1: testing
+len(myStr1): 7
+myStr1[0:2]: te
+myStr1[2:5]: sti
+myStr1[5:7]: ng
+myStr1[3:]: ting
+myStr1[:4]: test
+myStr1[:]: testing
+myStr2: 你好世界
+len(myStr2): 12
+myStr2[0:3]: 你
+myStr2[3:6]: 好
+myStr2[0:6]: 你好
+myStr1[1:1]: 
+myStr1[0:0]: 
+myStr1[7:7]: 
+a b c

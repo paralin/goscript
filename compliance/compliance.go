@@ -712,7 +712,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 				if runErr := goRunCmd.Run(); runErr != nil {
 					t.Fatalf("failed to run 'go run ./' in %s to generate expected.log: %v\nStderr: %s", testDir, runErr, goRunErrBuf.String())
 				}
-				expectedOutputFromGo := strings.TrimSpace(goRunOutBuf.String())
+				expectedOutputFromGo := strings.TrimSpace(goRunOutBuf.String()) + strings.TrimSpace(goRunErrBuf.String())
 				if writeErr := os.WriteFile(expectedLogPath, []byte(expectedOutputFromGo+"\n"), 0o644); writeErr != nil {
 					t.Fatalf("failed to write generated expected.log: %v", writeErr)
 				}

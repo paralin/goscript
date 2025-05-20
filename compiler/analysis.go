@@ -436,13 +436,15 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		v.currentFuncObj = v.pkg.TypesInfo.ObjectOf(n.Name)
 		v.analysis.IsInAsyncFunctionMap[n] = isAsync // Ensure FuncDecl node itself is marked
 
-		// Check if the body contains any defer statements
-		if n.Body != nil && v.containsDefer(n.Body) {
-			v.analysis.NeedsDeferMap[n.Body] = true
-		}
+		if n.Body != nil {
+			// Check if the body contains any defer statements
+			if v.containsDefer(n.Body) {
+				v.analysis.NeedsDeferMap[n.Body] = true
+			}
 
-		// Visit the body with updated state
-		ast.Walk(v, n.Body)
+			// Visit the body with updated state
+			ast.Walk(v, n.Body)
+		}
 
 		// Restore states after visiting
 		defer func() {
@@ -475,6 +477,10 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil // Stop traversal here, ast.Walk handled the body
 
 	case *ast.BlockStmt:
+		if n == nil || len(n.List) == 0 {
+			break
+		}
+
 		// Check for defer statements in this block
 		if v.containsDefer(n) {
 			v.analysis.NeedsDeferMap[n] = true
@@ -609,15 +615,10 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		}
 		return v // Continue traversal
-
-	case *ast.CompositeLit:
-		// No need to track private field access in composite literals since all fields are public
-		return v
-
-	default:
-		// For all other nodes, continue traversal
-		return v
 	}
+
+	// For all other nodes, continue traversal
+	return v
 }
 
 // containsAsyncOperations checks if a node contains any async operations like channel operations.
@@ -666,6 +667,9 @@ func (v *analysisVisitor) containsDefer(block *ast.BlockStmt) bool {
 	hasDefer := false
 
 	ast.Inspect(block, func(n ast.Node) bool {
+		if n == nil {
+			return true
+		}
 		if _, ok := n.(*ast.DeferStmt); ok {
 			hasDefer = true
 			return false

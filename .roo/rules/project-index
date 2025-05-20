@@ -1,0 +1,177 @@
+The following files exist within the compiler/ directory:
+
+analysis.go
+- NewAnalysis() *Analysis
+- NeedsDefer(node ast.Node) bool 
+- IsInAsyncFunction(node ast.Node) bool
+- IsAsyncFunc(obj types.Object) bool
+- IsFuncLitAsync(funcLit *ast.FuncLit) bool
+- NeedsBoxed(obj types.Object) bool
+- NeedsBoxedAccess(obj types.Object) bool
+- NeedsBoxedDeref(ptrType types.Type) bool
+- NeedsBoxedFieldAccess(ptrType types.Type) bool
+- AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap ast.CommentMap)
+
+assignment.go
+- writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Token, addDeclaration bool) error
+- shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool
+
+code-writer.go
+- NewTSCodeWriter(w io.Writer) *TSCodeWriter
+- WriteLinePreamble()
+- WriteLine(line string)
+- WriteLinef(line string, args ...any)
+- Indent(count int)
+- WriteImport(symbolName, importPath string)
+- WriteCommentLine(commentText string)
+- WriteCommentLinef(format string, args ...any)
+- WriteCommentInline(commentText string)
+- WriteCommentInlinef(format string, args ...any)
+- WriteLiterally(literal string)
+- WriteLiterallyf(literal string, args ...any)
+- WriteSectionTail()
+
+compiler.go
+- NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compiler, error)
+- CompilePackages(ctx context.Context, patterns ...string) error
+- NewPackageCompiler(le *logrus.Entry, compilerConf *Config, pkg *packages.Package) (*PackageCompiler, error)
+- Compile(ctx context.Context) error
+- CompileFile(ctx context.Context, name string, syntax *ast.File) error
+- NewFileCompiler(compilerConf *Config, pkg *packages.Package, astFile *ast.File, fullPath string, analysis *Analysis) (*FileCompiler, error)
+- Compile(ctx context.Context) error
+- NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analysis) *GoToTSCompiler
+
+compiler_test.go
+- TestCompliance(t *testing.T)
+
+composite-lit.go
+- WriteCompositeLit(exp *ast.CompositeLit) error
+- WriteBoxedValue(expr ast.Expr) error
+
+config.go
+- Validate() error
+
+config_test.go
+- TestConfigValidate(t *testing.T)
+- TestConfigFields(t *testing.T)
+
+decl.go
+- WriteDecls(decls []ast.Decl) error
+- WriteFuncDeclAsFunction(decl *ast.FuncDecl) error
+- WriteFuncDeclAsMethod(decl *ast.FuncDecl) error
+
+expr-call.go
+- WriteCallExpr(exp *ast.CallExpr) error
+
+expr-selector.go
+- WriteSelectorExpr(exp *ast.SelectorExpr) error
+
+expr-star.go
+- WriteStarExpr(exp *ast.StarExpr) error
+
+expr-type.go
+- WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error
+- isPointerComparison(exp *ast.BinaryExpr) bool
+- getTypeNameString(typeExpr ast.Expr) string
+- WriteBinaryExpr(exp *ast.BinaryExpr) error
+- WriteUnaryExpr(exp *ast.UnaryExpr) error
+- WriteSliceExpr(exp *ast.SliceExpr) error
+- WriteKeyValueExpr(exp *ast.KeyValueExpr) error
+
+expr-value.go
+- WriteValueExpr(a ast.Expr) error
+
+expr.go
+- WriteIndexExpr(exp *ast.IndexExpr) error
+
+field.go
+- WriteFieldList(a *ast.FieldList, isArguments bool)
+- WriteField(field *ast.Field, isArguments bool)
+
+lit.go
+- WriteBasicLit(exp *ast.BasicLit)
+- WriteFuncLitValue(exp *ast.FuncLit) error
+
+output.go
+- ComputeModulePath(outputRoot, goPkg string) string
+- translateGoPathToTypescriptPath(goImportPath string) string
+- packageNameFromGoPath(goPkgPath string) string
+- TranslateGoFilePathToTypescriptFilePath(goPkgPath, goCodeFilename string) string
+
+primitive.go
+- isPrimitiveType(name string) bool
+- GoBuiltinToTypescript(typeName string) (string, bool)
+- TokenToTs(tok token.Token) (string, bool)
+
+spec-struct.go
+- WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType) error
+
+spec-value.go
+- WriteValueSpec(a *ast.ValueSpec) error
+
+spec.go
+- WriteSpec(a ast.Spec) error
+- getEmbeddedFieldKeyName(fieldType types.Type) string
+- writeGetterSetter(fieldName string, fieldType types.Type, doc, comment *ast.CommentGroup)
+- writeBoxedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool)
+- writeClonedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool)
+- WriteTypeSpec(a *ast.TypeSpec) error
+- WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.InterfaceType) error
+- WriteImportSpec(a *ast.ImportSpec)
+
+stmt-assign.go
+- WriteStmtAssign(exp *ast.AssignStmt) error
+
+stmt-for.go
+- WriteStmtFor(exp *ast.ForStmt) error
+- WriteStmtForInit(stmt ast.Stmt) error
+- WriteStmtForPost(stmt ast.Stmt) error
+
+stmt-range.go
+- WriteStmtRange(exp *ast.RangeStmt) error
+
+stmt-select.go
+- WriteStmtSelect(exp *ast.SelectStmt) error
+
+stmt-type-switch.go
+- WriteStmtTypeSwitch(stmt *ast.TypeSwitchStmt) error
+
+stmt.go
+- WriteStmt(a ast.Stmt) error
+- WriteStmtDecl(stmt *ast.DeclStmt) error
+- WriteStmtIncDec(stmt *ast.IncDecStmt) error
+- WriteStmtBranch(stmt *ast.BranchStmt) error
+- WriteStmtGo(exp *ast.GoStmt) error
+- WriteStmtExpr(exp *ast.ExprStmt) error
+- WriteStmtSend(exp *ast.SendStmt) error
+- WriteStmtIf(exp *ast.IfStmt) error
+- WriteStmtReturn(exp *ast.ReturnStmt) error
+- WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool) error
+- WriteStmtSwitch(exp *ast.SwitchStmt) error
+- WriteCaseClause(exp *ast.CaseClause) error
+- writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *ast.UnaryExpr, tok token.Token) error
+- WriteDoc(doc *ast.CommentGroup)
+
+type-info.go
+- writeTypeInfoObject(typ types.Type)
+- writeMethodSignatures(methods []*types.Func)
+
+type.go
+- WriteGoType(typ types.Type)
+- WriteZeroValueForType(typ any)
+- WriteBasicType(t *types.Basic)
+- WriteNamedType(t *types.Named)
+- WritePointerType(t *types.Pointer)
+- WriteSliceType(t *types.Slice)
+- WriteArrayType(t *types.Array)
+- WriteMapType(t *types.Map)
+- WriteChannelType(t *types.Chan)
+- WriteFuncType(exp *ast.FuncType, isAsync bool)
+- WriteInterfaceType(t *types.Interface, astNode *ast.InterfaceType)
+- WriteSignatureType(t *types.Signature)
+- writeInterfaceStructure(iface *types.Interface, astNode *ast.InterfaceType)
+- getTypeString(goType types.Type) string
+- generateFlattenedInitTypeString(structType *types.Named) string
+- WriteStructType(t *types.Struct)
+
+This concludes the list of files in the compiler/ directory.
