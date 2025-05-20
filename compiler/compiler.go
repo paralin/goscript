@@ -8,6 +8,7 @@ import (
 	"go/types"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	gs "github.com/aperturerobotics/goscript"
@@ -89,6 +90,12 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 		return fmt.Errorf("failed to load packages: %w", err)
 	}
 
+	// build a list of packages that patterns matched
+	patternPkgPaths := make([]string, 0, len(pkgs))
+	for _, pkg := range pkgs {
+		patternPkgPaths = append(patternPkgPaths, pkg.PkgPath)
+	}
+
 	// If AllDependencies is true, we need to collect all dependencies
 	if c.config.AllDependencies {
 		// Create a set to track processed packages by their ID
@@ -142,13 +149,15 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 	// Compile all packages
 	for _, pkg := range pkgs {
 		// Check if the package has a handwritten equivalent
-		_, gsErr := gs.GsOverrides.ReadDir("gs/" + pkg.PkgPath)
-		if gsErr != nil && !os.IsNotExist(gsErr) {
-			return gsErr
-		}
-		if gsErr == nil {
-			c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
-			continue
+		if !slices.Contains(patternPkgPaths, pkg.PkgPath) {
+			_, gsErr := gs.GsOverrides.ReadDir("gs/" + pkg.PkgPath)
+			if gsErr != nil && !os.IsNotExist(gsErr) {
+				return gsErr
+			}
+			if gsErr == nil {
+				c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
+				continue
+			}
 		}
 
 		// Skip packages that failed to load
