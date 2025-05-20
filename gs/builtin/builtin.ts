@@ -1,4 +1,20 @@
 /**
+ * Implementation of Go's built-in println function
+ * @param args Arguments to print
+ */
+export function println(...args: any[]): void {
+  console.log(...args)
+}
+
+/**
+ * Implementation of Go's built-in panic function
+ * @param args Arguments passed to panic
+ */
+export function panic(...args: any[]): void {
+  throw new Error(`panic: ${args.map(arg => String(arg)).join(' ')}`);
+}
+
+/**
  * GoSliceObject contains metadata for complex slice views
  */
 interface GoSliceObject<T> {
@@ -2471,12 +2487,4 @@ export class AsyncDisposableStack implements AsyncDisposable {
       await this.stack[i]()
     }
   }
-}
-
-/**
- * Implementation of Go's built-in println function
- * @param args Arguments to print
- */
-export function println(...args: any[]): void {
-  console.log(...args)
 }

@@ -13,6 +13,7 @@ import (
 // into its TypeScript equivalent.
 // It handles several Go built-in functions specially:
 // - `println(...)` becomes `console.log(...)`.
+// - `panic(...)` becomes `$.panic(...)`.
 // - `len(arg)` becomes `$.len(arg)`.
 // - `cap(arg)` becomes `$.cap(arg)`.
 // - `delete(m, k)` becomes `$.deleteMapEntry(m, k)`.
@@ -76,6 +77,8 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		switch funIdent.String() {
 		case "println":
 			c.tsw.WriteLiterally("console.log(")
+		case "panic":
+			c.tsw.WriteLiterally("$.panic(")
 			for i, arg := range exp.Args {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
