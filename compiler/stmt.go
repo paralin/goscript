@@ -109,7 +109,7 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			return fmt.Errorf("failed to write branch statement: %w", err)
 		}
 	default:
-		return errors.Errorf("unknown statement: %s\n", a)
+		return errors.Errorf("unknown statement: %#v\n", a)
 	}
 	return nil
 }
@@ -941,7 +941,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 			c.tsw.WriteLine("")
 
 		} else {
-			c.tsw.WriteCommentLinef("unknown statement in select body: %T", stmt)
+			return errors.Errorf("unknown statement in select body: %T", stmt)
 		}
 	}
 

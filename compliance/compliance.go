@@ -187,27 +187,52 @@ func CompileGoToTypeScript(t *testing.T, parentModulePath, testDir, tempDir, out
 		t.Fatalf("failed to create compiler: %v", err)
 	}
 
-	packagePaths := make(map[string]struct{})
-	for _, src := range goFiles {
-		relPath, err := filepath.Rel(testDir, src)
-		if err != nil {
-			t.Fatal(err.Error())
+	var pkgsToCompile []string
+	packagesFilePath := filepath.Join(testDir, "packages")
+	if _, err := os.Stat(packagesFilePath); err == nil {
+		// "packages" file exists, read it
+		content, readErr := os.ReadFile(packagesFilePath)
+		if readErr != nil {
+			t.Fatalf("failed to read packages file %s: %v", packagesFilePath, readErr)
 		}
-		pkgPath := filepath.Dir(relPath)
-		// filepath.Dir(".") is ".", normalize to empty string for root package
-		if pkgPath == "." {
-			pkgPath = ""
+		lines := strings.SplitSeq(string(content), "\n")
+		for line := range lines {
+			trimmedLine := strings.TrimSpace(line)
+			if trimmedLine != "" && !strings.HasPrefix(trimmedLine, "#") {
+				pkgsToCompile = append(pkgsToCompile, trimmedLine)
+			}
 		}
-		packagePaths[pkgPath] = struct{}{}
+		if len(pkgsToCompile) == 0 {
+			t.Logf("packages file %s was empty or only contained comments", packagesFilePath)
+		}
 	}
 
-	var pkgsToCompile []string
-	for pkg := range packagePaths {
-		if pkg == "" {
-			pkgsToCompile = append(pkgsToCompile, "./") // Compile package in current dir
-		} else {
-			pkgsToCompile = append(pkgsToCompile, "./"+pkg)
+	if len(pkgsToCompile) == 0 {
+		packagePaths := make(map[string]struct{})
+		for _, src := range goFiles {
+			relPath, err := filepath.Rel(testDir, src)
+			if err != nil {
+				t.Fatal(err.Error())
+			}
+			pkgPath := filepath.Dir(relPath)
+			// filepath.Dir(".") is ".", normalize to empty string for root package
+			if pkgPath == "." {
+				pkgPath = ""
+			}
+			packagePaths[pkgPath] = struct{}{}
 		}
+
+		for pkg := range packagePaths {
+			if pkg == "" {
+				pkgsToCompile = append(pkgsToCompile, "./") // Compile package in current dir
+			} else {
+				pkgsToCompile = append(pkgsToCompile, "./"+pkg)
+			}
+		}
+	}
+
+	if len(pkgsToCompile) == 0 {
+		t.Fatalf("no packages to compile were determined for test directory %s", testDir)
 	}
 
 	t.Logf("Compiling packages: %v", pkgsToCompile)
