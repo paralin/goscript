@@ -10,18 +10,20 @@ import (
 // WriteStmtTypeSwitch translates a Go `type switch` statement (`ast.TypeSwitchStmt`)
 // into its TypeScript equivalent using `if/else if/else` and the `$.typeAssert` helper.
 func (c *GoToTSCompiler) WriteStmtTypeSwitch(stmt *ast.TypeSwitchStmt) error {
-	// Outer block for scoping Init, subject_val, and temp type assert vars
+	// Outer block for scoping variables
 	c.tsw.WriteLine("{")
 	c.tsw.Indent(1)
 
+	// Handle initialization statement if present
 	if stmt.Init != nil {
 		if err := c.WriteStmt(stmt.Init); err != nil {
 			return fmt.Errorf("failed to write type switch init statement: %w", err)
 		}
 	}
 
+	// Extract the subject expression and case variable identifier
 	var subjectExpr ast.Expr
-	var caseVarIdent *ast.Ident // The 'v' in 'v := x.(type)'
+	var caseVarIdent *ast.Ident // The variable in 'v := x.(type)'
 
 	switch assignNode := stmt.Assign.(type) {
 	case *ast.AssignStmt: // v := x.(type)
@@ -54,16 +56,13 @@ func (c *GoToTSCompiler) WriteStmtTypeSwitch(stmt *ast.TypeSwitchStmt) error {
 		return errors.Errorf("unknown Assign type in TypeSwitchStmt: %T", stmt.Assign)
 	}
 
-	c.tsw.WriteLiterally("const subject_val = ")
+	// Write the subject value
+	c.tsw.WriteLiterally("const subject = ")
 	if err := c.WriteValueExpr(subjectExpr); err != nil {
 		c.tsw.Indent(-1)
-		c.tsw.WriteLine("} // End TypeSwitchStmt due to error in subject_val")
+		c.tsw.WriteLine("} // End TypeSwitchStmt due to error in subject")
 		return fmt.Errorf("failed to write subject expression in type switch: %w", err)
 	}
-	c.tsw.WriteLine("")
-
-	c.tsw.WriteLine("let ts_typeassert_value: any")  // Will hold the typed value from $.typeAssert
-	c.tsw.WriteLine("let ts_typeassert_ok: boolean") // Will hold the ok status
 	c.tsw.WriteLine("")
 
 	hasDefault := false
@@ -79,53 +78,80 @@ func (c *GoToTSCompiler) WriteStmtTypeSwitch(stmt *ast.TypeSwitchStmt) error {
 		if len(caseClause.List) == 0 { // Default case
 			hasDefault = true
 			defaultCaseBody = caseClause.Body
-			// Default case is handled at the very end of the if-else-if chain.
-			// If it's the *only* thing (no type cases), it will be handled after the loop.
+			// Default case is handled at the very end of the if-else-if chain
 			continue
 		}
 
 		// Type case(s)
 		if firstCaseProcessed {
 			c.tsw.WriteLiterally(" else ")
+		} else {
+			firstCaseProcessed = true
 		}
-		firstCaseProcessed = true
 
 		if len(caseClause.List) == 1 { // Single type: case T:
 			caseTypeExpr := caseClause.List[0]
-			c.tsw.WriteLiterally("({value: ts_typeassert_value, ok: ts_typeassert_ok} = $.typeAssert<")
-			c.WriteTypeExpr(caseTypeExpr) // Type for generic, no error check
-			c.tsw.WriteLiterally(">(subject_val, ")
-			c.writeTypeDescription(caseTypeExpr) // Descriptor, no error check
-			c.tsw.WriteLiterally("));")
-			c.tsw.WriteLine("")
-			c.tsw.WriteLiterally("if (ts_typeassert_ok) {")
+			
+			// For single type cases, use a direct approach with a single type assertion
+			if caseVarIdent != nil && caseVarIdent.Name != "_" {
+				// If we need the value, use a temporary variable with a unique name per case
+				c.tsw.WriteLiterally("if (")
+				
+				// Create the type assertion result
+				c.tsw.WriteLiterally("$.typeAssert<")
+				c.WriteTypeExpr(caseTypeExpr) // Type for generic
+				c.tsw.WriteLiterally(">(subject, ")
+				c.writeTypeDescription(caseTypeExpr) // Type descriptor
+				c.tsw.WriteLiterally(").ok")
+				
+				c.tsw.WriteLiterally(") {")
+				c.tsw.WriteLine("")
+				c.tsw.Indent(1)
+				
+				// Declare the case variable inside the block
+				c.tsw.WriteLiterally("const ")
+				c.WriteIdent(caseVarIdent, false)
+				c.tsw.WriteLiterally(" = $.typeAssert<")
+				c.WriteTypeExpr(caseTypeExpr)
+				c.tsw.WriteLiterally(">(subject, ")
+				c.writeTypeDescription(caseTypeExpr)
+				c.tsw.WriteLiterally(").value")
+				c.tsw.WriteLine("")
+				c.tsw.Indent(-1)
+			} else {
+				// If we don't need the value, just check the .ok property
+				c.tsw.WriteLiterally("if ($.typeAssert<")
+				c.WriteTypeExpr(caseTypeExpr) // Type for generic
+				c.tsw.WriteLiterally(">(subject, ")
+				c.writeTypeDescription(caseTypeExpr) // Type descriptor
+				c.tsw.WriteLiterally(").ok) {")
+			}
 		} else { // Multiple types: case T1, T2:
 			c.tsw.WriteLiterally("if (")
 			for j, typeExpr := range caseClause.List {
 				if j > 0 {
 					c.tsw.WriteLiterally(" || ")
 				}
-				c.tsw.WriteLiterally("$.is(subject_val, ")
-				c.writeTypeDescription(typeExpr) // Descriptor for $.is, no error check
+				c.tsw.WriteLiterally("$.is(subject, ")
+				c.writeTypeDescription(typeExpr) // Descriptor for $.is
 				c.tsw.WriteLiterally(")")
 			}
 			c.tsw.WriteLiterally(") {")
+			
+			// For multi-type case, declare the case variable if needed
+			if caseVarIdent != nil && caseVarIdent.Name != "_" {
+				c.tsw.WriteLine("")
+				c.tsw.Indent(1)
+				c.tsw.WriteLiterally("const ")
+				c.WriteIdent(caseVarIdent, false)
+				c.tsw.WriteLiterally(" = subject")
+				c.tsw.WriteLine("")
+				c.tsw.Indent(-1)
+			}
 		}
+		
 		c.tsw.WriteLine("")
 		c.tsw.Indent(1)
-
-		if caseVarIdent != nil && caseVarIdent.Name != "_" {
-			c.tsw.WriteLiterally("const ")
-			c.WriteIdent(caseVarIdent, false) // isDeclaration = false for the const
-			if len(caseClause.List) == 1 {
-				// For single type case, $.typeAssert already gives the correct type to ts_typeassert_value
-				c.tsw.WriteLiterally(" = ts_typeassert_value")
-			} else {
-				// For multi-type case, 'v' gets the type of the original expression (subject_val)
-				c.tsw.WriteLiterally(" = subject_val")
-			}
-			c.tsw.WriteLine("")
-		}
 
 		for _, bodyStmt := range caseClause.Body {
 			if err := c.WriteStmt(bodyStmt); err != nil {
@@ -133,10 +159,10 @@ func (c *GoToTSCompiler) WriteStmtTypeSwitch(stmt *ast.TypeSwitchStmt) error {
 			}
 		}
 		c.tsw.Indent(-1)
-		c.tsw.WriteLiterally("}") // Close if (ts_typeassert_ok) or if ($.is(...) || ...)
+		c.tsw.WriteLiterally("}")
 	}
 
-	// Handle default case now
+	// Handle default case
 	if hasDefault {
 		if firstCaseProcessed { // If there were preceding if/else if blocks for type cases
 			c.tsw.WriteLine(" else {") // Default is the final else
@@ -144,16 +170,15 @@ func (c *GoToTSCompiler) WriteStmtTypeSwitch(stmt *ast.TypeSwitchStmt) error {
 			c.tsw.WriteLine("{ // Default only case")
 		}
 		c.tsw.Indent(1)
-		// caseVarIdent is NOT in scope for default
 		for _, bodyStmt := range defaultCaseBody {
 			if err := c.WriteStmt(bodyStmt); err != nil {
 				return fmt.Errorf("failed to write statement in type switch default case body: %w", err)
 			}
 		}
 		c.tsw.Indent(-1)
-		c.tsw.WriteLine("}") // Close default block
+		c.tsw.WriteLine("}")
 	} else if firstCaseProcessed {
-		// If there was no default, but there were type cases, the last one needs a newline.
+		// If there was no default, but there were type cases, the last one needs a newline
 		c.tsw.WriteLine("")
 	}
 

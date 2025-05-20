@@ -1009,6 +1009,18 @@ function areMethodArgsArraysIdentical(
   return true
 }
 
+/**
+ * Checks if a value is of a specific type.
+ * Similar to typeAssert but only returns a boolean without extracting the value.
+ * 
+ * @param value The value to check
+ * @param typeInfo The type information to check against
+ * @returns True if the value matches the type, false otherwise
+ */
+export function is(value: any, typeInfo: string | TypeInfo): boolean {
+  return matchesType(value, normalizeTypeInfo(typeInfo))
+}
+
 export function areTypeInfosIdentical(
   type1InfoOrName: string | TypeInfo,
   type2InfoOrName: string | TypeInfo,

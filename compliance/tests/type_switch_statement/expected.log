@@ -1,2 +1,5 @@
 string hello
 int
+string or bool true
+z is int 42
+default only
