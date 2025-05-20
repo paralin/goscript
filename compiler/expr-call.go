@@ -75,10 +75,10 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
 		switch funIdent.String() {
-		case "println":
-			c.tsw.WriteLiterally("console.log(")
 		case "panic":
 			c.tsw.WriteLiterally("$.panic(")
+		case "println":
+			c.tsw.WriteLiterally("console.log(")
 			for i, arg := range exp.Args {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
