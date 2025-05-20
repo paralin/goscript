@@ -108,6 +108,10 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 		if err := c.WriteStmtBranch(exp); err != nil {
 			return fmt.Errorf("failed to write branch statement: %w", err)
 		}
+	case *ast.TypeSwitchStmt:
+		if err := c.WriteStmtTypeSwitch(exp); err != nil {
+			return fmt.Errorf("failed to write type switch statement: %w", err)
+		}
 	default:
 		return errors.Errorf("unknown statement: %#v\n", a)
 	}
