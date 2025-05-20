@@ -457,28 +457,31 @@ func (c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) error {
 		c.tsw.WriteLine("")
 	} else {
 		// Case with expressions
-		c.tsw.WriteLiterally("case ")
-		for i, expr := range exp.List {
-			if i > 0 {
-				c.tsw.WriteLiterally(", ") // Although Go doesn't support multiple expressions per case like this,
-			} // TypeScript does, so we'll write it this way for now.
-			if err := c.WriteValueExpr(expr); err != nil {
+		// For Go's `case expr1, expr2:`, we translate to:
+		// case expr1:
+		// case expr2:
+		// ... body ...
+		// break
+		for _, caseExpr := range exp.List {
+			c.tsw.WriteLiterally("case ")
+			if err := c.WriteValueExpr(caseExpr); err != nil {
 				return fmt.Errorf("failed to write case clause expression: %w", err)
 			}
+			c.tsw.WriteLiterally(":")
+			c.tsw.WriteLine("")
 		}
-		c.tsw.WriteLiterally(":")
-		c.tsw.WriteLine("")
 	}
 
+	// The body is written once, after all case labels for this clause.
+	// Indentation for the body starts here.
 	c.tsw.Indent(1)
-	// Write the body of the case clause
 	for _, stmt := range exp.Body {
 		if err := c.WriteStmt(stmt); err != nil {
 			return fmt.Errorf("failed to write statement in case clause body: %w", err)
 		}
 	}
-	// Add break statement (Go's switch has implicit breaks)
-	c.tsw.WriteLine("break") // Remove semicolon
+	// Add break statement (Go's switch has implicit breaks, TS needs explicit break)
+	c.tsw.WriteLine("break")
 	c.tsw.Indent(-1)
 	return nil
 }
