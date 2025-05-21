@@ -387,15 +387,24 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			return nil // Handled regular function call
 		}
 	} else {
-		// Not an identifier (e.g., method call on a value)
-		if err := c.WriteValueExpr(expFun); err != nil {
-			return fmt.Errorf("failed to write method expression in call: %w", err)
-		}
+		// If expFun is a function literal, it needs to be wrapped in parentheses for IIFE syntax
+		if _, isFuncLit := expFun.(*ast.FuncLit); isFuncLit {
+			c.tsw.WriteLiterally("(")
+			if err := c.WriteValueExpr(expFun); err != nil {
+				return fmt.Errorf("failed to write function literal in call: %w", err)
+			}
+			c.tsw.WriteLiterally(")")
+		} else {
+			// Not an identifier (e.g., method call on a value)
+			if err := c.WriteValueExpr(expFun); err != nil {
+				return fmt.Errorf("failed to write method expression in call: %w", err)
+			}
 
-		if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
-			if _, ok := funType.Underlying().(*types.Signature); ok {
-				if _, isNamed := funType.(*types.Named); isNamed {
-					c.tsw.WriteLiterally("!")
+			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+				if _, ok := funType.Underlying().(*types.Signature); ok {
+					if _, isNamed := funType.(*types.Named); isNamed {
+						c.tsw.WriteLiterally("!")
+					}
 				}
 			}
 		}

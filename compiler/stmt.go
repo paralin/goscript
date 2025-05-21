@@ -458,21 +458,44 @@ func (s *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 // The statement is terminated with a newline.
 func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 	c.tsw.WriteLiterally("return ")
-	if len(exp.Results) > 1 {
-		c.tsw.WriteLiterally("[")
-	}
-	for i, res := range exp.Results {
-		if i != 0 {
-			c.tsw.WriteLiterally(", ")
+
+	// Check if it's a bare named return
+	if c.analysis.IsBareNamedReturn[exp] {
+		var namedReturns []string
+		if funcDecl, ok := c.analysis.ReturnStmtEnclosingFuncDecl[exp]; ok {
+			namedReturns = c.analysis.NamedReturnVars[funcDecl]
+		} else if funcLit, ok := c.analysis.ReturnStmtEnclosingFuncLit[exp]; ok {
+			namedReturns = c.analysis.FuncLitNamedReturnVars[funcLit]
 		}
-		if err := c.WriteValueExpr(res); err != nil { // Return results are values
-			return err
+
+		if len(namedReturns) > 0 {
+			c.tsw.WriteLiterally("[")
+			for i, name := range namedReturns {
+				if i != 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.tsw.WriteLiterally(name)
+			}
+			c.tsw.WriteLiterally("]")
+		}
+	} else {
+		// Handle explicit return values
+		if len(exp.Results) > 1 {
+			c.tsw.WriteLiterally("[")
+		}
+		for i, res := range exp.Results {
+			if i != 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			if err := c.WriteValueExpr(res); err != nil { // Return results are values
+				return err
+			}
+		}
+		if len(exp.Results) > 1 {
+			c.tsw.WriteLiterally("]")
 		}
 	}
-	if len(exp.Results) > 1 {
-		c.tsw.WriteLiterally("]")
-	}
-	c.tsw.WriteLine("") // Remove semicolon
+	c.tsw.WriteLine("")
 	return nil
 }
 

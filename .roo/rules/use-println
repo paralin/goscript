@@ -1,1 +1,0 @@
-When writing Go code for compliance tests, use the built-in `println()` function instead of `fmt.Println()` for printing output. This simplifies the test cases and avoids unnecessary imports.

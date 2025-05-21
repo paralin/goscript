@@ -48,7 +48,7 @@ func TestCompliance(t *testing.T) {
 	slices.Sort(testPaths)
 
 	// limit concurrency
-	simulLimit := make(chan struct{}, runtime.GOMAXPROCS(-1)*2)
+	simulLimit := make(chan struct{}, runtime.GOMAXPROCS(-1))
 	for range cap(simulLimit) {
 		simulLimit <- struct{}{}
 	}

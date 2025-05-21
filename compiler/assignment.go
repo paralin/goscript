@@ -177,6 +177,11 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 					return err
 				}
 				c.tsw.WriteLiterally("]")
+			} else if callExpr, isCallExpr := r.(*ast.CallExpr); isCallExpr {
+				// If the RHS is a function call, write it as a call
+				if err := c.WriteCallExpr(callExpr); err != nil {
+					return err
+				}
 			} else {
 				// Normal case - write the entire expression
 				if err := c.WriteValueExpr(r); err != nil {

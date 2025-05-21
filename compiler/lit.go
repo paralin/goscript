@@ -90,9 +90,40 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 
 	c.tsw.WriteLiterally(" => ")
 
+	hasNamedReturns := false
+	if exp.Type.Results != nil {
+		for _, field := range exp.Type.Results.List {
+			if len(field.Names) > 0 {
+				hasNamedReturns = true
+				break
+			}
+		}
+	}
+
+	if hasNamedReturns {
+		c.tsw.WriteLine("{")
+		c.tsw.Indent(1)
+
+		// Declare named return variables and initialize them to their zero values
+		for _, field := range exp.Type.Results.List {
+			for _, name := range field.Names {
+				c.tsw.WriteLiterallyf("let %s: ", name.Name)
+				c.WriteTypeExpr(field.Type)
+				c.tsw.WriteLiterally(" = ")
+				c.WriteZeroValueForType(c.pkg.TypesInfo.TypeOf(field.Type))
+				c.tsw.WriteLine("")
+			}
+		}
+	}
+
 	// Write function body
 	if err := c.WriteStmt(exp.Body); err != nil {
 		return err
+	}
+
+	if hasNamedReturns {
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("}")
 	}
 
 	return nil

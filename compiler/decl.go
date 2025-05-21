@@ -92,8 +92,39 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	c.WriteFuncType(decl.Type, isAsync) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
 
+	hasNamedReturns := false
+	if decl.Type.Results != nil {
+		for _, field := range decl.Type.Results.List {
+			if len(field.Names) > 0 {
+				hasNamedReturns = true
+				break
+			}
+		}
+	}
+
+	if hasNamedReturns {
+		c.tsw.WriteLine("{")
+		c.tsw.Indent(1)
+
+		// Declare named return variables and initialize them to their zero values
+		for _, field := range decl.Type.Results.List {
+			for _, name := range field.Names {
+				c.tsw.WriteLiterallyf("let %s: ", name.Name)
+				c.WriteTypeExpr(field.Type)
+				c.tsw.WriteLiterally(" = ")
+				c.WriteZeroValueForType(c.pkg.TypesInfo.TypeOf(field.Type))
+				c.tsw.WriteLine("")
+			}
+		}
+	}
+
 	if err := c.WriteStmt(decl.Body); err != nil {
 		return fmt.Errorf("failed to write function body: %w", err)
+	}
+
+	if hasNamedReturns {
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("}")
 	}
 
 	return nil

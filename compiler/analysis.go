@@ -64,16 +64,35 @@ type Analysis struct {
 
 	// IsInAsyncFunctionMap tracks nodes that are inside async functions
 	IsInAsyncFunctionMap map[ast.Node]bool
+
+	// NamedReturnVars maps *ast.FuncDecl to a slice of named return variable names.
+	NamedReturnVars map[*ast.FuncDecl][]string
+
+	// FuncLitNamedReturnVars maps *ast.FuncLit to a slice of named return variable names.
+	FuncLitNamedReturnVars map[*ast.FuncLit][]string
+	// IsBareNamedReturn maps *ast.ReturnStmt to true if it's a bare return in a function with named returns.
+	IsBareNamedReturn map[ast.Node]bool
+
+	// ReturnStmtEnclosingFuncDecl maps *ast.ReturnStmt to its enclosing *ast.FuncDecl.
+	ReturnStmtEnclosingFuncDecl map[*ast.ReturnStmt]*ast.FuncDecl
+
+	// ReturnStmtEnclosingFuncLit maps *ast.ReturnStmt to its enclosing *ast.FuncLit.
+	ReturnStmtEnclosingFuncLit map[*ast.ReturnStmt]*ast.FuncLit
 }
 
 // NewAnalysis creates a new Analysis instance.
 func NewAnalysis() *Analysis {
 	return &Analysis{
-		VariableUsage:        make(map[types.Object]*VariableUsageInfo),
-		Imports:              make(map[string]*fileImport),
-		AsyncFuncs:           make(map[types.Object]bool),
-		NeedsDeferMap:        make(map[ast.Node]bool),
-		IsInAsyncFunctionMap: make(map[ast.Node]bool),
+		VariableUsage:               make(map[types.Object]*VariableUsageInfo),
+		Imports:                     make(map[string]*fileImport),
+		AsyncFuncs:                  make(map[types.Object]bool),
+		NeedsDeferMap:               make(map[ast.Node]bool),
+		IsInAsyncFunctionMap:        make(map[ast.Node]bool),
+		NamedReturnVars:             make(map[*ast.FuncDecl][]string),
+		FuncLitNamedReturnVars:      make(map[*ast.FuncLit][]string),
+		IsBareNamedReturn:           make(map[ast.Node]bool),
+		ReturnStmtEnclosingFuncDecl: make(map[*ast.ReturnStmt]*ast.FuncDecl),
+		ReturnStmtEnclosingFuncLit:  make(map[*ast.ReturnStmt]*ast.FuncLit),
 	}
 }
 
@@ -302,6 +321,12 @@ type analysisVisitor struct {
 
 	// currentFuncObj tracks the object of the function declaration we're currently analyzing
 	currentFuncObj types.Object
+
+	// currentFuncDecl tracks the *ast.FuncDecl of the function we're currently analyzing.
+	currentFuncDecl *ast.FuncDecl
+
+	// currentFuncLit tracks the *ast.FuncLit of the function literal we're currently analyzing.
+	currentFuncLit *ast.FuncLit
 }
 
 // getOrCreateUsageInfo retrieves or creates the VariableUsageInfo for a given object.
@@ -393,8 +418,20 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		return v
 
 	case *ast.FuncDecl:
-		// Determine if this function declaration is async based on its body
+		// Save original states to restore after visiting
+		originalInAsync := v.inAsyncFunction
+		originalFuncObj := v.currentFuncObj
+		originalFuncDecl := v.currentFuncDecl
+		originalFuncLit := v.currentFuncLit
+		originalReceiver := v.currentReceiver
+
+		// Reset for current function
 		v.currentFuncName = n.Name.Name
+		v.currentFuncDecl = n
+		v.currentFuncLit = nil
+		v.currentReceiver = nil
+
+		// Determine if this function declaration is async based on its body
 		isAsync := false
 		if n.Body != nil {
 			containsAsyncOps := v.containsAsyncOperations(n.Body)
@@ -409,8 +446,6 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		v.analysis.IsInAsyncFunctionMap[n] = isAsync
 
 		// Set current receiver if this is a method
-		originalReceiver := v.currentReceiver
-		v.currentReceiver = nil // Reset for current function
 		if n.Recv != nil && len(n.Recv.List) > 0 {
 			// Assuming a single receiver for simplicity for now
 			if len(n.Recv.List[0].Names) > 0 {
@@ -427,9 +462,18 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		}
 
-		// Save original states to restore after visiting
-		originalInAsync := v.inAsyncFunction
-		originalFuncObj := v.currentFuncObj
+		// Store named return variables
+		if n.Type != nil && n.Type.Results != nil {
+			var namedReturns []string
+			for _, field := range n.Type.Results.List {
+				for _, name := range field.Names {
+					namedReturns = append(namedReturns, name.Name)
+				}
+			}
+			if len(namedReturns) > 0 {
+				v.analysis.NamedReturnVars[n] = namedReturns
+			}
+		}
 
 		// Update visitor state for this function
 		v.inAsyncFunction = isAsync
@@ -452,16 +496,38 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			v.inAsyncFunction = originalInAsync
 			v.currentReceiver = originalReceiver
 			v.currentFuncObj = originalFuncObj
+			v.currentFuncDecl = originalFuncDecl
+			v.currentFuncLit = originalFuncLit
 		}()
 		return nil // Stop traversal here, ast.Walk handled the body
 
 	case *ast.FuncLit:
+		// Save original inAsyncFunction state to restore after visiting
+		originalInAsync := v.inAsyncFunction
+		originalFuncDecl := v.currentFuncDecl
+		originalFuncLit := v.currentFuncLit
+
+		// Set current function literal
+		v.currentFuncDecl = nil
+		v.currentFuncLit = n
+
 		// Determine if this function literal is async based on its body
 		isAsync := v.containsAsyncOperations(n.Body)
 		v.analysis.IsInAsyncFunctionMap[n] = isAsync
 
-		// Save original inAsyncFunction state to restore after visiting
-		originalInAsync := v.inAsyncFunction
+		// Store named return variables for function literal
+		if n.Type != nil && n.Type.Results != nil {
+			var namedReturns []string
+			for _, field := range n.Type.Results.List {
+				for _, name := range field.Names {
+					namedReturns = append(namedReturns, name.Name)
+				}
+			}
+			if len(namedReturns) > 0 {
+				v.analysis.FuncLitNamedReturnVars[n] = namedReturns
+			}
+		}
+
 		v.inAsyncFunction = isAsync
 
 		// Check if the body contains any defer statements
@@ -474,6 +540,8 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 
 		// Restore inAsyncFunction state after visiting
 		v.inAsyncFunction = originalInAsync
+		v.currentFuncDecl = originalFuncDecl
+		v.currentFuncLit = originalFuncLit
 		return nil // Stop traversal here, ast.Walk handled the body
 
 	case *ast.BlockStmt:
@@ -612,6 +680,30 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 					Object: lhsTrackedObj, // This can be nil if LHS is complex (*p, map[k])
 					Type:   rhsAssignmentType,
 				})
+			}
+		}
+		return v // Continue traversal
+
+	case *ast.ReturnStmt:
+		// Record the enclosing function/literal for this return statement
+		if v.currentFuncDecl != nil {
+			v.analysis.ReturnStmtEnclosingFuncDecl[n] = v.currentFuncDecl
+		} else if v.currentFuncLit != nil {
+			v.analysis.ReturnStmtEnclosingFuncLit[n] = v.currentFuncLit
+		}
+
+		// Check if it's a bare return
+		if len(n.Results) == 0 {
+			if v.currentFuncDecl != nil {
+				// Check if the enclosing function declaration has named returns
+				if _, ok := v.analysis.NamedReturnVars[v.currentFuncDecl]; ok {
+					v.analysis.IsBareNamedReturn[n] = true
+				}
+			} else if v.currentFuncLit != nil {
+				// Check if the enclosing function literal has named returns
+				if _, ok := v.analysis.FuncLitNamedReturnVars[v.currentFuncLit]; ok {
+					v.analysis.IsBareNamedReturn[n] = true
+				}
 			}
 		}
 		return v // Continue traversal
