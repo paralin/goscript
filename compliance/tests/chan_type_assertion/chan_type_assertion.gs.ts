@@ -4,10 +4,10 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
-	let ch1 = $.makeChannel<number>(0, 0, 'both')
-	let ch2 = $.makeChannel<string>(0, "", 'send')
-	let ch3 = $.makeChannel<number>(0, 0, 'receive')
-	let ch4 = $.makeChannel<{  }>(0, {}, 'both')
+	let ch1 = $.makeChannel<number>(0, 0, 'both') // bidirectional int channel
+	let ch2 = $.makeChannel<string>(0, "", 'send') // send-only string channel
+	let ch3 = $.makeChannel<number>(0, 0, 'receive') // receive-only float64 channel
+	let ch4 = $.makeChannel<{  }>(0, {}, 'both') // bidirectional struct{} channel
 
 	let i: null | any = ch1
 	{

@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"strconv"
@@ -117,13 +118,13 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	}
 
 	// Write function body
-	if err := c.WriteStmt(exp.Body); err != nil {
-		return err
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write block statement: %w", err)
 	}
 
 	if hasNamedReturns {
 		c.tsw.Indent(-1)
-		c.tsw.WriteLine("}")
+		c.tsw.WriteLiterally("}")
 	}
 
 	return nil

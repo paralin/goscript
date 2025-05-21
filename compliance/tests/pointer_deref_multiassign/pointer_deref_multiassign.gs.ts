@@ -64,8 +64,8 @@ export function main(): void {
 	// === Pointer Dereference and Multi-Assignment ===
 	// Dereference structPointer to get a copy of the struct.
 	// Also demonstrates multi-variable assignment and the use of the blank identifier '_'.
-	let [dereferencedStructCopy, , , unusedString] = [structPointer!, structPointer.myBool, structPointer.MyInt, "hello"]
-	/* _ = */ unusedString
+	let [dereferencedStructCopy, , , unusedString] = [structPointer!, structPointer.myBool, structPointer.MyInt, "hello"] // testing _ set
+	/* _ = */ unusedString // Explicitly ignore unusedString to satisfy linters
 	/* _ = */ dereferencedStructCopy
 }
 

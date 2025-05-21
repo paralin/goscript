@@ -40,21 +40,21 @@ class MyStruct {
 }
 
 export function main(): void {
-	let s1: $.Box<MyStruct> = $.box(new MyStruct({Val: 1}))
-	let s2: $.Box<MyStruct> = $.box(new MyStruct({Val: 2}))
+	let s1: $.Box<MyStruct> = $.box(new MyStruct({Val: 1})) // p1 takes the address of s1, so s1 is boxed
+	let s2: $.Box<MyStruct> = $.box(new MyStruct({Val: 2})) // p2 takes the address of s2, so s2 is boxed
 
-	let p1: $.Box<$.Box<MyStruct> | null> = $.box(s1)
-	let p2: $.Box<$.Box<MyStruct> | null> = $.box(s1)
-	let p3: $.Box<$.Box<MyStruct> | null> = $.box(s2)
+	let p1: $.Box<$.Box<MyStruct> | null> = $.box(s1) // *MyStruct, points to s1, pp1 takes the address of p1, so p1 is boxed
+	let p2: $.Box<$.Box<MyStruct> | null> = $.box(s1) // *MyStruct, points to s1, pp2 takes the address of p2, so p2 is boxed
+	let p3: $.Box<$.Box<MyStruct> | null> = $.box(s2) // *MyStruct, points to s2, pp3 takes the address of p3, so p3 is boxed
 
-	let p4 = s1
+	let p4 = s1 // *MyStruct, points to s1, nothing takes the address of p4, so p4 is not boxed
 	/* _ = */ p4!.value
 
-	let pp1: $.Box<$.Box<$.Box<MyStruct> | null> | null> = $.box(p1)
-	let pp2 = p2
-	let pp3 = p3
+	let pp1: $.Box<$.Box<$.Box<MyStruct> | null> | null> = $.box(p1) // **MyStruct, points to p1
+	let pp2 = p2 // **MyStruct, points to p2
+	let pp3 = p3 // **MyStruct, points to p3
 
-	let ppp1 = pp1
+	let ppp1 = pp1 // ***MyStruct, points to pp1, not boxed as nothing takes address of ppp1
 
 	console.log("--- Initial Values ---")
 	console.log("s1.Val:", s1!.value.Val) // 1
@@ -79,7 +79,7 @@ export function main(): void {
 
 	// --- Modifications through Pointers ---
 	console.log("\n--- Modifications ---")
-	p1!.value!.value = new MyStruct({Val: 10})
+	p1!.value!.value = new MyStruct({Val: 10}) // Modify s1 via p1
 	console.log("After *p1 = {Val: 10}:")
 	console.log("  s1.Val:", s1!.value.Val) // 10
 	console.log("  (*p2).Val:", p2!.value!.value.Val) // 10
@@ -87,7 +87,7 @@ export function main(): void {
 	console.log("  (***ppp1).Val:", ppp1!.value!.value!.Val) // 10
 	console.log("  s2.Val:", s2!.value.Val) // 2 (unmodified)
 
-	pp3!.value!.value = new MyStruct({Val: 20})
+	pp3!.value!.value = new MyStruct({Val: 20}) // Modify s2 via pp3 -> p3
 	console.log("After **pp3 = {Val: 20}:")
 	console.log("  s2.Val:", s2!.value.Val) // 20
 	console.log("  (*p3).Val:", p3!.value!.value.Val) // 20
@@ -103,7 +103,7 @@ export function main(): void {
 	console.log("npp == nil:", npp == null) // true
 	console.log("nppp == nil:", nppp == null) // true
 
-	npp = np
+	npp = np // npp now points to np (which is nil)
 	console.log("After npp = &np:")
 	console.log("  npp == nil:", npp == null) // false
 	console.log("  *npp == nil:", npp!.value == null) // true

@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -392,6 +393,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		if err := c.writeAssignmentCore(exp.Lhs, exp.Rhs, exp.Tok, false); err != nil {
 			return err
 		}
+		// Handle potential inline comment for multi-variable assignment
+		c.writeInlineComment(exp)
 		c.tsw.WriteLine("") // Add newline after the statement
 		return nil
 	}
@@ -402,10 +405,35 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		if err := c.writeAssignmentCore(exp.Lhs, exp.Rhs, exp.Tok, addDeclaration); err != nil {
 			return err
 		}
+		// Handle potential inline comment for single assignment
+		c.writeInlineComment(exp)
 		c.tsw.WriteLine("") // Add newline after the statement
 		return nil
 	}
 
 	// Should not reach here if LHS/RHS counts are valid and handled
 	return fmt.Errorf("unhandled assignment case")
+}
+
+// writeInlineComment checks for and writes any inline comments associated with the given AST node.
+// It is intended to be called immediately after writing the main statement/expression.
+func (c *GoToTSCompiler) writeInlineComment(node ast.Node) {
+	if c.pkg == nil || c.pkg.Fset == nil || !node.End().IsValid() {
+		return
+	}
+
+	file := c.pkg.Fset.File(node.End())
+	if file == nil {
+		return
+	}
+
+	endLine := file.Line(node.End())
+	// Check comments associated *directly* with the node
+	for _, cg := range c.analysis.Cmap[node] {
+		if cg.Pos().IsValid() && file.Line(cg.Pos()) == endLine && cg.Pos() > node.End() {
+			commentText := strings.TrimSpace(strings.TrimPrefix(cg.Text(), "//"))
+			c.tsw.WriteLiterally(" // " + commentText)
+			return // Only write the first inline comment found
+		}
+	}
 }

@@ -23,7 +23,7 @@ export function main(): void {
 	console.log("myStr1[:]:", $.sliceString(myStr1, undefined, undefined)) // Expected: "testing"
 
 	// Slicing with Unicode characters
-	let myStr2 = "你好世界"
+	let myStr2 = "你好世界" // "Hello World" in Chinese
 	// UTF-8 bytes:
 	// 你: E4 BD A0
 	// 好: E5 A5 BD

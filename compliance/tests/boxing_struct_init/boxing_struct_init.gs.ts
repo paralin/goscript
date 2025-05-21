@@ -43,7 +43,7 @@ export function main(): void {
 	// Scenario 1: Value type that NeedsBoxed
 	// 'val' is a value type, but its address is taken, so it should be boxed in TS.
 	let val: $.Box<MyStruct> = $.box(new MyStruct({MyInt: 10}))
-	let ptrToVal = val
+	let ptrToVal = val // Makes NeedsBoxedAccess(val) true
 
 	// Accessing field on boxed value type: Should generate val.value.MyInt
 	val!.value.MyInt = 20

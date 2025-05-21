@@ -25,15 +25,15 @@ export function main(): void {
 	console.log(e) // Expected output: 1
 
 	let f: number = 5
-	f &= 3
+	f &= 3 // 101 & 011 = 001
 	console.log(f) // Expected output: 1
 
 	let g: number = 5
-	g |= 3
+	g |= 3 // 101 | 011 = 111
 	console.log(g) // Expected output: 7
 
 	let h: number = 5
-	h ^= 3
+	h ^= 3 // 101 ^ 011 = 110
 	console.log(h) // Expected output: 6
 
 	// This operation is not yet supported.
@@ -42,11 +42,11 @@ export function main(): void {
 	// println(i) // Expected output: 4
 
 	let j: number = 5
-	j <<= 1
+	j <<= 1 // 101 << 1 = 1010
 	console.log(j) // Expected output: 10
 
 	let k: number = 5
-	k >>= 1
+	k >>= 1 // 101 >> 1 = 010
 	console.log(k) // Expected output: 2
 }
 

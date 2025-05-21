@@ -33,7 +33,6 @@ import (
 func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 	switch exp := a.(type) {
 	case *ast.BlockStmt:
-		// WriteStmtBlock does not currently return an error, assuming it's safe for now.
 		if err := c.WriteStmtBlock(exp, false); err != nil {
 			return fmt.Errorf("failed to write block statement: %w", err)
 		}
@@ -73,7 +72,6 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			return fmt.Errorf("failed to write declaration statement: %w", err)
 		}
 	case *ast.ForStmt:
-		// WriteStmtFor does not currently return an error, assuming it's safe for now.
 		if err := c.WriteStmtFor(exp); err != nil {
 			return fmt.Errorf("failed to write for statement: %w", err)
 		}
@@ -83,7 +81,6 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 			return fmt.Errorf("failed to write range statement: %w", err)
 		}
 	case *ast.SwitchStmt:
-		// WriteStmtSwitch does not currently return an error, assuming it's safe for now.
 		if err := c.WriteStmtSwitch(exp); err != nil {
 			return fmt.Errorf("failed to write switch statement: %w", err)
 		}
@@ -605,7 +602,6 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 					start = file.Line(cg.Pos())
 				}
 				writeBlank(lastLine, start)
-				// WriteDoc does not currently return an error, assuming it's safe for now.
 				c.WriteDoc(cg) // WriteDoc will handle the actual comment text
 				if file != nil && cg.End().IsValid() {
 					lastLine = file.Line(cg.End())
@@ -642,7 +638,6 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 		// only emit if it follows the last content
 		if start > lastLine {
 			writeBlank(lastLine, start)
-			// WriteDoc does not currently return an error, assuming it's safe for now.
 			c.WriteDoc(cg)
 			if file != nil && cg.End().IsValid() {
 				lastLine = file.Line(cg.End())
@@ -709,7 +704,6 @@ func (c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error {
 	// Handle case clauses
 	for _, stmt := range exp.Body.List {
 		if caseClause, ok := stmt.(*ast.CaseClause); ok {
-			// WriteCaseClause does not currently return an error, assuming it's safe for now.
 			if err := c.WriteCaseClause(caseClause); err != nil {
 				return fmt.Errorf("failed to write case clause in switch statement: %w", err)
 			}

@@ -33,7 +33,7 @@ export function main(): void {
 	console.log(emptyStringFromRunes)
 
 	// === []rune(string) and string([]rune) Round Trip ===
-	let originalString = "你好世界"
+	let originalString = "你好世界" // Example with multi-byte characters
 	let runesFromString = $.stringToRunes(originalString)
 	let stringFromRunes = $.runesToString(runesFromString)
 	console.log(originalString)

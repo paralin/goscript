@@ -42,7 +42,7 @@ class MyStruct {
 export function main(): void {
 	let s1 = new MyStruct({Value: 10})
 	let p: $.Box<MyStruct> | null = null
-	p = new MyStruct({Value: 20})
+	p = new MyStruct({Value: 20}) // Initialize p to point to something
 
 	// This assignment should trigger the .clone() on s1
 	// because s1 is a struct and *p is being assigned.
@@ -57,10 +57,10 @@ export function main(): void {
 	// Test assignment from a pointer to a struct (should not clone)
 	let s2 = new MyStruct({Value: 40})
 	let p2 = new MyStruct({Value: 50})
-	p2!.value = s2!.clone()
+	p2!.value = s2!.clone() // Assigning the struct pointed to by s2 to the struct pointed to by p2
 	console.log(p2.Value) // Expected: 40
 
-	s2.Value = 60
+	s2.Value = 60 // Modify original s2
 
 	// GoScript should replicate this by cloning if the RHS is a struct value.
 	// In *p2 = *s2, *s2 is a struct value.

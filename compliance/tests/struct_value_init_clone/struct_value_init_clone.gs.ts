@@ -56,7 +56,7 @@ export function main(): void {
 
 	// Assign to another variable (should trigger clone)
 	let p2 = p1.clone()
-	p2.X = 10
+	p2.X = 10 // Modify the copy
 
 	// Print both to show they are independent
 	console.log("p1 after p2 mod:", p1.X, p1.Y)
@@ -64,8 +64,8 @@ export function main(): void {
 
 	// Initialize via variable assignment
 	let v = new Point({X: 3, Y: 4})
-	let p3 = v.clone()
-	p3.Y = 40
+	let p3 = v.clone() // Should trigger clone
+	p3.Y = 40 // Modify the copy
 
 	console.log("v after p3 mod:", v.X, v.Y)
 	console.log("p3:", p3.X, p3.Y)

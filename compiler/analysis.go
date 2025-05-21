@@ -70,6 +70,7 @@ type Analysis struct {
 
 	// FuncLitNamedReturnVars maps *ast.FuncLit to a slice of named return variable names.
 	FuncLitNamedReturnVars map[*ast.FuncLit][]string
+
 	// IsBareNamedReturn maps *ast.ReturnStmt to true if it's a bare return in a function with named returns.
 	IsBareNamedReturn map[ast.Node]bool
 

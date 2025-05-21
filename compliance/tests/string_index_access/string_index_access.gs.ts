@@ -9,7 +9,7 @@ export function main(): void {
 	console.log("Byte from myStr1[2]:", $.indexString(myStr1, 2)) // Expected: s (byte value 115)
 	console.log("Byte from myStr1[6]:", $.indexString(myStr1, 6)) // Expected: g (byte value 103)
 
-	let myStr2 = "你好世界"
+	let myStr2 = "你好世界" // "Hello World" in Chinese
 	// Accessing bytes of multi-byte characters
 	// '你' is E4 BD A0 in UTF-8
 	// '好' is E5 A5 BD in UTF-8

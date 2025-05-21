@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 // This function receives from a channel, making it async.
 async function receiveFromChan(ch: $.Channel<number>): Promise<number> {
-	let val = await ch.receive()
+	let val = await ch.receive() // This operation makes the function async
 	return val
 }
 
