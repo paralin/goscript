@@ -45,7 +45,7 @@ class Foo {
 	);
 }
 
-export function NewFoo(): $.Box<Foo> | null {
+export function NewFoo(): Foo | null {
 	return new Foo({done: $.makeChannel<boolean>(0, false, 'both')})
 }
 

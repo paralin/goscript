@@ -50,6 +50,72 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	}
 }
 
+// WriteGoTypeForFunctionReturn is similar to WriteGoType but handles pointer types
+// specially for function return values. According to the boxing strategy, function
+// return values cannot be directly addressed in Go, so pointer-to-struct types
+// should be represented as `ClassName | null` rather than `$.Box<ClassName> | null`.
+func (c *GoToTSCompiler) WriteGoTypeForFunctionReturn(typ types.Type) {
+	if typ == nil {
+		c.tsw.WriteLiterally("any")
+		c.tsw.WriteCommentInline("nil type")
+		return
+	}
+
+	switch t := typ.(type) {
+	case *types.Basic:
+		c.WriteBasicType(t)
+	case *types.Named:
+		c.WriteNamedType(t)
+	case *types.Pointer:
+		c.WritePointerTypeForFunctionReturn(t)
+	case *types.Slice:
+		c.WriteSliceType(t)
+	case *types.Array:
+		c.WriteArrayType(t)
+	case *types.Map:
+		c.WriteMapType(t)
+	case *types.Chan:
+		c.WriteChannelType(t)
+	case *types.Interface:
+		c.WriteInterfaceType(t, nil) // No ast.InterfaceType available here
+	case *types.Signature:
+		c.WriteSignatureType(t)
+	case *types.Struct:
+		c.WriteStructType(t)
+	case *types.Alias:
+		c.WriteGoTypeForFunctionReturn(t.Underlying())
+	default:
+		// For other types, just write "any" and add a comment
+		c.tsw.WriteLiterally("any")
+		c.tsw.WriteCommentInlinef("unhandled type: %T", typ)
+	}
+}
+
+// WritePointerTypeForFunctionReturn translates a Go pointer type (*T) to its TypeScript
+// equivalent for function return types. Unlike WritePointerType, this function
+// handles pointer-to-struct types specially: they become `ClassName | null` instead
+// of `$.Box<ClassName> | null` because function return values cannot be addressed.
+func (c *GoToTSCompiler) WritePointerTypeForFunctionReturn(t *types.Pointer) {
+	elemType := t.Elem()
+
+	// Check if the element type is a struct (directly or via a named type)
+	isStructType := false
+	if _, ok := elemType.Underlying().(*types.Struct); ok {
+		isStructType = true
+	}
+
+	if isStructType {
+		// For pointer-to-struct in function returns, generate ClassName | null
+		c.WriteGoTypeForFunctionReturn(elemType)
+		c.tsw.WriteLiterally(" | null")
+	} else {
+		// For pointer-to-primitive in function returns, still use boxing
+		c.tsw.WriteLiterally("$.Box<")
+		c.WriteGoTypeForFunctionReturn(elemType)
+		c.tsw.WriteLiterally("> | null")
+	}
+}
+
 // WriteZeroValueForType writes the TypeScript representation of the zero value
 // for a given Go type.
 // It handles `types.Array` by recursively writing zero values for each element
@@ -231,7 +297,7 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 		if len(exp.Results.List) == 1 && len(exp.Results.List[0].Names) == 0 {
 			// Single unnamed return type
 			typ := c.pkg.TypesInfo.TypeOf(exp.Results.List[0].Type)
-			c.WriteGoType(typ)
+			c.WriteGoTypeForFunctionReturn(typ)
 		} else {
 			// Multiple or named return types -> tuple
 			c.tsw.WriteLiterally("[")
@@ -240,7 +306,7 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 					c.tsw.WriteLiterally(", ")
 				}
 				typ := c.pkg.TypesInfo.TypeOf(field.Type)
-				c.WriteGoType(typ)
+				c.WriteGoTypeForFunctionReturn(typ)
 			}
 			c.tsw.WriteLiterally("]")
 		}
@@ -316,7 +382,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 	if results.Len() == 0 {
 		c.tsw.WriteLiterally("void")
 	} else if results.Len() == 1 {
-		c.WriteGoType(results.At(0).Type())
+		c.WriteGoTypeForFunctionReturn(results.At(0).Type())
 	} else {
 		// Multiple return values -> tuple
 		c.tsw.WriteLiterally("[")
@@ -324,7 +390,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 			if i > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			c.WriteGoType(results.At(i).Type())
+			c.WriteGoTypeForFunctionReturn(results.At(i).Type())
 		}
 		c.tsw.WriteLiterally("]")
 	}
@@ -402,14 +468,14 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 			if results.Len() == 0 {
 				c.tsw.WriteLiterally("void")
 			} else if results.Len() == 1 {
-				c.WriteGoType(results.At(0).Type()) // Recursive call for result type
+				c.WriteGoTypeForFunctionReturn(results.At(0).Type()) // Recursive call for result type
 			} else {
 				c.tsw.WriteLiterally("[")
 				for j := 0; j < results.Len(); j++ {
 					if j > 0 {
 						c.tsw.WriteLiterally(", ")
 					}
-					c.WriteGoType(results.At(j).Type()) // Recursive call for result type
+					c.WriteGoTypeForFunctionReturn(results.At(j).Type()) // Recursive call for result type
 				}
 				c.tsw.WriteLiterally("]")
 			}

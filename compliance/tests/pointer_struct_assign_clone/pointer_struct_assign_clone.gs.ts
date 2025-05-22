@@ -83,7 +83,7 @@ function getStruct(): MyStruct {
 	return new MyStruct({Value: 100})
 }
 
-function getStructPointer(): $.Box<MyStruct> | null {
+function getStructPointer(): MyStruct | null {
 	return new MyStruct({Value: 110})
 }
 
