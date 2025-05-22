@@ -20,9 +20,12 @@ import (
 // - `make(chan T, size)` becomes `$.makeChannel<T_ts>(size, zeroValueForT)`.
 // - `make(map[K]V)` becomes `$.makeMap<K_ts, V_ts>()`.
 // - `make([]T, len, cap)` becomes `$.makeSlice<T_ts>(len, cap)`.
+// - `make([]byte, len, cap)` becomes `new Uint8Array(len)`.
 // - `string(runeVal)` becomes `String.fromCharCode(runeVal)`.
-// - `string([]runeVal)` or `string([]byteVal)` becomes `$.runesToString(sliceVal)`.
-// - `[]rune(stringVal)` becomes `$.stringToRunes(stringVal)`.
+// - `string([]runeVal)` becomes `$.runesToString(sliceVal)`.
+// - `string([]byteVal)` becomes `$.bytesToString(sliceVal)`.
+// - `[]rune(stringVal)` becomes `$.stringToRunes(stringVal)“.
+// - `[]byte(stringVal)` becomes `$.stringToBytes(stringVal)`.
 // - `close(ch)` becomes `ch.close()`.
 // - `append(slice, elems...)` becomes `$.append(slice, elems...)`.
 // - `byte(val)` becomes `$.byte(val)`.
@@ -180,13 +183,30 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					if sliceType == nil {
 						return errors.New("could not get type information for slice in make call")
 					}
-					goElemType, ok := sliceType.Underlying().(*types.Slice)
+					goUnderlyingType, ok := sliceType.Underlying().(*types.Slice)
 					if !ok {
 						return errors.New("expected slice type for make call")
 					}
+					goElemType := goUnderlyingType.Elem()
+
+					// Check if it's make([]byte, ...)
+					if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
+						c.tsw.WriteLiterally("new Uint8Array(")
+						if len(exp.Args) >= 2 {
+							if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+								return err
+							}
+							// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+						} else {
+							// If no length is provided, default to 0
+							c.tsw.WriteLiterally("0")
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled make for []byte
+					}
 
 					c.tsw.WriteLiterally("$.makeSlice<")
-					c.WriteGoType(goElemType.Elem()) // Write the element type
+					c.WriteGoType(goElemType) // Write the element type
 					c.tsw.WriteLiterally(">(")
 
 					if len(exp.Args) >= 2 {
@@ -257,15 +277,24 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					// Case 3: Argument is a slice of runes or bytes string([]rune{...}) or string([]byte{...})
 					if sliceType, isSlice := tv.Type.Underlying().(*types.Slice); isSlice {
 						if basic, isBasic := sliceType.Elem().Underlying().(*types.Basic); isBasic {
-							// Handle both runes (int32) and bytes (uint8)
-							if basic.Kind() == types.Int32 || basic.Kind() == types.Uint8 {
-								// Translate string([]rune) or string([]byte) to $.runesToString(...)
-								c.tsw.WriteLiterally("$.runesToString(")
+							// Handle string([]byte)
+							if basic.Kind() == types.Uint8 {
+								c.tsw.WriteLiterally("$.bytesToString(")
 								if err := c.WriteValueExpr(arg); err != nil {
-									return fmt.Errorf("failed to write argument for string([]rune/[]byte) conversion: %w", err)
+									return fmt.Errorf("failed to write argument for string([]byte) conversion: %w", err)
 								}
 								c.tsw.WriteLiterally(")")
-								return nil // Handled string([]rune) or string([]byte)
+								return nil // Handled string([]byte)
+							}
+							// Handle both runes (int32)
+							if basic.Kind() == types.Int32 {
+								// Translate string([]rune) to $.runesToString(...)
+								c.tsw.WriteLiterally("$.runesToString(")
+								if err := c.WriteValueExpr(arg); err != nil {
+									return fmt.Errorf("failed to write argument for string([]rune) conversion: %w", err)
+								}
+								c.tsw.WriteLiterally(")")
+								return nil // Handled string([]rune)
 							}
 						}
 					}

@@ -6,7 +6,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 export function main(): void {
 	// Test basic array literal
 	//nolint:staticcheck
-	let a: number[] = $.arrayToSlice<number>([1, 2, 3])
+	let a = $.arrayToSlice<number>([1, 2, 3])
 	console.log(a![0], a![1], a![2])
 
 	// Test array literal with inferred length

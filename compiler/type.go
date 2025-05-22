@@ -56,6 +56,7 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 // to form a TypeScript array literal (e.g., `[0, 0, 0]`).
 // For `types.Basic` (like `bool`, `string`, numeric types), it writes the
 // corresponding TypeScript zero value (`false`, `""`, `0`).
+// For `[]byte`, it writes `new Uint8Array(0)`.
 // Other types default to `null`. This function is primarily used for initializing
 // arrays and variables where an explicit initializer is absent.
 func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
@@ -96,6 +97,14 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 		}
 		// For other named types, use the zero value of the underlying type
 		c.WriteZeroValueForType(t.Underlying())
+	case *types.Slice:
+		// Check if it's a []byte slice
+		if elem, ok := t.Elem().(*types.Basic); ok && elem.Kind() == types.Uint8 {
+			c.tsw.WriteLiterally("new Uint8Array(0)")
+			return
+		}
+		// For other slice types, default to null
+		c.tsw.WriteLiterally("null")
 	case *types.Struct:
 		// For anonymous struct types, initialize with {}
 		c.tsw.WriteLiterally("{}")
@@ -160,7 +169,13 @@ func (c *GoToTSCompiler) WritePointerType(t *types.Pointer) {
 
 // WriteSliceType translates a Go slice type ([]T) to its TypeScript equivalent.
 // It generates $.Slice<T_ts>, where T_ts is the translated element type.
+// For []byte, it generates Uint8Array.
 func (c *GoToTSCompiler) WriteSliceType(t *types.Slice) {
+	// Check if it's a []byte slice
+	if elem, ok := t.Elem().(*types.Basic); ok && elem.Kind() == types.Uint8 {
+		c.tsw.WriteLiterally("Uint8Array")
+		return
+	}
 	c.tsw.WriteLiterally("$.Slice<")
 	c.WriteGoType(t.Elem())
 	c.tsw.WriteLiterally(">")

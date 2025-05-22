@@ -80,7 +80,7 @@ export function main(): void {
 	// Successful type assertion to an inline interface
 	let { value: g, ok: ok } = $.typeAssert<null | {
 		Greet(): string
-	}>(i, {kind: $.TypeKind.Interface, methods: []})
+	}>(i, 'unknown')
 	if (ok) {
 		console.log("Greet assertion successful:", g.Greet())
 	} else {
@@ -90,7 +90,7 @@ export function main(): void {
 	// Failing type assertion to a different inline interface
 	let { value: s, ok: ok2 } = $.typeAssert<null | {
 		NonExistentMethod(): number
-	}>(i, {kind: $.TypeKind.Interface, methods: []})
+	}>(i, 'unknown')
 	if (ok2) {
 		console.log("NonExistentMethod assertion successful (unexpected):", s.NonExistentMethod())
 	} else {
@@ -104,7 +104,7 @@ export function main(): void {
 	// Assert 'j' (which holds MyStringer) to an inline interface that MyStringer satisfies.
 	let { value: inlineMs, ok: ok4 } = $.typeAssert<null | {
 		String(): string
-	}>(j, {kind: $.TypeKind.Interface, methods: []})
+	}>(j, 'unknown')
 	if (ok4) {
 		console.log("Inline String assertion successful:", inlineMs.String())
 	} else {
@@ -117,7 +117,7 @@ export function main(): void {
 
 	let { value: inlineK, ok: ok5 } = $.typeAssert<null | {
 		String(): string
-	}>(k, {kind: $.TypeKind.Interface, methods: []})
+	}>(k, 'unknown')
 	if (ok5) {
 		console.log("k.(interface{ String() string }) successful:", inlineK.String())
 	} else {

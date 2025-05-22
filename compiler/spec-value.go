@@ -1,10 +1,10 @@
 package compiler
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
-
-	"github.com/pkg/errors"
+	"go/types"
 )
 
 // WriteValueSpec translates a Go value specification (`ast.ValueSpec`),
@@ -44,36 +44,67 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		name := a.Names[0]
 		obj := c.pkg.TypesInfo.Defs[name]
 		if obj == nil {
-			return errors.Errorf("could not resolve type: %v", name)
+			return fmt.Errorf("could not resolve type: %v", name)
 		}
 
 		goType := obj.Type()
 		needsBox := c.analysis.NeedsBoxed(obj) // Check if address is taken
 
-		// Start declaration
-		c.tsw.WriteLiterally("let ")
-		c.tsw.WriteLiterally(name.Name)
-		c.tsw.WriteLiterally(": ")
-
-		// Write type annotation
-		if needsBox {
-			// If boxed, the variable holds Box<OriginalGoType>
-			c.tsw.WriteLiterally("$.Box<")
-			c.WriteGoType(goType) // Write the original Go type T
-			c.tsw.WriteLiterally(">")
-		} else {
-			// If not boxed, the variable holds the translated Go type directly
-			c.WriteGoType(goType)
-		}
-
-		// Write initializer
-		c.tsw.WriteLiterally(" = ")
 		hasInitializer := len(a.Values) > 0
 		var initializerExpr ast.Expr
 		if hasInitializer {
 			initializerExpr = a.Values[0]
+		}
 
-			// Special case for nil pointer to struct type: (*struct{})(nil)
+		// Check if the initializer will result in an $.arrayToSlice call in TypeScript
+		isSliceConversion := false
+		if hasInitializer {
+			// Case 1: Direct call to $.arrayToSlice in Go source (less common for typical array literals)
+			if callExpr, isCallExpr := initializerExpr.(*ast.CallExpr); isCallExpr {
+				if selExpr, isSelExpr := callExpr.Fun.(*ast.SelectorExpr); isSelExpr {
+					if pkgIdent, isPkgIdent := selExpr.X.(*ast.Ident); isPkgIdent && pkgIdent.Name == "$" {
+						if selExpr.Sel.Name == "arrayToSlice" {
+							isSliceConversion = true
+						}
+					}
+				}
+			}
+
+			// Case 2: Go array or slice literal, which will be compiled to $.arrayToSlice
+			// We also check if the original Go type is actually a slice or array.
+			if !isSliceConversion { // Only check if not already determined by Case 1
+				if _, isCompositeLit := initializerExpr.(*ast.CompositeLit); isCompositeLit {
+					switch goType.Underlying().(type) {
+					case *types.Slice, *types.Array:
+						isSliceConversion = true
+					}
+				}
+			}
+		}
+
+		// Start declaration
+		c.tsw.WriteLiterally("let ")
+		c.tsw.WriteLiterally(name.Name)
+
+		if !isSliceConversion {
+			c.tsw.WriteLiterally(": ")
+			// Write type annotation
+			if needsBox {
+				// If boxed, the variable holds Box<OriginalGoType>
+				c.tsw.WriteLiterally("$.Box<")
+				c.WriteGoType(goType) // Write the original Go type T
+				c.tsw.WriteLiterally(">")
+			} else {
+				// If not boxed, the variable holds the translated Go type directly
+				c.WriteGoType(goType)
+			}
+		}
+
+		// Write initializer
+		c.tsw.WriteLiterally(" = ")
+
+		// Special case for nil pointer to struct type: (*struct{})(nil)
+		if hasInitializer {
 			if callExpr, isCallExpr := initializerExpr.(*ast.CallExpr); isCallExpr {
 				if starExpr, isStarExpr := callExpr.Fun.(*ast.StarExpr); isStarExpr {
 					if _, isStructType := starExpr.X.(*ast.StructType); isStructType {
@@ -81,6 +112,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 						if len(callExpr.Args) == 1 {
 							if nilIdent, isIdent := callExpr.Args[0].(*ast.Ident); isIdent && nilIdent.Name == "nil" {
 								c.tsw.WriteLiterally("null")
+								c.tsw.WriteLine("") // Ensure newline after null
 								return nil
 							}
 						}

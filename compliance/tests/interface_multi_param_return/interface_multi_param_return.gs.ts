@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 type MultiParamReturner = null | {
-	Process(data: $.Slice<number>, count: number, _p2: string): [boolean, $.GoError]
+	Process(data: Uint8Array, count: number, _p2: string): [boolean, $.GoError]
 }
 
 $.registerInterfaceType(
@@ -28,7 +28,7 @@ class MyProcessor {
 		return cloned
 	}
 
-	public Process(data: $.Slice<number>, count: number, _: string): [boolean, $.GoError] {
+	public Process(data: Uint8Array, count: number, _: string): [boolean, $.GoError] {
 		const p = this
 		if (count > 0 && $.len(data) > 0) {
 			console.log("Processing successful")
@@ -51,7 +51,7 @@ class MyProcessor {
 export function main(): void {
 	let processor: MultiParamReturner = new MyProcessor({})
 
-	let data = $.arrayToSlice<number>([1, 2, 3])
+	let data = new Uint8Array([1, 2, 3])
 	let [success, ] = processor.Process(data, 5, "unused")
 
 	if (success) {

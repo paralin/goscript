@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
-	"go/types"
 	"strings"
 )
 
@@ -46,418 +45,165 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 		return fmt.Errorf("type assertion assignment requires exactly 2 variables on LHS, got %d", len(lhs))
 	}
 
-	// Get variable names, handling blank identifiers
-	valueIsBlank := false
-	okIsBlank := false
-	var valueName string
+	var okIsBlank bool
 	var okName string
-	var valueIdent *ast.Ident
-	var okIdent *ast.Ident
 
-	if valId, ok := lhs[0].(*ast.Ident); ok {
-		valueIdent = valId
-		if valId.Name == "_" {
-			valueIsBlank = true
-		} else {
-			valueName = valId.Name
+	okExpr := lhs[1]
+	okIdent, ok := okExpr.(*ast.Ident)
+	if !ok {
+		return fmt.Errorf("ok expression is not an identifier: %T", okExpr)
+	}
+	okIsBlank = okIdent.Name == "_"
+	okName = okIdent.Name
+
+	valueExpr := lhs[0]
+
+	// Determine if 'ok' variable is new in 'tok == token.DEFINE' context.
+	// This uses types.Info.Defs to see if the identifier is defined by this statement.
+	var okIsNewInDefine bool
+	if tok == token.DEFINE && !okIsBlank {
+		if c.pkg.TypesInfo.Defs[okIdent] != nil {
+			okIsNewInDefine = true
 		}
-	} else {
-		return fmt.Errorf("unhandled LHS expression type for value in type assertion: %T", lhs[0])
 	}
 
-	if okId, ok := lhs[1].(*ast.Ident); ok {
-		okIdent = okId
-		if okId.Name == "_" {
-			okIsBlank = true
-		} else {
-			okName = okId.Name
-		}
-	} else {
-		return fmt.Errorf("unhandled LHS expression type for ok in type assertion: %T", lhs[1])
-	}
-
-	// For token.DEFINE (:=), we need to check if any of the variables are already declared
-	// In Go, := can be used for redeclaration if at least one variable is new
-	writeEndParen := false
-	if tok == token.DEFINE {
-		// Identify which variables are new vs existing
-		valueIsNew := true
-		okIsNew := true
-		anyNewVars := false
-		allNewVars := true
-
-		// Check if variables are already in scope
-		if !valueIsBlank {
-			if obj := c.pkg.TypesInfo.Uses[valueIdent]; obj != nil {
-				// If it's in Uses, it's referenced elsewhere, so it exists
-				valueIsNew = false
-				allNewVars = false
-			}
-			if valueIsNew {
-				anyNewVars = true
-			}
-		}
-
-		if !okIsBlank {
-			if obj := c.pkg.TypesInfo.Uses[okIdent]; obj != nil {
-				// If it's in Uses, it's referenced elsewhere, so it exists
-				okIsNew = false
-				allNewVars = false
-			}
-			if okIsNew {
-				anyNewVars = true
-			}
-		}
-
-		if allNewVars && anyNewVars {
-			c.tsw.WriteLiterally("let ")
-		} else if anyNewVars {
-			// If only some variables are new, declare them separately
-			if !valueIsBlank && valueIsNew {
-				c.tsw.WriteLiterally("let ")
-				c.tsw.WriteLiterally(valueName)
-				// Add type annotation if possible
-				if tv, ok := c.pkg.TypesInfo.Types[assertedType]; ok {
-					c.tsw.WriteLiterally(": ")
-					c.WriteGoType(tv.Type)
-				}
-				c.tsw.WriteLine("")
-			}
-			if !okIsBlank && okIsNew {
-				c.tsw.WriteLiterally("let ")
-				c.tsw.WriteLiterally(okName)
-				c.tsw.WriteLiterally(": boolean") // ok is always boolean
-				c.tsw.WriteLine("")
-			}
-			// Use parenthesized destructuring assignment for existing variables
-			c.tsw.WriteLiterally(";(")
-			writeEndParen = true
-		} else {
-			// All variables exist, use parenthesized destructuring assignment
-			c.tsw.WriteLiterally(";(")
-			writeEndParen = true
-		}
-	} else {
-		c.tsw.WriteLiterally("(")
-	}
-
-	c.tsw.WriteLiterally("{ ")
-	// Dynamically build the destructuring pattern
-	parts := []string{}
-	if !valueIsBlank {
-		parts = append(parts, fmt.Sprintf("value: %s", valueName))
-	}
-	if !okIsBlank {
-		parts = append(parts, fmt.Sprintf("ok: %s", okName))
-	}
-	c.tsw.WriteLiterally(strings.Join(parts, ", "))
-	c.tsw.WriteLiterally(" } = $.typeAssert<")
-
-	// Write the asserted type for the generic
-	c.WriteTypeExpr(assertedType)
-	c.tsw.WriteLiterally(">(")
-
-	// Write the interface expression
-	if err := c.WriteValueExpr(interfaceExpr); err != nil {
-		return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
-	}
-	c.tsw.WriteLiterally(", ")
-
-	// Use structured type information for all types
-	switch typeExpr := assertedType.(type) {
-	case *ast.MapType:
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Map, ")
-
-		c.tsw.WriteLiterally("keyType: ")
-		if ident, ok := typeExpr.Key.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
-			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterallyf("'%s'", tsType)
-			} else {
-				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
-			}
-		} else {
-			c.writeTypeDescription(typeExpr.Key)
-		}
-
-		c.tsw.WriteLiterally(", ")
-
-		// Add element type
-		c.tsw.WriteLiterally("elemType: ")
-		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
-			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterallyf("'%s'", tsType)
-			} else {
-				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
-			}
-		} else {
-			c.writeTypeDescription(typeExpr.Value)
-		}
-
-		c.tsw.WriteLiterally("}")
-	case *ast.ArrayType:
-		// Determine if it's a slice or array
-		typeKind := "$.TypeKind.Slice"
-		if typeExpr.Len != nil {
-			typeKind = "$.TypeKind.Array"
-		}
-
-		// Create a type descriptor object
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterallyf("kind: %s, ", typeKind)
-
-		// Add element type
-		c.tsw.WriteLiterally("elemType: ")
-		if ident, ok := typeExpr.Elt.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
-			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterallyf("'%s'", tsType)
-			} else {
-				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
-			}
-		} else {
-			c.writeTypeDescription(typeExpr.Elt)
-		}
-
-		c.tsw.WriteLiterally("}")
-	case *ast.StructType:
-		// For struct types, create a type descriptor object
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Struct")
-
-		// Get the type name if available
-		typeName := c.getTypeNameString(assertedType)
-		if typeName != "unknown" {
-			c.tsw.WriteLiterallyf(", name: '%s'", typeName)
-		}
-
-		if typeExpr.Fields != nil && typeExpr.Fields.List != nil {
-			// Add fields property to provide type information
-			c.tsw.WriteLiterally(", fields: {")
-
-			hasFields := false
-			for _, field := range typeExpr.Fields.List {
-				if len(field.Names) > 0 {
-					for _, name := range field.Names {
-						if hasFields {
-							c.tsw.WriteLiterally(", ")
-						}
-						c.tsw.WriteLiterally(fmt.Sprintf("'%s': ", name.Name))
-						c.writeTypeDescription(field.Type)
-						hasFields = true
-					}
-				}
-			}
-
-			c.tsw.WriteLiterally("}")
-		} else {
-			c.tsw.WriteLiterally(", fields: {}")
-		}
-
-		// Add empty methods set to satisfy StructTypeInfo interface
-		c.tsw.WriteLiterally(", methods: []")
-
-		c.tsw.WriteLiterally("}")
-	case *ast.InterfaceType:
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Interface")
-
-		// Get the type name if available
-		typeName := c.getTypeNameString(assertedType)
-		if typeName != "unknown" {
-			c.tsw.WriteLiterallyf(", name: '%s'", typeName)
-		}
-
-		// Add methods if available
-		c.tsw.WriteLiterally(", methods: []")
-
-		c.tsw.WriteLiterally("}")
-	case *ast.StarExpr:
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Pointer")
-
-		// Add element type if it's a struct type or named type
-		if structType, ok := typeExpr.X.(*ast.StructType); ok {
-			c.tsw.WriteLiterally(", elemType: ")
-			c.writeTypeDescription(structType)
-		} else if ident, ok := typeExpr.X.(*ast.Ident); ok {
-			c.tsw.WriteLiterallyf(", elemType: '%s'", ident.Name)
-		}
-
-		c.tsw.WriteLiterally("}")
-	case *ast.ChanType:
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Channel")
-
-		// Add element type
-		c.tsw.WriteLiterally(", elemType: ")
-		if ident, ok := typeExpr.Value.(*ast.Ident); ok && isPrimitiveType(ident.Name) {
-			if tsType, ok := GoBuiltinToTypescript(ident.Name); ok {
-				c.tsw.WriteLiterallyf("'%s'", tsType)
-			} else {
-				c.tsw.WriteLiterallyf("'%s'", ident.Name) // Fallback
-			}
-		} else {
-			c.writeTypeDescription(typeExpr.Value)
-		}
-
-		c.tsw.WriteLiterally(", direction: ")
-		switch typeExpr.Dir {
-		case ast.SEND:
-			c.tsw.WriteLiterally("'send'")
-		case ast.RECV:
-			c.tsw.WriteLiterally("'receive'")
-		case ast.SEND | ast.RECV: // bidirectional
-			c.tsw.WriteLiterally("'both'")
-		default:
-			// This should not happen, but just in case
-			c.tsw.WriteLiterally("'both'")
-		}
-
-		c.tsw.WriteLiterally("}")
-	case *ast.FuncType:
-		// For function types, create a type descriptor object with params and results
-		c.tsw.WriteLiterally("{")
-		c.tsw.WriteLiterally("kind: $.TypeKind.Function")
-
-		// Add name if this is a named function type
-		if namedType := c.pkg.TypesInfo.TypeOf(typeExpr); namedType != nil {
-			if named, ok := namedType.(*types.Named); ok {
-				c.tsw.WriteLiterallyf(", name: '%s'", named.Obj().Name())
-			}
-		}
-
-		// Add params if present
-		if typeExpr.Params != nil && len(typeExpr.Params.List) > 0 {
-			c.tsw.WriteLiterally(", params: [")
-			for i, param := range typeExpr.Params.List {
-				if i > 0 {
-					c.tsw.WriteLiterally(", ")
-				}
-				c.writeTypeDescription(param.Type)
-			}
-			c.tsw.WriteLiterally("]")
-		}
-
-		// Add results if present
-		if typeExpr.Results != nil && len(typeExpr.Results.List) > 0 {
-			c.tsw.WriteLiterally(", results: [")
-			for i, result := range typeExpr.Results.List {
-				if i > 0 {
-					c.tsw.WriteLiterally(", ")
-				}
-				c.writeTypeDescription(result.Type)
-			}
-			c.tsw.WriteLiterally("]")
-		}
-
-		c.tsw.WriteLiterally("}")
+	switch vLHS := valueExpr.(type) {
 	case *ast.Ident:
-		if isPrimitiveType(typeExpr.Name) {
-			c.tsw.WriteLiterally("{")
-			c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
+		var valueIsBlank bool
+		var valueName string
+		valueIdent := vLHS
+		valueIsBlank = (valueIdent.Name == "_")
+		valueName = valueIdent.Name
 
-			// Use TypeScript equivalent if available
-			if tsType, ok := GoBuiltinToTypescript(typeExpr.Name); ok {
-				c.tsw.WriteLiterallyf("name: '%s'", tsType) // TODO: use %q?
-			} else {
-				c.tsw.WriteLiterallyf("name: '%s'", typeExpr.Name)
+		var valueIsNewInDefine bool
+		if tok == token.DEFINE && !valueIsBlank {
+			if c.pkg.TypesInfo.Defs[valueIdent] != nil { // valueIdent is defined by this statement
+				valueIsNewInDefine = true
 			}
+		}
 
-			c.tsw.WriteLiterally("}")
-		} else {
-			// Check if this is a named function type
-			isFunctionType := false
-			if namedType := c.pkg.TypesInfo.TypeOf(typeExpr); namedType != nil {
-				if named, ok := namedType.(*types.Named); ok {
-					if _, ok := named.Underlying().(*types.Signature); ok {
-						// This is a named function type, generate a FunctionTypeInfo
-						isFunctionType = true
-						c.tsw.WriteLiterally("{")
-						c.tsw.WriteLiterally("kind: $.TypeKind.Function")
-						c.tsw.WriteLiterallyf(", name: '%s'", typeExpr.Name)
+		writeEndParen := false  // For wrapping assignment in parens to make it an expression
+		letDestructure := false // True if 'let { value: v, ok: o } = ...' is appropriate
 
-						// Get the underlying signature
-						signature := named.Underlying().(*types.Signature)
+		if tok == token.DEFINE {
+			anyNewVars := (valueIsNewInDefine && !valueIsBlank) || (okIsNewInDefine && !okIsBlank)
+			// allVarsNewOrBlank means suitable for a single `let {v,o} = ...` destructuring
+			allVarsNewOrBlank := (valueIsBlank || valueIsNewInDefine) && (okIsBlank || okIsNewInDefine)
 
-						// Add params if present
-						params := signature.Params()
-						if params != nil && params.Len() > 0 {
-							c.tsw.WriteLiterally(", params: [")
-							for i := 0; i < params.Len(); i++ {
-								if i > 0 {
-									c.tsw.WriteLiterally(", ")
-								}
-								// Use basic type info for parameters
-								param := params.At(i)
-								c.tsw.WriteLiterally("{")
-								c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
-
-								typeName := param.Type().String()
-								if tsType, ok := GoBuiltinToTypescript(typeName); ok {
-									c.tsw.WriteLiterallyf("name: '%s'", tsType)
-								} else {
-									c.tsw.WriteLiterallyf("name: '%s'", typeName)
-								}
-
-								c.tsw.WriteLiterally("}")
-							}
-							c.tsw.WriteLiterally("]")
-						}
-
-						// Add results if present
-						results := signature.Results()
-						if results != nil && results.Len() > 0 {
-							c.tsw.WriteLiterally(", results: [")
-							for i := 0; i < results.Len(); i++ {
-								if i > 0 {
-									c.tsw.WriteLiterally(", ")
-								}
-								result := results.At(i)
-								c.tsw.WriteLiterally("{")
-								c.tsw.WriteLiterally("kind: $.TypeKind.Basic, ")
-
-								typeName := result.Type().String()
-								if tsType, ok := GoBuiltinToTypescript(typeName); ok {
-									c.tsw.WriteLiterallyf("name: '%s'", tsType)
-								} else {
-									c.tsw.WriteLiterallyf("name: '%s'", typeName)
-								}
-
-								c.tsw.WriteLiterally("}")
-							}
-							c.tsw.WriteLiterally("]")
-						}
-
-						c.tsw.WriteLiterally("}")
-					}
+			if allVarsNewOrBlank && anyNewVars {
+				letDestructure = true
+			} else if anyNewVars { // Mixed: some new, some existing. Declare new ones separately.
+				if !valueIsBlank && valueIsNewInDefine {
+					c.tsw.WriteLiterally("let ")
+					c.tsw.WriteLiterally(valueName)
+					c.tsw.WriteLiterally(": ")
+					c.WriteTypeExpr(assertedType) // Use WriteTypeExpr for TS type annotation
+					c.tsw.WriteLine("")
 				}
+				if !okIsBlank && okIsNewInDefine {
+					c.tsw.WriteLiterally("let ")
+					c.tsw.WriteLiterally(okName)
+					c.tsw.WriteLiterally(": boolean")
+					c.tsw.WriteLine("")
+				}
+				c.tsw.WriteLiterally("(") // Parenthesize the assignment part
+				writeEndParen = true
+			} else { // All variables exist
+				c.tsw.WriteLiterally("(")
+				writeEndParen = true
 			}
-
-			// Default case for non-function named types
-			if !isFunctionType {
-				c.tsw.WriteLiterallyf("'%s'", typeExpr.Name)
-			}
+		} else { // tok == token.ASSIGN
+			c.tsw.WriteLiterally("(")
+			writeEndParen = true
 		}
-	case *ast.SelectorExpr:
-		// For imported types like pkg.Type
-		if ident, ok := typeExpr.X.(*ast.Ident); ok {
-			c.tsw.WriteLiterallyf("'%s.%s'", ident.Name, typeExpr.Sel.Name)
-		} else {
-			c.tsw.WriteLiterallyf("'%s'", c.getTypeNameString(assertedType))
+
+		if letDestructure {
+			c.tsw.WriteLiterally("let ")
 		}
-	default:
-		// For other types, use the string name as before
-		typeName := c.getTypeNameString(assertedType)
-		c.tsw.WriteLiterallyf("'%s'", typeName)
-	}
 
-	c.tsw.WriteLiterally(")")
-
-	if tok != token.DEFINE || writeEndParen {
+		// Write the destructuring part: { value: v, ok: o }
+		c.tsw.WriteLiterally("{ ")
+		parts := []string{}
+		if !valueIsBlank {
+			parts = append(parts, fmt.Sprintf("value: %s", valueName))
+		}
+		if !okIsBlank {
+			parts = append(parts, fmt.Sprintf("ok: %s", okName))
+		}
+		c.tsw.WriteLiterally(strings.Join(parts, ", "))
+		c.tsw.WriteLiterally(" } = $.typeAssert<")
+		c.WriteTypeExpr(assertedType) // Generic: <AssertedTypeTS>
+		c.tsw.WriteLiterally(">(")
+		if err := c.WriteValueExpr(interfaceExpr); err != nil { // Arg1: interfaceExpr
+			return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
+		}
+		c.tsw.WriteLiterally(", ")
+		c.writeTypeDescription(assertedType) // Arg2: type info for runtime
 		c.tsw.WriteLiterally(")")
-	}
 
-	c.tsw.WriteLine("") // Add newline after the statement
+		if writeEndParen {
+			c.tsw.WriteLiterally(")")
+		}
+		c.tsw.WriteLine("")
+
+	case *ast.SelectorExpr:
+		// Handle s.field, ok := expr.(Type)
+		tempValName := "_gs_ta_val_" // Fixed name for temporary value
+		tempOkName := "_gs_ta_ok_"   // Fixed name for temporary ok status
+
+		// Declare temporary variables:
+		// let _gs_ta_val_: AssertedTypeTS;
+		c.tsw.WriteLiterally("let ")
+		c.tsw.WriteLiterally(tempValName)
+		c.tsw.WriteLiterally(": ")
+		c.WriteTypeExpr(assertedType) // TypeScript type for assertedType
+		c.tsw.WriteLine("")
+
+		// let _gs_ta_ok_: boolean;
+		c.tsw.WriteLiterally("let ")
+		c.tsw.WriteLiterally(tempOkName)
+		c.tsw.WriteLiterally(": boolean")
+		c.tsw.WriteLine("")
+
+		// Perform type assertion into temporary variables:
+		// ({ value: _gs_ta_val_, ok: _gs_ta_ok_ } = $.typeAssert<AssertedTypeTS>(expr, "GoTypeStr"));
+		c.tsw.WriteLiterally("({ value: ")
+		c.tsw.WriteLiterally(tempValName)
+		c.tsw.WriteLiterally(", ok: ")
+		c.tsw.WriteLiterally(tempOkName)
+		c.tsw.WriteLiterally(" } = $.typeAssert<")
+		c.WriteTypeExpr(assertedType) // Generic: <AssertedTypeTS>
+		c.tsw.WriteLiterally(">(")
+		if err := c.WriteValueExpr(interfaceExpr); err != nil { // Arg1: interfaceExpr
+			return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
+		}
+		c.tsw.WriteLiterally(", ")
+		c.writeTypeDescription(assertedType) // Arg2: type info for runtime
+		c.tsw.WriteLine("))")
+
+		// Assign temporary value to the selector expression:
+		// s.f = _gs_ta_val_;
+		if err := c.WriteValueExpr(vLHS); err != nil { // Writes selector expression (e.g., "s.f")
+			return fmt.Errorf("failed to write LHS selector expression in type assertion: %w", err)
+		}
+		c.tsw.WriteLiterally(" = ")
+		c.tsw.WriteLiterally(tempValName)
+		c.tsw.WriteLine("")
+
+		// Assign temporary ok to the ok variable (e.g., okName = _gs_ta_ok_; or let okName = ...)
+		if !okIsBlank {
+			if okIsNewInDefine { // okIsNewInDefine was determined earlier based on tok == token.DEFINE and Defs check
+				c.tsw.WriteLiterally("let ")
+			}
+			c.tsw.WriteLiterally(okName)
+			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally(tempOkName)
+			c.tsw.WriteLine("")
+		}
+
+	default:
+		return fmt.Errorf("unhandled LHS expression type for value in type assertion: %T", valueExpr)
+	}
 
 	return nil
 }

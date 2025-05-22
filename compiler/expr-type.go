@@ -29,6 +29,52 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 	switch t := typeExpr.(type) {
 	case *ast.Ident:
+		// Resolve the identifier to its type
+		goType := c.pkg.TypesInfo.TypeOf(t)
+		if goType != nil {
+			if namedType, isNamed := goType.(*types.Named); isNamed {
+				if sig, isFuncSig := namedType.Underlying().(*types.Signature); isFuncSig {
+					// It's a named function type (e.g. type MyFunc func())
+					c.tsw.WriteLiterally("{")
+					c.tsw.WriteLiterally("kind: $.TypeKind.Function, ")
+					c.tsw.WriteLiterallyf("name: '%s'", namedType.Obj().Name()) // Use the original defined name
+
+					// Add params if present
+					if sig.Params() != nil && sig.Params().Len() > 0 {
+						c.tsw.WriteLiterally(", params: [")
+						for i := 0; i < sig.Params().Len(); i++ {
+							if i > 0 {
+								c.tsw.WriteLiterally(", ")
+							}
+							paramVar := sig.Params().At(i)
+							c.writeTypeInfoObject(paramVar.Type())
+						}
+						c.tsw.WriteLiterally("]")
+					} else {
+						c.tsw.WriteLiterally(", params: []")
+					}
+
+					// Add results if present
+					if sig.Results() != nil && sig.Results().Len() > 0 {
+						c.tsw.WriteLiterally(", results: [")
+						for i := 0; i < sig.Results().Len(); i++ {
+							if i > 0 {
+								c.tsw.WriteLiterally(", ")
+							}
+							resultVar := sig.Results().At(i)
+							c.writeTypeInfoObject(resultVar.Type())
+						}
+						c.tsw.WriteLiterally("]")
+					} else {
+						c.tsw.WriteLiterally(", results: []")
+					}
+
+					c.tsw.WriteLiterally("}")
+					return
+				}
+			}
+		}
+
 		if isPrimitiveType(t.Name) {
 			if tsType, ok := GoBuiltinToTypescript(t.Name); ok {
 				c.tsw.WriteLiterally("{")
@@ -112,9 +158,16 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		c.tsw.WriteLiterally("kind: $.TypeKind.Function")
 
 		// Add name if this is a named function type
-		if namedType := c.pkg.TypesInfo.TypeOf(typeExpr); namedType != nil {
-			if named, ok := namedType.(*types.Named); ok {
-				c.tsw.WriteLiterallyf(", name: '%s'", named.Obj().Name())
+		// For an anonymous ast.FuncType, typeExpr is the ast.FuncType itself.
+		// We need to check if the type information associated with this AST node
+		// points to a *types.Named type.
+		resolvedGoType := c.pkg.TypesInfo.TypeOf(typeExpr)
+		if resolvedGoType != nil {
+			if named, ok := resolvedGoType.(*types.Named); ok {
+				// Ensure it's actually a function type that's named
+				if _, isFuncSig := named.Underlying().(*types.Signature); isFuncSig {
+					c.tsw.WriteLiterallyf(", name: '%s'", named.Obj().Name())
+				}
 			}
 		}
 

@@ -1,0 +1,26 @@
+b1: Uint8Array(0) []
+b2: Uint8Array(5) [ 72, 101, 108, 108, 111 ]
+b3: Uint8Array(5) [ 87, 111, 114, 108, 100 ]
+b1 after assignment: Uint8Array(5) [ 72, 101, 108, 108, 111 ]
+b4 from string: Uint8Array(8) [
+   71, 111,  83,  99,
+  114, 105, 112, 116
+]
+s2 from bytes: Hello
+b2[0]: 72
+b2 after modification: Uint8Array(5) [ 87, 101, 108, 108, 111 ]
+s2 after b2 modification (should be 'Hello'): Hello
+len(b2): 5 cap(b2): 5
+len(b3): 5 cap(b3): 5
+b5 after append: Uint8Array(7) [
+   87, 101, 108, 108,
+  111,  33,  33
+]
+len(b5): 7 cap(b5): 7
+b6 after append slice: Uint8Array(16) [
+   87, 101, 108, 108, 111,
+   33,  33,  32,  71, 111,
+   83,  99, 114, 105, 112,
+  116
+]
+len(b6): 16 cap(b6): 16

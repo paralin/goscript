@@ -15,7 +15,8 @@ import (
 //   - Map literals (e.g., `map[K]V{k1: v1}`): Translated to `new Map([[k1_ts, v1_ts]])`.
 //     Values are processed by `writeBoxedValue`.
 //   - Array/Slice literals (e.g., `[]T{e1, e2}`, `[N]T{idx: val}`):
-//     Translated using the `$.arrayToSlice<T_ts>([...])` runtime helper.
+//   - For `[]byte{...}`, translated to `new Uint8Array([...])`.
+//   - For other `[]T` or `[N]T`, translated using the `$.arrayToSlice<T_ts>([...])` runtime helper.
 //     It handles both keyed and unkeyed elements, infers length if necessary,
 //     and uses zero values for uninitialized array elements.
 //     Multi-dimensional arrays/slices pass a depth parameter to `$.arrayToSlice`.
@@ -73,14 +74,29 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 				// We'll handle this with depth parameter to arrayToSlice
 			}
 
-			c.tsw.WriteLiterally("$.arrayToSlice")
+			// Check if it's a []byte literal
+			isByteSliceLiteral := false
+			if typInfo := c.pkg.TypesInfo.TypeOf(exp.Type); typInfo != nil {
+				if sliceT, ok := typInfo.Underlying().(*types.Slice); ok {
+					if basicElem, ok := sliceT.Elem().(*types.Basic); ok && basicElem.Kind() == types.Uint8 {
+						isByteSliceLiteral = true
+					}
+				}
+			}
 
-			// write the type annotation
-			c.tsw.WriteLiterally("<")
-			// Write the element type using the existing function
-			c.WriteTypeExpr(arrType.Elt)
-			c.tsw.WriteLiterally(">")
+			if isByteSliceLiteral {
+				c.tsw.WriteLiterally("new Uint8Array")
+			} else {
+				c.tsw.WriteLiterally("$.arrayToSlice")
 
+				// write the type annotation
+				c.tsw.WriteLiterally("<")
+				// Write the element type using the existing function
+				c.WriteTypeExpr(arrType.Elt)
+				c.tsw.WriteLiterally(">")
+			}
+
+			// opening
 			c.tsw.WriteLiterally("([")
 
 			// Use type info to get array length and element type
@@ -166,7 +182,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 			c.tsw.WriteLiterally("]")
 
 			// If it's a multi-dimensional array/slice, use depth=2 to convert nested arrays
-			if isMultiDimensional {
+			if isMultiDimensional && !isByteSliceLiteral { // Depth parameter not applicable to Uint8Array constructor
 				c.tsw.WriteLiterally(", 2") // Depth of 2 for one level of nesting
 			}
 
@@ -271,9 +287,8 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 				}
 
 				// Handle the case where an anonymous struct has values without keys
-				// Handle the case where an anonymous struct has values without keys.
 				// This block processes non-key-value elements and associates them with struct fields.
-				if isAnonymousStruct && len(exp.Elts) > 0 && len(directFields) == 0 && structType != nil {
+				if isAnonymousStruct && len(exp.Elts) > 0 && len(directFields) == 0 {
 					// Check if any elements in the composite literal are not key-value pairs.
 					hasNonKeyValueElts := false
 					for _, elt := range exp.Elts {

@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 type Reader = null | {
 	// Read reads data from the reader.
-	Read(_p0: $.Slice<number>): [number, $.GoError]
+	Read(_p0: Uint8Array): [number, $.GoError]
 }
 
 $.registerInterfaceType(
@@ -47,7 +47,7 @@ class MyStruct {
 		return cloned
 	}
 
-	public Read(p: $.Slice<number>): [number, $.GoError] {
+	public Read(p: Uint8Array): [number, $.GoError] {
 		const m = this
 		return [0, null]
 	}
