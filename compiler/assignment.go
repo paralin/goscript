@@ -100,7 +100,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				if lhsObj != nil {
 					c.tsw.WriteLiterally(": ")
 					c.tsw.WriteLiterally("$.Box<")
-					c.WriteGoType(lhsObj.Type())
+					c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
 					c.tsw.WriteLiterally(">")
 				}
 

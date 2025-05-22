@@ -22,7 +22,7 @@ import (
 func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	// Get type information for the expression and use WriteGoType
 	typ := c.pkg.TypesInfo.TypeOf(a)
-	c.WriteGoType(typ)
+	c.WriteGoType(typ, GoTypeContextGeneral)
 }
 
 // writeTypeDescription writes the TypeInfo for a type expr.

@@ -293,21 +293,21 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 					}
 					c.tsw.WriteLiterally(paramName)
 					c.tsw.WriteLiterally(": ")
-					c.WriteGoType(param.Type())
+					c.WriteGoType(param.Type(), GoTypeContextGeneral)
 				}
 				c.tsw.WriteLiterally(")")
 				results := sig.Results()
 				if results.Len() > 0 {
 					c.tsw.WriteLiterally(": ")
 					if results.Len() == 1 {
-						c.WriteGoTypeForFunctionReturn(results.At(0).Type())
+						c.WriteGoType(results.At(0).Type(), GoTypeContextFunctionReturn)
 					} else {
 						c.tsw.WriteLiterally("[")
 						for j := 0; j < results.Len(); j++ {
 							if j > 0 {
 								c.tsw.WriteLiterally(", ")
 							}
-							c.WriteGoTypeForFunctionReturn(results.At(j).Type())
+							c.WriteGoType(results.At(j).Type(), GoTypeContextFunctionReturn)
 						}
 						c.tsw.WriteLiterally("]")
 					}

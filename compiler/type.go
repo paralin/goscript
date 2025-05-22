@@ -7,13 +7,31 @@ import (
 	"strings"
 )
 
+// GoTypeContext specifies the context in which a Go type is being translated to TypeScript.
+// This affects how certain types (especially pointers) are handled.
+type GoTypeContext int
+
+const (
+	// GoTypeContextGeneral is used for general type translation
+	GoTypeContextGeneral GoTypeContext = iota
+	// GoTypeContextFunctionReturn is used when translating types for function return values.
+	// In this context, pointer-to-struct types become `ClassName | null` instead of
+	// `$.Box<ClassName> | null` because function return values cannot be addressed.
+	GoTypeContextFunctionReturn
+)
+
 // WriteGoType is the main dispatcher for translating Go types to their TypeScript
 // equivalents. It examines the type and delegates to more specialized type writer
 // functions based on the specific Go type encountered.
 //
+// The context parameter controls how certain types (especially pointers) are handled:
+//   - GoTypeContextGeneral: Standard type translation
+//   - GoTypeContextFunctionReturn: Special handling for function return types where
+//     pointer-to-struct types become `ClassName | null` instead of `$.Box<ClassName> | null`
+//
 // It handles nil types as 'any' with a comment, and dispatches to appropriate
 // type-specific writers for all other recognized Go types.
-func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
+func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 	if typ == nil {
 		c.tsw.WriteLiterally("any")
 		c.tsw.WriteCommentInline("nil type")
@@ -26,7 +44,11 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	case *types.Named:
 		c.WriteNamedType(t)
 	case *types.Pointer:
-		c.WritePointerType(t)
+		if context == GoTypeContextFunctionReturn {
+			c.writePointerTypeForFunctionReturn(t)
+		} else {
+			c.WritePointerType(t)
+		}
 	case *types.Slice:
 		c.WriteSliceType(t)
 	case *types.Array:
@@ -42,7 +64,7 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	case *types.Struct:
 		c.WriteStructType(t)
 	case *types.Alias:
-		c.WriteGoType(t.Underlying())
+		c.WriteGoType(t.Underlying(), context)
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
@@ -50,52 +72,11 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type) {
 	}
 }
 
-// WriteGoTypeForFunctionReturn is similar to WriteGoType but handles pointer types
-// specially for function return values. According to the boxing strategy, function
-// return values cannot be directly addressed in Go, so pointer-to-struct types
-// should be represented as `ClassName | null` rather than `$.Box<ClassName> | null`.
-func (c *GoToTSCompiler) WriteGoTypeForFunctionReturn(typ types.Type) {
-	if typ == nil {
-		c.tsw.WriteLiterally("any")
-		c.tsw.WriteCommentInline("nil type")
-		return
-	}
-
-	switch t := typ.(type) {
-	case *types.Basic:
-		c.WriteBasicType(t)
-	case *types.Named:
-		c.WriteNamedType(t)
-	case *types.Pointer:
-		c.WritePointerTypeForFunctionReturn(t)
-	case *types.Slice:
-		c.WriteSliceType(t)
-	case *types.Array:
-		c.WriteArrayType(t)
-	case *types.Map:
-		c.WriteMapType(t)
-	case *types.Chan:
-		c.WriteChannelType(t)
-	case *types.Interface:
-		c.WriteInterfaceType(t, nil) // No ast.InterfaceType available here
-	case *types.Signature:
-		c.WriteSignatureType(t)
-	case *types.Struct:
-		c.WriteStructType(t)
-	case *types.Alias:
-		c.WriteGoTypeForFunctionReturn(t.Underlying())
-	default:
-		// For other types, just write "any" and add a comment
-		c.tsw.WriteLiterally("any")
-		c.tsw.WriteCommentInlinef("unhandled type: %T", typ)
-	}
-}
-
-// WritePointerTypeForFunctionReturn translates a Go pointer type (*T) to its TypeScript
+// writePointerTypeForFunctionReturn translates a Go pointer type (*T) to its TypeScript
 // equivalent for function return types. Unlike WritePointerType, this function
 // handles pointer-to-struct types specially: they become `ClassName | null` instead
 // of `$.Box<ClassName> | null` because function return values cannot be addressed.
-func (c *GoToTSCompiler) WritePointerTypeForFunctionReturn(t *types.Pointer) {
+func (c *GoToTSCompiler) writePointerTypeForFunctionReturn(t *types.Pointer) {
 	elemType := t.Elem()
 
 	// Check if the element type is a struct (directly or via a named type)
@@ -106,12 +87,12 @@ func (c *GoToTSCompiler) WritePointerTypeForFunctionReturn(t *types.Pointer) {
 
 	if isStructType {
 		// For pointer-to-struct in function returns, generate ClassName | null
-		c.WriteGoTypeForFunctionReturn(elemType)
+		c.WriteGoType(elemType, GoTypeContextFunctionReturn)
 		c.tsw.WriteLiterally(" | null")
 	} else {
 		// For pointer-to-primitive in function returns, still use boxing
 		c.tsw.WriteLiterally("$.Box<")
-		c.WriteGoTypeForFunctionReturn(elemType)
+		c.WriteGoType(elemType, GoTypeContextFunctionReturn)
 		c.tsw.WriteLiterally("> | null")
 	}
 }
@@ -229,7 +210,7 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 // It generates $.Box<T_ts> | null, where T_ts is the translated element type.
 func (c *GoToTSCompiler) WritePointerType(t *types.Pointer) {
 	c.tsw.WriteLiterally("$.Box<")
-	c.WriteGoType(t.Elem())
+	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
 	c.tsw.WriteLiterally("> | null") // Pointers are always nullable
 }
 
@@ -243,14 +224,14 @@ func (c *GoToTSCompiler) WriteSliceType(t *types.Slice) {
 		return
 	}
 	c.tsw.WriteLiterally("$.Slice<")
-	c.WriteGoType(t.Elem())
+	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
 	c.tsw.WriteLiterally(">")
 }
 
 // WriteArrayType translates a Go array type ([N]T) to its TypeScript equivalent.
 // It generates T_ts[], where T_ts is the translated element type.
 func (c *GoToTSCompiler) WriteArrayType(t *types.Array) {
-	c.WriteGoType(t.Elem())
+	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
 	c.tsw.WriteLiterally("[]") // Arrays cannot be nil
 }
 
@@ -259,9 +240,9 @@ func (c *GoToTSCompiler) WriteArrayType(t *types.Array) {
 // and element types respectively.
 func (c *GoToTSCompiler) WriteMapType(t *types.Map) {
 	c.tsw.WriteLiterally("Map<")
-	c.WriteGoType(t.Key())
+	c.WriteGoType(t.Key(), GoTypeContextGeneral)
 	c.tsw.WriteLiterally(", ")
-	c.WriteGoType(t.Elem())
+	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
 	c.tsw.WriteLiterally(">")
 }
 
@@ -270,7 +251,7 @@ func (c *GoToTSCompiler) WriteMapType(t *types.Map) {
 // Channels are nilable in Go, so they are represented as nullable types in TypeScript.
 func (c *GoToTSCompiler) WriteChannelType(t *types.Chan) {
 	c.tsw.WriteLiterally("$.Channel<")
-	c.WriteGoType(t.Elem())
+	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
 	c.tsw.WriteLiterally("> | null")
 }
 
@@ -298,7 +279,7 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 		if len(exp.Results.List) == 1 && len(exp.Results.List[0].Names) == 0 {
 			// Single unnamed return type
 			typ := c.pkg.TypesInfo.TypeOf(exp.Results.List[0].Type)
-			c.WriteGoTypeForFunctionReturn(typ)
+			c.WriteGoType(typ, GoTypeContextFunctionReturn)
 		} else {
 			// Multiple or named return types -> tuple
 			c.tsw.WriteLiterally("[")
@@ -307,7 +288,7 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 					c.tsw.WriteLiterally(", ")
 				}
 				typ := c.pkg.TypesInfo.TypeOf(field.Type)
-				c.WriteGoTypeForFunctionReturn(typ)
+				c.WriteGoType(typ, GoTypeContextFunctionReturn)
 			}
 			c.tsw.WriteLiterally("]")
 		}
@@ -369,10 +350,10 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 		c.tsw.WriteLiterally(": ")
 
 		if paramVariadic && paramIsSlice {
-			c.WriteGoType(paramSlice.Elem())
+			c.WriteGoType(paramSlice.Elem(), GoTypeContextGeneral)
 			c.tsw.WriteLiterally("[]")
 		} else {
-			c.WriteGoType(param.Type())
+			c.WriteGoType(param.Type(), GoTypeContextGeneral)
 		}
 	}
 	c.tsw.WriteLiterally(")")
@@ -383,7 +364,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 	if results.Len() == 0 {
 		c.tsw.WriteLiterally("void")
 	} else if results.Len() == 1 {
-		c.WriteGoTypeForFunctionReturn(results.At(0).Type())
+		c.WriteGoType(results.At(0).Type(), GoTypeContextFunctionReturn)
 	} else {
 		// Multiple return values -> tuple
 		c.tsw.WriteLiterally("[")
@@ -391,7 +372,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 			if i > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			c.WriteGoTypeForFunctionReturn(results.At(i).Type())
+			c.WriteGoType(results.At(i).Type(), GoTypeContextFunctionReturn)
 		}
 		c.tsw.WriteLiterally("]")
 	}
@@ -459,7 +440,7 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 				}
 				c.tsw.WriteLiterally(paramName)
 				c.tsw.WriteLiterally(": ")
-				c.WriteGoType(paramVar.Type()) // Recursive call for param type
+				c.WriteGoType(paramVar.Type(), GoTypeContextGeneral) // Recursive call for param type
 			}
 			c.tsw.WriteLiterally(")") // End params
 
@@ -469,14 +450,14 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 			if results.Len() == 0 {
 				c.tsw.WriteLiterally("void")
 			} else if results.Len() == 1 {
-				c.WriteGoTypeForFunctionReturn(results.At(0).Type()) // Recursive call for result type
+				c.WriteGoType(results.At(0).Type(), GoTypeContextFunctionReturn) // Recursive call for result type
 			} else {
 				c.tsw.WriteLiterally("[")
 				for j := 0; j < results.Len(); j++ {
 					if j > 0 {
 						c.tsw.WriteLiterally(", ")
 					}
-					c.WriteGoTypeForFunctionReturn(results.At(j).Type()) // Recursive call for result type
+					c.WriteGoType(results.At(j).Type(), GoTypeContextFunctionReturn) // Recursive call for result type
 				}
 				c.tsw.WriteLiterally("]")
 			}
@@ -500,7 +481,7 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 			// When WriteGoType encounters an interface, it will call WriteInterfaceType
 			// which will pass nil for astNode, so comments for deeply embedded interface literals
 			// might not be available unless they are named types.
-			c.WriteGoType(embeddedType)
+			c.WriteGoType(embeddedType, GoTypeContextGeneral)
 		}
 	}
 }
@@ -514,7 +495,7 @@ func (c *GoToTSCompiler) getTypeString(goType types.Type) string {
 	var typeStr strings.Builder
 	writer := NewTSCodeWriter(&typeStr)
 	tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
-	tempCompiler.WriteGoType(goType)
+	tempCompiler.WriteGoType(goType, GoTypeContextGeneral)
 	return typeStr.String()
 }
 
@@ -534,7 +515,7 @@ func (c *GoToTSCompiler) WriteStructType(t *types.Struct) {
 			c.tsw.WriteLiterally("; ")
 		}
 		c.tsw.WriteLiterally(field.Name() + "?: ")
-		c.WriteGoType(field.Type())
+		c.WriteGoType(field.Type(), GoTypeContextGeneral)
 	}
 	c.tsw.WriteLiterally(" }")
 }

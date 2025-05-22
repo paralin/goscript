@@ -131,7 +131,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 						// Add type annotation if we have type information
 						if i < len(resultTypes) {
 							c.tsw.WriteLiterally(": ")
-							c.WriteGoType(resultTypes[i].Type())
+							c.WriteGoType(resultTypes[i].Type(), GoTypeContextGeneral)
 						}
 
 						c.tsw.WriteLine("")

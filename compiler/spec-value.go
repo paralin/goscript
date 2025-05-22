@@ -92,11 +92,11 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 			if needsBox {
 				// If boxed, the variable holds Box<OriginalGoType>
 				c.tsw.WriteLiterally("$.Box<")
-				c.WriteGoType(goType) // Write the original Go type T
+				c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
 				c.tsw.WriteLiterally(">")
 			} else {
 				// If not boxed, the variable holds the translated Go type directly
-				c.WriteGoType(goType)
+				c.WriteGoType(goType, GoTypeContextGeneral)
 			}
 		}
 

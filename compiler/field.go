@@ -50,7 +50,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 				c.tsw.WriteLiterally(name.Name)
 				c.tsw.WriteLiterally(": ")
 				typ := c.pkg.TypesInfo.TypeOf(field.Type)
-				c.WriteGoType(typ)
+				c.WriteGoType(typ, GoTypeContextGeneral)
 			}
 		}
 
@@ -89,7 +89,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 					c.tsw.WriteLiterally(name.Name)
 					c.tsw.WriteLiterally(": ")
 					typ := c.pkg.TypesInfo.TypeOf(field.Type)
-					c.WriteGoType(typ) // Use WriteGoType for parameter type
+					c.WriteGoType(typ, GoTypeContextGeneral) // Use WriteGoType for parameter type
 				}
 			} else {
 				// For struct fields and other non-argument fields
@@ -155,7 +155,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 		// write type for struct fields (not arguments)
 		c.tsw.WriteLiterally(": ")
 		typ := c.pkg.TypesInfo.TypeOf(field.Type)
-		c.WriteGoType(typ) // Use WriteGoType for field type
+		c.WriteGoType(typ, GoTypeContextGeneral) // Use WriteGoType for field type
 
 		if !isArguments {
 			// write tag comment if any for struct fields

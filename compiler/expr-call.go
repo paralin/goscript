@@ -123,7 +123,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				if chanType, ok := typ.Underlying().(*types.Chan); ok {
 					// Handle channel creation: make(chan T, bufferSize) or make(chan T)
 					c.tsw.WriteLiterally("$.makeChannel<")
-					c.WriteGoType(chanType.Elem())
+					c.WriteGoType(chanType.Elem(), GoTypeContextGeneral)
 					c.tsw.WriteLiterally(">(")
 
 					// If buffer size is provided, add it
@@ -206,7 +206,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					}
 
 					c.tsw.WriteLiterally("$.makeSlice<")
-					c.WriteGoType(goElemType) // Write the element type
+					c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
 					c.tsw.WriteLiterally(">(")
 
 					if len(exp.Args) >= 2 {

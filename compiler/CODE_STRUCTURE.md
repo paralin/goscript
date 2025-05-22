@@ -113,12 +113,20 @@ type NodeInfo struct {
 
 **✅ Status**: Successfully consolidated 11 separate analysis maps into 3 consolidated structures. All compliance tests pass. Updated references in stmt.go to use new consolidated API.
 
-#### 1.2 Consolidate Duplicate Type Logic in `type.go`
+#### 1.2 Consolidate Duplicate Type Logic in `type.go` ✅ COMPLETED
 Extract genuinely duplicated type handling logic:
 ```go
-// Unify WriteGoType and WriteGoTypeForFunctionReturn shared logic
-func (c *GoToTSCompiler) writeTypeDispatch(typ types.Type, isForFunctionReturn bool) {
-    // Extract the common switch logic used in both functions
+// GoTypeContext specifies the context in which a Go type is being translated to TypeScript
+type GoTypeContext int
+
+const (
+    GoTypeContextGeneral GoTypeContext = iota
+    GoTypeContextFunctionReturn
+)
+
+// Unified WriteGoType with context parameter
+func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
+    // Single dispatcher function handling both general and function return contexts
 }
 
 // Consolidate zero value generation scattered across files
@@ -126,6 +134,16 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
     // Move scattered zero value logic here from composite-lit.go and others
 }
 ```
+
+**✅ Status**: Successfully consolidated duplicate type dispatch logic by:
+1. **Phase 1**: Extracted common code from WriteGoType and WriteGoTypeForFunctionReturn into a shared writeTypeDispatch function
+2. **Phase 2**: Further simplified by eliminating writeTypeDispatch entirely and adding a GoTypeContext enum parameter to WriteGoType
+3. **Final Result**: Single WriteGoType function with context parameter replaces both WriteGoType and WriteGoTypeForFunctionReturn
+4. **Updated all call sites** across the codebase to use the new signature
+5. **Eliminated over 40 lines** of duplicated code while preserving exact functionality
+6. **Zero value generation** was already properly centralized in WriteZeroValueForType function
+
+All compliance tests pass. The API is now cleaner with a single type translation function instead of multiple overlapping functions.
 
 ### Phase 2: Targeted File Consolidation
 
