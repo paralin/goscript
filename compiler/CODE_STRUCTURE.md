@@ -75,10 +75,10 @@ This document analyzes the Go-to-TypeScript compiler codebase and outlines a maj
 
 ### Phase 1: Eliminate Real Code Duplication
 
-#### 1.1 Streamline `analysis.go` 
+#### 1.1 Streamline `analysis.go` ✅ COMPLETED
 Consolidate related analysis maps that track similar data:
 ```go
-// Consolidate in analysis.go - combine related tracking
+// ✅ COMPLETED - Consolidated in analysis.go - combine related tracking
 type Analysis struct {
     // Keep existing VariableUsage map
     VariableUsage map[types.Object]*VariableUsageInfo
@@ -92,6 +92,9 @@ type Analysis struct {
     // Keep specialized maps that serve different purposes
     Imports map[string]*fileImport
     Cmap    ast.CommentMap
+    
+    // FuncLitData tracks function literal specific data since they don't have types.Object
+    FuncLitData map[*ast.FuncLit]*FunctionInfo
 }
 
 type FunctionInfo struct {
@@ -100,11 +103,15 @@ type FunctionInfo struct {
 }
 
 type NodeInfo struct {
-    NeedsDefer     bool
-    InAsyncContext bool
-    IsBareReturn   bool
+    NeedsDefer        bool
+    InAsyncContext    bool
+    IsBareReturn      bool
+    EnclosingFuncDecl *ast.FuncDecl
+    EnclosingFuncLit  *ast.FuncLit
 }
 ```
+
+**✅ Status**: Successfully consolidated 11 separate analysis maps into 3 consolidated structures. All compliance tests pass. Updated references in stmt.go to use new consolidated API.
 
 #### 1.2 Consolidate Duplicate Type Logic in `type.go`
 Extract genuinely duplicated type handling logic:
