@@ -49,22 +49,22 @@ class Message {
 	);
 }
 
-let messages: $.Channel<Message> = $.makeChannel<Message>(0, new Message(), 'both')
+let messages: $.Channel<Message> | null = $.makeChannel<Message>(0, new Message(), 'both')
 
 let totalMessages: number = 8
 
 // A worker function that will be called as a goroutine
 async function worker(id: number): Promise<void> {
 	// Send worker starting message
-	await messages.send(new Message({priority: 10 + id, text: "Worker " + String.fromCharCode(48 + id) + " starting"}))
+	await $.chanSend(messages, new Message({priority: 10 + id, text: "Worker " + String.fromCharCode(48 + id) + " starting"}))
 
 	// Send worker done message
-	await messages.send(new Message({priority: 20 + id, text: "Worker " + String.fromCharCode(48 + id) + " done"}))
+	await $.chanSend(messages, new Message({priority: 20 + id, text: "Worker " + String.fromCharCode(48 + id) + " done"}))
 }
 
 // Another worker function to test multiple different goroutines
 async function anotherWorker(name: string): Promise<void> {
-	await messages.send(new Message({priority: 40, text: "Another worker: " + name}))
+	await $.chanSend(messages, new Message({priority: 40, text: "Another worker: " + name}))
 }
 
 export async function main(): Promise<void> {
@@ -90,7 +90,7 @@ export async function main(): Promise<void> {
 
 	// Start an anonymous function worker
 	queueMicrotask(async () => {
-		await messages.send(new Message({priority: 50, text: "Anonymous function worker"}))
+		await $.chanSend(messages, new Message({priority: 50, text: "Anonymous function worker"}))
 	})
 
 	// Add status message
@@ -98,7 +98,7 @@ export async function main(): Promise<void> {
 
 	// Collect all messages from goroutines
 	for (let i = 0; i < totalMessages; i++) {
-		allMessages = $.append(allMessages, await messages.receive())
+		allMessages = $.append(allMessages, await $.chanRecv(messages))
 	}
 
 	// Add final message

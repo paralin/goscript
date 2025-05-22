@@ -1,0 +1,10 @@
+Test 1: Select with nil channel and default
+PASS: Default case executed correctly
+
+Test 2: Select with multiple nil channels and default
+PASS: Default case executed with multiple nil channels
+
+Test 3: Select with mix of nil and valid channels
+PASS: Received from valid channel: true
+
+All nil channel tests completed

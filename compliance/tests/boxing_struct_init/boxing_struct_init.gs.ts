@@ -53,13 +53,13 @@ export function main(): void {
 	let ptr = new MyStruct({MyInt: 30})
 
 	// Accessing field on pointer type: Should generate ptr.MyInt
-	ptr.MyInt = 40
-	console.log("ptr.MyInt:", ptr.MyInt) // Expected: 40
+	ptr!.MyInt = 40
+	console.log("ptr.MyInt:", ptr!.MyInt) // Expected: 40
 
 	// Accessing pointer value, should use .value
-	console.log("ptrToVal.MyInt:", ptrToVal!.value.MyInt)
+	console.log("ptrToVal.MyInt:", ptrToVal!.value!.MyInt)
 
-	let myIntVal = ptrToVal!.value.MyInt
+	let myIntVal = ptrToVal!.value!.MyInt
 	console.log("myIntVal:", myIntVal)
 }
 

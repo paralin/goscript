@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 export async function main(): Promise<void> {
 	let ch = $.makeChannel<number>(1, 0, 'both')
-	await ch.send(1)
+	await $.chanSend(ch, 1)
 
 	// TODO: The comments on the following cases are written twice in the output.
 

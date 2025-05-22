@@ -30,7 +30,7 @@ export async function main(): Promise<void> {
 	], true)
 
 	// Now put something in the channel
-	await ch1.send("hello")
+	await $.chanSend(ch1, "hello")
 
 	// Second test: should read from channel
 	await $.selectStatement([
@@ -55,7 +55,7 @@ export async function main(): Promise<void> {
 
 	// Test 3: Select with channel closing and ok value
 	let ch2 = $.makeChannel<number>(1, 0, 'both')
-	await ch2.send(42)
+	await $.chanSend(ch2, 42)
 	ch2.close()
 
 	// First receive gets the buffered value
@@ -159,7 +159,7 @@ export async function main(): Promise<void> {
 	let ch4 = $.makeChannel<string>(1, "", 'both')
 	let ch5 = $.makeChannel<string>(1, "", 'both')
 
-	await ch4.send("from ch4")
+	await $.chanSend(ch4, "from ch4")
 
 	// Should select ch4 because it has data, ch5 is empty
 	await $.selectStatement([
@@ -184,7 +184,7 @@ export async function main(): Promise<void> {
 	], false)
 
 	// Now ch4 is empty and ch5 is empty
-	await ch5.send("from ch5")
+	await $.chanSend(ch5, "from ch5")
 
 	// Should select ch5 because it has data, ch4 is empty
 	await $.selectStatement([
@@ -211,7 +211,7 @@ export async function main(): Promise<void> {
 	// Test 9: Channel closing test case for a separate test
 	let chClose = $.makeChannel<boolean>(0, false, 'both')
 	chClose.close()
-	const { value: val, ok: ok } = await chClose.receiveWithOk()
+	const { value: val, ok: ok } = await $.chanRecvWithOk(chClose)
 	if (!ok) {
 		console.log("TEST9: Channel is closed, ok is false, val:", val)
 	} else {

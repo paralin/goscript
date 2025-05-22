@@ -56,7 +56,7 @@ export function main(): void {
 	// Modifying the copy does not affect the original struct pointed to by structPointer.
 	simpleDereferencedCopy.MyString = "modified dereferenced copy"
 	// Expected: "hello world"
-	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + structPointer.MyString)
+	console.log("Original structPointer after modifying simpleDereferencedCopy: Expected: hello world, Actual: " + structPointer!.MyString)
 	// Expected: "modified dereferenced copy"
 	console.log("Simple Dereferenced Copy: Expected: modified dereferenced copy, Actual: " + simpleDereferencedCopy.MyString)
 }

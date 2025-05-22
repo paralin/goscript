@@ -550,11 +550,11 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 	} else {
 		// If both are blank, just await the call and return
 		if okIsBlank {
-			c.tsw.WriteLiterally("await ")
+			c.tsw.WriteLiterally("await $.chanRecvWithOk(")
 			if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
 				return fmt.Errorf("failed to write channel expression in receive: %w", err)
 			}
-			c.tsw.WriteLiterally(".receiveWithOk()")
+			c.tsw.WriteLiterally(")")
 			c.tsw.WriteLine("")
 			return nil // Nothing to assign
 		}
@@ -572,11 +572,11 @@ func (c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *as
 	// Write the destructuring assignment/declaration
 	c.tsw.WriteLiterally(keyword) // "const " or ""
 	c.tsw.WriteLiterally(destructuringPattern)
-	c.tsw.WriteLiterally(" = await ")
+	c.tsw.WriteLiterally(" = await $.chanRecvWithOk(")
 	if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
 		return fmt.Errorf("failed to write channel expression in receive: %w", err)
 	}
-	c.tsw.WriteLiterally(".receiveWithOk()")
+	c.tsw.WriteLiterally(")")
 	c.tsw.WriteLine("")
 
 	return nil

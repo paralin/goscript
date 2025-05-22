@@ -42,8 +42,8 @@ class MyStruct {
 export function main(): void {
 	let myStruct = new MyStruct({myPrivate: null})
 	let intVar: $.Box<number> = $.box(10)
-	myStruct.myPrivate = intVar
+	myStruct!.myPrivate = intVar
 	intVar!.value = 15
-	console.log(myStruct.myPrivate!.value)
+	console.log(myStruct!.myPrivate!.value)
 }
 

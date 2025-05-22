@@ -1,0 +1,5 @@
+Greet assertion failed
+NonExistentMethod assertion failed as expected
+Inline String assertion failed
+k.(interface{ String() string }) failed
+l.(*struct{ Name string }) successful, ptr is nil as expected

@@ -150,12 +150,12 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	// Handle special cases like channel send
 	if exp.Op == token.ARROW {
-		// Channel send: ch <- val becomes await ch.send(val)
-		c.tsw.WriteLiterally("await ")
+		// Channel send: ch <- val becomes await $.chanSend(ch, val)
+		c.tsw.WriteLiterally("await $.chanSend(")
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write channel send target: %w", err)
 		}
-		c.tsw.WriteLiterally(".send(")
+		c.tsw.WriteLiterally(", ")
 		if err := c.WriteValueExpr(exp.Y); err != nil {
 			return fmt.Errorf("failed to write channel send value: %w", err)
 		}
@@ -276,12 +276,12 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 // their statement contexts (e.g., `IncDecStmt`).
 func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 	if exp.Op == token.ARROW {
-		// Channel receive: <-ch becomes await ch.receive()
-		c.tsw.WriteLiterally("await ")
+		// Channel receive: <-ch becomes await $.chanRecv(ch)
+		c.tsw.WriteLiterally("await $.chanRecv(")
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write channel receive operand: %w", err)
 		}
-		c.tsw.WriteLiterally(".receive()")
+		c.tsw.WriteLiterally(")")
 		return nil
 	}
 

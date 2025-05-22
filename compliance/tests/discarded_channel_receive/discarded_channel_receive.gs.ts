@@ -8,10 +8,10 @@ export async function main(): Promise<void> {
 
 	// Close the channel to allow the main goroutine to exit
 	queueMicrotask(async () => {
-		await ch.send(1)
+		await $.chanSend(ch, 1)
 		ch.close() // Close the channel to allow the main goroutine to exit
 	})
-	await ch.receive()
+	await $.chanRecv(ch)
 	console.log("done") // Add a print statement to verify execution
 }
 

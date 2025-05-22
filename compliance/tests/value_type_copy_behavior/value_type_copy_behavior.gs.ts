@@ -134,8 +134,8 @@ export function main(): void {
 	console.log("  Before pointer modification - original.MyString: " + original!.value.MyString)
 
 	// Modify the struct 'original' *through* the pointerCopy.
-	pointerCopy!.value.MyString = "modified through pointer"
-	pointerCopy!.value.MyInt = 100
+	pointerCopy!.value!.MyString = "modified through pointer"
+	pointerCopy!.value!.MyInt = 100
 
 	// Show the state of 'original' *after* modification via the pointer.
 	// Both fields reflect the changes made through pointerCopy.

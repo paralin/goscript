@@ -7,8 +7,8 @@ export async function main(): Promise<void> {
 	// Start an anonymous function worker
 	let msgs = $.makeChannel<string>(1, "", 'both')
 	queueMicrotask(async () => {
-		await msgs.send("anonymous function worker")
+		await $.chanSend(msgs, "anonymous function worker")
 	})
-	console.log(await msgs.receive())
+	console.log(await $.chanRecv(msgs))
 }
 

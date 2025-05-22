@@ -61,7 +61,7 @@ export function main(): void {
 
 	// === Verifying Copy Independence ===
 	// Expected: "hello world"
-	console.log("pointerCopy (points to original structPointer): Expected: hello world, Actual: " + pointerCopy.MyString)
+	console.log("pointerCopy (points to original structPointer): Expected: hello world, Actual: " + pointerCopy!.MyString)
 	// Expected: "original dereferenced copy modified"
 	console.log("dereferencedStructCopy (modified after copies were made): Expected: original dereferenced copy modified, Actual: " + dereferencedStructCopy.MyString)
 	// Expected: "value copy 1"

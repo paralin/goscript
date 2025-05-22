@@ -265,8 +265,18 @@ func (c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error {
 
 		// Write the selector expression (e.g., f.Bar)
 		// Note: callExpr.Fun is the *ast.SelectorExpr itself
-		if err := c.WriteValueExpr(callExpr.Fun); err != nil {
-			return fmt.Errorf("failed to write selector expression in goroutine: %w", err)
+		// For method calls, we need to add null assertion since Go would panic on nil receiver
+		if selectorExpr, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
+			if err := c.WriteValueExpr(selectorExpr.X); err != nil {
+				return fmt.Errorf("failed to write selector base expression in goroutine: %w", err)
+			}
+			// Add null assertion for method calls - Go would panic if receiver is nil
+			c.tsw.WriteLiterally("!.")
+			c.WriteIdent(selectorExpr.Sel, true)
+		} else {
+			if err := c.WriteValueExpr(callExpr.Fun); err != nil {
+				return fmt.Errorf("failed to write selector expression in goroutine: %w", err)
+			}
 		}
 
 		// Write the function arguments
@@ -304,12 +314,12 @@ func (c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error {
 func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 	// Handle simple channel receive used as a statement (<-ch)
 	if unaryExpr, ok := exp.X.(*ast.UnaryExpr); ok && unaryExpr.Op == token.ARROW {
-		// Translate <-ch to await ch.receive()
-		c.tsw.WriteLiterally("await ")
+		// Translate <-ch to await $.chanRecv(ch)
+		c.tsw.WriteLiterally("await $.chanRecv(")
 		if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Channel expression
 			return fmt.Errorf("failed to write channel expression in receive statement: %w", err)
 		}
-		c.tsw.WriteLiterally(".receive()") // Use receive() as the value is discarded
+		c.tsw.WriteLiterally(")") // Use chanRecv() as the value is discarded
 		c.tsw.WriteLine("")
 		return nil
 	}
@@ -361,12 +371,12 @@ func (c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error {
 // channel send operations are asynchronous in the TypeScript model.
 // The statement is terminated with a newline.
 func (c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error {
-	// Translate ch <- value to await ch.send(value)
-	c.tsw.WriteLiterally("await ")
+	// Translate ch <- value to await $.chanSend(ch, value)
+	c.tsw.WriteLiterally("await $.chanSend(")
 	if err := c.WriteValueExpr(exp.Chan); err != nil { // The channel expression
 		return fmt.Errorf("failed to write channel expression in send statement: %w", err)
 	}
-	c.tsw.WriteLiterally(".send(")
+	c.tsw.WriteLiterally(", ")
 	if err := c.WriteValueExpr(exp.Value); err != nil { // The value expression
 		return fmt.Errorf("failed to write value expression in send statement: %w", err)
 	}

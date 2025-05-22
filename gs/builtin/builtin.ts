@@ -2580,7 +2580,10 @@ export async function selectStatement<T>(
       // Skip default case in this check
       continue
     }
-    // Add check for channel existence
+    // Skip nil channels - they are never ready in Go
+    if (caseObj.channel === null) {
+      continue
+    }
     if (caseObj.channel) {
       if (caseObj.isSend && caseObj.channel.canSendNonBlocking()) {
         readyCases.push(caseObj)
@@ -2637,20 +2640,22 @@ export async function selectStatement<T>(
   // 3. If no operations are ready and no default case, block until one is ready
   // Use Promise.race on the blocking promises
   const blockingPromises = cases
-    .filter((c) => c.id !== -1)
+    .filter((c) => c.id !== -1) // Exclude default case
+    .filter((c) => c.channel !== null) // Exclude nil channels (they would block forever)
     .map((caseObj) => {
-      // Exclude default case
-      // Add check for channel existence (though it should always exist here)
-      if (caseObj.channel) {
-        if (caseObj.isSend) {
-          return caseObj.channel.selectSend(caseObj.value, caseObj.id)
-        } else {
-          return caseObj.channel.selectReceive(caseObj.id)
-        }
+      // At this point caseObj.channel is guaranteed to be non-null
+      if (caseObj.isSend) {
+        return caseObj.channel!.selectSend(caseObj.value, caseObj.id)
+      } else {
+        return caseObj.channel!.selectReceive(caseObj.id)
       }
-      // Return a promise that never resolves if channel is somehow missing
-      return new Promise<SelectResult<any>>(() => {})
     })
+
+  // If all non-default cases have nil channels, we effectively block forever
+  if (blockingPromises.length === 0) {
+    // No valid channels to operate on, block forever (unless there's a default)
+    return new Promise<void>(() => {}) // Promise never resolves
+  }
 
   const result = await Promise.race(blockingPromises)
   // Execute onSelected handler for the selected case
@@ -2659,6 +2664,56 @@ export async function selectStatement<T>(
     await selectedCase.onSelected(result) // Await the handler
   }
   // No explicit return needed here, as the function will implicitly return after the await
+}
+
+/**
+ * Helper function for channel send operations that handles nil channels correctly.
+ * In Go, sending to a nil channel blocks forever.
+ * @param channel The channel to send to (can be null)
+ * @param value The value to send
+ * @returns Promise that never resolves if channel is null, otherwise delegates to channel.send()
+ */
+export async function chanSend<T>(
+  channel: Channel<T> | ChannelRef<T> | null,
+  value: T,
+): Promise<void> {
+  if (channel === null) {
+    // In Go, sending to a nil channel blocks forever
+    return new Promise<void>(() => {}) // Promise that never resolves
+  }
+  return channel.send(value)
+}
+
+/**
+ * Helper function for channel receive operations that handles nil channels correctly.
+ * In Go, receiving from a nil channel blocks forever.
+ * @param channel The channel to receive from (can be null)
+ * @returns Promise that never resolves if channel is null, otherwise delegates to channel.receive()
+ */
+export async function chanRecv<T>(
+  channel: Channel<T> | ChannelRef<T> | null,
+): Promise<T> {
+  if (channel === null) {
+    // In Go, receiving from a nil channel blocks forever
+    return new Promise<T>(() => {}) // Promise that never resolves
+  }
+  return channel.receive()
+}
+
+/**
+ * Helper function for channel receive operations with ok value that handles nil channels correctly.
+ * In Go, receiving from a nil channel blocks forever.
+ * @param channel The channel to receive from (can be null)
+ * @returns Promise that never resolves if channel is null, otherwise delegates to channel.receiveWithOk()
+ */
+export async function chanRecvWithOk<T>(
+  channel: Channel<T> | ChannelRef<T> | null,
+): Promise<ChannelReceiveResult<T>> {
+  if (channel === null) {
+    // In Go, receiving from a nil channel blocks forever
+    return new Promise<ChannelReceiveResult<T>>(() => {}) // Promise that never resolves
+  }
+  return channel.receiveWithOk()
 }
 
 /**

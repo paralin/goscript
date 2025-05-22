@@ -10,13 +10,13 @@ export async function main(): Promise<void> {
 	// Wait for signal from main
 	__defer.defer(async () => {
 		console.log("deferred start")
-		await ch.receive()
+		await $.chanRecv(ch)
 		console.log("deferred end")
 	});
 
 	console.log("main start")
 	console.log("main signaling defer")
-	await ch.send(true)
+	await $.chanSend(ch, true)
 	console.log("main end")
 }
 

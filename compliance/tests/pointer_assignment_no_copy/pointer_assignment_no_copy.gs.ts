@@ -57,17 +57,17 @@ export function main(): void {
 	let pointerCopy = original
 
 	// Modify the struct through the original pointer.
-	original.MyString = "modified original"
+	original!.MyString = "modified original"
 
 	// The change should be reflected when accessing through the copied pointer.
 	// Expected: "modified original"
-	console.log("Pointer copy value: Expected: modified original, Actual: " + pointerCopy.MyString)
+	console.log("Pointer copy value: Expected: modified original, Actual: " + pointerCopy!.MyString)
 
 	// Modify the struct through the copied pointer.
-	pointerCopy.MyInt = 20
+	pointerCopy!.MyInt = 20
 
 	// The change should be reflected when accessing through the original pointer.
 	// Expected: 20
-	console.log("Original value after pointer copy modification: Expected: 20, Actual:", original.MyInt)
+	console.log("Original value after pointer copy modification: Expected: 20, Actual:", original!.MyInt)
 }
 

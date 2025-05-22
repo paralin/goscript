@@ -82,7 +82,7 @@ export function main(): void {
 		Greet(): string
 	}>(i, 'unknown')
 	if (ok) {
-		console.log("Greet assertion successful:", g.Greet())
+		console.log("Greet assertion successful:", g!.Greet())
 	} else {
 		console.log("Greet assertion failed")
 	}
@@ -92,7 +92,7 @@ export function main(): void {
 		NonExistentMethod(): number
 	}>(i, 'unknown')
 	if (ok2) {
-		console.log("NonExistentMethod assertion successful (unexpected):", s.NonExistentMethod())
+		console.log("NonExistentMethod assertion successful (unexpected):", s!.NonExistentMethod())
 	} else {
 		console.log("NonExistentMethod assertion failed as expected")
 	}
@@ -106,7 +106,7 @@ export function main(): void {
 		String(): string
 	}>(j, 'unknown')
 	if (ok4) {
-		console.log("Inline String assertion successful:", inlineMs.String())
+		console.log("Inline String assertion successful:", inlineMs!.String())
 	} else {
 		console.log("Inline String assertion failed")
 	}
@@ -119,7 +119,7 @@ export function main(): void {
 		String(): string
 	}>(k, 'unknown')
 	if (ok5) {
-		console.log("k.(interface{ String() string }) successful:", inlineK.String())
+		console.log("k.(interface{ String() string }) successful:", inlineK!.String())
 	} else {
 		console.log("k.(interface{ String() string }) failed")
 	}

@@ -42,7 +42,7 @@ class MyStruct {
 	// GetMyString returns the MyString field.
 	public GetMyString(): string {
 		const m = this
-		return m.MyString
+		return m!.MyString
 	}
 
 	// Register this type with the runtime type system
@@ -59,6 +59,6 @@ export function main(): void {
 	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	// === Method Call on Pointer Receiver ===
 	// Calling a method with a pointer receiver (*MyStruct) using a pointer variable.
-	console.log("Method call on pointer (structPointer): Expected: hello world, Actual: " + structPointer.GetMyString())
+	console.log("Method call on pointer (structPointer): Expected: hello world, Actual: " + structPointer!.GetMyString())
 }
 

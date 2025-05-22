@@ -91,8 +91,28 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
 	}
 
-	// Add .
-	c.tsw.WriteLiterally(".")
+	// Add null assertion for selector expressions when accessing fields/methods on nullable types
+	// In Go, accessing fields or calling methods on nil pointers/interfaces panics, so we should throw in TypeScript
+	baseType := c.pkg.TypesInfo.TypeOf(exp.X)
+	if baseType != nil {
+		// Check if the base is a pointer type
+		if _, isPtr := baseType.(*types.Pointer); isPtr {
+			c.tsw.WriteLiterally("!.")
+		} else if _, isInterface := baseType.Underlying().(*types.Interface); isInterface {
+			// For interface types, add null assertion since interfaces can be nil
+			c.tsw.WriteLiterally("!.")
+		} else if callExpr, isCall := exp.X.(*ast.CallExpr); isCall {
+			// For function calls that return nullable types, add null assertion
+			_ = callExpr // Use the variable to avoid unused error
+			c.tsw.WriteLiterally("!.")
+		} else {
+			// Add .
+			c.tsw.WriteLiterally(".")
+		}
+	} else {
+		// Add .
+		c.tsw.WriteLiterally(".")
+	}
 
 	// Write the field/method name.
 	// Pass 'true' to WriteIdent to potentially add '.value' if the field itself

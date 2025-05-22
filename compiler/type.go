@@ -266,11 +266,12 @@ func (c *GoToTSCompiler) WriteMapType(t *types.Map) {
 }
 
 // WriteChannelType translates a Go channel type (chan T) to its TypeScript equivalent.
-// It generates $.Channel<T_ts>, where T_ts is the translated element type.
+// It generates $.Channel<T_ts> | null, where T_ts is the translated element type.
+// Channels are nilable in Go, so they are represented as nullable types in TypeScript.
 func (c *GoToTSCompiler) WriteChannelType(t *types.Chan) {
 	c.tsw.WriteLiterally("$.Channel<")
 	c.WriteGoType(t.Elem())
-	c.tsw.WriteLiterally(">")
+	c.tsw.WriteLiterally("> | null")
 }
 
 // WriteFuncType translates a Go function type (`ast.FuncType`) into a TypeScript
