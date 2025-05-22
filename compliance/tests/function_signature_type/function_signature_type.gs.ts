@@ -101,7 +101,7 @@ export function main(): void {
 	let [res1, err1] = fn1!(10, "hello")
 	console.log("fn1 result 1: ", res1, " ")
 	if (err1 != null) {
-		console.log(err1.Error())
+		console.log(err1!.Error())
 	} else {
 		console.log("nil")
 	}
@@ -109,7 +109,7 @@ export function main(): void {
 	let [res1_2, err1_2] = fn1!(-5, "world")
 	console.log("fn1 result 2: ", res1_2, " ")
 	if (err1_2 != null) {
-		console.log(err1_2.Error())
+		console.log(err1_2!.Error())
 	} else {
 		console.log("nil")
 	}

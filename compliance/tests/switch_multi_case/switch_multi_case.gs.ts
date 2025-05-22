@@ -28,7 +28,7 @@ export function main(): void {
 		case stdZeroMonth:
 			[month, value, err] = getnum(value, std == stdZeroMonth)
 			if (err != null) {
-				console.log("Error:", err.Error())
+				console.log("Error:", err!.Error())
 			}
 			console.log("Month:", month, "Value:", value)
 			break
@@ -46,7 +46,7 @@ export function main(): void {
 		case stdZeroMonth:
 			[month, value, err] = getnum(value, std == stdZeroMonth)
 			if (err != null) {
-				console.log("Error:", err.Error())
+				console.log("Error:", err!.Error())
 			}
 			console.log("Month:", month, "Value:", value)
 			break

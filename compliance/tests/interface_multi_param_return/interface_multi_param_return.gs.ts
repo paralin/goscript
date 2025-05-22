@@ -52,7 +52,7 @@ export function main(): void {
 	let processor: MultiParamReturner = new MyProcessor({})
 
 	let data = new Uint8Array([1, 2, 3])
-	let [success, ] = processor.Process(data, 5, "unused")
+	let [success, ] = processor!.Process(data, 5, "unused")
 
 	if (success) {
 		console.log("Main: Success reported")
@@ -61,7 +61,7 @@ export function main(): void {
 	}
 
 	// test case: re-use success variable, ignore second variable
-	[success, ] = processor.Process(data, 5, "unused")
+	[success, ] = processor!.Process(data, 5, "unused")
 	if (success) {
 		console.log("Main: Success reported")
 	} else {

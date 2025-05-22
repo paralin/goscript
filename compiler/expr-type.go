@@ -228,6 +228,80 @@ func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 		}
 
 		c.tsw.WriteLiterally("}")
+	case *ast.InterfaceType:
+		// Handle inline interface types like interface{ Method() string }
+		c.tsw.WriteLiterally("{")
+		c.tsw.WriteLiterally("kind: $.TypeKind.Interface, ")
+		c.tsw.WriteLiterally("methods: [")
+
+		// Add method signatures for each method in the interface
+		if t.Methods != nil && t.Methods.List != nil {
+			hasMethod := false
+			for _, field := range t.Methods.List {
+				// Only process method declarations (not embedded interfaces)
+				if len(field.Names) > 0 {
+					for _, methodName := range field.Names {
+						if hasMethod {
+							c.tsw.WriteLiterally(", ")
+						}
+						hasMethod = true
+
+						// Write method signature in the same format as writeMethodSignatures
+						c.tsw.WriteLiterallyf("{ name: '%s', args: [", methodName.Name)
+
+						// Get the function type for this method
+						if funcType, ok := field.Type.(*ast.FuncType); ok {
+							// Add parameters
+							if funcType.Params != nil && funcType.Params.List != nil {
+								paramIndex := 0
+								for _, param := range funcType.Params.List {
+									// Each parameter field can declare multiple variables of the same type
+									if len(param.Names) > 0 {
+										for _, paramName := range param.Names {
+											if paramIndex > 0 {
+												c.tsw.WriteLiterally(", ")
+											}
+											c.tsw.WriteLiterallyf("{ name: '%s', type: ", paramName.Name)
+											c.writeTypeDescription(param.Type)
+											c.tsw.WriteLiterally(" }")
+											paramIndex++
+										}
+									} else {
+										// No names, create a generic parameter name
+										if paramIndex > 0 {
+											c.tsw.WriteLiterally(", ")
+										}
+										c.tsw.WriteLiterallyf("{ name: '_p%d', type: ", paramIndex)
+										c.writeTypeDescription(param.Type)
+										c.tsw.WriteLiterally(" }")
+										paramIndex++
+									}
+								}
+							}
+
+							c.tsw.WriteLiterally("], returns: [")
+
+							// Add return types
+							if funcType.Results != nil && funcType.Results.List != nil {
+								for i, result := range funcType.Results.List {
+									if i > 0 {
+										c.tsw.WriteLiterally(", ")
+									}
+									c.tsw.WriteLiterally("{ type: ")
+									c.writeTypeDescription(result.Type)
+									c.tsw.WriteLiterally(" }")
+								}
+							}
+
+							c.tsw.WriteLiterally("] }")
+						}
+					}
+				}
+			}
+		}
+
+		c.tsw.WriteLiterally("]")
+		c.tsw.WriteLiterally("}")
 	default:
 		// For other types, use the string representation
 		c.tsw.WriteLiterallyf("'%s'", c.getTypeNameString(typeExpr))
