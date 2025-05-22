@@ -467,12 +467,19 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 	c.tsw.WriteLiterally("return ")
 
 	// Check if it's a bare named return
-	if c.analysis.IsBareNamedReturn[exp] {
+	nodeInfo := c.analysis.NodeData[exp]
+	if nodeInfo != nil && nodeInfo.IsBareReturn {
 		var namedReturns []string
-		if funcDecl, ok := c.analysis.ReturnStmtEnclosingFuncDecl[exp]; ok {
-			namedReturns = c.analysis.NamedReturnVars[funcDecl]
-		} else if funcLit, ok := c.analysis.ReturnStmtEnclosingFuncLit[exp]; ok {
-			namedReturns = c.analysis.FuncLitNamedReturnVars[funcLit]
+		if nodeInfo.EnclosingFuncDecl != nil {
+			if obj := c.pkg.TypesInfo.ObjectOf(nodeInfo.EnclosingFuncDecl.Name); obj != nil {
+				if funcInfo := c.analysis.FunctionData[obj]; funcInfo != nil {
+					namedReturns = funcInfo.NamedReturns
+				}
+			}
+		} else if nodeInfo.EnclosingFuncLit != nil {
+			if funcInfo := c.analysis.FuncLitData[nodeInfo.EnclosingFuncLit]; funcInfo != nil {
+				namedReturns = funcInfo.NamedReturns
+			}
 		}
 
 		if len(namedReturns) > 0 {
@@ -546,7 +553,7 @@ func (c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool
 	for _, stmt := range exp.List {
 		if deferStmt, ok := stmt.(*ast.DeferStmt); ok {
 			if funcLit, ok := deferStmt.Call.Fun.(*ast.FuncLit); ok {
-				if c.analysis.IsInAsyncFunctionMap[funcLit] {
+				if c.analysis.IsFuncLitAsync(funcLit) {
 					hasAsyncDefer = true
 					break
 				}
@@ -746,7 +753,7 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 	// Determine if the deferred call is to an async function literal using analysis
 	isAsyncDeferred := false
 	if funcLit, ok := exp.Call.Fun.(*ast.FuncLit); ok {
-		isAsyncDeferred = c.analysis.IsInAsyncFunctionMap[funcLit]
+		isAsyncDeferred = c.analysis.IsFuncLitAsync(funcLit)
 	}
 
 	// Set async prefix based on pre-computed async status

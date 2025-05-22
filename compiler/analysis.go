@@ -41,6 +41,21 @@ type VariableUsageInfo struct {
 	Destinations []AssignmentInfo
 }
 
+// FunctionInfo consolidates function-related tracking data.
+type FunctionInfo struct {
+	IsAsync      bool
+	NamedReturns []string
+}
+
+// NodeInfo consolidates node-related tracking data.
+type NodeInfo struct {
+	NeedsDefer        bool
+	InAsyncContext    bool
+	IsBareReturn      bool
+	EnclosingFuncDecl *ast.FuncDecl
+	EnclosingFuncLit  *ast.FuncLit
+}
+
 // Analysis holds information gathered during the analysis phase of the Go code compilation.
 // This data is used to make decisions about how to generate TypeScript code.
 // Analysis is read-only after being built and should not be modified during code generation.
@@ -55,45 +70,25 @@ type Analysis struct {
 	// Cmap stores the comment map for the file
 	Cmap ast.CommentMap
 
-	// AsyncFuncs tracks which functions are async using the function's types.Object
-	// as the key to avoid false-positive matches with functions having the same name
-	AsyncFuncs map[types.Object]bool
+	// FunctionData consolidates function-related tracking into one map
+	FunctionData map[types.Object]*FunctionInfo
 
-	// NeedsDeferMap tracks nodes that need defer handling
-	NeedsDeferMap map[ast.Node]bool
+	// NodeData consolidates node-related tracking into one map
+	NodeData map[ast.Node]*NodeInfo
 
-	// IsInAsyncFunctionMap tracks nodes that are inside async functions
-	IsInAsyncFunctionMap map[ast.Node]bool
-
-	// NamedReturnVars maps *ast.FuncDecl to a slice of named return variable names.
-	NamedReturnVars map[*ast.FuncDecl][]string
-
-	// FuncLitNamedReturnVars maps *ast.FuncLit to a slice of named return variable names.
-	FuncLitNamedReturnVars map[*ast.FuncLit][]string
-
-	// IsBareNamedReturn maps *ast.ReturnStmt to true if it's a bare return in a function with named returns.
-	IsBareNamedReturn map[ast.Node]bool
-
-	// ReturnStmtEnclosingFuncDecl maps *ast.ReturnStmt to its enclosing *ast.FuncDecl.
-	ReturnStmtEnclosingFuncDecl map[*ast.ReturnStmt]*ast.FuncDecl
-
-	// ReturnStmtEnclosingFuncLit maps *ast.ReturnStmt to its enclosing *ast.FuncLit.
-	ReturnStmtEnclosingFuncLit map[*ast.ReturnStmt]*ast.FuncLit
+	// Keep specialized maps that serve different purposes
+	// FuncLitData tracks function literal specific data since they don't have types.Object
+	FuncLitData map[*ast.FuncLit]*FunctionInfo
 }
 
 // NewAnalysis creates a new Analysis instance.
 func NewAnalysis() *Analysis {
 	return &Analysis{
-		VariableUsage:               make(map[types.Object]*VariableUsageInfo),
-		Imports:                     make(map[string]*fileImport),
-		AsyncFuncs:                  make(map[types.Object]bool),
-		NeedsDeferMap:               make(map[ast.Node]bool),
-		IsInAsyncFunctionMap:        make(map[ast.Node]bool),
-		NamedReturnVars:             make(map[*ast.FuncDecl][]string),
-		FuncLitNamedReturnVars:      make(map[*ast.FuncLit][]string),
-		IsBareNamedReturn:           make(map[ast.Node]bool),
-		ReturnStmtEnclosingFuncDecl: make(map[*ast.ReturnStmt]*ast.FuncDecl),
-		ReturnStmtEnclosingFuncLit:  make(map[*ast.ReturnStmt]*ast.FuncLit),
+		VariableUsage: make(map[types.Object]*VariableUsageInfo),
+		Imports:       make(map[string]*fileImport),
+		FunctionData:  make(map[types.Object]*FunctionInfo),
+		NodeData:      make(map[ast.Node]*NodeInfo),
+		FuncLitData:   make(map[*ast.FuncLit]*FunctionInfo),
 	}
 }
 
@@ -102,7 +97,11 @@ func (a *Analysis) NeedsDefer(node ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	return a.NeedsDeferMap[node]
+	nodeInfo := a.NodeData[node]
+	if nodeInfo == nil {
+		return false
+	}
+	return nodeInfo.NeedsDefer
 }
 
 // IsInAsyncFunction returns whether the given node is inside an async function.
@@ -110,7 +109,11 @@ func (a *Analysis) IsInAsyncFunction(node ast.Node) bool {
 	if node == nil {
 		return false
 	}
-	return a.IsInAsyncFunctionMap[node]
+	nodeInfo := a.NodeData[node]
+	if nodeInfo == nil {
+		return false
+	}
+	return nodeInfo.InAsyncContext
 }
 
 // IsAsyncFunc returns whether the given object represents an async function.
@@ -118,7 +121,11 @@ func (a *Analysis) IsAsyncFunc(obj types.Object) bool {
 	if obj == nil {
 		return false
 	}
-	return a.AsyncFuncs[obj]
+	funcInfo := a.FunctionData[obj]
+	if funcInfo == nil {
+		return false
+	}
+	return funcInfo.IsAsync
 }
 
 // IsFuncLitAsync checks if a function literal is async based on our analysis.
@@ -126,8 +133,16 @@ func (a *Analysis) IsFuncLitAsync(funcLit *ast.FuncLit) bool {
 	if funcLit == nil {
 		return false
 	}
-	// Function literals are marked during analysis if they contain async operations
-	return a.IsInAsyncFunctionMap[funcLit]
+	// Check function literal specific data first
+	if funcInfo := a.FuncLitData[funcLit]; funcInfo != nil {
+		return funcInfo.IsAsync
+	}
+	// Fall back to node data for backwards compatibility
+	nodeInfo := a.NodeData[funcLit]
+	if nodeInfo == nil {
+		return false
+	}
+	return nodeInfo.InAsyncContext
 }
 
 // NeedsBoxed returns whether the given object needs to be boxed.
@@ -350,8 +365,11 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		return nil
 	}
 
-	// Store async state for the current node
-	v.analysis.IsInAsyncFunctionMap[node] = v.inAsyncFunction
+	// Initialize and store async state for the current node
+	if v.analysis.NodeData[node] == nil {
+		v.analysis.NodeData[node] = &NodeInfo{}
+	}
+	v.analysis.NodeData[node].InAsyncContext = v.inAsyncFunction
 
 	switch n := node.(type) {
 	case *ast.GenDecl:
@@ -439,12 +457,18 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			if containsAsyncOps {
 				// Get the object for this function declaration
 				if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
-					v.analysis.AsyncFuncs[obj] = true
+					v.analysis.FunctionData[obj] = &FunctionInfo{
+						IsAsync:      true,
+						NamedReturns: v.getNamedReturns(n),
+					}
+					isAsync = true
 				}
-				isAsync = true
 			}
 		}
-		v.analysis.IsInAsyncFunctionMap[n] = isAsync
+		if v.analysis.NodeData[n] == nil {
+			v.analysis.NodeData[n] = &NodeInfo{}
+		}
+		v.analysis.NodeData[n].InAsyncContext = isAsync
 
 		// Set current receiver if this is a method
 		if n.Recv != nil && len(n.Recv.List) > 0 {
@@ -472,19 +496,27 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 				}
 			}
 			if len(namedReturns) > 0 {
-				v.analysis.NamedReturnVars[n] = namedReturns
+				if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
+					if v.analysis.FunctionData[obj] == nil {
+						v.analysis.FunctionData[obj] = &FunctionInfo{}
+					}
+					v.analysis.FunctionData[obj].NamedReturns = namedReturns
+				}
 			}
 		}
 
 		// Update visitor state for this function
 		v.inAsyncFunction = isAsync
 		v.currentFuncObj = v.pkg.TypesInfo.ObjectOf(n.Name)
-		v.analysis.IsInAsyncFunctionMap[n] = isAsync // Ensure FuncDecl node itself is marked
+		v.analysis.NodeData[n].InAsyncContext = isAsync // Ensure FuncDecl node itself is marked
 
 		if n.Body != nil {
 			// Check if the body contains any defer statements
 			if v.containsDefer(n.Body) {
-				v.analysis.NeedsDeferMap[n.Body] = true
+				if v.analysis.NodeData[n] == nil {
+					v.analysis.NodeData[n] = &NodeInfo{}
+				}
+				v.analysis.NodeData[n].NeedsDefer = true
 			}
 
 			// Visit the body with updated state
@@ -514,7 +546,10 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 
 		// Determine if this function literal is async based on its body
 		isAsync := v.containsAsyncOperations(n.Body)
-		v.analysis.IsInAsyncFunctionMap[n] = isAsync
+		if v.analysis.NodeData[n] == nil {
+			v.analysis.NodeData[n] = &NodeInfo{}
+		}
+		v.analysis.NodeData[n].InAsyncContext = isAsync
 
 		// Store named return variables for function literal
 		if n.Type != nil && n.Type.Results != nil {
@@ -525,7 +560,10 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 				}
 			}
 			if len(namedReturns) > 0 {
-				v.analysis.FuncLitNamedReturnVars[n] = namedReturns
+				v.analysis.FuncLitData[n] = &FunctionInfo{
+					IsAsync:      isAsync,
+					NamedReturns: namedReturns,
+				}
 			}
 		}
 
@@ -533,7 +571,10 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 
 		// Check if the body contains any defer statements
 		if n.Body != nil && v.containsDefer(n.Body) {
-			v.analysis.NeedsDeferMap[n.Body] = true
+			if v.analysis.NodeData[n] == nil {
+				v.analysis.NodeData[n] = &NodeInfo{}
+			}
+			v.analysis.NodeData[n].NeedsDefer = true
 		}
 
 		// Visit the body with updated state
@@ -550,13 +591,18 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			break
 		}
 
+		// Initialize NodeData for this block
+		if v.analysis.NodeData[n] == nil {
+			v.analysis.NodeData[n] = &NodeInfo{}
+		}
+
 		// Check for defer statements in this block
 		if v.containsDefer(n) {
-			v.analysis.NeedsDeferMap[n] = true
+			v.analysis.NodeData[n].NeedsDefer = true
 		}
 
 		// Store async state for this block
-		v.analysis.IsInAsyncFunctionMap[n] = v.inAsyncFunction
+		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
 
 		return v
 
@@ -575,12 +621,18 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			if obj := v.pkg.TypesInfo.Uses[funcIdent]; obj != nil && v.analysis.IsAsyncFunc(obj) {
 				// We're calling an async function, so mark current function as async if we're in one
 				if v.currentFuncObj != nil {
-					v.analysis.AsyncFuncs[v.currentFuncObj] = true
+					v.analysis.FunctionData[v.currentFuncObj] = &FunctionInfo{
+						IsAsync:      true,
+						NamedReturns: v.getNamedReturns(v.currentFuncDecl),
+					}
 					v.inAsyncFunction = true // Update visitor state
 					// Mark the FuncDecl node itself if possible (might need to store the node too)
-					for nodeAst := range v.analysis.IsInAsyncFunctionMap { // Find the node to update
+					for nodeAst := range v.analysis.NodeData { // Find the node to update
 						if fd, ok := nodeAst.(*ast.FuncDecl); ok && v.pkg.TypesInfo.ObjectOf(fd.Name) == v.currentFuncObj {
-							v.analysis.IsInAsyncFunctionMap[nodeAst] = true
+							if v.analysis.NodeData[nodeAst] == nil {
+								v.analysis.NodeData[nodeAst] = &NodeInfo{}
+							}
+							v.analysis.NodeData[nodeAst].InAsyncContext = true
 						}
 					}
 				}
@@ -588,7 +640,10 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		}
 
 		// Store async state for this call expression
-		v.analysis.IsInAsyncFunctionMap[n] = v.inAsyncFunction
+		if v.analysis.NodeData[n] == nil {
+			v.analysis.NodeData[n] = &NodeInfo{}
+		}
+		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
 
 		return v
 
@@ -686,24 +741,37 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		return v // Continue traversal
 
 	case *ast.ReturnStmt:
+		// Initialize NodeData for return statement
+		if v.analysis.NodeData[n] == nil {
+			v.analysis.NodeData[n] = &NodeInfo{}
+		}
+
 		// Record the enclosing function/literal for this return statement
 		if v.currentFuncDecl != nil {
-			v.analysis.ReturnStmtEnclosingFuncDecl[n] = v.currentFuncDecl
+			v.analysis.NodeData[n].EnclosingFuncDecl = v.currentFuncDecl
 		} else if v.currentFuncLit != nil {
-			v.analysis.ReturnStmtEnclosingFuncLit[n] = v.currentFuncLit
+			v.analysis.NodeData[n].EnclosingFuncLit = v.currentFuncLit
 		}
 
 		// Check if it's a bare return
 		if len(n.Results) == 0 {
 			if v.currentFuncDecl != nil {
 				// Check if the enclosing function declaration has named returns
-				if _, ok := v.analysis.NamedReturnVars[v.currentFuncDecl]; ok {
-					v.analysis.IsBareNamedReturn[n] = true
+				if obj := v.pkg.TypesInfo.ObjectOf(v.currentFuncDecl.Name); obj != nil {
+					if _, ok := v.analysis.FunctionData[obj]; ok {
+						if v.analysis.NodeData[n] == nil {
+							v.analysis.NodeData[n] = &NodeInfo{}
+						}
+						v.analysis.NodeData[n].IsBareReturn = true
+					}
 				}
 			} else if v.currentFuncLit != nil {
 				// Check if the enclosing function literal has named returns
-				if _, ok := v.analysis.FuncLitNamedReturnVars[v.currentFuncLit]; ok {
-					v.analysis.IsBareNamedReturn[n] = true
+				if _, ok := v.analysis.FuncLitData[v.currentFuncLit]; ok {
+					if v.analysis.NodeData[n] == nil {
+						v.analysis.NodeData[n] = &NodeInfo{}
+					}
+					v.analysis.NodeData[n].IsBareReturn = true
 				}
 			}
 		}
@@ -820,4 +888,17 @@ func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap
 
 	// Walk the AST with our visitor
 	ast.Walk(visitor, file)
+}
+
+// getNamedReturns retrieves the named returns for a function
+func (v *analysisVisitor) getNamedReturns(funcDecl *ast.FuncDecl) []string {
+	var namedReturns []string
+	if funcDecl.Type != nil && funcDecl.Type.Results != nil {
+		for _, field := range funcDecl.Type.Results.List {
+			for _, name := range field.Names {
+				namedReturns = append(namedReturns, name.Name)
+			}
+		}
+	}
+	return namedReturns
 }
