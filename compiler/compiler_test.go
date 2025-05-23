@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -97,15 +98,42 @@ func TestCompliance(t *testing.T) {
 			t.SkipNow()
 		}
 
-		t.Log("running: npm run typecheck")
-		cmd := exec.Command("npm", "run", "typecheck")
-		cmd.Dir = workspaceDir // Run in the workspace directory
-		cmd.Stdout = os.Stderr
-		cmd.Stderr = os.Stderr
-
-		err = cmd.Run()
+		// Get parent module path for the global typecheck
+		parentModPath, err := getParentGoModulePath()
 		if err != nil {
-			t.Errorf("npm run typecheck failed: %v", err)
+			t.Fatalf("Failed to determine parent Go module path: %v", err)
+		}
+
+		// Create global typecheck tsconfig
+		tsconfigPath := compliance.WriteGlobalTypeCheckConfig(t, parentModPath, workspaceDir)
+
+		// Run TypeScript type checking
+		typecheckDir := filepath.Dir(tsconfigPath)
+		cmd := exec.Command("tsc", "--project", filepath.Base(tsconfigPath))
+		cmd.Dir = typecheckDir
+
+		// Set up PATH to include node_modules/.bin
+		nodeBinDir := filepath.Join(workspaceDir, "node_modules", ".bin")
+		currentPath := os.Getenv("PATH")
+		newPath := nodeBinDir + string(os.PathListSeparator) + currentPath
+		cmd.Env = append(os.Environ(), "PATH="+newPath)
+
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Errorf("Global TypeScript type checking failed: %v\noutput:\n%s", err, string(output))
+		} else {
+			t.Logf("Global TypeScript type checking passed")
 		}
 	})
+}
+
+// getParentGoModulePath is a helper function to get the parent Go module path
+// This is similar to the one in compliance.go but simplified for use in tests
+func getParentGoModulePath() (string, error) {
+	cmd := exec.Command("go", "list", "-m")
+	output, err := cmd.Output()
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(output)), nil
 }

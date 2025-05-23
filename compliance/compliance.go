@@ -752,3 +752,141 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	tsconfigPathForCheck := WriteTypeCheckConfig(t, parentModPath, workspaceDir, testDir)
 	RunTypeScriptTypeCheck(t, workspaceDir, testDir, tsconfigPathForCheck)
 }
+
+// WriteGlobalTypeCheckConfig generates a "tsconfig.json" file in "./compliance/typecheck/"
+// for type-checking all .gs.ts files across all compliance tests.
+// It uses `git ls-files` to find all .gs.ts files and filters out any that are in test
+// directories containing "expect-typecheck-fail", "skip-test", or "expect-fail" files.
+//
+// Parameters:
+//   - t: The testing.T instance for logging and assertions.
+//   - parentModulePath: The Go module path of the parent project.
+//   - workspaceDir: The root directory of the goscript workspace.
+//
+// Returns the path to the generated "tsconfig.json" file.
+func WriteGlobalTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir string) string {
+	t.Helper()
+
+	// Create the typecheck directory
+	typecheckDir := filepath.Join(workspaceDir, "compliance", "typecheck")
+	if err := os.MkdirAll(typecheckDir, 0o755); err != nil {
+		t.Fatalf("failed to create typecheck directory %s: %v", typecheckDir, err)
+	}
+
+	// Use git ls-files to find all .gs.ts files in compliance/tests
+	// Use -z option to get NUL-separated output to handle pathnames with unusual characters
+	cmd := exec.Command("git", "ls-files", "-z", "compliance/tests/**/*.gs.ts")
+	cmd.Dir = workspaceDir
+	var outBuf, errBuf bytes.Buffer
+	cmd.Stdout = &outBuf
+	cmd.Stderr = &errBuf
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("failed to run 'git ls-files -z compliance/tests/**/*.gs.ts': %v\nstderr: %s", err, errBuf.String())
+	}
+
+	// Split by NUL bytes instead of newlines to handle quoted pathnames properly
+	gitFiles := strings.Split(strings.TrimRight(outBuf.String(), "\x00"), "\x00")
+	if len(gitFiles) == 1 && gitFiles[0] == "" {
+		gitFiles = []string{} // Handle case where no files are found
+	}
+
+	// Filter out files from test directories with exclusion markers
+	var validGsTsFiles []string
+	excludedTestDirs := make(map[string]bool)
+
+	for _, gitFile := range gitFiles {
+		if gitFile == "" {
+			continue
+		}
+
+		// gitFile is like "compliance/tests/testname/file.gs.ts"
+		// Extract the test directory name
+		parts := strings.Split(gitFile, string(filepath.Separator))
+		if len(parts) < 4 || parts[0] != "compliance" || parts[1] != "tests" {
+			continue // Skip files that don't match expected pattern
+		}
+
+		testName := parts[2]
+		testDir := filepath.Join(workspaceDir, "compliance", "tests", testName)
+
+		// Check if this test directory has already been marked as excluded
+		if excludedTestDirs[testName] {
+			continue
+		}
+
+		// Check for exclusion marker files
+		exclusionMarkers := []string{"expect-typecheck-fail", "skip-test", "expect-fail"}
+		hasExclusionMarker := false
+		for _, marker := range exclusionMarkers {
+			markerPath := filepath.Join(testDir, marker)
+			if _, err := os.Stat(markerPath); err == nil {
+				hasExclusionMarker = true
+				excludedTestDirs[testName] = true
+				break
+			} else if !os.IsNotExist(err) {
+				t.Logf("warning: failed to check for %s in %s: %v", marker, testDir, err)
+			}
+		}
+
+		if !hasExclusionMarker {
+			validGsTsFiles = append(validGsTsFiles, gitFile)
+		}
+	}
+
+	t.Logf("Found %d .gs.ts files for global type checking (excluded %d test directories)",
+		len(validGsTsFiles), len(excludedTestDirs))
+
+	// Calculate relative paths from typecheckDir to workspaceDir
+	relWorkspacePath, err := filepath.Rel(typecheckDir, workspaceDir)
+	if err != nil {
+		t.Fatalf("failed to get relative path from %s to %s: %v", typecheckDir, workspaceDir, err)
+	}
+
+	// Convert git file paths to relative paths from typecheckDir
+	var includes []string
+	for _, gitFile := range validGsTsFiles {
+		// gitFile is relative to workspaceDir, so prepend relWorkspacePath
+		relPath := filepath.ToSlash(filepath.Join(relWorkspacePath, gitFile))
+		includes = append(includes, relPath)
+	}
+
+	// Create the tsconfig
+	rootTsConfigPath := filepath.ToSlash(filepath.Join(relWorkspacePath, "tsconfig.json"))
+
+	tsconfig := maps.Clone(baseTsConfig)
+	tsconfig["extends"] = rootTsConfigPath
+	if len(includes) > 0 {
+		tsconfig["include"] = includes
+	} else {
+		// If no files, specify empty files array explicitly
+		tsconfig["files"] = []string{}
+	}
+
+	compilerOptions := maps.Clone(tsconfig["compilerOptions"].(map[string]interface{}))
+	compilerOptions["baseUrl"] = "." // typecheckDir is baseUrl
+
+	// Set up paths for module resolution
+	builtinTsRelPath := filepath.ToSlash(filepath.Join(relWorkspacePath, "gs", "*"))
+	testsPaths := make(map[string][]string)
+
+	// Add a wildcard path for all test modules
+	testsPaths[fmt.Sprintf("@goscript/%s/compliance/tests/*", parentModulePath)] = []string{
+		filepath.ToSlash(filepath.Join(relWorkspacePath, "compliance/tests/*")),
+	}
+	testsPaths["@goscript/*"] = []string{builtinTsRelPath}
+
+	compilerOptions["paths"] = testsPaths
+	tsconfig["compilerOptions"] = compilerOptions
+
+	tsconfigContentBytes, err := json.MarshalIndent(tsconfig, "", "  ")
+	if err != nil {
+		t.Fatalf("failed to marshal global typecheck tsconfig to JSON: %v", err)
+	}
+
+	tsconfigPath := filepath.Join(typecheckDir, "tsconfig.json")
+	if err := os.WriteFile(tsconfigPath, append(tsconfigContentBytes, '\n'), 0o644); err != nil {
+		t.Fatalf("failed to write global typecheck tsconfig.json to %s: %v", tsconfigPath, err)
+	}
+
+	return tsconfigPath
+}
