@@ -26,7 +26,7 @@ $.registerInterfaceType(
   [{ name: "Compare", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }]
 );
 
-class Box<T extends any> {
+class ValueContainer<T extends any> {
 	public get value(): T {
 		return this._fields.value.value
 	}
@@ -42,22 +42,22 @@ class Box<T extends any> {
 	}
 
 	public _fields: {
-		value: $.Box<T>;
-		count: $.Box<number>;
+		value: $.VarRef<T>;
+		count: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{count?: number, value?: T}>) {
 		this._fields = {
-			value: $.box(init?.value ?? null!),
-			count: $.box(init?.count ?? 0)
+			value: $.varRef(init?.value ?? null!),
+			count: $.varRef(init?.count ?? 0)
 		}
 	}
 
-	public clone(): Box<T> {
-		const cloned = new Box<T>()
+	public clone(): ValueContainer<T> {
+		const cloned = new ValueContainer<T>()
 		cloned._fields = {
-			value: $.box(this._fields.value.value),
-			count: $.box(this._fields.count.value)
+			value: $.varRef(this._fields.value.value),
+			count: $.varRef(this._fields.count.value)
 		}
 		return cloned
 	}
@@ -80,15 +80,15 @@ class Box<T extends any> {
 
 	// Register this type with the runtime type system
 	static __typeInfo = $.registerStructType(
-	  'Box',
-	  new Box(),
+	  'ValueContainer',
+	  new ValueContainer(),
 	  [{ name: "Get", args: [], returns: [{ type: { kind: $.TypeKind.Interface, methods: [] } }] }, { name: "Set", args: [{ name: "v", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [] }, { name: "Size", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }],
-	  Box,
+	  ValueContainer,
 	  {"value": { kind: $.TypeKind.Interface, methods: [] }, "count": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 
-class StringBox {
+class StringValueContainer {
 	public get value(): string {
 		return this._fields.value.value
 	}
@@ -97,19 +97,19 @@ class StringBox {
 	}
 
 	public _fields: {
-		value: $.Box<string>;
+		value: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{value?: string}>) {
 		this._fields = {
-			value: $.box(init?.value ?? "")
+			value: $.varRef(init?.value ?? "")
 		}
 	}
 
-	public clone(): StringBox {
-		const cloned = new StringBox()
+	public clone(): StringValueContainer {
+		const cloned = new StringValueContainer()
 		cloned._fields = {
-			value: $.box(this._fields.value.value)
+			value: $.varRef(this._fields.value.value)
 		}
 		return cloned
 	}
@@ -131,10 +131,10 @@ class StringBox {
 
 	// Register this type with the runtime type system
 	static __typeInfo = $.registerStructType(
-	  'StringBox',
-	  new StringBox(),
+	  'StringValueContainer',
+	  new StringValueContainer(),
 	  [{ name: "Compare", args: [{ name: "other", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "other", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }],
-	  StringBox,
+	  StringValueContainer,
 	  {"value": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
@@ -153,19 +153,19 @@ function checkEqual<T extends $.Comparable>(c: Comparable<T>, val: T): boolean {
 export function main(): void {
 	console.log("=== Generic Interface Test ===")
 
-	// Test Box implementing Container
-	let intBox = new Box<number>({})
-	let result = useContainer(intBox, 42)
-	console.log("Int box result:", result)
-	console.log("Int box size:", intBox!.Size())
+	// Test ValueContainer implementing Container
+	let intValueContainer = new ValueContainer<number>({})
+	let result = useContainer(intValueContainer, 42)
+	console.log("Int ValueContainer result:", result)
+	console.log("Int ValueContainer size:", intValueContainer!.Size())
 
-	let stringBox = new Box<string>({})
-	let strResult = useContainer(stringBox, "hello")
-	console.log("String box result:", strResult)
-	console.log("String box size:", stringBox!.Size())
+	let stringValueContainer = new ValueContainer<string>({})
+	let strResult = useContainer(stringValueContainer, "hello")
+	console.log("String ValueContainer result:", strResult)
+	console.log("String ValueContainer size:", stringValueContainer!.Size())
 
-	// Test StringBox implementing Comparable
-	let sb = new StringBox({value: "test"})
+	// Test StringValueContainer implementing Comparable
+	let sb = new StringValueContainer({value: "test"})
 	console.log("String comparison equal:", checkEqual(sb, "test"))
 	console.log("String comparison not equal:", checkEqual(sb, "other"))
 	console.log("String comparison -1:", sb!.Compare("zebra"))

@@ -19,22 +19,22 @@ class MyStruct {
 	}
 
 	public _fields: {
-		MyInt: $.Box<number>;
-		MyString: $.Box<string>;
+		MyInt: $.VarRef<number>;
+		MyString: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{MyInt?: number, MyString?: string}>) {
 		this._fields = {
-			MyInt: $.box(init?.MyInt ?? 0),
-			MyString: $.box(init?.MyString ?? "")
+			MyInt: $.varRef(init?.MyInt ?? 0),
+			MyString: $.varRef(init?.MyString ?? "")
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			MyInt: $.box(this._fields.MyInt.value),
-			MyString: $.box(this._fields.MyString.value)
+			MyInt: $.varRef(this._fields.MyInt.value),
+			MyString: $.varRef(this._fields.MyString.value)
 		}
 		return cloned
 	}
@@ -65,22 +65,22 @@ class NestedStruct {
 	}
 
 	public _fields: {
-		Value: $.Box<number>;
-		InnerStruct: $.Box<MyStruct>;
+		Value: $.VarRef<number>;
+		InnerStruct: $.VarRef<MyStruct>;
 	}
 
 	constructor(init?: Partial<{InnerStruct?: MyStruct, Value?: number}>) {
 		this._fields = {
-			Value: $.box(init?.Value ?? 0),
-			InnerStruct: $.box(init?.InnerStruct?.clone() ?? new MyStruct())
+			Value: $.varRef(init?.Value ?? 0),
+			InnerStruct: $.varRef(init?.InnerStruct?.clone() ?? new MyStruct())
 		}
 	}
 
 	public clone(): NestedStruct {
 		const cloned = new NestedStruct()
 		cloned._fields = {
-			Value: $.box(this._fields.Value.value),
-			InnerStruct: $.box(this._fields.InnerStruct.value?.clone() ?? null)
+			Value: $.varRef(this._fields.Value.value),
+			InnerStruct: $.varRef(this._fields.InnerStruct.value?.clone() ?? null)
 		}
 		return cloned
 	}
@@ -102,8 +102,8 @@ export function main(): void {
 	console.log("----------------------------------------------------------")
 
 	// original is the starting struct instance.
-	// We take its address later for pointerCopy, so it might be allocated on the heap (boxed).
-	let original: $.Box<MyStruct> = $.box(new MyStruct({MyInt: 42, MyString: "original"}))
+	// We take its address later for pointerCopy, so it might be allocated on the heap (varrefed).
+	let original = $.varRef(new MyStruct({MyInt: 42, MyString: "original"}))
 
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.

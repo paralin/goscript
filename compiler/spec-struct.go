@@ -12,7 +12,7 @@ import (
 // It handles the generation of:
 //   - The class declaration.
 //   - Getters and setters for all fields (both direct and embedded).
-//   - The internal `_fields` property, which stores field values in `$.Box` containers
+//   - The internal `_fields` property, which stores field values in `$.VarRef` containers
 //     to maintain Go's value semantics.
 //   - A constructor that initializes the `_fields` and allows partial initialization.
 //   - A `clone` method for creating a deep copy of the struct instance.
@@ -83,7 +83,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			fieldKeyName = field.Name()
 		}
 		fieldTsType := c.getTypeString(field.Type())
-		c.tsw.WriteLinef("%s: $.Box<%s>;", fieldKeyName, fieldTsType)
+		c.tsw.WriteLinef("%s: $.VarRef<%s>;", fieldKeyName, fieldTsType)
 	}
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
@@ -111,7 +111,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				fieldKeyName = field.Name()
 			}
 
-			c.writeBoxedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
 
 			if i < numFields-1 {
 				c.tsw.WriteLine(",")

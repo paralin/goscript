@@ -12,19 +12,19 @@ class MyStruct {
 	}
 
 	public _fields: {
-		Value: $.Box<number>;
+		Value: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{Value?: number}>) {
 		this._fields = {
-			Value: $.box(init?.Value ?? 0)
+			Value: $.varRef(init?.Value ?? 0)
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			Value: $.box(this._fields.Value.value)
+			Value: $.varRef(this._fields.Value.value)
 		}
 		return cloned
 	}
@@ -41,7 +41,7 @@ class MyStruct {
 
 export function main(): void {
 	let s1 = new MyStruct({Value: 10})
-	let p: $.Box<MyStruct> | null = null
+	let p: MyStruct | null = null
 	p = new MyStruct({Value: 20}) // Initialize p to point to something
 
 	// This assignment should trigger the .clone() on s1

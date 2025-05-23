@@ -28,7 +28,7 @@ class B {
 		return cloned
 	}
 
-	public MethodB(valB: $.Box<B> | null): void {
+	public MethodB(valB: B | null): void {
 		const b = this
 	}
 

@@ -695,7 +695,7 @@ function matchesPointerType(value: any, info: TypeInfo): boolean {
     return true
   }
 
-  // Check if the value is a Box (has a 'value' property)
+  // Check if the value is a VarRef (has a 'value' property)
   if (typeof value !== 'object' || !('value' in value)) {
     return false
   }

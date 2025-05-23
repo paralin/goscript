@@ -33,7 +33,7 @@ import (
 //   - Uses `writeAssignmentCore` which handles:
 //   - Blank identifier `_` on LHS (evaluates RHS for side effects).
 //   - Assignment to dereferenced pointer `*p = val` -> `p_ts!.value = val_ts`.
-//   - Short declaration `x := y`: `let x = y_ts;`. If `x` is boxed, `let x: $.Box<T> = $.box(y_ts);`.
+//   - Short declaration `x := y`: `let x = y_ts;`. If `x` is variable referenced, `let x: $.VarRef<T> = $.varRef(y_ts);`.
 //   - Regular assignment `x = y`, including compound assignments like `x += y`.
 //   - Assignment to map index `m[k] = v` using `$.mapSet`.
 //   - Struct value assignment `s1 = s2` becomes `s1 = s2.clone()` if `s2` is a struct.
@@ -44,7 +44,7 @@ import (
 // The function ensures that the number of LHS and RHS expressions matches for
 // most cases, erroring if they don't, except for specifically handled patterns
 // like multi-assign from single call or discarded channel receive.
-// It correctly applies `let` for `:=` (define) tokens and handles boxing and
+// It correctly applies `let` for `:=` (define) tokens and handles varRefing and
 // cloning semantics based on type information and analysis.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// writeMultiVarAssignFromCall handles multi-variable assignment from a single function call.
@@ -182,8 +182,17 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 					}
 				} else if starExpr, ok := lhsExpr.(*ast.StarExpr); ok {
 					// Handle pointer dereference assignment: *p = value becomes p!.value = value
-					if err := c.WriteValueExpr(starExpr.X); err != nil {
-						return fmt.Errorf("failed to write star expression X in LHS: %w", err)
+					// Write the pointer variable directly without using WriteValueExpr
+					// because we don't want automatic .value access here
+					switch operand := starExpr.X.(type) {
+					case *ast.Ident:
+						// Write identifier without .value access
+						c.WriteIdent(operand, false)
+					default:
+						// For other expressions, use WriteValueExpr
+						if err := c.WriteValueExpr(starExpr.X); err != nil {
+							return fmt.Errorf("failed to write star expression X in LHS: %w", err)
+						}
 					}
 					c.tsw.WriteLiterally("!.value")
 				} else {
@@ -223,8 +232,17 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				}
 			} else if starExpr, ok := lhsExpr.(*ast.StarExpr); ok {
 				// Handle pointer dereference in destructuring: *p becomes p!.value
-				if err := c.WriteValueExpr(starExpr.X); err != nil {
-					return fmt.Errorf("failed to write star expression X in destructuring: %w", err)
+				// Write the pointer variable directly without using WriteValueExpr
+				// because we don't want automatic .value access here
+				switch operand := starExpr.X.(type) {
+				case *ast.Ident:
+					// Write identifier without .value access
+					c.WriteIdent(operand, false)
+				default:
+					// For other expressions, use WriteValueExpr
+					if err := c.WriteValueExpr(starExpr.X); err != nil {
+						return fmt.Errorf("failed to write star expression X in destructuring: %w", err)
+					}
 				}
 				c.tsw.WriteLiterally("!.value")
 			} else {

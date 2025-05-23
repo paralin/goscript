@@ -32,19 +32,19 @@ class FuncContainer {
 	}
 
 	public _fields: {
-		myFunc: $.Box<null | any>;
+		myFunc: $.VarRef<null | any>;
 	}
 
 	constructor(init?: Partial<{myFunc?: null | any}>) {
 		this._fields = {
-			myFunc: $.box(init?.myFunc ?? null)
+			myFunc: $.varRef(init?.myFunc ?? null)
 		}
 	}
 
 	public clone(): FuncContainer {
 		const cloned = new FuncContainer()
 		cloned._fields = {
-			myFunc: $.box(this._fields.myFunc.value)
+			myFunc: $.varRef(this._fields.myFunc.value)
 		}
 		return cloned
 	}

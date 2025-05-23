@@ -237,8 +237,8 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		_, isSlice := elem.(*types.Slice)
 		_, isArray := elem.(*types.Array)
 		if isArray || isSlice {
-			// For pointer to array/slice, we always need to dereference with .value
-			// because the pointed-to value is boxed when its address is taken
+			// For pointer to array/slice, we need to dereference the pointer
+			// Check if the pointer variable itself is varrefed
 
 			// Determine the index variable name for the generated loop
 			indexVarName := "_i" // Default name
@@ -250,9 +250,18 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			// If both key and value are provided, use an index loop and assign both
 			if exp.Key != nil && exp.Value != nil {
 				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-				if err := c.WriteValueExpr(exp.X); err != nil { // Write the expression for the iterable
-					return fmt.Errorf("failed to write range loop pointer array/slice expression (key and value): %w", err)
+
+				// Write the pointer expression - use WriteIdent to avoid automatic .value access
+				// since we'll add !.value for pointer dereference
+				if ident, ok := exp.X.(*ast.Ident); ok {
+					c.WriteIdent(ident, false) // Don't add .value here
+				} else {
+					if err := c.WriteValueExpr(exp.X); err != nil {
+						return fmt.Errorf("failed to write range loop pointer array/slice expression (key and value): %w", err)
+					}
 				}
+				// Add dereference for the pointer: since we're ranging over a pointer to array/slice,
+				// we need to dereference to get to the array/slice
 				c.tsw.WriteLiterally("!.value")
 				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
 				c.tsw.Indent(1)
@@ -262,10 +271,17 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 					c.tsw.WriteLiterally("const ")
 					c.WriteIdent(ident, false)
 					c.tsw.WriteLiterally(" = ")
-					if err := c.WriteValueExpr(exp.X); err != nil {
-						return fmt.Errorf("failed to write range loop pointer array/slice value expression: %w", err)
+					// Write the pointer expression again for value access
+					if identX, ok := exp.X.(*ast.Ident); ok {
+						c.WriteIdent(identX, false) // Don't add .value here
+					} else {
+						if err := c.WriteValueExpr(exp.X); err != nil {
+							return fmt.Errorf("failed to write range loop pointer array/slice value expression: %w", err)
+						}
 					}
-					c.tsw.WriteLiterallyf("!.value![%s]", indexVarName)
+					c.tsw.WriteLiterally("!.value![")
+					c.tsw.WriteLiterally(indexVarName)
+					c.tsw.WriteLiterally("]")
 					c.tsw.WriteLine("")
 				}
 				if err := c.WriteStmt(exp.Body); err != nil {
@@ -276,9 +292,14 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				return nil
 			} else if exp.Key != nil && exp.Value == nil { // Only key provided
 				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-				// Write the expression for the iterable
-				if err := c.WriteValueExpr(exp.X); err != nil {
-					return fmt.Errorf("failed to write expression for the pointer iterable: %w", err)
+				// Write the pointer expression - use WriteIdent to avoid automatic .value access
+				// since we'll add !.value for pointer dereference
+				if ident, ok := exp.X.(*ast.Ident); ok {
+					c.WriteIdent(ident, false) // Don't add .value here
+				} else {
+					if err := c.WriteValueExpr(exp.X); err != nil {
+						return fmt.Errorf("failed to write expression for the pointer iterable: %w", err)
+					}
 				}
 				c.tsw.WriteLiterally("!.value")
 				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
@@ -297,8 +318,14 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				// Fallback: simple index loop without declaring range variables, use _i
 				indexVarName := "_i"
 				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-				if err := c.WriteValueExpr(exp.X); err != nil {
-					return fmt.Errorf("failed to write range loop pointer array/slice length expression (fallback): %w", err)
+				// Write the pointer expression - use WriteIdent to avoid automatic .value access
+				// since we'll add !.value for pointer dereference
+				if ident, ok := exp.X.(*ast.Ident); ok {
+					c.WriteIdent(ident, false) // Don't add .value here
+				} else {
+					if err := c.WriteValueExpr(exp.X); err != nil {
+						return fmt.Errorf("failed to write range loop pointer array/slice length expression (fallback): %w", err)
+					}
 				}
 				c.tsw.WriteLiterally("!.value")
 				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)

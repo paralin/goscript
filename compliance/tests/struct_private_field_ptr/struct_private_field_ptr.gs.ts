@@ -4,27 +4,27 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 class MyStruct {
-	public get myPrivate(): $.Box<number> | null {
+	public get myPrivate(): $.VarRef<number> | null {
 		return this._fields.myPrivate.value
 	}
-	public set myPrivate(value: $.Box<number> | null) {
+	public set myPrivate(value: $.VarRef<number> | null) {
 		this._fields.myPrivate.value = value
 	}
 
 	public _fields: {
-		myPrivate: $.Box<$.Box<number> | null>;
+		myPrivate: $.VarRef<$.VarRef<number> | null>;
 	}
 
-	constructor(init?: Partial<{myPrivate?: $.Box<number> | null}>) {
+	constructor(init?: Partial<{myPrivate?: $.VarRef<number> | null}>) {
 		this._fields = {
-			myPrivate: $.box(init?.myPrivate ?? null)
+			myPrivate: $.varRef(init?.myPrivate ?? null)
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			myPrivate: $.box(this._fields.myPrivate.value)
+			myPrivate: $.varRef(this._fields.myPrivate.value)
 		}
 		return cloned
 	}
@@ -41,7 +41,7 @@ class MyStruct {
 
 export function main(): void {
 	let myStruct = new MyStruct({myPrivate: null})
-	let intVar: $.Box<number> = $.box(10)
+	let intVar: $.VarRef<number> = $.varRef(10)
 	myStruct!.myPrivate = intVar
 	intVar!.value = 15
 	console.log(myStruct!.myPrivate!.value)

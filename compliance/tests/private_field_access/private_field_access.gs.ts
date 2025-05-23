@@ -19,22 +19,22 @@ class MyStruct {
 	}
 
 	public _fields: {
-		publicField: $.Box<string>;
-		privateField: $.Box<number>;
+		publicField: $.VarRef<string>;
+		privateField: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{privateField?: number, publicField?: string}>) {
 		this._fields = {
-			publicField: $.box(init?.publicField ?? ""),
-			privateField: $.box(init?.privateField ?? 0)
+			publicField: $.varRef(init?.publicField ?? ""),
+			privateField: $.varRef(init?.privateField ?? 0)
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			publicField: $.box(this._fields.publicField.value),
-			privateField: $.box(this._fields.privateField.value)
+			publicField: $.varRef(this._fields.publicField.value),
+			privateField: $.varRef(this._fields.privateField.value)
 		}
 		return cloned
 	}

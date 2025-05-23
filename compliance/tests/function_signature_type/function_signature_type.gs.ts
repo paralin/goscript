@@ -28,19 +28,19 @@ class MyError {
 	}
 
 	public _fields: {
-		s: $.Box<string>;
+		s: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{s?: string}>) {
 		this._fields = {
-			s: $.box(init?.s ?? "")
+			s: $.varRef(init?.s ?? "")
 		}
 	}
 
 	public clone(): MyError {
 		const cloned = new MyError()
 		cloned._fields = {
-			s: $.box(this._fields.s.value)
+			s: $.varRef(this._fields.s.value)
 		}
 		return cloned
 	}

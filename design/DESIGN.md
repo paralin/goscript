@@ -8,7 +8,7 @@ GoScript translates Go code to TypeScript. This document outlines the design pri
 
 1.  **AST Mapping:** Aim for a close mapping between the Go AST (`go/ast`) and the TypeScript AST, simplifying the compiler logic.
 2.  **Type Preservation:** Preserve Go's static typing as much as possible using TypeScript's type system.
-3.  **Value Semantics:** Emulate Go's value semantics for basic types and structs using copying where necessary. Pointers are used to emulate reference semantics when Go uses pointers. See [Boxes and Pointers](#boxes-and-pointers).
+3.  **Value Semantics:** Emulate Go's value semantics for basic types and structs using copying where necessary. Pointers are used to emulate reference semantics when Go uses pointers. See [VarRefes and Pointers](#varRefes-and-pointers).
 4.  **Idiomatic TypeScript:** Generate TypeScript code that feels natural to TypeScript developers, even if it means minor divergences from exact Go runtime behavior (e.g., `for range` loop variable scoping).
 5.  **Readability:** Prioritize clear and understandable generated code.
 
@@ -38,7 +38,7 @@ GoScript translates Go code to TypeScript. This document outlines the design pri
     *   **Maps:** Translated to TypeScript `Map<K, V>`.
     *   **Channels:** Translated using helper classes/functions from the runtime (`$.Chan<T>`) potentially leveraging async iterators or libraries like `csp-ts`. See `DESIGN_CONCURRENCY.md` (TODO: Create this file).
     *   **Interfaces:** Translated to TypeScript interfaces. Type assertions and type switches require runtime type information or helper functions. See `DESIGN_INTERFACES.md` (TODO: Create this file).
-    *   **Pointers:** Translated using a `$.Box<T>` wrapper type from the runtime. See [Boxes and Pointers](#boxes-and-pointers).
+    *   **Pointers:** Translated using a `$.VarRef<T>` wrapper type from the runtime. See [VarRefes and Pointers](#varRefes-and-pointers).
 *   **Function Types:** Translated to TypeScript function types.
 
 ### Variables and Constants
@@ -85,7 +85,7 @@ GoScript translates Go code to TypeScript. This document outlines the design pri
 
 *   Most operators map directly (`+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||`, `!`).
 *   Bitwise operators (`&`, `|`, `^`, `&^`, `<<`, `>>`) require runtime helper functions (`$.bitAnd()`, etc.) especially for integer types beyond JavaScript's standard number representation or for correct handling of signed vs unsigned shifts.
-*   Pointer operations (`*`, `&`) are handled via the `$.Box<T>` type and its methods/properties (e.g., `*p` becomes `p.value`, `&x` becomes `$.box(x)` or handled implicitly via assignment).
+*   Pointer operations (`*`, `&`) are handled via the `$.VarRef<T>` type and its methods/properties (e.g., `*p` becomes `p.value`, `&x` becomes `$.varRef(x)` or handled implicitly via assignment).
 
 ### Concurrency
 
@@ -101,28 +101,28 @@ Go's explicit error return values are maintained. Functions returning an error t
 *   `cap()`: Mapped to runtime helpers for slices/channels.
 *   `append()`: Mapped to a runtime helper function `$.append()`.
 *   `make()`: Mapped to runtime helper functions (`$.makeSlice()`, `$.makeMap()`, `$.makeChan()`).
-*   `new()`: Mapped to `$.box(new T())` or similar, returning a pointer (`$.Box<T>`) to a zero value.
+*   `new()`: Mapped to `$.varRef(new T())` or similar, returning a pointer (`$.VarRef<T>`) to a zero value.
 *   `copy()`: Mapped to a runtime helper function `$.copy()`.
 *   `delete()`: Mapped to `map.delete()`.
 *   `panic()`/`recover()`: Mapped to throwing exceptions and `try...catch` with runtime helpers (`$.panic()`, `$.recover()`). See `DESIGN_PANIC_RECOVER.md` (TODO: Create this file).
 *   `print()`/`println()`: Mapped to `console.log` or similar.
 
-### Boxes and Pointers
+### Variable References and Pointers
 
-See `design/BOXES_POINTERS.md`. Go pointers are represented using a `$.Box<T>` wrapper type provided by the runtime. This allows emulating pointer semantics (shared reference, ability to modify the original value indirectly) in TypeScript.
+See `design/VAR_REFS.md`. Go pointers are represented using a `$.VarRef<T>` wrapper type provided by the runtime. This allows emulating pointer semantics (shared reference, ability to modify the original value indirectly) in TypeScript.
 
-*   Taking the address (`&x`): Often implicit when assigning to a variable expecting a `$.Box<T>`, or explicitly `$.box(x)`.
+*   Taking the address (`&x`): Often implicit when assigning to a variable expecting a `$.VarRef<T>`, or explicitly `$.varRef(x)`.
 *   Dereferencing (`*p`): Accessing the `p.value` property.
-*   Pointer assignment (`p = q`): Assigns the `$.Box` reference.
+*   Pointer assignment (`p = q`): Assigns the `$.VarRef` reference.
 *   Assigning to dereferenced pointer (`*p = y`): Modifying `p.value = y`.
 
-Value types (structs, basic types) are copied on assignment unless they are boxed.
+Value types (structs, basic types) are copied on assignment unless they are variable references.
 
 ## Runtime (`@goscript/builtin`)
 
 The runtime provides:
 
-*   Helper types (`$.int`, `$.error`, `$.Slice`, `$.Chan`, `$.Box`, etc.).
+*   Helper types (`$.int`, `$.error`, `$.Slice`, `$.Chan`, `$.VarRef`, etc.).
 *   Helper functions (`$.makeSlice`, `$.append`, `$.copy`, `$.panic`, `$.recover`, `$.go`, `$.defer`, bitwise operations, etc.).
 *   Runtime type information utilities (for type assertions/switches).
 
@@ -170,37 +170,37 @@ After reviewing the code and tests, some important implementation considerations
    * Ensure pointer comparisons use appropriate TypeScript equality semantics.
    * Pointer comparison operators (`==`, `!=`, `==nil`) must be correctly translated to their TypeScript equivalents.
 
-2. **Pointer Representation, Boxing & Addressability**:
-   * **Boxing:** To handle Go's pointers and addressability within JavaScript's reference model, GoScript employs a "boxing" strategy. When the address of a variable (`&v`) is taken anywhere in the code, that variable is declared using the `$.Box<T>` type from the runtime (`@goscript/builtin`). This box holds the actual value and allows multiple pointers to reference and modify the same underlying value.
+2. **Pointer Representation, Variable References & Addressability**:
+   * **Variable References:** To handle Go's pointers and addressability within JavaScript's reference model, GoScript employs a "variable reference" strategy. When the address of a variable (`&v`) is taken anywhere in the code, that variable is declared using the `$.VarRef<T>` type from the runtime (`@goscript/builtin`). This variable reference holds the actual value and allows multiple pointers to reference and modify the same underlying value.
      ```go
      // Go
      var x int = 10
-     p := &x // Address of x is taken, so x must be boxed
+     p := &x // Address of x is taken, so x must be a variable reference
      ```
      ```typescript
      // TypeScript
      import * as $ from "@goscript/builtin"
-     let x: $.Box<number> = $.Box(10) // x is boxed
-     let p: $.Box<number> | null = x  // p points to the box x
+     let x: $.VarRef<number> = $.varRef(10) // x is a variable reference
+     let p: $.VarRef<number> | null = x  // p points to the variable reference x
      ```
-   * **Addressability:** Only variables that have been boxed (because their address was taken) are addressable.
-   * **Pointer Types:** Go pointer types are mapped to potentially nullable `Box` types in TypeScript. See the "Type Mapping" section for details.
-   * **Multi-level Pointers:** A variable (which can itself be a pointer) is boxed if its own address is taken.
+   * **Addressability:** Only variables that have been made variable references (because their address was taken) are addressable.
+   * **Pointer Types:** Go pointer types are mapped to potentially nullable `VarRef` types in TypeScript. See the "Type Mapping" section for details.
+   * **Multi-level Pointers:** A variable (which can itself be a pointer) becomes a variable reference if its own address is taken.
      ```go
-     // Go (Example from compliance/tests/boxing/boxing.go)
-     var x int = 10      // x is boxed because p1 takes its address
-     var p1 *int = &x    // p1 is boxed because p2 takes its address
-     var p2 **int = &p1  // p2 is boxed because p3 takes its address
-     var p3 ***int = &p2 // p3 is NOT boxed because its address is not taken
+     // Go (Example from compliance/tests/varRef/varRef.go)
+     var x int = 10      // x is a variable reference because p1 takes its address
+     var p1 *int = &x    // p1 is a variable reference because p2 takes its address
+     var p2 **int = &p1  // p2 is a variable reference because p3 takes its address
+     var p3 ***int = &p2 // p3 is NOT a variable reference because its address is not taken
      ```
      This translates to:
      ```typescript
      // TypeScript
      import * as $ from "@goscript/builtin"
-     let x: $.Box<number> = $.box(10);
-     let p1: $.Box<$.Box<number> | null> = $.box(x); // p1's box holds a reference to x's box
-     let p2: $.Box<$.Box<$.Box<number> | null> | null> = $.box(p1); // p2's box holds a reference to p1's box
-     let p3: $.Box<$.Box<$.Box<number> | null> | null> | null = p2; // p3 is not boxed; it directly holds the reference to p2's box
+     let x: $.VarRef<number> = $.varRef(10);
+     let p1: $.VarRef<$.VarRef<number> | null> = $.varRef(x); // p1's variable reference holds a reference to x's variable reference
+     let p2: $.VarRef<$.VarRef<$.VarRef<number> | null> | null> = $.varRef(p1); // p2's variable reference holds a reference to p1's variable reference
+     let p3: $.VarRef<$.VarRef<$.VarRef<number> | null> | null> | null = p2; // p3 is not a variable reference; it directly holds the reference to p2's variable reference
      ```
      Dereferencing `***p3` then becomes `p3!.value!.value!.value`.
 
@@ -215,7 +215,7 @@ After reviewing the code and tests, some important implementation considerations
 - **Keywords:** Go keywords are generally not an issue, but care must be taken if a Go identifier clashes with a TypeScript keyword.
 
 ## Type Mapping
-- **Built-in Types:** Go built-in types are mapped to corresponding TypeScript types (e.g., `string` -> `string`, `int` -> `number`, `bool` -> `boolean`, `float64` -> `number`). If the address of a variable with a built-in type is taken, it's wrapped in `$.Box<T>` (e.g., `$.Box<number>`).
+- **Built-in Types:** Go built-in types are mapped to corresponding TypeScript types (e.g., `string` -> `string`, `int` -> `number`, `bool` -> `boolean`, `float64` -> `number`). If the address of a variable with a built-in type is taken, it's wrapped in `$.VarRef<T>` (e.g., `$.VarRef<number>`).
 
 - **String and Rune Conversions:** Go's `rune` type (an alias for `int32` representing a Unicode code point) and its interaction with `string` are handled as follows:
     -   **`rune` Type:** Translated to TypeScript `number`.
@@ -252,7 +252,7 @@ After reviewing the code and tests, some important implementation considerations
 
 - **Structs:** Converted to TypeScript `class`es. Both exported and unexported Go fields become `public` members in the TypeScript class. A `clone()` method is added to support Go's value semantics on assignment/read. This `clone()` method performs a deep copy of the struct's fields, including recursively cloning any nested struct fields, to ensure true value semantics.
     -   **Constructor Initialization:** The generated class constructor accepts an optional `init` object. Fields are initialized using this object. Crucially, for fields that are themselves struct *values* (not pointers):
-        - If the corresponding value in `init` is provided, it is **cloned** using its `.clone()` method before assignment to maintain Go's value semantics (e.g., `this._fields.InnerStruct = $.box(init?.InnerStruct?.clone() ?? new InnerStruct())`).
+        - If the corresponding value in `init` is provided, it is **cloned** using its `.clone()` method before assignment to maintain Go's value semantics (e.g., `this._fields.InnerStruct = $.varRef(init?.InnerStruct?.clone() ?? new InnerStruct())`).
         - If the corresponding value in `init` is nullish (`null` or `undefined`), the field is initialized with a *new instance* of the struct's zero value (`new FieldType()`) to maintain parity with Go's non-nullable struct semantics.
         - Pointer fields are initialized to `null` if the `init` value is nullish (no cloning needed).
         ```typescript
@@ -550,15 +550,15 @@ After reviewing the code and tests, some important implementation considerations
 
 Go's value semantics (where assigning a struct copies it) are emulated in TypeScript by:
 1.  Adding a `clone()` method to generated classes representing structs. This method performs a deep copy.
-    -   The `clone()` method creates a new instance of the struct and then copies the values from the original struct's `_fields` to the new instance's `_fields`. For each field, the value is retrieved from the source box (e.g., `this._fields.MyInt.value`) and then re-boxed in the destination (e.g., `cloned._fields.MyInt = $.box(...)`).
-    -   For nested struct fields, the `clone()` method of the nested struct is called recursively (e.g., `cloned._fields.InnerStruct = $.box(this._fields.InnerStruct.value?.clone() ?? null)`).
+    -   The `clone()` method creates a new instance of the struct and then copies the values from the original struct's `_fields` to the new instance's `_fields`. For each field, the value is retrieved from the source variable reference (e.g., `this._fields.MyInt.value`) and then re-wrapped in a new variable reference in the destination (e.g., `cloned._fields.MyInt = $.varRef(...)`).
+    -   For nested struct fields, the `clone()` method of the nested struct is called recursively (e.g., `cloned._fields.InnerStruct = $.varRef(this._fields.InnerStruct.value?.clone() ?? new MyStruct())`).
     ```typescript
     // Example: MyStruct.clone()
     public clone(): MyStruct {
         const cloned = new MyStruct()
         cloned._fields = {
-            MyInt: $.box(this._fields.MyInt.value),
-            MyString: $.box(this._fields.MyString.value)
+            MyInt: $.varRef(this._fields.MyInt.value),
+            MyString: $.varRef(this._fields.MyString.value)
         }
         return cloned
     }
@@ -567,29 +567,29 @@ Go's value semantics (where assigning a struct copies it) are emulated in TypeSc
     public clone(): NestedStruct {
         const cloned = new NestedStruct()
         cloned._fields = {
-            Value: $.box(this._fields.Value.value),
-            InnerStruct: $.box(this._fields.InnerStruct.value?.clone() ?? new MyStruct()) // Recursive clone
+            Value: $.varRef(this._fields.Value.value),
+            InnerStruct: $.varRef(this._fields.InnerStruct.value?.clone() ?? new MyStruct()) // Recursive clone
         }
         return cloned
     }
     ```
 2.  Automatically calling `.clone()` during assignment statements (`=`, `:=`) whenever a struct *value* is being copied.
-    -   If the source variable is a direct struct instance (not boxed), it's `let valueCopy = original.clone()`.
-    -   If the source variable is a `$.Box<StructType>` (because its address was taken), the assignment becomes `let valueCopy = original.value.clone()`.
+    -   If the source variable is a direct struct instance (not a variable reference), it's `let valueCopy = original.clone()`.
+    -   If the source variable is a `$.VarRef<StructType>` (because its address was taken), the assignment becomes `let valueCopy = original.value.clone()`.
     ```go
     // Go
     original := MyStruct{MyInt: 42}
     valueCopy := original
-    // (later &original might be used, causing 'original' to be boxed in TS)
+    // (later &original might be used, causing 'original' to be a variable reference in TS)
     ```
     ```typescript
-    // TypeScript (assuming 'original' is boxed)
-    let original: $.Box<MyStruct> = $.box(new MyStruct({MyInt: 42}));
+    // TypeScript (assuming 'original' is a variable reference)
+    let original: $.VarRef<MyStruct> = $.varRef(new MyStruct({MyInt: 42}));
     let valueCopy = original.value.clone();
     ```
-3.  Pointer assignments preserve Go's reference semantics by copying the reference to the `$.Box` or the direct object reference (for unboxed struct pointers).
+3.  Pointer assignments preserve Go's reference semantics by copying the reference to the `$.VarRef` or the direct object reference (for non-variable-reference struct pointers).
 
-Pointer assignments are handled as described under Operators (`&`, `*`) and Pointer Representation/Boxing.
+Pointer assignments are handled as described under Operators (`&`, `*`) and Pointer Representation/Variable References.
 
 ## Multi-Assignment Statements
 
@@ -612,26 +612,26 @@ Go operators are generally mapped directly to their TypeScript equivalents:
     - `==`, `!=` for **non-pointers**: Map directly to `===`, `!==`. Struct comparison is reference equality unless specific comparison methods are defined.
     - `<`, `<=`, `>`, `>=`: Map directly.
 - **Address Operator (`&`):**
-    - Taking the address of a variable (`&v`) translates to referencing the `$.Box<T>` object associated with `v`.
+    - Taking the address of a variable (`&v`) translates to referencing the `$.VarRef<T>` object associated with `v`.
     ```go
     var x int
-    p := &x // x becomes boxed here
+    p := &x // x becomes a variable reference here
     ```
     ```typescript
-    let x: $.Box<number> = $.Box(0) // x declared as Box
-    let p: $.Box<number> | null = x         // p gets reference to x's Box
+    let x: $.VarRef<number> = $.varRef(0) // x declared as VarRef
+    let p: $.VarRef<number> | null = x         // p gets reference to x's VarRef
     ```
 - **Dereference Operator (`*`):**
-    - Dereferencing a pointer (`*p`) translates to accessing the `.value` property of the corresponding `Box`.
-    - Dereferencing a pointer to a struct depends on the context (see `design/BOXES_POINTERS.md`).
-    - **Multi-level Dereferencing:** Involves chaining `.value` accesses, corresponding to each level of boxing for the intermediate pointers.
+    - Dereferencing a pointer (`*p`) translates to accessing the `.value` property of the corresponding `VarRef`.
+    - Dereferencing a pointer to a struct depends on the context (see `design/VAR_REFS.md`).
+    - **Multi-level Dereferencing:** Involves chaining `.value` accesses, corresponding to each level of variable reference for the intermediate pointers.
       ```go
-      // Go (from compliance/tests/boxing/boxing.go)
+      // Go (from compliance/tests/varRef/varRef.go)
       // var x int = 10; var p1 *int = &x; var p2 **int = &p1; var p3 ***int = &p2;
-      // x is $.Box<number>
-      // p1 is $.Box<$.Box<number> | null>
-      // p2 is $.Box<$.Box<$.Box<number> | null> | null>
-      // p3 is $.Box<$.Box<$.Box<number> | null> | null> | null (refers to p2's box)
+      // x is $.VarRef<number>
+      // p1 is $.VarRef<$.VarRef<number> | null>
+      // p2 is $.VarRef<$.VarRef<$.VarRef<number> | null> | null>
+      // p3 is $.VarRef<$.VarRef<$.VarRef<number> | null> | null> | null (refers to p2's variable reference)
       ***p3 = 12
       y := ***p3
       ```
@@ -643,37 +643,37 @@ Go operators are generally mapped directly to their TypeScript equivalents:
       ```
 - **Pointer Assignment:**
     - **Assigning an address to a pointer (`p = &v`):**
-        - If the pointer variable `p` on the left-hand side is *not* boxed, it's assigned the reference to `v`'s `$.Box`.
+        - If the pointer variable `p` on the left-hand side is *not* a variable reference, it's assigned the reference to `v`'s `$.VarRef`.
           ```go
-          // Case 1: Pointer p is not boxed
-          var x int = 10 // x will be boxed
-          var p *int     // p is not boxed
+          // Case 1: Pointer p is not a variable reference
+          var x int = 10 // x will be a variable reference
+          var p *int     // p is not a variable reference
           p = &x         // Assign address of x to p
           ```
           ```typescript
-          let x: $.Box<number> = $.box(10)
-          let p: $.Box<number> | null // p is not a Box itself
-          p = x // p now holds the reference to x's Box
+          let x: $.VarRef<number> = $.varRef(10)
+          let p: $.VarRef<number> | null // p is not a VarRef itself
+          p = x // p now holds the reference to x's VarRef
           ```
-        - If the pointer variable `p1` on the left-hand side *is* boxed (because `&p1` was taken elsewhere), its `.value` is updated to point to `v`'s `$.Box`.
+        - If the pointer variable `p1` on the left-hand side *is* a variable reference (because `&p1` was taken elsewhere), its `.value` is updated to point to `v`'s `$.VarRef`.
           ```go
-          // Case 2: Pointer p1 IS boxed
-          // Assume: var p1 $.Box<$.Box<number> | null> (p1 was boxed)
-          var y int = 15 // y will be boxed
+          // Case 2: Pointer p1 IS a variable reference
+          // Assume: var p1 $.VarRef<$.VarRef<number> | null> (p1 was made a variable reference)
+          var y int = 15 // y will be a variable reference
           p1 = &y
           ```
           ```typescript
-          // Assume: let p1: $.Box<$.Box<number> | null> = ...;
-          let y: $.Box<number> = $.box(15)
-          p1.value = y // Update the inner value of p1's Box to point to y's Box
+          // Assume: let p1: $.VarRef<$.VarRef<number> | null> = ...;
+          let y: $.VarRef<number> = $.varRef(15)
+          p1.value = y // Update the inner value of p1's VarRef to point to y's VarRef
           ```
-    - **Assigning to a dereferenced pointer (`*p = val`):** Translates to assigning to the `.value` property of the `Box` that `p` (or the final pointer in a chain) refers to.
+    - **Assigning to a dereferenced pointer (`*p = val`):** Translates to assigning to the `.value` property of the `VarRef` that `p` (or the final pointer in a chain) refers to.
       ```go
-      // Assume p points to x's box: p: $.Box<number> | null = x_box
+      // Assume p points to x's variable reference: p: $.VarRef<number> | null = x_varRef
       *p = 100
       ```
       ```typescript
-      p!.value = 100 // Assign to the value inside the Box p points to
+      p!.value = 100 // Assign to the value inside the VarRef p points to
       ```
 - **Bitwise Operators:** `&`, `|`, `^`, `&^`, `<<`, `>>` map to TS `&`, `|`, `^`, `& ~`, `<<`, `>>`. Bitwise NOT `^x` maps to `~x`.
 

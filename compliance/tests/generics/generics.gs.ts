@@ -34,22 +34,22 @@ class Pair<T extends any> {
 	}
 
 	public _fields: {
-		First: $.Box<T>;
-		Second: $.Box<T>;
+		First: $.VarRef<T>;
+		Second: $.VarRef<T>;
 	}
 
 	constructor(init?: Partial<{First?: T, Second?: T}>) {
 		this._fields = {
-			First: $.box(init?.First ?? null!),
-			Second: $.box(init?.Second ?? null!)
+			First: $.varRef(init?.First ?? null!),
+			Second: $.varRef(init?.Second ?? null!)
 		}
 	}
 
 	public clone(): Pair<T> {
 		const cloned = new Pair<T>()
 		cloned._fields = {
-			First: $.box(this._fields.First.value),
-			Second: $.box(this._fields.Second.value)
+			First: $.varRef(this._fields.First.value),
+			Second: $.varRef(this._fields.Second.value)
 		}
 		return cloned
 	}

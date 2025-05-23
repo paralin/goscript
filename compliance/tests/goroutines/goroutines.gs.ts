@@ -19,22 +19,22 @@ class Message {
 	}
 
 	public _fields: {
-		priority: $.Box<number>;
-		text: $.Box<string>;
+		priority: $.VarRef<number>;
+		text: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{priority?: number, text?: string}>) {
 		this._fields = {
-			priority: $.box(init?.priority ?? 0),
-			text: $.box(init?.text ?? "")
+			priority: $.varRef(init?.priority ?? 0),
+			text: $.varRef(init?.text ?? "")
 		}
 	}
 
 	public clone(): Message {
 		const cloned = new Message()
 		cloned._fields = {
-			priority: $.box(this._fields.priority.value),
-			text: $.box(this._fields.text.value)
+			priority: $.varRef(this._fields.priority.value),
+			text: $.varRef(this._fields.text.value)
 		}
 		return cloned
 	}

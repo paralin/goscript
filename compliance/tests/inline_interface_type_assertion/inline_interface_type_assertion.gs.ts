@@ -127,7 +127,7 @@ export function main(): void {
 	// Test case: nil value of an inline interface type assigned to interface{}
 	let l: null | any = null
 
-	let { value: ptr, ok: ok6 } = $.typeAssert<$.Box<{ Name?: string }> | null>(l, {kind: $.TypeKind.Pointer, elemType: {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}}, methods: []}})
+	let { value: ptr, ok: ok6 } = $.typeAssert<{ Name?: string } | null>(l, {kind: $.TypeKind.Pointer, elemType: {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}}, methods: []}})
 	if (ok6) {
 		if (ptr == null) {
 			console.log("l.(*struct{ Name string }) successful, ptr is nil as expected")

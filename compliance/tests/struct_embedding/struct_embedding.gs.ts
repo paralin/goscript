@@ -19,22 +19,22 @@ class Person {
 	}
 
 	public _fields: {
-		Name: $.Box<string>;
-		Age: $.Box<number>;
+		Name: $.VarRef<string>;
+		Age: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{Age?: number, Name?: string}>) {
 		this._fields = {
-			Name: $.box(init?.Name ?? ""),
-			Age: $.box(init?.Age ?? 0)
+			Name: $.varRef(init?.Name ?? ""),
+			Age: $.varRef(init?.Age ?? 0)
 		}
 	}
 
 	public clone(): Person {
 		const cloned = new Person()
 		cloned._fields = {
-			Name: $.box(this._fields.Name.value),
-			Age: $.box(this._fields.Age.value)
+			Name: $.varRef(this._fields.Name.value),
+			Age: $.varRef(this._fields.Age.value)
 		}
 		return cloned
 	}
@@ -70,22 +70,22 @@ class Employee {
 	}
 
 	public _fields: {
-		Person: $.Box<Person>;
-		ID: $.Box<number>;
+		Person: $.VarRef<Person>;
+		ID: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{ID?: number, Person?: Partial<ConstructorParameters<typeof Person>[0]>}>) {
 		this._fields = {
-			Person: $.box(new Person(init?.Person)),
-			ID: $.box(init?.ID ?? 0)
+			Person: $.varRef(new Person(init?.Person)),
+			ID: $.varRef(init?.ID ?? 0)
 		}
 	}
 
 	public clone(): Employee {
 		const cloned = new Employee()
 		cloned._fields = {
-			Person: $.box(this._fields.Person.value.clone()),
-			ID: $.box(this._fields.ID.value)
+			Person: $.varRef(this._fields.Person.value.clone()),
+			ID: $.varRef(this._fields.ID.value)
 		}
 		return cloned
 	}
@@ -134,22 +134,22 @@ class Address {
 	}
 
 	public _fields: {
-		Street: $.Box<string>;
-		City: $.Box<string>;
+		Street: $.VarRef<string>;
+		City: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{City?: string, Street?: string}>) {
 		this._fields = {
-			Street: $.box(init?.Street ?? ""),
-			City: $.box(init?.City ?? "")
+			Street: $.varRef(init?.Street ?? ""),
+			City: $.varRef(init?.City ?? "")
 		}
 	}
 
 	public clone(): Address {
 		const cloned = new Address()
 		cloned._fields = {
-			Street: $.box(this._fields.Street.value),
-			City: $.box(this._fields.City.value)
+			Street: $.varRef(this._fields.Street.value),
+			City: $.varRef(this._fields.City.value)
 		}
 		return cloned
 	}
@@ -178,19 +178,19 @@ class Contact {
 	}
 
 	public _fields: {
-		Phone: $.Box<string>;
+		Phone: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{Phone?: string}>) {
 		this._fields = {
-			Phone: $.box(init?.Phone ?? "")
+			Phone: $.varRef(init?.Phone ?? "")
 		}
 	}
 
 	public clone(): Contact {
 		const cloned = new Contact()
 		cloned._fields = {
-			Phone: $.box(this._fields.Phone.value)
+			Phone: $.varRef(this._fields.Phone.value)
 		}
 		return cloned
 	}
@@ -240,28 +240,28 @@ class Manager {
 	}
 
 	public _fields: {
-		Person: $.Box<Person>;
-		Address: $.Box<Address>;
-		Contact: $.Box<Contact>;
-		Level: $.Box<number>;
+		Person: $.VarRef<Person>;
+		Address: $.VarRef<Address>;
+		Contact: $.VarRef<Contact>;
+		Level: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{Address?: Partial<ConstructorParameters<typeof Address>[0]>, Contact?: Partial<ConstructorParameters<typeof Contact>[0]>, Level?: number, Person?: Partial<ConstructorParameters<typeof Person>[0]>}>) {
 		this._fields = {
-			Person: $.box(new Person(init?.Person)),
-			Address: $.box(new Address(init?.Address)),
-			Contact: $.box(new Contact(init?.Contact)),
-			Level: $.box(init?.Level ?? 0)
+			Person: $.varRef(new Person(init?.Person)),
+			Address: $.varRef(new Address(init?.Address)),
+			Contact: $.varRef(new Contact(init?.Contact)),
+			Level: $.varRef(init?.Level ?? 0)
 		}
 	}
 
 	public clone(): Manager {
 		const cloned = new Manager()
 		cloned._fields = {
-			Person: $.box(this._fields.Person.value.clone()),
-			Address: $.box(this._fields.Address.value.clone()),
-			Contact: $.box(this._fields.Contact.value.clone()),
-			Level: $.box(this._fields.Level.value)
+			Person: $.varRef(this._fields.Person.value.clone()),
+			Address: $.varRef(this._fields.Address.value.clone()),
+			Contact: $.varRef(this._fields.Contact.value.clone()),
+			Level: $.varRef(this._fields.Level.value)
 		}
 		return cloned
 	}
@@ -348,7 +348,7 @@ export function main(): void {
 
 	// --- Multiple Embedding Tests ---
 	console.log("\n--- Multiple Embedding ---")
-	let m: $.Box<Manager> = $.box(new Manager({Level: 5, Address: {Street: "123 Main St", City: "Anytown"}, Contact: {Phone: "555-1234"}, Person: {Name: "Charlie", Age: 40}}))
+	let m = $.varRef(new Manager({Level: 5, Address: {Street: "123 Main St", City: "Anytown"}, Contact: {Phone: "555-1234"}, Person: {Name: "Charlie", Age: 40}}))
 
 	// Accessing fields from all embedded structs and the outer struct
 	console.log("Manager Name:", m!.value.Name) // From Person

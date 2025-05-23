@@ -145,13 +145,14 @@ func (a *Analysis) IsFuncLitAsync(funcLit *ast.FuncLit) bool {
 	return nodeInfo.InAsyncContext
 }
 
-// NeedsBoxed returns whether the given object needs to be boxed.
-// According to the new logic, a variable needs boxing if its address is taken
-// and assigned to another variable (i.e., it appears as a destination with AddressOfAssignment).
-func (a *Analysis) NeedsBoxed(obj types.Object) bool {
+// NeedsVarRef returns whether the given object needs to be variable referenced.
+// This is true when the object's address is taken (e.g., &myVar) in the analyzed code.
+// Variables that have their address taken must be wrapped in VarRef to maintain identity.
+func (a *Analysis) NeedsVarRef(obj types.Object) bool {
 	if obj == nil {
 		return false
 	}
+
 	usageInfo, exists := a.VariableUsage[obj]
 	if !exists {
 		return false
@@ -165,156 +166,97 @@ func (a *Analysis) NeedsBoxed(obj types.Object) bool {
 	return false
 }
 
-// NeedsBoxedAccess returns whether accessing the given object requires '.value' access in TypeScript.
-// This function is critical for correctly handling pointer dereferencing by determining when
-// a variable is boxed and needs .value to access its content.
+// NeedsVarRefAccess returns whether accessing the given object requires '.value' access in TypeScript.
+// This is more nuanced than NeedsVarRef and considers both direct variable references and
+// pointers that may point to variable-referenced values.
 //
-// Two distinct cases determine when a variable needs .value access:
-//
-//  1. The variable itself is boxed (its address is taken)
-//     Example: let x = $.box(10) => x.value
-//
-//  2. For pointer variables: it points to a boxed struct variable rather than a direct struct literal
-//     Example: let ptrToVal = val (where val is boxed) => ptrToVal.value
-//     vs.     let ptr = new MyStruct() => ptr (no .value needed)
-//
-// This distinction is crucial for avoiding over-dereferencing or under-dereferencing,
-// which was the root cause of several bugs in our pointer handling.
-func (a *Analysis) NeedsBoxedAccess(obj types.Object) bool {
+// Examples:
+//   - Direct variable reference (NeedsVarRef = true):
+//     Example: let x = $.varRef(10) => x.value
+//   - Pointer pointing to a variable-referenced value:
+//     Example: let p: VarRef<number> | null = x => p!.value
+//   - Regular pointer (NeedsVarRef = false, but points to variable reference):
+//     Example: let q = x => q!.value (where x is VarRef)
+func (a *Analysis) NeedsVarRefAccess(obj types.Object) bool {
 	if obj == nil {
 		return false
 	}
 
-	// First, check if the variable itself is boxed - this always requires .value
-	// A variable is boxed if its address is taken elsewhere in the code
-	if a.NeedsBoxed(obj) {
+	// If the variable itself is variable referenced, it needs .value access
+	if a.NeedsVarRef(obj) {
 		return true
 	}
 
-	// Check if this is a pointer variable pointing to a boxed struct value
-	objType := obj.Type()
-	if ptrType, isPointer := objType.Underlying().(*types.Pointer); isPointer {
-		// Check if it's a pointer to a struct
-		if elemType := ptrType.Elem(); elemType != nil {
-			if _, isStructType := elemType.Underlying().(*types.Struct); isStructType {
-				// For struct pointers, check if it points to a boxed struct variable
-				if usageInfo, exists := a.VariableUsage[obj]; exists {
-					for _, src := range usageInfo.Sources {
-						// Check if this pointer was assigned the address of another variable
-						// (e.g., ptr = &someVar) rather than a direct literal (ptr = &Struct{})
-						if src.Type == AddressOfAssignment && src.Object != nil {
-							// Bug fix: If the source variable is boxed, the pointer needs .value to access it
-							// This distinguishes between:
-							// - ptrToVal := &val (val is boxed, so we need ptrToVal.value)
-							// - ptr := &MyStruct{} (direct literal, no boxing needed)
-							return a.NeedsBoxed(src.Object)
-						}
+	// For pointer variables, check if they point to a variable-referenced value
+	if ptrType, ok := obj.Type().(*types.Pointer); ok {
+		// Check all assignments to this pointer variable
+		for varObj, info := range a.VariableUsage {
+			if varObj == obj {
+				for _, src := range info.Sources {
+					if src.Type == AddressOfAssignment && src.Object != nil {
+						// This pointer was assigned &someVar, check if someVar is variable referenced
+						return a.NeedsVarRef(src.Object)
 					}
 				}
 			}
 		}
+
+		// Handle direct pointer initialization like: var p *int = &x
+		// Check if the pointer type's element type requires variable referencing
+		_ = ptrType.Elem()
+		// For now, conservatively return false for untracked cases
 	}
 
 	return false
 }
 
-// NeedsBoxedDeref determines whether a pointer dereference operation (*ptr) needs
-// the .value suffix in TypeScript when used in a direct dereference expression.
+// NeedsVarRefDeref determines whether a pointer dereference operation (*ptr) needs
+// additional .value access beyond the standard !.value pattern.
 //
-// Critical distinction (source of bugs):
+// Standard pattern: ptr!.value  (for *int, *string, etc.)
+// Enhanced pattern: ptr.value!.value  (when ptr itself is variable referenced)
 //
-//  1. For primitive types and pointers-to-primitive: Need .value
-//     *p => p!.value
-//     **p => p!.value!.value
+// This function returns true when the pointer variable itself is variable referenced,
+// meaning we need an extra .value to access the actual pointer before dereferencing.
 //
-//  2. For pointers to structs: No .value needed because structs are references
-//     *p => p!
-//     Where p is a pointer to a struct
+// Examples:
+//   - ptr := &x (ptr not variable referenced): *ptr => ptr!.value
+//   - ptrPtr := &ptr (ptr is variable referenced): *ptr => ptr.value!.value
 //
-// This distinction is essential because in TypeScript:
-// - Primitives are stored inside $.Box with a .value property
-// - Structs are reference types, so dereferencing just removes the null possibility
-func (a *Analysis) NeedsBoxedDeref(ptrType types.Type) bool {
-	// If we don't have a valid pointer type, default to true (safer)
-	if ptrType == nil {
-		return true
-	}
-
-	// Unwrap the pointer to get the element type
-	ptrTypeUnwrapped, ok := ptrType.(*types.Pointer)
-	if !ok {
-		return true // Not a pointer type, default to true
-	}
-
-	// Get the underlying element type
-	elemType := ptrTypeUnwrapped.Elem()
-	if elemType == nil {
-		return true
-	}
-
-	// Check if the element is another pointer - if so, we always need .value
-	// This fixes the bug with multi-level pointer dereferencing like **p
-	if _, isPointer := elemType.(*types.Pointer); isPointer {
-		return true
-	}
-
-	// Check if the element is a struct (directly or via a named type)
-	// Bug fix: Struct pointers in TS don't need .value when dereferenced
-	// because structs are already references in JavaScript/TypeScript
-	if _, isStruct := elemType.Underlying().(*types.Struct); isStruct {
-		return false // Pointers to structs don't need .value suffix in direct dereference (*p)
-	}
-
-	// For all other cases (primitives, pointers-to-pointers, etc.) need .value
-	// This ensures primitives and nested pointers are correctly dereferenced
-	return true
+// Args:
+//
+//	ptrType: The type of the pointer being dereferenced
+//
+// Returns:
+//
+//	true if additional .value access is needed due to the pointer being variable referenced
+func (a *Analysis) NeedsVarRefDeref(ptrType types.Type) bool {
+	// For now, return false - this would need more sophisticated analysis
+	// to track when pointer variables themselves are variable referenced
+	return false
 }
 
-// NeedsBoxedFieldAccess determines whether a pointer variable needs the .value
-// suffix when accessing fields (e.g., ptr.field).
+// NeedsVarRefFieldAccess determines whether a pointer variable needs the .value
+// access when performing field access through the pointer.
 //
-// Bug fix: This function was a major source of issues with struct field access.
-// The critical discovery was that field access through a pointer depends not on the
-// field itself, but on whether the pointer variable is boxed:
+// In Go, field access through pointers is automatically dereferenced:
 //
-//  1. For normal struct pointers (unboxed): No .value needed
-//     Example: let ptr = new MyStruct() => ptr.field
-//     (Common case from &MyStruct{} literals)
+//	ptr.Field  // equivalent to (*ptr).Field
 //
-//  2. For boxed struct pointers: Need .value to access the pointed-to struct
-//     Example: let ptrToVal = val (where val is boxed) => ptrToVal.value.field
+// In TypeScript, we need to determine if the pointer is:
+//  1. A simple pointer: ptr.Field  (no .value needed)
+//  2. A variable-referenced pointer: ptr.value.Field  (needs .value)
 //
-// We ultimately delegated this decision to WriteSelectorExpr which examines
-// the actual variable to determine if it's boxed, rather than just the type.
-func (a *Analysis) NeedsBoxedFieldAccess(ptrType types.Type) bool {
-	// If we don't have a valid pointer type, default to false
-	if ptrType == nil {
-		return false
-	}
-
-	// Unwrap the pointer to get the element type
-	ptrTypeUnwrapped, ok := ptrType.(*types.Pointer)
-	if !ok {
-		return false // Not a pointer type, no dereference needed for field access
-	}
-
-	// Check if the element is a struct (directly or via a named type)
-	elemType := ptrTypeUnwrapped.Elem()
-	if elemType == nil {
-		return false // Not pointing to anything
-	}
-
-	// For pointers to structs, check if it's a struct type first
-	_, isStruct := elemType.Underlying().(*types.Struct)
-	if !isStruct {
-		return false // Not a pointer to a struct
-	}
-
-	// The critical decision: We'll determine if .value is needed in the WriteSelectorExpr function
-	// by checking if the pointer variable itself is boxed.
-	// This allows us to handle both:
-	// - ptr := &MyStruct{} (unboxed, direct access)
-	// - ptrToVal := &val (boxed, needs .value)
+// Args:
+//
+//	ptrType: The pointer type being used for field access
+//
+// Returns:
+//
+//	true if .value access is needed before field access
+func (a *Analysis) NeedsVarRefFieldAccess(ptrType types.Type) bool {
+	// This would require analysis of the specific pointer variable
+	// For now, return false as a conservative default
 	return false
 }
 
@@ -479,7 +421,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 						if vr, ok := def.(*types.Var); ok {
 							v.currentReceiver = vr
 							// Add the receiver variable to the VariableUsage map
-							// to ensure it is properly analyzed for boxing
+							// to ensure it is properly analyzed for varRefing
 							v.getOrCreateUsageInfo(v.currentReceiver)
 						}
 					}
@@ -609,7 +551,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.UnaryExpr:
 		// We handle address-of (&) within AssignStmt where it's actually used.
 		// Standalone &x doesn't directly assign, but its usage in assignments
-		// or function calls determines boxing. Assignments are handled below.
+		// or function calls determines varRefing. Assignments are handled below.
 		// Function calls like foo(&x) would require different tracking if needed.
 		// For now, we focus on assignments as per the request.
 		return v
@@ -724,7 +666,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 
 			// 2. If RHS involved a source variable (rhsSourceObj is not nil),
 			//    record that this source variable was used (its destinations).
-			//    This is CRITICAL for boxing analysis (e.g., if &rhsSourceObj was assigned).
+			//    This is CRITICAL for varRefing analysis (e.g., if &rhsSourceObj was assigned).
 			if rhsSourceObj != nil {
 				sourceUsageInfo := v.getOrCreateUsageInfo(rhsSourceObj)
 				// The 'Object' in DestinationInfo is what/where rhsSourceObj (or its address) was assigned TO.
@@ -842,7 +784,7 @@ func (v *analysisVisitor) containsDefer(block *ast.BlockStmt) bool {
 }
 
 // AnalyzeFile analyzes a Go source file AST and populates the Analysis struct with information
-// that will be used during code generation to properly handle pointers, variables that need boxing, etc.
+// that will be used during code generation to properly handle pointers, variables that need varRefing, etc.
 func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap ast.CommentMap) {
 	// Store the comment map in the analysis object
 	analysis.Cmap = cmap

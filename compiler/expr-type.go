@@ -11,7 +11,7 @@ import (
 // It handles various Go type expressions:
 // - Basic types (e.g., int, string, bool) -> TypeScript primitives (number, string, boolean)
 // - Named types -> TypeScript class/interface names
-// - Pointer types (`*T`) -> `$.Box<T_ts> | null`
+// - Pointer types (`*T`) -> `$.VarRef<T_ts> | null`
 // - Slice types (`[]T`) -> `$.Slice<T_ts>`
 // - Array types (`[N]T`) -> `T_ts[]`
 // - Map types (`map[K]V`) -> `Map<K_ts, V_ts>`

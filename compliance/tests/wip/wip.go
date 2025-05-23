@@ -1,14 +1,21 @@
 package main
 
 func main() {
-	var x int = 10
+	// Create a simple integer
+	x := 10
 
-	var p1 *int = &x    // p1 is boxed as p2 takes its address
-	var p2 **int = &p1  // p2 is boxed as p3 takes its address
-	var p3 ***int = &p2 // p3 is not boxed as nothing takes its address
+	// p1 will be varrefed because its address is taken later
+	p1 := &x
 
-	println("**p3 ==", ***p3)
+	// p2 is not varrefed as nothing takes its address
+	p2 := &x
 
-	var q1 *int = &x       // q1 is not boxed as nothing takes its address
-	println("*q1 ==", *q1) // Should translate to q1!.value
+	// Take the address of p1 to make it varrefed
+	pp1 := &p1
+
+	// Compare the pointers - they should be different pointers
+	// but point to the same value
+	println("p1==p2:", p1 == p2)
+	println("*p1==*p2:", *p1 == *p2)
+	println("pp1 deref:", **pp1)
 }

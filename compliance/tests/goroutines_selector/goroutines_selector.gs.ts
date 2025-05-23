@@ -12,19 +12,19 @@ class Foo {
 	}
 
 	public _fields: {
-		done: $.Box<$.Channel<boolean> | null>;
+		done: $.VarRef<$.Channel<boolean> | null>;
 	}
 
 	constructor(init?: Partial<{done?: $.Channel<boolean> | null}>) {
 		this._fields = {
-			done: $.box(init?.done ?? null)
+			done: $.varRef(init?.done ?? null)
 		}
 	}
 
 	public clone(): Foo {
 		const cloned = new Foo()
 		cloned._fields = {
-			done: $.box(this._fields.done.value)
+			done: $.varRef(this._fields.done.value)
 		}
 		return cloned
 	}

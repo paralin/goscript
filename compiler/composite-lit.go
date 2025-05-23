@@ -13,27 +13,28 @@ import (
 //
 // It handles several types of composite literals:
 //   - Map literals (e.g., `map[K]V{k1: v1}`): Translated to `new Map([[k1_ts, v1_ts]])`.
-//     Values are processed by `writeBoxedValue`.
+//     Values are processed by `WriteVarRefedValue`.
 //   - Array/Slice literals (e.g., `[]T{e1, e2}`, `[N]T{idx: val}`):
 //   - For `[]byte{...}`, translated to `new Uint8Array([...])`.
 //   - For other `[]T` or `[N]T`, translated using the `$.arrayToSlice<T_ts>([...])` runtime helper.
 //     It handles both keyed and unkeyed elements, infers length if necessary,
 //     and uses zero values for uninitialized array elements.
 //     Multi-dimensional arrays/slices pass a depth parameter to `$.arrayToSlice`.
-//     Element values are processed by `writeBoxedValue`.
+//     Element values are processed by `WriteVarRefedValue`.
 //   - Struct literals:
 //   - Named structs (e.g., `MyStruct{F: v}` or `&MyStruct{F: v}`): Translated to
 //     `new MyStruct_ts({ F: v_ts, ... })`. The constructor typically uses an `_init` method.
 //   - Anonymous structs (e.g., `struct{F int}{F: v}`): Translated to TypeScript
 //     object literals `{ F: v_ts, ... }`.
 //     It processes keyed elements (`FieldName: Value`) and unkeyed elements (for anonymous
-//     structs or arrays). Field values are processed by `writeBoxedValue`.
+//     structs or arrays). Field values are processed by `WriteVarRefedValue`.
 //     Embedded struct fields are initialized, and explicit initializers for embedded
 //     structs (e.g. `Outer{InnerField: InnerType{...}}`) are handled.
-//     The function uses `c.analysis` to determine correct value access (e.g., `.value` for boxed fields).
+//     The function uses `c.analysis` to determine correct value access (e.g., `.value` for var-refed fields).
 func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 	// Get the type of the composite literal
 	litType := c.pkg.TypesInfo.TypeOf(exp)
+
 	if exp.Type != nil {
 		// Handle map literals: map[K]V{k1: v1, k2: v2}
 		if _, isMapType := exp.Type.(*ast.MapType); isMapType {
@@ -47,11 +48,11 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 				if kv, ok := elm.(*ast.KeyValueExpr); ok {
 					c.tsw.WriteLiterally("[")
-					if err := c.WriteBoxedValue(kv.Key); err != nil {
+					if err := c.WriteVarRefedValue(kv.Key); err != nil {
 						return fmt.Errorf("failed to write map literal key: %w", err)
 					}
 					c.tsw.WriteLiterally(", ")
-					if err := c.WriteBoxedValue(kv.Value); err != nil {
+					if err := c.WriteVarRefedValue(kv.Value); err != nil {
 						return fmt.Errorf("failed to write map literal value: %w", err)
 					}
 					c.tsw.WriteLiterally("]")
@@ -139,7 +140,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						hasKeyedElements = true
 					} else {
 						c.tsw.WriteCommentInline("unhandled keyed array literal key type")
-						if err := c.WriteBoxedValue(elm); err != nil {
+						if err := c.WriteVarRefedValue(elm); err != nil {
 							return fmt.Errorf("failed to write keyed array literal element with unhandled key type: %w", err)
 						}
 					}
@@ -167,7 +168,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					c.tsw.WriteLiterally(", ")
 				}
 				if elm, ok := elements[i]; ok && elm != nil {
-					if err := c.WriteBoxedValue(elm); err != nil {
+					if err := c.WriteVarRefedValue(elm); err != nil {
 						return fmt.Errorf("failed to write array literal element: %w", err)
 					}
 				} else {
@@ -340,7 +341,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					}
 					c.tsw.WriteLiterally(keyName)
 					c.tsw.WriteLiterally(": ")
-					if err := c.WriteBoxedValue(directFields[keyName]); err != nil {
+					if err := c.WriteVarRefedValue(directFields[keyName]); err != nil {
 						return err
 					}
 					firstFieldWritten = true
@@ -368,14 +369,14 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 							if i > 0 {
 								c.tsw.WriteLiterally(", ")
 							}
-							if err := c.WriteBoxedValue(elem); err != nil {
+							if err := c.WriteVarRefedValue(elem); err != nil {
 								return err
 							}
 						}
 						c.tsw.WriteLiterally("}")
 					} else {
 						// Not a composite literal, write it normally
-						if err := c.WriteBoxedValue(explicitEmbedded[embeddedName]); err != nil {
+						if err := c.WriteVarRefedValue(explicitEmbedded[embeddedName]); err != nil {
 							return err
 						}
 					}
@@ -414,7 +415,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						}
 						c.tsw.WriteLiterally(keyName) // Field name within the embedded struct
 						c.tsw.WriteLiterally(": ")
-						if err := c.WriteBoxedValue(fieldsMap[keyName]); err != nil {
+						if err := c.WriteVarRefedValue(fieldsMap[keyName]); err != nil {
 							return err
 						}
 					}
@@ -436,7 +437,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					if i != 0 {
 						c.tsw.WriteLiterally(", ")
 					}
-					if err := c.WriteBoxedValue(elm); err != nil {
+					if err := c.WriteVarRefedValue(elm); err != nil {
 						return fmt.Errorf("failed to write literal field: %w", err)
 					}
 				}
@@ -448,60 +449,124 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 	// Untyped composite literal. Let's use type information to determine what it is.
 	// First try to get the type information for the expression
-	isObject := false
 	if tv, ok := c.pkg.TypesInfo.Types[exp]; ok && tv.Type != nil {
 		underlying := tv.Type.Underlying()
 		switch underlying.(type) {
 		case *types.Map, *types.Struct:
-			isObject = true
+			// Handle struct directly with the struct literal logic
+			if structType, ok := underlying.(*types.Struct); ok {
+				return c.writeUntypedStructLiteral(exp, structType) // true = anonymous
+			}
+			// Map case would be handled here
+			return fmt.Errorf("untyped map composite literals not yet supported")
 		case *types.Array, *types.Slice:
-			isObject = false
+			// Handle array/slice
+			return c.writeUntypedArrayLiteral(exp)
+		case *types.Pointer:
+			// Handle pointer to composite literal
+			ptrType := underlying.(*types.Pointer)
+			elemType := ptrType.Elem().Underlying()
+			switch elemType.(type) {
+			case *types.Struct:
+				// This is an anonymous struct literal with inferred pointer type
+				// Just create the struct object directly - no var-refing needed
+				// Anonymous literals are not variables, so they don't get var-refed
+				structType := elemType.(*types.Struct)
+				return c.writeUntypedStructLiteral(exp, structType) // true = anonymous
+			default:
+				return fmt.Errorf("unhandled pointer composite literal element type: %T", elemType)
+			}
 		default:
 			return fmt.Errorf("unhandled composite literal type: %T", underlying)
 		}
 	} else {
 		return fmt.Errorf("could not determine composite literal type from type information")
 	}
+}
 
-	if isObject {
-		c.tsw.WriteLiterally("{ ")
-	} else {
-		c.tsw.WriteLiterally("[ ")
-	}
-
+// writeUntypedArrayLiteral handles untyped composite literals that are arrays/slices
+func (c *GoToTSCompiler) writeUntypedArrayLiteral(exp *ast.CompositeLit) error {
+	c.tsw.WriteLiterally("[ ")
 	for i, elm := range exp.Elts {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		if err := c.WriteBoxedValue(elm); err != nil {
-			return fmt.Errorf("failed to write untyped composite literal element: %w", err)
+		if err := c.WriteVarRefedValue(elm); err != nil {
+			return fmt.Errorf("failed to write untyped array literal element: %w", err)
 		}
 	}
-	if isObject {
-		c.tsw.WriteLiterally(" }")
-	} else {
-		c.tsw.WriteLiterally(" ]")
-	}
+	c.tsw.WriteLiterally(" ]")
 	return nil
 }
 
-// WriteBoxedValue translates a Go expression (`ast.Expr`) into its TypeScript equivalent,
+// writeUntypedStructLiteral handles untyped composite literals that are structs or pointers to structs
+func (c *GoToTSCompiler) writeUntypedStructLiteral(exp *ast.CompositeLit, structType *types.Struct) error {
+	// Create field mapping like the typed struct case
+	directFields := make(map[string]ast.Expr)
+
+	// Handle elements that are key-value pairs
+	for _, elt := range exp.Elts {
+		if kv, ok := elt.(*ast.KeyValueExpr); ok {
+			if keyIdent, ok := kv.Key.(*ast.Ident); ok {
+				directFields[keyIdent.Name] = kv.Value
+			}
+		}
+	}
+
+	// Handle elements that are positional (no key specified)
+	if len(directFields) == 0 {
+		// If no key-value pairs, try to match positional values to struct fields
+		for i, elt := range exp.Elts {
+			if _, isKV := elt.(*ast.KeyValueExpr); !isKV && i < structType.NumFields() {
+				field := structType.Field(i)
+				directFields[field.Name()] = elt
+			}
+		}
+	}
+
+	// Write the object literal (always anonymous for untyped)
+	c.tsw.WriteLiterally("{")
+
+	firstFieldWritten := false
+	// Write fields in order
+	directKeys := make([]string, 0, len(directFields))
+	for k := range directFields {
+		directKeys = append(directKeys, k)
+	}
+	slices.Sort(directKeys)
+	for _, keyName := range directKeys {
+		if firstFieldWritten {
+			c.tsw.WriteLiterally(", ")
+		}
+		c.tsw.WriteLiterally(keyName)
+		c.tsw.WriteLiterally(": ")
+		if err := c.WriteVarRefedValue(directFields[keyName]); err != nil {
+			return err
+		}
+		firstFieldWritten = true
+	}
+
+	c.tsw.WriteLiterally("}")
+	return nil
+}
+
+// WriteVarRefedValue translates a Go expression (`ast.Expr`) into its TypeScript equivalent,
 // specifically for use as a value within a composite literal (e.g., struct fields,
 // map keys/values, or array/slice elements). Its primary goal is to ensure that the
-// actual, unboxed value of the expression is used.
+// actual un-refed value of the expression is used.
 //
 // How it works:
 //   - Identifiers (`*ast.Ident`): Delegates to `c.WriteIdent(ident, true)`, forcing
 //     the `accessValue` flag to `true`. This ensures that if `ident` refers to a
-//     GoScript boxed variable, the generated TypeScript accesses its underlying `.value`
+//     GoScript var-refed variable, the generated TypeScript accesses its underlying `.value`
 //     (e.g., `myVar.value`).
 //   - Selector Expressions (`*ast.SelectorExpr`, e.g., `obj.Field`): Delegates to
 //     `c.WriteSelectorExpr(e)`. This function handles the necessary logic for
-//     accessing fields or methods, including any required unboxing if the field
-//     itself or the object it's accessed on is boxed (e.g., `obj.value.field` or
+//     accessing fields or methods, including any required un-var-refing if the field
+//     itself or the object it's accessed on is var-refed (e.g., `obj.value.field` or
 //     `obj.field.value`).
 //   - Star Expressions (`*ast.StarExpr`, e.g., `*ptr`): Delegates to `c.WriteStarExpr(e)`.
-//     This function handles pointer dereferencing, which in GoScript's boxing model
+//     This function handles pointer dereferencing, which in GoScript's var-refing model
 //     often translates to accessing the `.value` field of the pointer (e.g., `ptr.value`).
 //   - Basic Literals (`*ast.BasicLit`, e.g., `123`, `"hello"`): Delegates to
 //     `c.WriteBasicLit(e)` for direct translation.
@@ -511,25 +576,25 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 //
 // Necessity and Distinction from `WriteValueExpr`:
 // While `WriteValueExpr` is a general-purpose function for translating Go expressions
-// and also unboxes identifiers (by calling `WriteIdent` with `accessValue: true`),
-// `WriteBoxedValue` serves a specific and crucial role when called from `WriteCompositeLit`:
+// and also un-var-refes identifiers (by calling `WriteIdent` with `accessValue: true`),
+// `WriteVarRefedValue` serves a specific and crucial role when called from `WriteCompositeLit`:
 //  1. Clarity of Intent: It explicitly signals that for the constituents of a composite
-//     literal, the *unboxed value* is mandatory.
+//     literal, the *un-var-refed value* is mandatory.
 //  2. Contract for `WriteCompositeLit`: It ensures that `WriteCompositeLit` receives
 //     the correct values for initialization, insulating it from potential changes in
-//     the default behavior of `WriteValueExpr` regarding unboxing.
+//     the default behavior of `WriteValueExpr` regarding un-var-refing.
 //  3. Prevents Recursion: `WriteValueExpr` handles `*ast.CompositeLit` nodes by
 //     calling `WriteCompositeLit`. If `WriteCompositeLit` were to directly call
 //     `WriteValueExpr` for its elements, it could lead to unintended recursion or
-//     behavior if an element itself was another composite literal. `WriteBoxedValue`
+//     behavior if an element itself was another composite literal. `WriteVarRefedValue`
 //     acts as a specific intermediary for the *elements*.
 //
-// In summary, `WriteBoxedValue` is a specialized dispatcher used by `WriteCompositeLit`
+// In summary, `WriteVarRefedValue` is a specialized dispatcher used by `WriteCompositeLit`
 // to guarantee that all parts of a Go composite literal are initialized with their
-// proper, unboxed TypeScript values.
-func (c *GoToTSCompiler) WriteBoxedValue(expr ast.Expr) error {
+// proper, unrefed TypeScript values.
+func (c *GoToTSCompiler) WriteVarRefedValue(expr ast.Expr) error {
 	if expr == nil {
-		return fmt.Errorf("nil expression passed to writeBoxedValue")
+		return fmt.Errorf("nil expression passed to write var refed value")
 	}
 
 	// Handle different expression types

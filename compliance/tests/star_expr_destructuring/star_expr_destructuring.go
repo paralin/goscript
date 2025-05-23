@@ -8,7 +8,7 @@ func main() {
 	var a int = 0
 	var b string = ""
 
-	// Create pointers - these will be properly boxed
+	// Create pointers - these will be properly varrefed
 	var pA *int = &a
 	var pB *string = &b
 

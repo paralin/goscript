@@ -16,7 +16,7 @@ const (
 	GoTypeContextGeneral GoTypeContext = iota
 	// GoTypeContextFunctionReturn is used when translating types for function return values.
 	// In this context, pointer-to-struct types become `ClassName | null` instead of
-	// `$.Box<ClassName> | null` because function return values cannot be addressed.
+	// `$.VarRef<ClassName> | null` because function return values cannot be addressed.
 	GoTypeContextFunctionReturn
 )
 
@@ -27,7 +27,7 @@ const (
 // The context parameter controls how certain types (especially pointers) are handled:
 //   - GoTypeContextGeneral: Standard type translation
 //   - GoTypeContextFunctionReturn: Special handling for function return types where
-//     pointer-to-struct types become `ClassName | null` instead of `$.Box<ClassName> | null`
+//     pointer-to-struct types become `ClassName | null` instead of `$.VarRef<ClassName> | null`
 //
 // It handles nil types as 'any' with a comment, and dispatches to appropriate
 // type-specific writers for all other recognized Go types.
@@ -47,7 +47,7 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 		if context == GoTypeContextFunctionReturn {
 			c.writePointerTypeForFunctionReturn(t)
 		} else {
-			c.WritePointerType(t)
+			c.WritePointerType(t, context)
 		}
 	case *types.Slice:
 		c.WriteSliceType(t)
@@ -78,7 +78,7 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 // writePointerTypeForFunctionReturn translates a Go pointer type (*T) to its TypeScript
 // equivalent for function return types. Unlike WritePointerType, this function
 // handles pointer-to-struct types specially: they become `ClassName | null` instead
-// of `$.Box<ClassName> | null` because function return values cannot be addressed.
+// of `$.VarRef<ClassName> | null` because function return values cannot be addressed.
 func (c *GoToTSCompiler) writePointerTypeForFunctionReturn(t *types.Pointer) {
 	elemType := t.Elem()
 
@@ -93,8 +93,8 @@ func (c *GoToTSCompiler) writePointerTypeForFunctionReturn(t *types.Pointer) {
 		c.WriteGoType(elemType, GoTypeContextFunctionReturn)
 		c.tsw.WriteLiterally(" | null")
 	} else {
-		// For pointer-to-primitive in function returns, still use boxing
-		c.tsw.WriteLiterally("$.Box<")
+		// For pointer-to-primitive in function returns, still use varRefing
+		c.tsw.WriteLiterally("$.VarRef<")
 		c.WriteGoType(elemType, GoTypeContextFunctionReturn)
 		c.tsw.WriteLiterally("> | null")
 	}
@@ -227,11 +227,36 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 }
 
 // WritePointerType translates a Go pointer type (*T) to its TypeScript equivalent.
-// It generates $.Box<T_ts> | null, where T_ts is the translated element type.
-func (c *GoToTSCompiler) WritePointerType(t *types.Pointer) {
-	c.tsw.WriteLiterally("$.Box<")
-	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
-	c.tsw.WriteLiterally("> | null") // Pointers are always nullable
+func (c *GoToTSCompiler) WritePointerType(t *types.Pointer, context GoTypeContext) {
+	elemGoType := t.Elem()
+	underlyingElemGoType := elemGoType.Underlying()
+
+	// Handle pointers to functions: *func(...) -> func(...) | null
+	if _, isSignature := underlyingElemGoType.(*types.Signature); isSignature {
+		c.WriteGoType(elemGoType, context) // Write the function signature itself, pass context
+		c.tsw.WriteLiterally(" | null")    // Function pointers are nullable
+		return
+	}
+
+	// Handle pointers to structs or interfaces: *MyStruct -> MyStruct | null
+	_, isStruct := underlyingElemGoType.(*types.Struct)
+	_, isInterface := underlyingElemGoType.(*types.Interface)
+
+	if isStruct || isInterface {
+		// For pointers to structs or interfaces, the TS type is StructName | null or InterfaceName | null.
+		// This aligns with VAR_REFS.md and JS/TS object reference semantics.
+		// TODO If the target variable is boxed, we have to wrap with VarRef as well?
+		c.WriteGoType(elemGoType, context) // Write the struct/interface type directly, pass context
+		c.tsw.WriteLiterally(" | null")
+	} else {
+		// For pointers to other types (primitives, slices, maps, other pointers like **MyStruct),
+		// they are generally represented as $.VarRef<T_ts> | null.
+		// Example: *int -> $.VarRef<number> | null
+		// Example: **MyStruct -> $.VarRef<MyStruct | null> | null (recursive call handles inner part)
+		c.tsw.WriteLiterally("$.VarRef<")
+		c.WriteGoType(elemGoType, context) // Translate element type, pass context
+		c.tsw.WriteLiterally("> | null")   // Pointers are always nullable
+	}
 }
 
 // WriteSliceType translates a Go slice type ([]T) to its TypeScript equivalent.

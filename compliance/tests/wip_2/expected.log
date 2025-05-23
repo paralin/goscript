@@ -1,0 +1,7 @@
+p1==p2: true
+*p1==*p2: true
+p1==p3: true
+Value through ppp1: 10
+pp1==savedPP1: true
+**pp1: 10
+**savedPP1: 10

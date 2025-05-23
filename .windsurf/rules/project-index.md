@@ -5,187 +5,203 @@ trigger: always_on
 The following is an overview of the functions within the `compiler` package.
 
 ## analysis.go
-- `NewAnalysis`
-- `NeedsDefer`
-- `IsInAsyncFunction`
-- `IsAsyncFunc`
-- `IsFuncLitAsync`
-- `NeedsBoxed`
-- `NeedsBoxedAccess`
-- `NeedsBoxedDeref`
-- `NeedsBoxedFieldAccess`
-- `getOrCreateUsageInfo`
-- `Visit`
-- `containsAsyncOperations`
-- `containsDefer`
-- `AnalyzeFile`
+- `NewAnalysis() *Analysis`
+- `(a *Analysis) NeedsDefer(node ast.Node) bool`
+- `(a *Analysis) IsInAsyncFunction(node ast.Node) bool`
+- `(a *Analysis) IsAsyncFunc(obj types.Object) bool`
+- `(a *Analysis) IsFuncLitAsync(funcLit *ast.FuncLit) bool`
+- `(a *Analysis) NeedsVarRef(obj types.Object) bool`
+- `(a *Analysis) NeedsVarRefAccess(obj types.Object) bool`
+- `(a *Analysis) NeedsVarRefDeref(ptrType types.Type) bool`
+- `(a *Analysis) NeedsVarRefFieldAccess(ptrType types.Type) bool`
+- `(v *analysisVisitor) getOrCreateUsageInfo(obj types.Object) *VariableUsageInfo`
+- `(v *analysisVisitor) Visit(node ast.Node) ast.Visitor`
+- `(v *analysisVisitor) containsAsyncOperations(node ast.Node) bool`
+- `(v *analysisVisitor) containsDefer(block *ast.BlockStmt) bool`
+- `(v *analysisVisitor) getNamedReturns(funcDecl *ast.FuncDecl) []string`
+- `AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap ast.CommentMap)`
 
 ## assignment.go
-- `writeAssignmentCore`
-- `shouldApplyClone`
+- `(c *GoToTSCompiler) writeAssignmentCore(lhs []ast.Expr, rhs []ast.Expr, tok token.Token, addDeclaration bool) error`
+- `shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool`
 
 ## code-writer.go
-- `NewTSCodeWriter`
-- `WriteLinePreamble`
-- `WriteLine`
-- `WriteLinef`
-- `Indent`
-- `WriteImport`
-- `WriteCommentLine`
-- `WriteCommentLinef`
-- `WriteCommentInline`
-- `WriteCommentInlinef`
-- `WriteLiterally`
-- `WriteLiterallyf`
-- `WriteSectionTail`
+- `NewTSCodeWriter(w io.Writer) *TSCodeWriter`
+- `(w *TSCodeWriter) WriteLinePreamble()`
+- `(w *TSCodeWriter) WriteLine(line string)`
+- `(w *TSCodeWriter) WriteLinef(line string, args ...any)`
+- `(w *TSCodeWriter) Indent(count int)`
+- `(w *TSCodeWriter) WriteImport(symbolName string, importPath string)`
+- `(w *TSCodeWriter) WriteCommentLine(commentText string)`
+- `(w *TSCodeWriter) WriteCommentLinef(format string, args ...any)`
+- `(w *TSCodeWriter) WriteCommentInline(commentText string)`
+- `(w *TSCodeWriter) WriteCommentInlinef(format string, args ...any)`
+- `(w *TSCodeWriter) WriteLiterally(literal string)`
+- `(w *TSCodeWriter) WriteLiterallyf(literal string, args ...any)`
+- `(w *TSCodeWriter) WriteSectionTail()`
 
 ## compiler.go
-- `NewCompiler`
-- `CompilePackages`
-- `NewPackageCompiler`
-- `Compile`
-- `generateIndexFile`
-- `CompileFile`
-- `NewFileCompiler`
-- `Compile`
-- `NewGoToTSCompiler`
-- `WriteIdent`
-- `WriteCaseClause`
-- `writeChannelReceiveWithOk`
-- `WriteDoc`
+- `NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compiler, error)`
+- `(c *Compiler) CompilePackages(ctx context.Context, patterns ...string) error`
+- `NewPackageCompiler(le *logrus.Entry, compilerConf *Config, pkg *packages.Package) (*PackageCompiler, error)`
+- `(c *PackageCompiler) Compile(ctx context.Context) error`
+- `(c *PackageCompiler) generateIndexFile(compiledFiles []string) error`
+- `(p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File) error`
+- `NewFileCompiler(compilerConf *Config, pkg *packages.Package, astFile *ast.File, fullPath string, analysis *Analysis) (*FileCompiler, error)`
+- `(c *FileCompiler) Compile(ctx context.Context) error`
+- `NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analysis) *GoToTSCompiler`
+- `(c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool)`
+- `(c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) error`
+- `(c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *ast.UnaryExpr, tok token.Token) error`
+- `(c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup)`
 
 ## compiler_test.go
-- `TestCompliance`
+- `TestCompliance(t *testing.T)`
+- `getParentGoModulePath() (string, error)`
 
 ## composite-lit.go
-- `WriteCompositeLit`
-- `WriteBoxedValue`
+- `(c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error`
+- `(c *GoToTSCompiler) writeUntypedArrayLiteral(exp *ast.CompositeLit) error`
+- `(c *GoToTSCompiler) writeUntypedStructLiteral(exp *ast.CompositeLit, structType *types.Struct, isAnonymous bool) error`
+- `(c *GoToTSCompiler) WriteVarRefedValue(expr ast.Expr) error`
 
 ## config.go
-- `Validate`
+- `(c *Config) Validate() error`
 
 ## config_test.go
-- `TestConfigValidate`
-- `TestConfigFields`
+- `TestConfigValidate(t *testing.T)`
+- `TestConfigFields(t *testing.T)`
 
 ## decl.go
-- `WriteDecls`
-- `WriteFuncDeclAsFunction`
-- `WriteFuncDeclAsMethod`
+- `(c *GoToTSCompiler) WriteDecls(decls []ast.Decl) error`
+- `(c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error`
+- `(c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error`
 
 ## expr.go
-- `WriteIndexExpr`
-- `WriteTypeAssertExpr`
-- `isPointerComparison`
-- `getTypeNameString`
-- `WriteBinaryExpr`
-- `WriteUnaryExpr`
-- `WriteSliceExpr`
-- `WriteKeyValueExpr`
+- `(c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error`
+- `(c *GoToTSCompiler) WriteIndexListExpr(exp *ast.IndexListExpr) error`
+- `(c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error`
+- `(c *GoToTSCompiler) isPointerComparison(exp *ast.BinaryExpr) bool`
+- `(c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string`
+- `(c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error`
+- `(c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error`
+- `(c *GoToTSCompiler) WriteSliceExpr(exp *ast.SliceExpr) error`
+- `(c *GoToTSCompiler) WriteKeyValueExpr(exp *ast.KeyValueExpr) error`
 
 ## expr-call.go
-- `WriteCallExpr`
+- `(c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error`
 
 ## expr-selector.go
-- `WriteSelectorExpr`
+- `(c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error`
 
 ## expr-star.go
-- `WriteStarExpr`
+- `(c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error`
 
 ## expr-type.go
-- `WriteTypeExpr`
-- `writeTypeDescription`
+- `(c *GoToTSCompiler) WriteTypeExpr(a ast.Expr)`
+- `(c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr)`
 
 ## expr-value.go
-- `WriteValueExpr`
+- `(c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error`
 
 ## field.go
-- `WriteFieldList`
-- `WriteField`
+- `(c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool)`
+- `(c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool)`
+
+## index.ts
+- `compile(config: CompileConfig): Promise<void>`
 
 ## lit.go
-- `WriteBasicLit`
-- `WriteFuncLitValue`
+- `(c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit)`
+- `(c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error`
 
 ## output.go
-- `ComputeModulePath`
-- `translateGoPathToTypescriptPath`
-- `packageNameFromGoPath`
-- `TranslateGoFilePathToTypescriptFilePath`
+- `ComputeModulePath(outputRoot string, goPkg string) string`
+- `translateGoPathToTypescriptPath(goImportPath string) string`
+- `packageNameFromGoPath(goPkgPath string) string`
+- `TranslateGoFilePathToTypescriptFilePath(goPkgPath string, goCodeFilename string) string`
 
 ## primitive.go
-- `isPrimitiveType`
-- `GoBuiltinToTypescript`
-- `TokenToTs`
+- `isPrimitiveType(name string) bool`
+- `GoBuiltinToTypescript(typeName string) (string, bool)`
+- `TokenToTs(tok token.Token) (string, bool)`
 
 ## spec.go
-- `WriteSpec`
-- `getEmbeddedFieldKeyName`
-- `writeGetterSetter`
-- `writeBoxedFieldInitializer`
-- `writeClonedFieldInitializer`
-- `WriteTypeSpec`
-- `WriteInterfaceTypeSpec`
-- `WriteImportSpec`
+- `(c *GoToTSCompiler) WriteSpec(a ast.Spec) error`
+- `(c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string`
+- `(c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Type, doc *ast.CommentGroup, comment *ast.CommentGroup)`
+- `(c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool)`
+- `(c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool)`
+- `(c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error`
+- `(c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.InterfaceType) error`
+- `(c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec)`
 
 ## spec-struct.go
-- `WriteStructTypeSpec`
-- `generateFlattenedInitTypeString`
+- `(c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType) error`
+- `(c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named) string`
 
 ## spec-value.go
-- `WriteValueSpec`
+- `(c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error`
 
 ## stmt.go
-- `WriteStmt`
-- `WriteStmtDecl`
-- `WriteStmtIncDec`
-- `WriteStmtBranch`
-- `WriteStmtGo`
-- `WriteStmtExpr`
-- `WriteStmtSend`
-- `WriteStmtIf`
-- `WriteStmtReturn`
-- `WriteStmtBlock`
-- `WriteStmtSwitch`
-- `WriteStmtDefer`
+- `(c *GoToTSCompiler) WriteStmt(a ast.Stmt) error`
+- `(c *GoToTSCompiler) WriteStmtDecl(stmt *ast.DeclStmt) error`
+- `(c *GoToTSCompiler) WriteStmtIncDec(stmt *ast.IncDecStmt) error`
+- `(c *GoToTSCompiler) WriteStmtBranch(stmt *ast.BranchStmt) error`
+- `(c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error`
+- `(c *GoToTSCompiler) WriteStmtExpr(exp *ast.ExprStmt) error`
+- `(c *GoToTSCompiler) WriteStmtSend(exp *ast.SendStmt) error`
+- `(c *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error`
+- `(c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error`
+- `(c *GoToTSCompiler) WriteStmtBlock(exp *ast.BlockStmt, suppressNewline bool) error`
+- `(c *GoToTSCompiler) WriteStmtSwitch(exp *ast.SwitchStmt) error`
+- `(c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error`
+- `(c *GoToTSCompiler) WriteStmtLabeled(stmt *ast.LabeledStmt) error`
 
 ## stmt-assign.go
-- `WriteStmtAssign`
+- `(c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error`
+- `(c *GoToTSCompiler) writeInlineComment(node ast.Node)`
 
 ## stmt-for.go
-- `WriteStmtFor`
-- `WriteStmtForInit`
-- `WriteStmtForPost`
+- `(c *GoToTSCompiler) WriteStmtFor(exp *ast.ForStmt) error`
+- `(c *GoToTSCompiler) WriteStmtForInit(stmt ast.Stmt) error`
+- `(c *GoToTSCompiler) WriteStmtForPost(stmt ast.Stmt) error`
 
 ## stmt-range.go
-- `WriteStmtRange`
+- `(c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error`
 
 ## stmt-select.go
-- `WriteStmtSelect`
+- `(c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error`
 
 ## stmt-type-switch.go
-- `WriteStmtTypeSwitch`
+- `(c *GoToTSCompiler) WriteStmtTypeSwitch(stmt *ast.TypeSwitchStmt) error`
 
 ## type.go
-- `WriteGoType`
-- `WriteZeroValueForType`
-- `WriteBasicType`
-- `WriteNamedType`
-- `WritePointerType`
-- `WriteSliceType`
-- `WriteArrayType`
-- `WriteMapType`
-- `WriteChannelType`
-- `WriteFuncType`
-- `WriteInterfaceType`
-- `WriteSignatureType`
-- `writeInterfaceStructure`
-- `getTypeString`
-- `WriteStructType`
+- `(c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext)`
+- `(c *GoToTSCompiler) writePointerTypeForFunctionReturn(t *types.Pointer)`
+- `(c *GoToTSCompiler) WriteZeroValueForType(typ any)`
+- `(c *GoToTSCompiler) WriteBasicType(t *types.Basic)`
+- `(c *GoToTSCompiler) WriteNamedType(t *types.Named)`
+- `(c *GoToTSCompiler) WritePointerType(t *types.Pointer)`
+- `(c *GoToTSCompiler) WriteSliceType(t *types.Slice)`
+- `(c *GoToTSCompiler) WriteArrayType(t *types.Array)`
+- `(c *GoToTSCompiler) WriteMapType(t *types.Map)`
+- `(c *GoToTSCompiler) WriteChannelType(t *types.Chan)`
+- `(c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool)`
+- `(c *GoToTSCompiler) WriteInterfaceType(t *types.Interface, astNode *ast.InterfaceType)`
+- `(c *GoToTSCompiler) WriteSignatureType(t *types.Signature)`
+- `(c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode *ast.InterfaceType)`
+- `(c *GoToTSCompiler) getTypeString(goType types.Type) string`
+- `(c *GoToTSCompiler) WriteStructType(t *types.Struct)`
+- `(c *GoToTSCompiler) WriteTypeParameters(typeParams *ast.FieldList)`
+- `(c *GoToTSCompiler) WriteTypeConstraint(constraint ast.Expr)`
 
 ## type-assert.go
-- `writeTypeAssert`
+- `(c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.TypeAssertExpr, tok token.Token) error`
 
 ## type-info.go
-- `writeTypeInfoObject`
-- `writeMethodSignatures`
+- `(c *GoToTSCompiler) writeTypeInfoObject(typ types.Type)`
+- `(c *GoToTSCompiler) writeMethodSignatures(methods []*types.Func)`
+
+
+This concludes the list of files in the compiler/ directory.

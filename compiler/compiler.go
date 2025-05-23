@@ -287,7 +287,7 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 // CompileFile handles the compilation of a single Go source file to TypeScript.
 // It first performs a pre-compilation analysis of the file using `AnalyzeFile`
 // to gather information necessary for accurate TypeScript generation (e.g.,
-// about boxing, async functions, defer statements).
+// about varRefing, async functions, defer statements).
 // Then, it creates a `FileCompiler` instance for the file and invokes its
 // `Compile` method to generate the TypeScript code.
 func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File) error {
@@ -382,7 +382,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 // GoToTSCompiler is the core component responsible for translating Go AST nodes
 // and type information into TypeScript code. It uses a `TSCodeWriter` to output
 // the generated TypeScript and relies on `Analysis` data to make informed
-// decisions about code generation (e.g., boxing, async behavior).
+// decisions about code generation (e.g., varRefing, async behavior).
 type GoToTSCompiler struct {
 	tsw *TSCodeWriter
 
@@ -408,14 +408,12 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 // variable, function name) into its TypeScript equivalent.
 //   - If the identifier is `nil`, it writes `null`.
 //   - Otherwise, it writes the identifier's name.
-//   - If `accessBoxedValue` is true and the analysis (`c.analysis.NeedsBoxedAccess`)
-//     indicates that this identifier refers to a variable whose value is stored
-//     in a box (due to its address being taken or other boxing requirements),
-//     it appends `.value` to access the actual value from the box.
+//   - If `accessVarRefedValue` is true and the analysis (`c.analysis.NeedsVarRefAccess`)
+//     indicates the variable is variable referenced, `.value` is appended to access the contained value.
 //
 // This function relies on `go/types` (`TypesInfo.Uses` or `Defs`) to resolve
-// the identifier and the `Analysis` data to determine boxing needs.
-func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
+// the identifier and the `Analysis` data to determine varRefing needs.
+func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool) {
 	if exp.Name == "nil" {
 		c.tsw.WriteLiterally("null")
 		return
@@ -432,7 +430,7 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
 	c.tsw.WriteLiterally(exp.Name)
 
 	// Determine if we need to access .value based on analysis data
-	if obj != nil && accessBoxedValue && c.analysis.NeedsBoxedAccess(obj) {
+	if obj != nil && accessVarRefedValue && c.analysis.NeedsVarRefAccess(obj) {
 		c.tsw.WriteLiterally("!.value")
 	}
 }
