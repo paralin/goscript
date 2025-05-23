@@ -29,7 +29,10 @@ var goToTypescriptPrimitives = map[string]string{
 	"int16": "number",
 	"int32": "number",
 	"rune":  "number", // alias for int32
-	"int64": "bigint", // Requires TypeScript target >= ES2020
+
+	// TODO: add bigint support
+	// "int64": "bigint", // Requires TypeScript target >= ES2020
+	"int64": "number",
 
 	// Unsigned Integers
 	"uint":   "number",
@@ -37,7 +40,10 @@ var goToTypescriptPrimitives = map[string]string{
 	"byte":   "number",
 	"uint16": "number",
 	"uint32": "number",
-	"uint64": "bigint", // Requires TypeScript target >= ES2020
+
+	// TODO: add bigint support
+	// "uint64": "bigint", // Requires TypeScript target >= ES2020
+	"uint64": "number",
 
 	// Floating Point Numbers
 	"float32": "number",
