@@ -28,6 +28,8 @@ import (
 //   - Go statements (`ast.GoStmt`): `WriteStmtGo`.
 //   - Select statements (`ast.SelectStmt`): `WriteStmtSelect`.
 //   - Branch statements (`ast.BranchStmt`): `WriteStmtBranch`.
+//   - Type switch statements (`ast.TypeSwitchStmt`): `WriteStmtTypeSwitch`.
+//   - Labeled statements (`ast.LabeledStmt`): `WriteStmtLabeled`.
 //
 // If an unknown statement type is encountered, it returns an error.
 func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
@@ -108,6 +110,10 @@ func (c *GoToTSCompiler) WriteStmt(a ast.Stmt) error {
 	case *ast.TypeSwitchStmt:
 		if err := c.WriteStmtTypeSwitch(exp); err != nil {
 			return fmt.Errorf("failed to write type switch statement: %w", err)
+		}
+	case *ast.LabeledStmt:
+		if err := c.WriteStmtLabeled(exp); err != nil {
+			return fmt.Errorf("failed to write labeled statement: %w", err)
 		}
 	default:
 		return errors.Errorf("unknown statement: %#v\n", a)
@@ -818,6 +824,21 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("});")
+
+	return nil
+}
+
+// WriteStmtLabeled handles labeled statements (ast.LabeledStmt), such as "label: statement".
+// In TypeScript, this translates to "label: statement" directly.
+func (c *GoToTSCompiler) WriteStmtLabeled(stmt *ast.LabeledStmt) error {
+	// Write the label name followed by a colon
+	c.tsw.WriteLiterally(stmt.Label.Name)
+	c.tsw.WriteLiterally(": ")
+
+	// Write the labeled statement
+	if err := c.WriteStmt(stmt.Stmt); err != nil {
+		return fmt.Errorf("failed to write labeled statement: %w", err)
+	}
 
 	return nil
 }

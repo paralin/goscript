@@ -105,6 +105,17 @@ func (c *GoToTSCompiler) WriteStmtForInit(stmt ast.Stmt) error {
 	case *ast.ExprStmt:
 		// Handle expression statement in init
 		return c.WriteValueExpr(s.X)
+	case *ast.IncDecStmt:
+		// Handle increment/decrement in init (e.g., for i++; ...)
+		if err := c.WriteValueExpr(s.X); err != nil { // The expression (e.g., i)
+			return err
+		}
+		tokStr, ok := TokenToTs(s.Tok)
+		if !ok {
+			return errors.Errorf("unknown incdec token: %v", s.Tok)
+		}
+		c.tsw.WriteLiterally(tokStr) // The token (e.g., ++)
+		return nil
 	default:
 		return errors.Errorf("unhandled for loop init statement: %T", stmt)
 	}
