@@ -34,6 +34,7 @@ import (
 func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 	// Get the type of the composite literal
 	litType := c.pkg.TypesInfo.TypeOf(exp)
+
 	if exp.Type != nil {
 		// Handle map literals: map[K]V{k1: v1, k2: v2}
 		if _, isMapType := exp.Type.(*ast.MapType); isMapType {
@@ -448,40 +449,102 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 	// Untyped composite literal. Let's use type information to determine what it is.
 	// First try to get the type information for the expression
-	isObject := false
 	if tv, ok := c.pkg.TypesInfo.Types[exp]; ok && tv.Type != nil {
 		underlying := tv.Type.Underlying()
 		switch underlying.(type) {
 		case *types.Map, *types.Struct:
-			isObject = true
+			// Handle struct directly with the struct literal logic
+			if structType, ok := underlying.(*types.Struct); ok {
+				return c.writeUntypedStructLiteral(exp, structType, true) // true = anonymous
+			}
+			// Map case would be handled here
+			return fmt.Errorf("untyped map composite literals not yet supported")
 		case *types.Array, *types.Slice:
-			isObject = false
+			// Handle array/slice
+			return c.writeUntypedArrayLiteral(exp)
+		case *types.Pointer:
+			// Handle pointer to composite literal
+			ptrType := underlying.(*types.Pointer)
+			elemType := ptrType.Elem().Underlying()
+			switch elemType.(type) {
+			case *types.Struct:
+				// This should be treated as an anonymous struct literal
+				structType := elemType.(*types.Struct)
+				return c.writeUntypedStructLiteral(exp, structType, true) // true = anonymous
+			default:
+				return fmt.Errorf("unhandled pointer composite literal element type: %T", elemType)
+			}
 		default:
 			return fmt.Errorf("unhandled composite literal type: %T", underlying)
 		}
 	} else {
 		return fmt.Errorf("could not determine composite literal type from type information")
 	}
+}
 
-	if isObject {
-		c.tsw.WriteLiterally("{ ")
-	} else {
-		c.tsw.WriteLiterally("[ ")
-	}
-
+// writeUntypedArrayLiteral handles untyped composite literals that are arrays/slices
+func (c *GoToTSCompiler) writeUntypedArrayLiteral(exp *ast.CompositeLit) error {
+	c.tsw.WriteLiterally("[ ")
 	for i, elm := range exp.Elts {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
 		if err := c.WriteBoxedValue(elm); err != nil {
-			return fmt.Errorf("failed to write untyped composite literal element: %w", err)
+			return fmt.Errorf("failed to write untyped array literal element: %w", err)
 		}
 	}
-	if isObject {
-		c.tsw.WriteLiterally(" }")
-	} else {
-		c.tsw.WriteLiterally(" ]")
+	c.tsw.WriteLiterally(" ]")
+	return nil
+}
+
+// writeUntypedStructLiteral handles untyped composite literals that are structs or pointers to structs
+func (c *GoToTSCompiler) writeUntypedStructLiteral(exp *ast.CompositeLit, structType *types.Struct, isAnonymous bool) error {
+	// Create field mapping like the typed struct case
+	directFields := make(map[string]ast.Expr)
+
+	// Handle elements that are key-value pairs
+	for _, elt := range exp.Elts {
+		if kv, ok := elt.(*ast.KeyValueExpr); ok {
+			if keyIdent, ok := kv.Key.(*ast.Ident); ok {
+				directFields[keyIdent.Name] = kv.Value
+			}
+		}
 	}
+
+	// Handle elements that are positional (no key specified)
+	if len(directFields) == 0 {
+		// If no key-value pairs, try to match positional values to struct fields
+		for i, elt := range exp.Elts {
+			if _, isKV := elt.(*ast.KeyValueExpr); !isKV && i < structType.NumFields() {
+				field := structType.Field(i)
+				directFields[field.Name()] = elt
+			}
+		}
+	}
+
+	// Write the object literal (always anonymous for untyped)
+	c.tsw.WriteLiterally("{")
+
+	firstFieldWritten := false
+	// Write fields in order
+	directKeys := make([]string, 0, len(directFields))
+	for k := range directFields {
+		directKeys = append(directKeys, k)
+	}
+	slices.Sort(directKeys)
+	for _, keyName := range directKeys {
+		if firstFieldWritten {
+			c.tsw.WriteLiterally(", ")
+		}
+		c.tsw.WriteLiterally(keyName)
+		c.tsw.WriteLiterally(": ")
+		if err := c.WriteBoxedValue(directFields[keyName]); err != nil {
+			return err
+		}
+		firstFieldWritten = true
+	}
+
+	c.tsw.WriteLiterally("}")
 	return nil
 }
 

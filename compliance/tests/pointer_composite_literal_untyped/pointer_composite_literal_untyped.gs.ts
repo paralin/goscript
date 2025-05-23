@@ -12,4 +12,9 @@ export function main(): void {
 
 	// Now try to use an untyped composite literal that resolves to a pointer
 	// This is the case that should trigger the error
-	let data = $.arrayToSlice<$.Box<{ x?: number }> | null>([
+	let data = $.arrayToSlice<$.Box<{ x?: number }> | null>([{x: 42}, {x: 43}])
+
+	console.log("First element x:", data![0]!.x)
+	console.log("Second element x:", data![1]!.x)
+}
+
