@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function printVal(val: any/* unhandled type: *types.TypeParam */): void {
+function printVal<T extends any>(val: T): void {
 	console.log(val)
 }
 

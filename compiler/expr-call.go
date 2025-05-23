@@ -307,6 +307,22 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 							}
 						}
 					}
+
+					// Case 4: Argument is a generic type parameter (e.g., string | []byte)
+					if typeParam, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
+						// Check if this is a []byte | string union constraint
+						constraint := typeParam.Constraint()
+						if constraint != nil {
+							// For now, assume any type parameter that could be string or []byte needs the helper
+							// This is a heuristic - in the future we could parse the constraint more precisely
+							c.tsw.WriteLiterally("$.genericBytesOrStringToString(")
+							if err := c.WriteValueExpr(arg); err != nil {
+								return fmt.Errorf("failed to write argument for string(generic) conversion: %w", err)
+							}
+							c.tsw.WriteLiterally(")")
+							return nil // Handled string(generic type parameter)
+						}
+					}
 				}
 			}
 			// Return error for other unhandled string conversions
@@ -381,8 +397,10 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 									return fmt.Errorf("failed to write argument for type cast: %w", err)
 								}
 
-								// Then use the TypeScript "as" operator with the type name
-								c.tsw.WriteLiterallyf(" as %s)", funIdent.String())
+								// Then use the TypeScript "as" operator with the mapped type name
+								c.tsw.WriteLiterally(" as ")
+								c.WriteGoType(typeName.Type(), GoTypeContextGeneral)
+								c.tsw.WriteLiterally(")")
 								return nil // Handled non-function type cast
 							}
 						}

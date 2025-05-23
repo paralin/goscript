@@ -52,6 +52,9 @@ func (c *GoToTSCompiler) WriteValueExpr(a ast.Expr) error {
 		return c.WriteTypeAssertExpr(exp)
 	case *ast.IndexExpr:
 		return c.WriteIndexExpr(exp)
+	case *ast.IndexListExpr:
+		// Handle generic function instantiation: f[T1, T2](args) -> f<T1, T2>(args)
+		return c.WriteIndexListExpr(exp)
 	case *ast.SliceExpr:
 		return c.WriteSliceExpr(exp)
 	case *ast.ParenExpr:

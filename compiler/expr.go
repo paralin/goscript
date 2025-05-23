@@ -11,6 +11,30 @@ import (
 
 // WriteIndexExpr translates a Go index expression (a[b]) to its TypeScript equivalent.
 func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
+	// Check if this might be a generic function instantiation with a single type argument
+	// In this case, the Index should be a type expression, not a value expression
+	if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
+		// If X is a function type, this might be generic instantiation
+		if _, isFuncType := tv.Type.Underlying().(*types.Signature); isFuncType {
+			// Check if the index is a type expression (identifier that refers to a type)
+			if indexIdent, isIdent := exp.Index.(*ast.Ident); isIdent {
+				// Check if this identifier refers to a type
+				if obj := c.pkg.TypesInfo.Uses[indexIdent]; obj != nil {
+					if _, isTypeName := obj.(*types.TypeName); isTypeName {
+						// This is a generic function instantiation: f[T] -> f<T>
+						if err := c.WriteValueExpr(exp.X); err != nil {
+							return err
+						}
+						c.tsw.WriteLiterally("<")
+						c.WriteTypeExpr(exp.Index)
+						c.tsw.WriteLiterally(">")
+						return nil
+					}
+				}
+			}
+		}
+	}
+
 	// Handle map access: use Map.get() instead of brackets for reading values
 	if tv, ok := c.pkg.TypesInfo.Types[exp.X]; ok {
 		underlyingType := tv.Type.Underlying()
@@ -45,6 +69,22 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 			c.tsw.WriteLiterally(")")
 			return nil
 		}
+
+		// Check if it's a type parameter with a union constraint (e.g., string | []byte)
+		if _, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
+			// For type parameters with string | []byte constraint, use specialized function
+			// that returns number (byte value) for better TypeScript typing
+			c.tsw.WriteLiterally("$.indexStringOrBytes(")
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return err
+			}
+			c.tsw.WriteLiterally(", ")
+			if err := c.WriteValueExpr(exp.Index); err != nil {
+				return err
+			}
+			c.tsw.WriteLiterally(")")
+			return nil
+		}
 	}
 
 	// Regular array/slice access: use brackets
@@ -56,6 +96,26 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 		return err
 	}
 	c.tsw.WriteLiterally("]")
+	return nil
+}
+
+// WriteIndexListExpr translates a Go generic function instantiation (f[T1, T2]) to its TypeScript equivalent (f<T1, T2>).
+func (c *GoToTSCompiler) WriteIndexListExpr(exp *ast.IndexListExpr) error {
+	// Write the function expression
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return err
+	}
+
+	// Write the type arguments using TypeScript syntax
+	c.tsw.WriteLiterally("<")
+	for i, typeArg := range exp.Indices {
+		if i > 0 {
+			c.tsw.WriteLiterally(", ")
+		}
+		c.WriteTypeExpr(typeArg)
+	}
+	c.tsw.WriteLiterally(">")
+
 	return nil
 }
 
@@ -231,6 +291,19 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 		isBitwise = true
 	}
 
+	// Special handling for large bit shift expressions that would overflow in JavaScript
+	if exp.Op == token.SHL {
+		// Check if this is 1 << 63 pattern
+		if leftLit, leftIsLit := exp.X.(*ast.BasicLit); leftIsLit && leftLit.Value == "1" {
+			if rightLit, rightIsLit := exp.Y.(*ast.BasicLit); rightIsLit && rightLit.Value == "63" {
+				// Replace 1 << 63 with Number.MAX_SAFE_INTEGER (9007199254740991)
+				// This is the largest integer that can be exactly represented in JavaScript
+				c.tsw.WriteLiterally("Number.MAX_SAFE_INTEGER")
+				return nil
+			}
+		}
+	}
+
 	if isBitwise {
 		c.tsw.WriteLiterally("(") // Add opening parenthesis for bitwise operations
 	}
@@ -359,6 +432,7 @@ func (c *GoToTSCompiler) WriteSliceExpr(exp *ast.SliceExpr) error {
 	tv := c.pkg.TypesInfo.TypeOf(exp.X)
 	isString := false
 	isByteSlice := false
+	isTypeParam := false
 	if tv != nil {
 		if basicType, isBasic := tv.Underlying().(*types.Basic); isBasic && (basicType.Info()&types.IsString) != 0 {
 			isString = true
@@ -368,6 +442,46 @@ func (c *GoToTSCompiler) WriteSliceExpr(exp *ast.SliceExpr) error {
 				isByteSlice = true
 			}
 		}
+		if _, isTP := tv.(*types.TypeParam); isTP {
+			isTypeParam = true
+		}
+	}
+
+	// Handle type parameters with union constraints (e.g., string | []byte)
+	if isTypeParam {
+		// For type parameters, we need to create a runtime helper that handles both string and []byte
+		c.tsw.WriteLiterally("$.sliceStringOrBytes(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return err
+		}
+		c.tsw.WriteLiterally(", ")
+		if exp.Low != nil {
+			if err := c.WriteValueExpr(exp.Low); err != nil {
+				return err
+			}
+		} else {
+			c.tsw.WriteLiterally("undefined")
+		}
+		c.tsw.WriteLiterally(", ")
+		if exp.High != nil {
+			if err := c.WriteValueExpr(exp.High); err != nil {
+				return err
+			}
+		} else {
+			c.tsw.WriteLiterally("undefined")
+		}
+		if exp.Slice3 {
+			c.tsw.WriteLiterally(", ")
+			if exp.Max != nil {
+				if err := c.WriteValueExpr(exp.Max); err != nil {
+					return err
+				}
+			} else {
+				c.tsw.WriteLiterally("undefined")
+			}
+		}
+		c.tsw.WriteLiterally(")")
+		return nil
 	}
 
 	if isString && !exp.Slice3 {

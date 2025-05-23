@@ -65,6 +65,9 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 		c.WriteStructType(t)
 	case *types.Alias:
 		c.WriteGoType(t.Underlying(), context)
+	case *types.TypeParam:
+		// For type parameters, write the type parameter name (e.g., "T", "K", etc.)
+		c.tsw.WriteLiterally(t.Obj().Name())
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
@@ -155,6 +158,10 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 	case *types.Struct:
 		// For anonymous struct types, initialize with {}
 		c.tsw.WriteLiterally("{}")
+	case *types.TypeParam:
+		// For type parameters, use null! (non-null assertion) to avoid TypeScript
+		// casting errors with union types like string | Uint8Array
+		c.tsw.WriteLiterally("null!")
 	default:
 		c.tsw.WriteLiterally("null")
 	}
@@ -518,4 +525,81 @@ func (c *GoToTSCompiler) WriteStructType(t *types.Struct) {
 		c.WriteGoType(field.Type(), GoTypeContextGeneral)
 	}
 	c.tsw.WriteLiterally(" }")
+}
+
+// WriteTypeParameters translates Go type parameters to TypeScript generic parameters.
+// It handles the TypeParams field of ast.FuncDecl and ast.TypeSpec to generate
+// TypeScript generic parameter lists like <T extends SomeConstraint, U extends OtherConstraint>.
+func (c *GoToTSCompiler) WriteTypeParameters(typeParams *ast.FieldList) {
+	if typeParams == nil || len(typeParams.List) == 0 {
+		return
+	}
+
+	c.tsw.WriteLiterally("<")
+	for i, field := range typeParams.List {
+		if i > 0 {
+			c.tsw.WriteLiterally(", ")
+		}
+		// Write each type parameter name and constraint
+		for j, name := range field.Names {
+			if j > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.tsw.WriteLiterally(name.Name)
+
+			// Write constraint if present
+			if field.Type != nil {
+				c.tsw.WriteLiterally(" extends ")
+				c.WriteTypeConstraint(field.Type)
+			}
+		}
+	}
+	c.tsw.WriteLiterally(">")
+}
+
+// WriteTypeConstraint translates Go type constraints to TypeScript constraint expressions.
+// It handles different constraint types including:
+// - Union types: []byte | string -> string | Uint8Array
+// - Interface types: interface{Method()} -> {Method(): void}
+// - Basic types: any -> any, comparable -> $.Comparable
+func (c *GoToTSCompiler) WriteTypeConstraint(constraint ast.Expr) {
+	switch t := constraint.(type) {
+	case *ast.Ident:
+		// Handle predeclared constraints
+		switch t.Name {
+		case "any":
+			c.tsw.WriteLiterally("any")
+		case "comparable":
+			c.tsw.WriteLiterally("$.Comparable")
+		default:
+			// Use the type directly
+			c.WriteTypeExpr(t)
+		}
+	case *ast.BinaryExpr:
+		// Handle union types like []byte | string
+		if t.Op.String() == "|" {
+			c.WriteTypeConstraint(t.X)
+			c.tsw.WriteLiterally(" | ")
+			c.WriteTypeConstraint(t.Y)
+		} else {
+			// Fallback for other binary expressions
+			c.WriteTypeExpr(constraint)
+		}
+	case *ast.InterfaceType:
+		// Handle interface constraints
+		c.WriteTypeExpr(constraint)
+	case *ast.ArrayType:
+		// Handle []byte specifically
+		if ident, ok := t.Elt.(*ast.Ident); ok && ident.Name == "byte" {
+			c.tsw.WriteLiterally("Uint8Array")
+		} else {
+			c.WriteTypeExpr(constraint)
+		}
+	case *ast.SliceExpr:
+		// Handle slice types in constraints
+		c.WriteTypeExpr(constraint)
+	default:
+		// Fallback: use the standard type expression writer
+		c.WriteTypeExpr(constraint)
+	}
 }

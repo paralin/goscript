@@ -88,6 +88,11 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 		return fmt.Errorf("failed to write function name: %w", err)
 	}
 
+	// Write type parameters if present
+	if decl.Type.TypeParams != nil {
+		c.WriteTypeParameters(decl.Type.TypeParams)
+	}
+
 	// WriteFuncType needs to be aware if the function is async
 	c.WriteFuncType(decl.Type, isAsync) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")

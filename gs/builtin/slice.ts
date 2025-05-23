@@ -717,6 +717,13 @@ export function index<T>(collection: string | Slice<T> | T[], index: number): T 
 
   if (typeof collection === 'string') {
     return indexString(collection, index) // Use the existing indexString for byte access
+  } else if (collection instanceof Uint8Array) {
+    if (index < 0 || index >= collection.length) {
+      throw new Error(
+        `runtime error: index out of range [${index}] with length ${collection.length}`,
+      )
+    }
+    return collection[index]
   } else if (isComplexSlice(collection)) {
     if (index < 0 || index >= collection.__meta__.length) {
       throw new Error(
@@ -888,4 +895,50 @@ export function genericBytesOrStringToString(value: string | Uint8Array): string
     return value
   }
   return bytesToString(value as unknown as number[])
+}
+
+/**
+ * Indexes into a value that could be either a string or Uint8Array.
+ * Used for generic type parameters with constraint string | []byte.
+ * Both cases return a byte value (number).
+ * @param value Value that is either a string or Uint8Array
+ * @param index The index to access
+ * @returns The byte value at the specified index
+ */
+export function indexStringOrBytes(value: string | Uint8Array, index: number): number {
+  if (typeof value === 'string') {
+    return indexString(value, index)
+  } else {
+    // For Uint8Array, direct access returns the byte value
+    if (index < 0 || index >= value.length) {
+      throw new Error(
+        `runtime error: index out of range [${index}] with length ${value.length}`,
+      )
+    }
+    return value[index]
+  }
+}
+
+/**
+ * Slices a value that could be either a string or Uint8Array.
+ * Used for generic type parameters with constraint string | []byte.
+ * @param value Value that is either a string or Uint8Array
+ * @param low Starting index (inclusive). Defaults to 0.
+ * @param high Ending index (exclusive). Defaults to length.
+ * @param max Capacity limit (only used for Uint8Array, ignored for strings)
+ * @returns The sliced value of the same type as input
+ */
+export function sliceStringOrBytes<T extends string | Uint8Array>(
+  value: T,
+  low?: number,
+  high?: number,
+  max?: number,
+): T {
+  if (typeof value === 'string') {
+    // For strings, use sliceString and ignore max parameter
+    return sliceString(value, low, high) as T
+  } else {
+    // For Uint8Array, use goSlice
+    return goSlice(value as Slice<number>, low, high, max) as T
+  }
 }
