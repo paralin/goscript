@@ -24,6 +24,12 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	if err := c.WriteValueExpr(a.Name); err != nil {
 		return err
 	}
+
+	// Write type parameters if present (for generics)
+	if a.TypeParams != nil {
+		c.WriteTypeParameters(a.TypeParams)
+	}
+
 	c.tsw.WriteLiterally(" ")
 	c.tsw.WriteLine("{")
 	c.tsw.Indent(1)
@@ -122,9 +128,25 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLine("")
 
 	// Generate the clone method
-	c.tsw.WriteLinef("public clone(): %s {", className)
+	cloneReturnType := className
+	if a.TypeParams != nil && len(a.TypeParams.List) > 0 {
+		cloneReturnType += "<"
+		first := true
+		for _, field := range a.TypeParams.List {
+			for _, name := range field.Names {
+				if !first {
+					cloneReturnType += ", "
+				}
+				first = false
+				cloneReturnType += name.Name
+			}
+		}
+		cloneReturnType += ">"
+	}
+
+	c.tsw.WriteLinef("public clone(): %s {", cloneReturnType)
 	c.tsw.Indent(1)
-	c.tsw.WriteLinef("const cloned = new %s()", className)
+	c.tsw.WriteLinef("const cloned = new %s()", cloneReturnType)
 	c.tsw.WriteLine("cloned._fields = {")
 	c.tsw.Indent(1)
 
@@ -165,7 +187,18 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			if starExpr, ok := recvType.(*ast.StarExpr); ok {
 				recvType = starExpr.X
 			}
-			if ident, ok := recvType.(*ast.Ident); ok && ident.Name == className {
+
+			// Check for both simple identifiers (Pair) and generic types (Pair[T])
+			var recvTypeName string
+			if ident, ok := recvType.(*ast.Ident); ok {
+				recvTypeName = ident.Name
+			} else if indexExpr, ok := recvType.(*ast.IndexExpr); ok {
+				if ident, ok := indexExpr.X.(*ast.Ident); ok {
+					recvTypeName = ident.Name
+				}
+			}
+
+			if recvTypeName == className {
 				c.tsw.WriteLine("")
 				if err := c.WriteFuncDeclAsMethod(funcDecl); err != nil {
 					return err

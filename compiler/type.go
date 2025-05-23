@@ -202,14 +202,27 @@ func (c *GoToTSCompiler) WriteBasicType(t *types.Basic) {
 
 // WriteNamedType translates a Go named type to its TypeScript equivalent.
 // It specially handles the error interface as $.GoError, and uses the original
-// type name for other named types.
+// type name for other named types. For generic types, it includes type arguments.
 func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 	// Check if the named type is the error interface
 	if iface, ok := t.Underlying().(*types.Interface); ok && iface.String() == "interface{Error() string}" {
 		c.tsw.WriteLiterally("$.GoError")
-	} else {
-		// Use Obj().Name() for the original defined name
-		c.tsw.WriteLiterally(t.Obj().Name())
+		return
+	}
+
+	// Use Obj().Name() for the original defined name
+	c.tsw.WriteLiterally(t.Obj().Name())
+
+	// For generic types, include type arguments
+	if t.TypeArgs() != nil && t.TypeArgs().Len() > 0 {
+		c.tsw.WriteLiterally("<")
+		for i := 0; i < t.TypeArgs().Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			c.WriteGoType(t.TypeArgs().At(i), GoTypeContextGeneral)
+		}
+		c.tsw.WriteLiterally(">")
 	}
 }
 

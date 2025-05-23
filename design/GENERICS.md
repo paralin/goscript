@@ -4,8 +4,6 @@
 
 This document outlines the approach for translating Go generics (introduced in Go 1.18) to TypeScript. Both Go and TypeScript support parametric polymorphism via generics, making the translation conceptually straightforward but with several important details to consider.
 
-**Status**: Generics support has been successfully implemented and tested. The `generics_leading_int` compliance test passes with correct output matching Go behavior.
-
 ## Type Parameters and Constraints
 
 ### Basic Translation
@@ -70,12 +68,22 @@ Go's type constraints map to TypeScript's `extends` clause:
 
 ## Generic Types
 
-Generic structs, interfaces, and type aliases are translated to their TypeScript counterparts:
+### Generic Structs
+
+Generic structs are translated to TypeScript classes with type parameters. The compiler properly handles:
+
+- Type parameter declaration on the class
+- Generic methods with proper receiver handling
+- Type-aware clone methods and constructors
 
 ```go
 // Go
 type Pair[T any] struct {
     First, Second T
+}
+
+func (p Pair[T]) GetFirst() T {
+    return p.First
 }
 
 func (p Pair[T]) Swap() Pair[T] {
@@ -85,24 +93,43 @@ func (p Pair[T]) Swap() Pair[T] {
 
 ```typescript
 // TypeScript
-class Pair<T> {
-    public First: T
-    public Second: T
+class Pair<T extends any> {
+    public get First(): T { /* ... */ }
+    public set First(value: T) { /* ... */ }
+    public get Second(): T { /* ... */ }
+    public set Second(value: T) { /* ... */ }
     
-    constructor(init?: { First?: T, Second?: T }) {
-        this._fields = {
-            First: $.box(init?.First ?? null),
-            Second: $.box(init?.Second ?? null)
-        }
+    constructor(init?: Partial<{ First?: T, Second?: T }>) {
+        // Initialization logic
+    }
+    
+    public clone(): Pair<T> {
+        const cloned = new Pair<T>()
+        // Clone logic
+        return cloned
+    }
+    
+    public GetFirst(): T {
+        const p = this
+        return p.First
     }
     
     public Swap(): Pair<T> {
         return new Pair<T>({ First: this.Second, Second: this.First })
     }
     
-    // ... other generated code (clone, etc.)
+    // Runtime type registration
+    static __typeInfo = $.registerStructType(
+        'Pair',
+        new Pair(),
+        // Method signatures and field information
+    );
 }
 ```
+
+### Method Resolution for Generic Types
+
+The compiler correctly identifies methods defined on generic struct receivers, handling both simple identifiers (`Pair`) and indexed expressions (`Pair[T]`) when parsing method receivers.
 
 ## Generic Functions
 
@@ -130,6 +157,24 @@ function Map<T, U>(s: T[], f: (v: T) => U): U[] {
 }
 ```
 
+### Return Type Handling
+
+For generic functions that return instantiated generic types, the compiler includes the complete type with type arguments:
+
+```go
+// Go
+func makePair[T any](a, b T) Pair[T] {
+    return Pair[T]{First: a, Second: b}
+}
+```
+
+```typescript
+// TypeScript
+function makePair<T extends any>(a: T, b: T): Pair<T> {
+    return new Pair<T>({First: a, Second: b})
+}
+```
+
 ## Type Inference
 
 Both Go and TypeScript support type parameter inference, allowing generic functions to be called without explicitly specifying type arguments:
@@ -148,9 +193,9 @@ const result = Map([1, 2, 3], (x: number) => x.toString())
 
 TypeScript's type inference rules are generally compatible with Go's, simplifying the translation.
 
-## Advanced Constraints: Type Sets
+## Advanced Constraints: Union Types
 
-Go 1.18 introduced type sets via the `|` operator in interfaces. We translate these to TypeScript union types:
+Go 1.18 introduced type sets via the `|` operator in interfaces. These are translated to TypeScript union types:
 
 ```go
 // Go
@@ -169,10 +214,10 @@ func Sum[T Number](values []T) T {
 
 ```typescript
 // TypeScript
-type Number = number | bigint // Simplified since both map to number/bigint
+type Number = number | bigint
 
 function Sum<T extends Number>(values: T[]): T {
-    let result = 0 as T // Initialize with proper zero value
+    let result = 0 as T
     for (let i = 0; i < values.length; i++) {
         result = $.add(result, values[i]) as T
     }
@@ -180,29 +225,20 @@ function Sum<T extends Number>(values: T[]): T {
 }
 ```
 
-Go also allows type parameters to be constrained by a union of types directly, without needing an intermediate interface. This provides a more concise way to define constraints for simple unions.
+### Direct Union Constraints
+
+Go allows type parameters to be constrained by a union of types directly:
 
 ```go
 // Go
-// A type parameter S constrained to be either a string or a byte slice.
 func getLength[S string | []byte](s S) int {
-    return len(s) // len() works polymorphicly in Go for string and []byte
+    return len(s)
 }
 
-// Indexing a value that could be a string or a byte slice.
-func getFirstElementCode[S string | []byte](s S) int {
-    if len(s) == 0 {
-        return -1
-    }
-    // In Go, s[0] would give a byte for both.
-    return int(s[0])
-}
-
-// Real-world example: leadingInt parses leading digits from string or []byte
 func leadingInt[bytes ~[]byte | ~string](s bytes) (x int, rem bytes, err bool) {
     var i int
     for i < len(s) {
-        c := s[i]  // Gets byte value for both string and []byte
+        c := s[i]
         if c < '0' || c > '9' {
             break
         }
@@ -215,44 +251,51 @@ func leadingInt[bytes ~[]byte | ~string](s bytes) (x int, rem bytes, err bool) {
 
 ```typescript
 // TypeScript
-// The union constraint translates directly.
 function getLength<S extends string | Uint8Array>(s: S): number {
-    return $.len(s); // Uses a runtime helper for consistent behavior
+    return $.len(s)
 }
 
-// For operations like indexing, specialized helpers ensure correct typing.
-function getFirstElementCode<S extends string | Uint8Array>(s: S): number {
-    if ($.len(s) === 0) {
-        return -1;
-    }
-    // $.indexStringOrBytes() handles both string (byte access) and Uint8Array
-    return $.indexStringOrBytes(s, 0);
-}
-
-// Real-world working example from generics_leading_int test
 function leadingInt<bytes extends Uint8Array | string>(s: bytes): [number, bytes, boolean] {
     let x: number = 0
-    let rem: bytes = null!
-    let err: boolean = false
-    {
-        let i = 0
-        for (; i < $.len(s); i++) {
-            let c = $.indexStringOrBytes(s, i)  // Returns number (byte value)
-            if (c < 48 || c > 57) {
-                break
-            }
-            x = x * 10 + (c as number) - 48
+    let i = 0
+    for (; i < $.len(s); i++) {
+        let c = $.indexStringOrBytes(s, i)
+        if (c < 48 || c > 57) {
+            break
         }
-        return [x, $.sliceStringOrBytes(s, i, undefined), false]
+        x = x * 10 + (c as number) - 48
     }
+    return [x, $.sliceStringOrBytes(s, i, undefined), false]
 }
 ```
 
-## Implementation Challenges
+## Runtime Support
 
-### Operator Constraints
+### Specialized Helpers for Union-Constrained Operations
 
-Go's operators in generic contexts (like `+`, `<`, etc. on generic types) require runtime helpers in TypeScript:
+When a type parameter is constrained by a union of types (e.g., `S string | []byte`), common operations require specialized runtime helpers to ensure consistent Go semantics:
+
+| Operation | Go Code | TypeScript Helper | Return Type |
+|-----------|---------|-------------------|-------------|
+| Length | `len(s)` | `$.len(s)` | `number` |
+| Indexing | `s[i]` | `$.indexStringOrBytes(s, i)` | `number` (byte value) |
+| Slicing | `s[i:j]` | `$.sliceStringOrBytes(s, i, j)` | Same as input type |
+| String conversion | `string(s)` | `$.genericBytesOrStringToString(s)` | `string` |
+
+### Type Constraint Interfaces
+
+The `@goscript/builtin` module provides interfaces for Go's built-in type constraints:
+
+```typescript
+// Comparable interface for Go's comparable constraint
+export interface Comparable {
+  // Marker interface for types that can be compared with == and !=
+}
+```
+
+## Operator Handling
+
+Go's operators in generic contexts require runtime helpers in TypeScript to maintain correct semantics:
 
 ```go
 // Go
@@ -268,114 +311,37 @@ function Add<T extends $.Integer>(a: T, b: T): T {
 }
 ```
 
-The `$.add` helper handles correct addition semantics for different numeric types.
+## Type Registration and Runtime Support
 
-### Operations on Union-Constrained Type Parameters
-
-When a type parameter is constrained by a union of types (e.g., `S string | []byte`), common operations like indexing (`s[i]`), slicing (`s[i:j]`), or getting length (`len(s)`) require special attention. While these operations might be polymorphic in Go for certain built-in types (like `string` and `[]byte`), TypeScript often lacks direct polymorphic equivalents that produce the exact Go semantics across the union.
-
-To bridge this gap and ensure consistent Go semantics, GoScript provides specialized helper functions in the `@goscript/builtin` module:
-
-#### Available Specialized Helpers
-
-| Operation | Go Code | TypeScript Helper | Return Type |
-|-----------|---------|-------------------|-------------|
-| Length | `len(s)` | `$.len(s)` | `number` |
-| Indexing | `s[i]` | `$.indexStringOrBytes(s, i)` | `number` (byte value) |
-| Slicing | `s[i:j]` | `$.sliceStringOrBytes(s, i, j)` | Same as input type |
-| String conversion | `string(s)` | `$.genericBytesOrStringToString(s)` | `string` |
-
-#### Implementation Details
-
-The compiler recognizes when an operation is performed on a type parameter with a `string | []byte` constraint and automatically substitutes the appropriate runtime helper:
-
-```go
-// Go - compiler detects union-constrained type parameter operations
-func process[S string | []byte](s S) {
-    length := len(s)     // Compiled to: $.len(s)
-    first := s[0]        // Compiled to: $.indexStringOrBytes(s, 0)  
-    slice := s[1:3]      // Compiled to: $.sliceStringOrBytes(s, 1, 3)
-}
-```
+Generic struct types are registered with the runtime type system using their base names (without type parameters) to avoid TypeScript's restriction on type parameters in static contexts:
 
 ```typescript
-// TypeScript - generated with proper helpers
-function process<S extends string | Uint8Array>(s: S): void {
-    const length = $.len(s)
-    const first = $.indexStringOrBytes(s, 0)
-    const slice = $.sliceStringOrBytes(s, 1, 3)
+class Pair<T extends any> {
+    // ... class implementation
+    
+    static __typeInfo = $.registerStructType(
+        'Pair',                    // Base name
+        new Pair(),               // Zero value (no type params)
+        // Method signatures and field information
+    );
 }
 ```
-
-This approach ensures that:
-1. **Type Safety**: TypeScript gets correct type information
-2. **Runtime Correctness**: Operations behave consistently with Go semantics  
-3. **Performance**: Direct operations when possible, helpers only when needed
-
-### Type Approximation
-
-Some Go type constraints can't be precisely expressed in TypeScript's type system. In these cases, we use runtime checks or type approximations.
-
-### Method Constraints
-
-Go allows constraining types based on methods they implement. This is handled using TypeScript interfaces:
-
-```go
-// Go
-type Stringer interface {
-    String() string
-}
-
-func Print[T Stringer](v T) {
-    fmt.Println(v.String())
-}
-```
-
-```typescript
-// TypeScript
-interface Stringer {
-    String(): string
-}
-
-function Print<T extends Stringer>(v: T): void {
-    console.log(v.String())
-}
-```
-
-## Special Cases
-
-### Instantiated Types
-
-Go allows instantiating generic types with concrete type arguments (e.g., `MyMap[string, int]`). In TypeScript, this is directly supported using similar syntax.
-
-### Type Parameter Inference with Context
-
-TypeScript and Go have slightly different rules for inferring type arguments from context. The compiler adapts Go's rules to TypeScript's capabilities.
 
 ## Conclusion
 
-The translation of Go generics to TypeScript has been successfully implemented, leveraging the similarities between both type systems while accounting for differences in operator behavior and constraint semantics. 
+The GoScript generics implementation successfully translates Go's generic types and functions to TypeScript while maintaining:
 
-### Implementation Status
+1. **Type Safety**: Full TypeScript type checking with proper constraint handling
+2. **Runtime Correctness**: Consistent behavior with Go semantics through specialized helpers
+3. **Performance**: Direct operations where possible, helpers only when needed
+4. **Compatibility**: Support for all Go generic features including union constraints and type inference
 
-✅ **Completed Features:**
-- Type parameter translation and constraint handling
-- Generic function compilation with proper type inference
-- Union-constrained type parameters (`string | []byte`)
-- Specialized runtime helpers for common operations
-- Zero value handling for type parameters
-- Full compilation pipeline with TypeScript type checking
+The implementation covers:
+- ✅ Generic functions with type parameters and constraints
+- ✅ Generic struct types with proper method handling
+- ✅ Union-constrained type parameters with specialized operations
+- ✅ Type inference and instantiation
+- ✅ Runtime type registration and support
+- ✅ Complete TypeScript compilation pipeline
 
-✅ **Working Examples:**
-- The `generics_leading_int` compliance test passes completely
-- Generates clean, type-safe TypeScript code
-- Runtime behavior matches Go semantics exactly
-
-### Key Implementation Details
-
-1. **Type Parameters**: Translated as TypeScript generic parameters with proper constraint mapping
-2. **Zero Values**: Use `null!` for type parameters to avoid TypeScript casting errors
-3. **Union Operations**: Specialized helpers like `$.indexStringOrBytes()` ensure correct typing and behavior
-4. **Compiler Intelligence**: Automatic detection and substitution of union-constrained operations
-
-The `@goscript/builtin` runtime provides the necessary helper functions and interfaces to ensure correct semantics for operations on generic types, making Go generics fully usable in the TypeScript target environment.
+This provides a robust foundation for using Go generics in the TypeScript target environment while maintaining the familiar Go programming model.

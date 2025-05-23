@@ -1,0 +1,30 @@
+=== Basic Generic Function ===
+42
+hello
+true
+=== Comparable Constraint ===
+true
+false
+true
+false
+=== Union Constraint ===
+5
+5
+=== Generic Struct ===
+10
+10
+20
+foo
+foo
+bar
+=== Generic Slice Operations ===
+1
+2
+3
+4
+a
+b
+c
+=== Type Inference ===
+100
+200 

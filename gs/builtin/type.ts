@@ -170,6 +170,14 @@ export function isChannelTypeInfo(info: TypeInfo): info is ChannelTypeInfo {
   return info.kind === TypeKind.Channel
 }
 
+/**
+ * Comparable interface for Go's comparable constraint.
+ * Types that implement this can be compared with == and !=.
+ */
+export interface Comparable {
+  // This is a marker interface - any type that can be compared implements this
+}
+
 // Registry to store runtime type information
 const typeRegistry = new Map<string, TypeInfo>()
 
