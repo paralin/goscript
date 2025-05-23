@@ -147,6 +147,10 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				hasSelectors = true
 				break
 			}
+			if _, ok := lhsExpr.(*ast.StarExpr); ok {
+				hasSelectors = true
+				break
+			}
 		}
 
 		// If we have selector expressions, we need to ensure variables are initialized
@@ -176,6 +180,12 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 					if err := c.WriteValueExpr(selectorExpr); err != nil {
 						return fmt.Errorf("failed to write selector expression in LHS: %w", err)
 					}
+				} else if starExpr, ok := lhsExpr.(*ast.StarExpr); ok {
+					// Handle pointer dereference assignment: *p = value becomes p!.value = value
+					if err := c.WriteValueExpr(starExpr.X); err != nil {
+						return fmt.Errorf("failed to write star expression X in LHS: %w", err)
+					}
+					c.tsw.WriteLiterally("!.value")
 				} else {
 					return errors.Errorf("unhandled LHS expression in assignment: %T", lhsExpr)
 				}
@@ -211,6 +221,12 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				if err := c.WriteValueExpr(selectorExpr); err != nil {
 					return fmt.Errorf("failed to write selector expression in LHS: %w", err)
 				}
+			} else if starExpr, ok := lhsExpr.(*ast.StarExpr); ok {
+				// Handle pointer dereference in destructuring: *p becomes p!.value
+				if err := c.WriteValueExpr(starExpr.X); err != nil {
+					return fmt.Errorf("failed to write star expression X in destructuring: %w", err)
+				}
+				c.tsw.WriteLiterally("!.value")
 			} else {
 				// Should not happen for valid Go code in this context, but handle defensively
 				return errors.Errorf("unhandled LHS expression in destructuring: %T", lhsExpr)

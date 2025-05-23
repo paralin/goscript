@@ -82,16 +82,17 @@ func GoBuiltinToTypescript(typeName string) (string, bool) {
 // in their respective expression/statement writers and might not be directly mapped here.
 // Bitwise AND NOT (`&^=`) is also mapped but may require specific runtime support if not directly translatable.
 var tokenMap = map[token.Token]string{
-	token.ADD: "+",
-	token.SUB: "-",
-	token.MUL: "*",
-	token.QUO: "/",
-	token.REM: "%",
-	token.AND: "&",
-	token.OR:  "|",
-	token.XOR: "^",
-	token.SHL: "<<",
-	token.SHR: ">>",
+	token.ADD:     "+",
+	token.SUB:     "-",
+	token.MUL:     "*",
+	token.QUO:     "/",
+	token.REM:     "%",
+	token.AND:     "&",
+	token.OR:      "|",
+	token.XOR:     "^",
+	token.SHL:     "<<",
+	token.SHR:     ">>",
+	token.AND_NOT: "& ~", // &^ operator: bitwise AND NOT
 
 	token.ADD_ASSIGN: "+=",
 	token.SUB_ASSIGN: "-=",
