@@ -1,4 +1,4 @@
-export * from './box.js'
+export * from './varRef.js'
 export * from './channel.js'
 export * from './defer.js'
 export * from './io.js'

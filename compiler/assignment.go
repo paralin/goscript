@@ -68,9 +68,9 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			return nil
 		}
 
-		// Special handling for boxed variables in declarations
+		// Special handling for variable referenced variables in declarations
 		if addDeclaration && tok == token.DEFINE {
-			// Determine if LHS is boxed
+			// Determine if LHS is variable referenced
 			isLHSBoxed := false
 			var lhsIdent *ast.Ident
 			var lhsObj types.Object
@@ -84,19 +84,19 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 					lhsObj = def
 				}
 
-				// Check if this variable needs to be boxed
-				if lhsObj != nil && c.analysis.NeedsBoxed(lhsObj) {
+				// Check if this variable needs to be variable referenced
+				if lhsObj != nil && c.analysis.NeedsVarRef(lhsObj) {
 					isLHSBoxed = true
 				}
 			}
 
-			// Special handling for short declaration of boxed variables
+			// Special handling for short declaration of variable referenced variables
 			if isLHSBoxed && lhsIdent != nil {
 				c.tsw.WriteLiterally("let ")
 				// Just write the identifier name without .value
 				c.tsw.WriteLiterally(lhsIdent.Name)
 
-				// Add type annotation for boxed variables in declarations
+				// Add type annotation for variable referenced variables in declarations
 				if lhsObj != nil {
 					// Check if the RHS will result in an $.arrayToSlice call in TypeScript
 					isSliceConversion := false
@@ -126,7 +126,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 					}
 
 					c.tsw.WriteLiterally(": ")
-					c.tsw.WriteLiterally("$.Box<")
+					c.tsw.WriteLiterally("$.VarRef<")
 
 					// Special case: if this is a slice conversion from an array type,
 					// we should use the slice type instead of the array type
@@ -148,8 +148,8 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 				c.tsw.WriteLiterally(" = ")
 
-				// Box the initializer
-				c.tsw.WriteLiterally("$.box(")
+				// Create the variable reference for the initializer
+				c.tsw.WriteLiterally("$.varRef(")
 				if err := c.WriteValueExpr(rhs[0]); err != nil {
 					return err
 				}
@@ -268,11 +268,11 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		}
 
 		if !currentIsMapIndex {
-			// For single assignments, handle boxed variables specially
+			// For single assignments, handle variable referenced variables specially
 			if len(lhs) == 1 && len(rhs) == 1 {
 				lhsExprIdent, lhsExprIsIdent := l.(*ast.Ident)
 				if lhsExprIsIdent {
-					// Determine if LHS is boxed
+					// Determine if LHS is variable referenced
 					isLHSBoxed := false
 					var lhsObj types.Object
 
@@ -283,12 +283,12 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 						lhsObj = def
 					}
 
-					// Check if this variable needs to be boxed
-					if lhsObj != nil && c.analysis.NeedsBoxed(lhsObj) {
+					// Check if this variable needs to be variable referenced
+					if lhsObj != nil && c.analysis.NeedsVarRef(lhsObj) {
 						isLHSBoxed = true
 					}
 
-					// prevent writing .value unless lhs is boxed
+					// prevent writing .value unless lhs is variable referenced
 					c.WriteIdent(lhsExprIdent, isLHSBoxed)
 					continue
 				}
@@ -321,14 +321,15 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		// Check if we need to access a boxed source value and apply clone
+
+		// Check if we need to access a variable referenced source value and apply clone
 		// For struct value assignments, we need to handle:
 		// 1. Unboxed source, unboxed target: source.clone()
-		// 2. Boxed source, unboxed target: source.value.clone()
-		// 3. Unboxed source, boxed target: $.box(source)
-		// 4. Boxed source, boxed target: source (straight assignment of the box)
+		// 2. Variable referenced source, unboxed target: source.value.clone()
+		// 3. Unboxed source, variable referenced target: $.varRef(source)
+		// 4. Variable referenced source, variable referenced target: source (straight assignment of the variable reference)
 
-		// Determine if RHS is a boxed variable (could be a struct or other variable)
+		// Determine if RHS is a variable referenced variable (could be a struct or other variable)
 		needsBoxedAccessRHS := false
 		var rhsObj types.Object
 
@@ -340,17 +341,17 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				rhsObj = c.pkg.TypesInfo.Defs[rhsIdent]
 			}
 
-			// Important: For struct copying, we need to check if the variable itself is boxed
-			// Important: For struct copying, we need to check if the variable needs boxed access
-			// This is more comprehensive than just checking if it's boxed
+			// Important: For struct copying, we need to check if the variable itself is variable referenced
+			// Important: For struct copying, we need to check if the variable needs variable referenced access
+			// This is more comprehensive than just checking if it's variable referenced
 			if rhsObj != nil {
-				needsBoxedAccessRHS = c.analysis.NeedsBoxedAccess(rhsObj)
+				needsBoxedAccessRHS = c.analysis.NeedsVarRefAccess(rhsObj)
 			}
 		}
 
 		// Handle different cases for struct cloning
 		if shouldApplyClone(c.pkg, r) {
-			// For other expressions, we need to handle boxed access differently
+			// For other expressions, we need to handle variable referenced access differently
 			if _, isIdent := r.(*ast.Ident); isIdent {
 				// For identifiers, WriteValueExpr already adds .value if needed
 				if err := c.WriteValueExpr(r); err != nil {
@@ -361,14 +362,15 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				if err := c.WriteValueExpr(r); err != nil {
 					return err
 				}
-				// Only add .value for non-identifiers that need boxed access
+				// Only add .value for non-identifiers that need variable referenced access
 				if needsBoxedAccessRHS {
-					c.tsw.WriteLiterally(".value") // Access the boxed value
+					c.tsw.WriteLiterally(".value") // Access the variable referenced value
 				}
 			}
 
 			c.tsw.WriteLiterally(".clone()") // Always add clone for struct values
 		} else {
+			// Non-struct case: write RHS normally
 			if err := c.WriteValueExpr(r); err != nil { // RHS is a non-struct value
 				return err
 			}

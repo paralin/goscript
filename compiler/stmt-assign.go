@@ -33,7 +33,7 @@ import (
 //   - Uses `writeAssignmentCore` which handles:
 //   - Blank identifier `_` on LHS (evaluates RHS for side effects).
 //   - Assignment to dereferenced pointer `*p = val` -> `p_ts!.value = val_ts`.
-//   - Short declaration `x := y`: `let x = y_ts;`. If `x` is boxed, `let x: $.Box<T> = $.box(y_ts);`.
+//   - Short declaration `x := y`: `let x = y_ts;`. If `x` is variable referenced, `let x: $.VarRef<T> = $.varRef(y_ts);`.
 //   - Regular assignment `x = y`, including compound assignments like `x += y`.
 //   - Assignment to map index `m[k] = v` using `$.mapSet`.
 //   - Struct value assignment `s1 = s2` becomes `s1 = s2.clone()` if `s2` is a struct.

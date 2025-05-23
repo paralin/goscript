@@ -12,19 +12,19 @@ class MyStruct {
 	}
 
 	public _fields: {
-		MyInt: $.Box<number>;
+		MyInt: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{MyInt?: number}>) {
 		this._fields = {
-			MyInt: $.box(init?.MyInt ?? 0)
+			MyInt: $.varRef(init?.MyInt ?? 0)
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			MyInt: $.box(this._fields.MyInt.value)
+			MyInt: $.varRef(this._fields.MyInt.value)
 		}
 		return cloned
 	}

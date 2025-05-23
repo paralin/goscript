@@ -13,12 +13,11 @@ import (
 //
 // For single variable declarations (`var x T = val` or `var x = val` or `var x T`):
 //   - It determines if the variable `x` needs to be boxed (e.g., if its address is taken)
-//     using `c.analysis.NeedsBoxed(obj)`.
-//   - If boxed: `let x: $.Box<T_ts> = $.box(initializer_ts_or_zero_ts);`
-//     The type annotation is `$.Box<T_ts>`, and the initializer is wrapped in `$.box()`.
-//   - If not boxed: `let x: T_ts = initializer_ts_or_zero_ts;`
-//     The type annotation is `T_ts`. If the initializer is `&unboxedVar`, it becomes `$.box(unboxedVar_ts)`.
-//     If the RHS is a struct value, `.clone()` is applied to maintain Go's value semantics.
+//     using `c.analysis.NeedsVarRef(obj)`.
+//   - If variable referenced: `let x: $.VarRef<T_ts> = $.varRef(initializer_ts_or_zero_ts);`
+//     The type annotation is `$.VarRef<T_ts>`, and the initializer is wrapped in `$.varRef()`.
+//   - If not variable referenced: `let x: T_ts = initializer_ts_or_zero_ts;`
+//     The type annotation is `T_ts`. If the initializer is `&unboxedVar`, it becomes `$.varRef(unboxedVar_ts)`.
 //   - If no initializer is provided, the TypeScript zero value (from `WriteZeroValueForType`)
 //     is used.
 //   - Type `T` (or `T_ts`) is obtained from `obj.Type()` and translated via `WriteGoType`.
@@ -48,7 +47,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		}
 
 		goType := obj.Type()
-		needsBox := c.analysis.NeedsBoxed(obj) // Check if address is taken
+		needsBox := c.analysis.NeedsVarRef(obj) // Check if address is taken
 
 		hasInitializer := len(a.Values) > 0
 		var initializerExpr ast.Expr
@@ -88,13 +87,13 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 
 		// Write type annotation if:
 		// 1. Not a slice conversion (normal case), OR
-		// 2. Is a slice conversion but needs boxing (we need explicit type for $.box())
+		// 2. Is a slice conversion but needs boxing (we need explicit type for $.varRef())
 		if !isSliceConversion || needsBox {
 			c.tsw.WriteLiterally(": ")
 			// Write type annotation
 			if needsBox {
-				// If boxed, the variable holds Box<OriginalGoType>
-				c.tsw.WriteLiterally("$.Box<")
+				// If boxed, the variable holds VarRef<OriginalGoType>
+				c.tsw.WriteLiterally("$.VarRef<")
 
 				// Special case: if this is a slice conversion from an array type,
 				// we should use the slice type instead of the array type
@@ -140,8 +139,8 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		}
 
 		if needsBox {
-			// Boxed variable: let v: Box<T> = $.box(init_or_zero);
-			c.tsw.WriteLiterally("$.box(")
+			// Boxed variable: let v: VarRef<T> = $.varRef(init_or_zero);
+			c.tsw.WriteLiterally("$.varRef(")
 			if hasInitializer {
 				// Write the compiled initializer expression normally
 				if err := c.WriteValueExpr(initializerExpr); err != nil {
@@ -163,17 +162,17 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 					unaryExprXIdent, ok := unaryExpr.X.(*ast.Ident)
 					if ok {
 						innerObj := c.pkg.TypesInfo.Uses[unaryExprXIdent]
-						needsBoxOperand = innerObj != nil && c.analysis.NeedsBoxed(innerObj)
+						needsBoxOperand = innerObj != nil && c.analysis.NeedsVarRef(innerObj)
 					}
 
 					// If v is boxed, assign the box itself (v)
-					// If v is not boxed, assign $.box(v)
+					// If v is not boxed, assign $.varRef(v)
 					if needsBoxOperand {
 						// special handling: do not write .value here.
 						c.WriteIdent(unaryExprXIdent, false)
 					} else {
-						// &unboxedVar -> $.box(unboxedVar)
-						c.tsw.WriteLiterally("$.box(")
+						// &unboxedVar -> $.varRef(unboxedVar)
+						c.tsw.WriteLiterally("$.varRef(")
 						if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Write 'v'
 							return err
 						}

@@ -21,22 +21,22 @@ class TestStruct {
 	}
 
 	public _fields: {
-		IntField: $.Box<number>;
-		StringField: $.Box<string>;
+		IntField: $.VarRef<number>;
+		StringField: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{IntField?: number, StringField?: string}>) {
 		this._fields = {
-			IntField: $.box(init?.IntField ?? 0),
-			StringField: $.box(init?.StringField ?? "")
+			IntField: $.varRef(init?.IntField ?? 0),
+			StringField: $.varRef(init?.StringField ?? "")
 		}
 	}
 
 	public clone(): TestStruct {
 		const cloned = new TestStruct()
 		cloned._fields = {
-			IntField: $.box(this._fields.IntField.value),
-			StringField: $.box(this._fields.StringField.value)
+			IntField: $.varRef(this._fields.IntField.value),
+			StringField: $.varRef(this._fields.StringField.value)
 		}
 		return cloned
 	}

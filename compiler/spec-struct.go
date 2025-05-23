@@ -83,7 +83,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			fieldKeyName = field.Name()
 		}
 		fieldTsType := c.getTypeString(field.Type())
-		c.tsw.WriteLinef("%s: $.Box<%s>;", fieldKeyName, fieldTsType)
+		c.tsw.WriteLinef("%s: $.VarRef<%s>;", fieldKeyName, fieldTsType)
 	}
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")

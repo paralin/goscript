@@ -69,8 +69,8 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 						c.tsw.WriteLiterally("!")
 
 						// Add .value ONLY if the pointer variable itself needs boxed access
-						// This handles the case where 'p' points to a boxed struct (e.g., p = s where s is Box<MyStruct>)
-						if ptrObj != nil && c.analysis.NeedsBoxedAccess(ptrObj) {
+						// This handles the case where 'p' points to a variable referenced struct (e.g., p = s where s is VarRef<MyStruct>)
+						if ptrObj != nil && c.analysis.NeedsVarRefAccess(ptrObj) {
 							c.tsw.WriteLiterally(".value")
 						}
 
@@ -119,7 +119,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	// needs boxed access (e.g., accessing a primitive field via pointer where
 	// the field's address might have been taken elsewhere - less common but possible).
 	// For simple struct field access like p.Val or (*p).Val, WriteIdent(..., true)
-	// relies on NeedsBoxedAccess for the field 'Val', which should typically be false.
+	// relies on NeedsVarRefAccess for the field 'Val', which should typically be false.
 	c.WriteIdent(exp.Sel, true)
 	return nil
 }

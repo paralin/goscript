@@ -408,10 +408,8 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 // variable, function name) into its TypeScript equivalent.
 //   - If the identifier is `nil`, it writes `null`.
 //   - Otherwise, it writes the identifier's name.
-//   - If `accessBoxedValue` is true and the analysis (`c.analysis.NeedsBoxedAccess`)
-//     indicates that this identifier refers to a variable whose value is stored
-//     in a box (due to its address being taken or other boxing requirements),
-//     it appends `.value` to access the actual value from the box.
+//   - If `accessBoxedValue` is true and the analysis (`c.analysis.NeedsVarRefAccess`)
+//     indicates the variable is variable referenced, `.value` is appended to access the contained value.
 //
 // This function relies on `go/types` (`TypesInfo.Uses` or `Defs`) to resolve
 // the identifier and the `Analysis` data to determine boxing needs.
@@ -432,7 +430,7 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool) {
 	c.tsw.WriteLiterally(exp.Name)
 
 	// Determine if we need to access .value based on analysis data
-	if obj != nil && accessBoxedValue && c.analysis.NeedsBoxedAccess(obj) {
+	if obj != nil && accessBoxedValue && c.analysis.NeedsVarRefAccess(obj) {
 		c.tsw.WriteLiterally("!.value")
 	}
 }

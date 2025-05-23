@@ -1,0 +1,8 @@
+setting x to 10
+***p3 == { value: 10 }
+
+setting ***p3 to 12
+***p3 == { value: 12 }
+
+setting y to 15, p1 to &y
+***p3 == { value: 15 }

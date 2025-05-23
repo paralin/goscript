@@ -468,7 +468,9 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 			elemType := ptrType.Elem().Underlying()
 			switch elemType.(type) {
 			case *types.Struct:
-				// This should be treated as an anonymous struct literal
+				// This is an anonymous struct literal with inferred pointer type
+				// Just create the struct object directly - no boxing needed
+				// Anonymous literals are not variables, so they don't get boxed
 				structType := elemType.(*types.Struct)
 				return c.writeUntypedStructLiteral(exp, structType, true) // true = anonymous
 			default:

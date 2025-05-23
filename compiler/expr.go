@@ -411,9 +411,9 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 			if obj == nil {
 				obj = c.pkg.TypesInfo.Defs[ident]
 			}
-			if obj != nil && c.analysis.NeedsBoxed(obj) {
-				// &boxedVar -> boxedVar (the box itself)
-				c.tsw.WriteLiterally(ident.Name) // Write the identifier name (which holds the box)
+			if obj != nil && c.analysis.NeedsVarRef(obj) {
+				// &varRefVar -> varRefVar (the variable reference itself)
+				c.tsw.WriteLiterally(ident.Name) // Write the identifier name (which holds the variable reference)
 				return nil
 			}
 		}

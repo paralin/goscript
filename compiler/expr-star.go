@@ -1,8 +1,8 @@
 package compiler
 
 import (
-	"fmt"
 	"go/ast"
+	"go/types"
 )
 
 // WriteStarExpr translates a Go pointer dereference expression (`ast.StarExpr`, e.g., `*p`)
@@ -15,17 +15,23 @@ import (
 //     (`p` holds a box, so dereference accesses its `value` field).
 //  2. If `p` is not boxed and points to a struct: `*p` -> `p!`.
 //     (`p` holds the struct instance directly; structs are reference types in TS).
-//  3. If `p` is boxed (i.e., `p` is `$.Box<PointerType>`) and points to a primitive/pointer:
-//     `*p` -> `p.value!.value`.
-//     (First `.value` unboxes `p`, then `!.value` dereferences the inner pointer).
-//  4. If `p` is boxed and points to a struct: `*p` -> `p.value!`.
+//  3. If `p` is variable referenced (i.e., `p` is `$.VarRef<PointerType>`) and points to a primitive/pointer:
+//     `p.value!.value` (access the variable reference, then dereference the pointer)
+//  4. If `p` is boxed and points to a struct: `p.value!`.
 //     (First `.value` unboxes `p` to get the struct instance).
 //
 // `WriteValueExpr(operand)` handles the initial unboxing of `p` if `p` itself is a boxed variable.
 // A non-null assertion `!` is always added as pointers can be nil.
-// `c.analysis.NeedsBoxedDeref(ptrType)` determines if an additional `.value` is needed
-// based on whether the dereferenced type is a primitive/pointer (requires `.value`) or
-// a struct (does not require `.value`).
+// `c.analysis.NeedsVarRefAccess(ptrObj)` determines if the pointer variable itself requires `.value` access (case 3).
+// `c.analysis.NeedsVarRefDeref(ptrType)` determines if an additional `.value` is needed for the dereferencing operation itself.
+//
+// Examples:
+//   - Simple pointer to primitive: `p!.value` (where p is *int)
+//   - Variable referenced pointer to primitive: `p.value!.value` (where p is VarRef<*int>)
+//     Example: let p = $.varRef(x) (where x is another variable reference) => p.value!.value
+//   - Pointer to struct: `p!` (where p is *MyStruct)
+//     Example: let p = $.varRef(new MyStruct()) => p.value!
+//   - Variable referenced pointer to struct: `p.value!` (where p is VarRef<*MyStruct>)
 func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	// Generate code for a pointer dereference expression (*p).
 	//
@@ -48,41 +54,28 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	//
 	// NOTE: This logic aligns with design/BOXES_POINTERS.md.
 
-	// Get the operand expression and its type information
-	operand := exp.X
-
-	// Get the type of the operand (the pointer being dereferenced)
-	ptrType := c.pkg.TypesInfo.TypeOf(operand)
-
-	// Special case for handling multi-level dereferencing:
-	// Check if the operand is itself a StarExpr (e.g., **p or ***p)
-	// We need to handle these specially to correctly generate nested .value accesses
-	if starExpr, isStarExpr := operand.(*ast.StarExpr); isStarExpr {
-		// First, write the inner star expression
-		if err := c.WriteStarExpr(starExpr); err != nil {
-			return fmt.Errorf("failed to write inner star expression: %w", err)
-		}
-
-		// Always add .value for multi-level dereferences
-		// For expressions like **p, each * adds a .value
-		c.tsw.WriteLiterally("!.value")
-		return nil
+	// Write the operand (the pointer variable)
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return err
 	}
 
-	// Standard case: single-level dereference
-	// Write the pointer expression, which will access .value if the variable is boxed
-	// WriteValueExpr will add .value if the variable itself is boxed (p.value)
-	if err := c.WriteValueExpr(operand); err != nil {
-		return fmt.Errorf("failed to write star expression operand: %w", err)
-	}
-
-	// Add ! for null assertion - all pointers can be null in TypeScript
+	// Add non-null assertion for pointer safety
 	c.tsw.WriteLiterally("!")
 
-	// Add .value only if we need boxed dereferencing for this type of pointer
+	// Get the object for the operand to check if it needs variable reference access
+	var operandObj types.Object
+	if ident, ok := exp.X.(*ast.Ident); ok {
+		if use := c.pkg.TypesInfo.Uses[ident]; use != nil {
+			operandObj = use
+		} else if def := c.pkg.TypesInfo.Defs[ident]; def != nil {
+			operandObj = def
+		}
+	}
+
+	// Determine if we need .value for dereferencing
 	// This depends on whether we're dereferencing to a primitive (needs .value)
 	// or to a struct (no .value needed)
-	if c.analysis.NeedsBoxedDeref(ptrType) {
+	if operandObj != nil && c.analysis.NeedsVarRefAccess(operandObj) {
 		c.tsw.WriteLiterally(".value")
 	}
 

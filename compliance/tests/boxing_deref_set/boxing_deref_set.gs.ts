@@ -5,13 +5,13 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
 	// y is boxed because p1 takes its address
-	let y: $.Box<number> = $.box(15)
+	let y: $.VarRef<number> = $.varRef(15)
 
 	// p1 is boxed because p1_boxer takes its address
-	let p1: $.Box<$.Box<number> | null> = $.box(null)
+	let p1: $.VarRef<$.VarRef<number> | null> = $.varRef(null)
 	// Ensure p1 is boxed
-	let p1_boxer: $.Box<$.Box<number> | null> | null = p1
-	/* _ = */ p1_boxer
+	let p1_boxer: $.VarRef<$.VarRef<number> | null> | null = p1
+	/* _ = */ p1_boxer!.value
 
 	// Expected TS: p1.value = y
 	p1!.value = y

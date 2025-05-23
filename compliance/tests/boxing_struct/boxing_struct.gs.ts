@@ -12,19 +12,19 @@ class MyStruct {
 	}
 
 	public _fields: {
-		MyInt: $.Box<number>;
+		MyInt: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{MyInt?: number}>) {
 		this._fields = {
-			MyInt: $.box(init?.MyInt ?? 0)
+			MyInt: $.varRef(init?.MyInt ?? 0)
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			MyInt: $.box(this._fields.MyInt.value)
+			MyInt: $.varRef(this._fields.MyInt.value)
 		}
 		return cloned
 	}
@@ -41,7 +41,7 @@ class MyStruct {
 
 export function main(): void {
 	// 'val' is a value type, but its address is taken, so it should be boxed in TS.
-	let val: $.Box<MyStruct> = $.box(new MyStruct({MyInt: 10}))
+	let val: $.VarRef<MyStruct> = $.varRef(new MyStruct({MyInt: 10}))
 	let ptrToVal = val
 
 	// Accessing pointer value, should use .value
