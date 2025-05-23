@@ -264,6 +264,15 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				// Handle direct string(int32) conversion
 				// This assumes 'rune' is int32
 				if tv, ok := c.pkg.TypesInfo.Types[arg]; ok {
+					// Case 3a: Argument is already a string - no-op
+					if basic, isBasic := tv.Type.Underlying().(*types.Basic); isBasic && basic.Kind() == types.String {
+						// Translate string(stringValue) to stringValue (no-op)
+						if err := c.WriteValueExpr(arg); err != nil {
+							return fmt.Errorf("failed to write argument for string(string) no-op conversion: %w", err)
+						}
+						return nil // Handled string(string) no-op
+					}
+
 					if basic, isBasic := tv.Type.Underlying().(*types.Basic); isBasic && (basic.Kind() == types.Int32 || basic.Kind() == types.UntypedRune) {
 						// Translate string(rune_val) to String.fromCharCode(rune_val)
 						c.tsw.WriteLiterally("String.fromCharCode(")
