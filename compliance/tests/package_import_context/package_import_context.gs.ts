@@ -16,8 +16,8 @@ export async function main(): Promise<void> {
 	let myCh = $.makeChannel<{  }>(0, {}, 'both')
 
 	queueMicrotask(async () => {
-		await sctx.Done().receive()
-		await myCh.send({})
+		await $.chanRecv(sctx!.Done())
+		await $.chanSend(myCh, {})
 	})
 
 	// Check that myCh is not readable yet
@@ -44,7 +44,7 @@ export async function main(): Promise<void> {
 	sctxCancel!()
 
 	// Now myCh should become readable
-	await myCh.receive()
+	await $.chanRecv(myCh)
 
 	console.log("read successfully")
 }

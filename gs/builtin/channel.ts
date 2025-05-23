@@ -352,9 +352,9 @@ class BufferedChannel<T> implements Channel<T> {
     }
 
     // Buffer is empty.
-    // If channel is closed (and buffer is empty), subsequent receives panic.
+    // If channel is closed (and buffer is empty), return zero value.
     if (this.closed) {
-      throw new Error('receive on closed channel')
+      return this.zeroValue
     }
 
     // Buffer is empty, channel is open.
@@ -483,7 +483,7 @@ class BufferedChannel<T> implements Channel<T> {
     this.receivers = []
     for (const receiverTask of receiversToNotify) {
       queueMicrotask(() =>
-        receiverTask.rejectReceive(new Error('receive on closed channel')),
+        receiverTask.resolveReceive(this.zeroValue),
       )
     }
 

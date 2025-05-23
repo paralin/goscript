@@ -145,10 +145,21 @@ func CompileGoToTypeScript(t *testing.T, parentModulePath, testDir, tempDir, out
 	if err != nil {
 		t.Fatalf("failed to get absolute path for temp directory %s: %v", tempDir, err)
 	}
+
+	// Check if AllDependencies should be disabled for this test
+	allDependencies := true
+	noAllDepsPath := filepath.Join(testDir, "no-all-deps")
+	if _, err := os.Stat(noAllDepsPath); err == nil {
+		allDependencies = false
+		t.Logf("Disabling AllDependencies for %s: no-all-deps file found", filepath.Base(testDir))
+	} else if !os.IsNotExist(err) {
+		t.Fatalf("failed to check for no-all-deps file in %s: %v", testDir, err)
+	}
+
 	conf := &compiler.Config{
 		Dir:             testDir,
 		OutputPathRoot:  outputDir,
-		AllDependencies: true,
+		AllDependencies: allDependencies,
 	}
 	if err := conf.Validate(); err != nil {
 		t.Fatalf("invalid compiler config: %v", err)
