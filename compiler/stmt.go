@@ -294,6 +294,37 @@ func (c *GoToTSCompiler) WriteStmtGo(exp *ast.GoStmt) error {
 
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("})") // Close the queueMicrotask callback and the statement
+	case *ast.TypeAssertExpr:
+		// Handle type assertion expressions: go x.(func())()
+		// We assume this is always synchronous (no async function returned by type assertion)
+		c.tsw.WriteLiterally("queueMicrotask(() => {")
+
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+
+		// Write the type assertion call
+		if err := c.WriteTypeAssertExpr(fun); err != nil {
+			return fmt.Errorf("failed to write type assertion expression in goroutine: %w", err)
+		}
+
+		// Add non-null assertion since mustTypeAssert throws on failure rather than returning null
+		c.tsw.WriteLiterally("!")
+
+		// Write the function arguments
+		c.tsw.WriteLiterally("(")
+		for i, arg := range callExpr.Args {
+			if i != 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			if err := c.WriteValueExpr(arg); err != nil {
+				return fmt.Errorf("failed to write argument %d in goroutine type assertion function call: %w", i, err)
+			}
+		}
+		c.tsw.WriteLiterally(")")
+		c.tsw.WriteLine("")
+
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("})") // Close the queueMicrotask callback and the statement
 	default:
 		return errors.Errorf("unhandled goroutine function type: %T", callExpr.Fun)
 	}
