@@ -327,21 +327,75 @@ class Pair<T extends any> {
 }
 ```
 
-## Conclusion
+### Method Resolution for Generic Types
 
-The GoScript generics implementation successfully translates Go's generic types and functions to TypeScript while maintaining:
+The compiler correctly identifies methods defined on generic struct receivers, handling both simple identifiers (`Pair`) and indexed expressions (`Pair[T]`) when parsing method receivers.
 
-1. **Type Safety**: Full TypeScript type checking with proper constraint handling
-2. **Runtime Correctness**: Consistent behavior with Go semantics through specialized helpers
-3. **Performance**: Direct operations where possible, helpers only when needed
-4. **Compatibility**: Support for all Go generic features including union constraints and type inference
+### Generic Interfaces
 
-The implementation covers:
-- ✅ Generic functions with type parameters and constraints
-- ✅ Generic struct types with proper method handling
-- ✅ Union-constrained type parameters with specialized operations
-- ✅ Type inference and instantiation
-- ✅ Runtime type registration and support
-- ✅ Complete TypeScript compilation pipeline
+Generic interfaces are translated to TypeScript interface types with type parameters. The compiler properly handles:
 
-This provides a robust foundation for using Go generics in the TypeScript target environment while maintaining the familiar Go programming model.
+- Type parameter declaration on the interface type
+- Method signatures using type parameters  
+- Runtime type registration with method metadata
+
+```go
+// Go
+type Container[T any] interface {
+    Get() T
+    Set(T)
+    Size() int
+}
+
+type Comparable[T comparable] interface {
+    Compare(T) int
+    Equal(T) bool
+}
+```
+
+```typescript
+// TypeScript
+type Container<T extends any> = null | {
+    Get(): T
+    Set(_p0: T): void
+    Size(): number
+}
+
+type Comparable<T extends $.Comparable> = null | {
+    Compare(_p0: T): number
+    Equal(_p0: T): boolean
+}
+
+// Runtime registration follows the same pattern as non-generic interfaces
+$.registerInterfaceType(
+  'Container',
+  null, // Zero value for interface is null
+  [/* method signatures */]
+);
+```
+
+#### Implementation Details for Generic Interfaces
+
+The compiler handles generic interfaces through:
+
+1. **Type Parameter Processing**: The `WriteInterfaceTypeSpec` function includes type parameter handling using the same mechanism as generic structs
+2. **Method Translation**: Type parameters in method signatures are preserved in the TypeScript interface structure
+3. **Runtime Registration**: Interface types are registered using their base name (without type parameters) for runtime type checking
+
+Functions can use generic interfaces as constraints and parameter types:
+
+```go
+// Go
+func useContainer[T any](c Container[T], val T) T {
+    c.Set(val)
+    return c.Get()
+}
+```
+
+```typescript
+// TypeScript  
+function useContainer<T extends any>(c: Container<T>, val: T): T {
+    c!.Set(val)
+    return c!.Get()
+}
+```

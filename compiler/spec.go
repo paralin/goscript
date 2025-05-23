@@ -183,6 +183,12 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 	if err := c.WriteValueExpr(a.Name); err != nil {
 		return err
 	}
+
+	// Write type parameters if present (for generics)
+	if a.TypeParams != nil {
+		c.WriteTypeParameters(a.TypeParams)
+	}
+
 	c.tsw.WriteLiterally(" = ")
 	// Get the types.Interface from the ast.InterfaceType.
 	// For an interface definition like `type MyInterface interface { M() }`,
