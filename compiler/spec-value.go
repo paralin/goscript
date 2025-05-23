@@ -86,13 +86,31 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		c.tsw.WriteLiterally("let ")
 		c.tsw.WriteLiterally(name.Name)
 
-		if !isSliceConversion {
+		// Write type annotation if:
+		// 1. Not a slice conversion (normal case), OR
+		// 2. Is a slice conversion but needs boxing (we need explicit type for $.box())
+		if !isSliceConversion || needsBox {
 			c.tsw.WriteLiterally(": ")
 			// Write type annotation
 			if needsBox {
 				// If boxed, the variable holds Box<OriginalGoType>
 				c.tsw.WriteLiterally("$.Box<")
-				c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
+
+				// Special case: if this is a slice conversion from an array type,
+				// we should use the slice type instead of the array type
+				if isSliceConversion {
+					if arrayType, isArray := goType.Underlying().(*types.Array); isArray {
+						// Convert [N]T to $.Slice<T>
+						c.tsw.WriteLiterally("$.Slice<")
+						c.WriteGoType(arrayType.Elem(), GoTypeContextGeneral)
+						c.tsw.WriteLiterally(">")
+					} else {
+						// For slice types, write as-is (already $.Slice<T>)
+						c.WriteGoType(goType, GoTypeContextGeneral)
+					}
+				} else {
+					c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
+				}
 				c.tsw.WriteLiterally(">")
 			} else {
 				// If not boxed, the variable holds the translated Go type directly

@@ -98,9 +98,51 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 				// Add type annotation for boxed variables in declarations
 				if lhsObj != nil {
+					// Check if the RHS will result in an $.arrayToSlice call in TypeScript
+					isSliceConversion := false
+					if len(rhs) > 0 {
+						rhsExpr := rhs[0]
+
+						// Case 1: Direct call to $.arrayToSlice in Go source
+						if callExpr, isCallExpr := rhsExpr.(*ast.CallExpr); isCallExpr {
+							if selExpr, isSelExpr := callExpr.Fun.(*ast.SelectorExpr); isSelExpr {
+								if pkgIdent, isPkgIdent := selExpr.X.(*ast.Ident); isPkgIdent && pkgIdent.Name == "$" {
+									if selExpr.Sel.Name == "arrayToSlice" {
+										isSliceConversion = true
+									}
+								}
+							}
+						}
+
+						// Case 2: Go array or slice literal, which will be compiled to $.arrayToSlice
+						if !isSliceConversion {
+							if _, isCompositeLit := rhsExpr.(*ast.CompositeLit); isCompositeLit {
+								switch lhsObj.Type().Underlying().(type) {
+								case *types.Slice, *types.Array:
+									isSliceConversion = true
+								}
+							}
+						}
+					}
+
 					c.tsw.WriteLiterally(": ")
 					c.tsw.WriteLiterally("$.Box<")
-					c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
+
+					// Special case: if this is a slice conversion from an array type,
+					// we should use the slice type instead of the array type
+					if isSliceConversion {
+						if arrayType, isArray := lhsObj.Type().Underlying().(*types.Array); isArray {
+							// Convert [N]T to $.Slice<T>
+							c.tsw.WriteLiterally("$.Slice<")
+							c.WriteGoType(arrayType.Elem(), GoTypeContextGeneral)
+							c.tsw.WriteLiterally(">")
+						} else {
+							// For slice types, write as-is (already $.Slice<T>)
+							c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
+						}
+					} else {
+						c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
+					}
 					c.tsw.WriteLiterally(">")
 				}
 

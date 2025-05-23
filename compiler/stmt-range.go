@@ -231,5 +231,88 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		}
 	}
 
+	// Handle pointer to array/slice types
+	if ptrType, ok := underlying.(*types.Pointer); ok {
+		elem := ptrType.Elem().Underlying()
+		_, isSlice := elem.(*types.Slice)
+		_, isArray := elem.(*types.Array)
+		if isArray || isSlice {
+			// For pointer to array/slice, we always need to dereference with .value
+			// because the pointed-to value is boxed when its address is taken
+
+			// Determine the index variable name for the generated loop
+			indexVarName := "_i" // Default name
+			if exp.Key != nil {
+				if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
+					indexVarName = keyIdent.Name
+				}
+			}
+			// If both key and value are provided, use an index loop and assign both
+			if exp.Key != nil && exp.Value != nil {
+				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
+				if err := c.WriteValueExpr(exp.X); err != nil { // Write the expression for the iterable
+					return fmt.Errorf("failed to write range loop pointer array/slice expression (key and value): %w", err)
+				}
+				c.tsw.WriteLiterally("!.value")
+				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
+				c.tsw.Indent(1)
+				c.tsw.WriteLine("")
+				// Declare value if not blank
+				if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+					c.tsw.WriteLiterally("const ")
+					c.WriteIdent(ident, false)
+					c.tsw.WriteLiterally(" = ")
+					if err := c.WriteValueExpr(exp.X); err != nil {
+						return fmt.Errorf("failed to write range loop pointer array/slice value expression: %w", err)
+					}
+					c.tsw.WriteLiterallyf("!.value![%s]", indexVarName)
+					c.tsw.WriteLine("")
+				}
+				if err := c.WriteStmt(exp.Body); err != nil {
+					return fmt.Errorf("failed to write range loop pointer array/slice body (key and value): %w", err)
+				}
+				c.tsw.Indent(-1)
+				c.tsw.WriteLine("}")
+				return nil
+			} else if exp.Key != nil && exp.Value == nil { // Only key provided
+				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
+				// Write the expression for the iterable
+				if err := c.WriteValueExpr(exp.X); err != nil {
+					return fmt.Errorf("failed to write expression for the pointer iterable: %w", err)
+				}
+				c.tsw.WriteLiterally("!.value")
+				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
+				c.tsw.Indent(1)
+				c.tsw.WriteLine("")
+				if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+					return fmt.Errorf("failed to write range loop pointer array/slice body (only key): %w", err)
+				}
+				c.tsw.Indent(-1)
+				c.tsw.WriteLine("}")
+				return nil
+			} else if exp.Key == nil && exp.Value != nil { // Only value provided
+				// I think this is impossible. See for_range_value_only test.
+				return errors.Errorf("unexpected value without key in for range expression: %v", exp)
+			} else {
+				// Fallback: simple index loop without declaring range variables, use _i
+				indexVarName := "_i"
+				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
+				if err := c.WriteValueExpr(exp.X); err != nil {
+					return fmt.Errorf("failed to write range loop pointer array/slice length expression (fallback): %w", err)
+				}
+				c.tsw.WriteLiterally("!.value")
+				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
+				c.tsw.Indent(1)
+				c.tsw.WriteLine("")
+				if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+					return fmt.Errorf("failed to write range loop pointer array/slice body (fallback): %w", err)
+				}
+				c.tsw.Indent(-1)
+				c.tsw.WriteLine("}")
+				return nil
+			}
+		}
+	}
+
 	return errors.Errorf("unsupported range loop type: %T for expression %v", underlying, exp)
 }
