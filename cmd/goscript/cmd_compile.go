@@ -44,7 +44,7 @@ var CompileCommands = []*cli.Command{{
 		&cli.StringFlag{
 			Name:        "output",
 			Usage:       "the output typescript path to use",
-			Destination: &cliCompilerConfig.OutputPathRoot,
+			Destination: &cliCompilerConfig.OutputPath,
 			Value:       "./output",
 			EnvVars:     []string{"GOSCRIPT_OUTPUT"},
 		},

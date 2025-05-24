@@ -202,7 +202,7 @@ func NewPackageCompiler(
 		le:           le,
 		pkg:          pkg,
 		compilerConf: compilerConf,
-		outputPath:   ComputeModulePath(compilerConf.OutputPathRoot, pkg.PkgPath),
+		outputPath:   ComputeModulePath(compilerConf.OutputPath, pkg.PkgPath),
 	}
 
 	return res, nil
@@ -351,7 +351,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	pkgPath := c.pkg.PkgPath
 
 	outputFilePath := TranslateGoFilePathToTypescriptFilePath(pkgPath, filepath.Base(c.fullPath))
-	outputFilePathAbs := filepath.Join(c.compilerConfig.OutputPathRoot, outputFilePath)
+	outputFilePathAbs := filepath.Join(c.compilerConfig.OutputPath, outputFilePath)
 
 	if err := os.MkdirAll(filepath.Dir(outputFilePathAbs), 0o755); err != nil {
 		return err

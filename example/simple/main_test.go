@@ -25,7 +25,7 @@ func TestBuildRunExampleSimple(t *testing.T) {
 	le := logrus.NewEntry(logger)
 
 	conf := &compiler.Config{
-		OutputPathRoot: outputDir,
+		OutputPath: outputDir,
 	}
 	if err := conf.Validate(); err != nil {
 		t.Fatalf("invalid compiler config: %v", err)

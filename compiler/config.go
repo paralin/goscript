@@ -13,8 +13,8 @@ type Config struct {
 
 	// Dir is the working directory for the compiler. If empty, uses the current working directory.
 	Dir string
-	// OutputPathRoot is the output path root.
-	OutputPathRoot string
+	// OutputPath is the output path root.
+	OutputPath string
 	// BuildFlags are the Go build flags (tags) to use during analysis.
 	BuildFlags []string
 	// AllDependencies controls whether to compile all dependencies of the requested packages.
@@ -30,7 +30,7 @@ func (c *Config) Validate() error {
 	if c.fset == nil {
 		c.fset = token.NewFileSet()
 	}
-	if c.OutputPathRoot == "" {
+	if c.OutputPath == "" {
 		return errors.New("output path root must be specified")
 	}
 	return nil

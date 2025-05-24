@@ -81,7 +81,7 @@ func main() {
 
     // Configure the compiler
     conf := &compiler.Config{
-        OutputPathRoot: "./ts_output",          // Directory for generated TypeScript files
+        OutputPath: "./ts_output",          // Directory for generated TypeScript files
     }
     if err := conf.Validate(); err != nil {
         log.Fatalf("invalid compiler config: %v", err)

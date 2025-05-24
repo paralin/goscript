@@ -158,7 +158,7 @@ func CompileGoToTypeScript(t *testing.T, parentModulePath, testDir, tempDir, out
 
 	conf := &compiler.Config{
 		Dir:             testDir,
-		OutputPathRoot:  outputDir,
+		OutputPath:      outputDir,
 		AllDependencies: allDependencies,
 	}
 	if err := conf.Validate(); err != nil {
