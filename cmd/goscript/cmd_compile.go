@@ -62,6 +62,13 @@ var CompileCommands = []*cli.Command{{
 			Destination: &cliCompilerBuildFlags,
 			EnvVars:     []string{"GOSCRIPT_BUILD_FLAGS"},
 		},
+		&cli.BoolFlag{
+			Name:        "disable-emit-builtin",
+			Usage:       "disable emitting built-in packages that have handwritten equivalents",
+			Destination: &cliCompilerConfig.DisableEmitBuiltin,
+			Value:       false,
+			EnvVars:     []string{"GOSCRIPT_DISABLE_EMIT_BUILTIN"},
+		},
 	},
 }}
 
