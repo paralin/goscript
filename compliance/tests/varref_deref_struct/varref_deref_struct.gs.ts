@@ -46,7 +46,7 @@ export function main(): void {
 	console.log(myStruct!.MyInt)
 
 	let myOtherStruct = new MyStruct({MyInt: 1})
-	if ((true)) {
+	if ((myOtherStruct !== myStruct)) {
 		console.log("expected not equal")
 	}
 }
