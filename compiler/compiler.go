@@ -146,6 +146,16 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 		*/
 	}
 
+	// If DisableEmitBuiltin is false, we need to copy the builtin package to the output directory
+	if !c.config.DisableEmitBuiltin {
+		c.le.Infof("Copying builtin package to output directory")
+		builtinPath := "gs/builtin"
+		outputPath := ComputeModulePath(c.config.OutputPath, "builtin")
+		if err := c.copyEmbeddedPackage(builtinPath, outputPath); err != nil {
+			return fmt.Errorf("failed to copy builtin package to output directory: %w", err)
+		}
+	}
+
 	// Compile all packages
 	for _, pkg := range pkgs {
 		// Check if the package has a handwritten equivalent
