@@ -22,8 +22,10 @@ import (
 //
 // `WriteValueExpr(operand)` handles the initial unvarRefing of `p` if `p` itself is a varrefed variable.
 // A non-null assertion `!` is always added as pointers can be nil.
-// `c.analysis.NeedsVarRefAccess(ptrObj)` determines if the pointer variable itself requires `.value` access (case 3).
-// `c.analysis.NeedsVarRefDeref(ptrType)` determines if an additional `.value` is needed for the dereferencing operation itself.
+// The function determines if `.value` access is needed by checking what the Go pointer operand points to.
+//
+// For multi-level dereferences like `***p`, this function is called recursively, with each level
+// adding the appropriate `!.value` suffix.
 //
 // Examples:
 //   - Simple pointer to primitive: `p!.value` (where p is *int)
@@ -32,51 +34,35 @@ import (
 //   - Pointer to struct: `p!` (where p is *MyStruct)
 //     Example: let p = $.varRef(new MyStruct()) => p.value!
 //   - Variable referenced pointer to struct: `p.value!` (where p is VarRef<*MyStruct>)
+//   - Triple pointer: `p3!.value!.value!.value` (where p3 is VarRef<VarRef<VarRef<number> | null> | null> | null)
 func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
-	// Generate code for a pointer dereference expression (*p).
-	//
-	// IMPORTANT: Pointer dereferencing in TypeScript requires careful handling of the varRef/unvarRef state:
-	//
-	// 1. p!.value - when p is not varrefed and points to a primitive/pointer
-	//    Example: let p = x (where x is a varRef) => p!.value
-	//
-	// 2. p!       - when p is not varrefed and points to a struct
-	//    Example: let p = new MyStruct() => p! (structs are reference types)
-	//
-	// 3. p.value!.value - when p is varrefed and points to a primitive/pointer
-	//    Example: let p = $.varRef(x) (where x is another varRef) => p.value!.value
-	//
-	// 4. p.value! - when p is varrefed and points to a struct
-	//    Example: let p = $.varRef(new MyStruct()) => p.value!
-	//
-	// Critical bug fix: We must handle each case correctly to avoid over-dereferencing
-	// (adding too many .value) or under-dereferencing (missing .value where needed)
-	//
-	// NOTE: This logic aligns with design/VAR_REFS.md.
-
-	// Write the operand (the pointer variable)
-	if err := c.WriteValueExpr(exp.X); err != nil {
-		return err
+	// Special handling for the operand to avoid double .value access
+	// When dereferencing, we want the pointer itself, not its value
+	switch operand := exp.X.(type) {
+	case *ast.Ident:
+		// For identifiers, write without accessing .value
+		// This prevents the double .value issue
+		c.WriteIdent(operand, false)
+	default:
+		// For other expressions (like nested star expressions), use WriteValueExpr
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return err
+		}
 	}
 
 	// Add non-null assertion for pointer safety
 	c.tsw.WriteLiterally("!")
 
-	// Get the object for the operand to check if it needs variable reference access
-	var operandObj types.Object
-	if ident, ok := exp.X.(*ast.Ident); ok {
-		if use := c.pkg.TypesInfo.Uses[ident]; use != nil {
-			operandObj = use
-		} else if def := c.pkg.TypesInfo.Defs[ident]; def != nil {
-			operandObj = def
+	// Check what the operand points to (not what the result is)
+	// This is the key fix: we need to check the operand type, not the result type
+	operandType := c.pkg.TypesInfo.TypeOf(exp.X)
+	if ptrType, isPtr := operandType.(*types.Pointer); isPtr {
+		elemType := ptrType.Elem()
+		// Only add .value if NOT pointing to a struct
+		if _, isStruct := elemType.Underlying().(*types.Struct); !isStruct {
+			c.tsw.WriteLiterally(".value")
 		}
-	}
-
-	// Determine if we need .value for dereferencing
-	// This depends on whether we're dereferencing to a primitive (needs .value)
-	// or to a struct (no .value needed)
-	if operandObj != nil && c.analysis.NeedsVarRefAccess(operandObj) {
-		c.tsw.WriteLiterally(".value")
+		// If pointing to a struct, don't add .value (structs are reference types in TS)
 	}
 
 	return nil
