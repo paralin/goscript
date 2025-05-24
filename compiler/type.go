@@ -202,7 +202,8 @@ func (c *GoToTSCompiler) WriteBasicType(t *types.Basic) {
 
 // WriteNamedType translates a Go named type to its TypeScript equivalent.
 // It specially handles the error interface as $.GoError, and uses the original
-// type name for other named types. For generic types, it includes type arguments.
+// type name for other named types. For imported types, it writes the qualified
+// name using the import alias found from the analysis imports. For generic types, it includes type arguments.
 func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 	// Check if the named type is the error interface
 	if iface, ok := t.Underlying().(*types.Interface); ok && iface.String() == "interface{Error() string}" {
@@ -210,7 +211,40 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 		return
 	}
 
-	// Use Obj().Name() for the original defined name
+	// Check if this type is from an imported package
+	typePkg := t.Obj().Pkg()
+	if typePkg != nil && typePkg != c.pkg.Types {
+		// This type is from an imported package, find the import alias
+		typePkgPath := typePkg.Path()
+
+		// Try to find the import alias by matching the package path
+		for importAlias, _ := range c.analysis.Imports {
+			// The importAlias could be either the explicit alias or the default package name
+			// If it's the default package name, it should match the last segment of the path
+			defaultPkgName := packageNameFromGoPath(typePkgPath)
+			if importAlias == defaultPkgName || importAlias == typePkgPath {
+				// Write the qualified name: importAlias.TypeName
+				c.tsw.WriteLiterally(importAlias)
+				c.tsw.WriteLiterally(".")
+				c.tsw.WriteLiterally(t.Obj().Name())
+
+				// For generic types, include type arguments
+				if t.TypeArgs() != nil && t.TypeArgs().Len() > 0 {
+					c.tsw.WriteLiterally("<")
+					for i := 0; i < t.TypeArgs().Len(); i++ {
+						if i > 0 {
+							c.tsw.WriteLiterally(", ")
+						}
+						c.WriteGoType(t.TypeArgs().At(i), GoTypeContextGeneral)
+					}
+					c.tsw.WriteLiterally(">")
+				}
+				return
+			}
+		}
+	}
+
+	// Use Obj().Name() for the original defined name (local types or unmatched imports)
 	c.tsw.WriteLiterally(t.Obj().Name())
 
 	// For generic types, include type arguments

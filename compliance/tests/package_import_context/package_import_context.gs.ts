@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 import * as context from "@goscript/context/index.js"
 
-async function run(ctx: Context): Promise<void> {
+async function run(ctx: context.Context): Promise<void> {
 	await using __defer = new $.AsyncDisposableStack();
 	let [sctx, sctxCancel] = context.WithCancel(ctx)
 	__defer.defer(() => {
