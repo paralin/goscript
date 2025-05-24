@@ -1,6 +1,3 @@
-// Generated file based on varref_deref_set.go
-// Updated when compliance tests are re-run, DO NOT EDIT!
-
 import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {

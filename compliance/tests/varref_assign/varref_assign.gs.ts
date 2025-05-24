@@ -12,7 +12,7 @@ export function main(): void {
 	// p2 is varrefed as p3 takes the address
 	let p2: $.VarRef<$.VarRef<$.VarRef<number> | null> | null> = $.varRef(p1)
 	// p3 is not varrefed as nothing takes its address
-	let p3: $.VarRef<$.VarRef<$.VarRef<number> | null> | null> | null = p2
+	let p3: $.VarRef<$.VarRef<number> | null> | null | null = p2
 	/* _ = */ p3!.value
 
 	// should be: let y: $.VarRef<number> = $.varRef(15)

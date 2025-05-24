@@ -71,6 +71,23 @@ func main() {
 				"myStruct": {NeedsVarRef: false, NeedsVarRefAccess: false}, // NOT varrefed, direct pointer to struct
 			},
 		},
+		{
+			name: "pointer_composite_literal_untyped",
+			code: `package main
+func main() {
+	var ptr *struct{ x int }
+	ptr = &struct{ x int }{42}
+	println("Pointer value x:", ptr.x)
+
+	data := []*struct{ x int }{{42}, {43}}
+	println("First element x:", data[0].x)
+	println("Second element x:", data[1].x)
+}`,
+			expected: map[string]AnalysisExpectation{
+				"ptr":  {NeedsVarRef: false, NeedsVarRefAccess: false}, // Should NOT be varrefed
+				"data": {NeedsVarRef: false, NeedsVarRefAccess: false}, // Should NOT be varrefed
+			},
+		},
 	}
 
 	for _, tt := range tests {

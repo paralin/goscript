@@ -92,8 +92,10 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 				// write the type annotation
 				c.tsw.WriteLiterally("<")
-				// Write the element type using the existing function
-				c.WriteTypeExpr(arrType.Elt)
+				// Write the element type without VarRef wrapping for pointer types
+				// This ensures array elements are correctly typed as ElementType | null
+				// instead of $.VarRef<ElementType> | null
+				c.WriteNonVarRefTypeExpr(arrType.Elt)
 				c.tsw.WriteLiterally(">")
 			}
 

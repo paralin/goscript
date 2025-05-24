@@ -12,8 +12,8 @@ export function main(): void {
 	let b: $.VarRef<string> = $.varRef("")
 
 	// Create pointers - these will be properly varrefed
-	let pA: $.VarRef<number> | null = a
-	let pB: $.VarRef<string> | null = b
+	let pA: number | null = a
+	let pB: string | null = b
 
 	// This should trigger the "unhandled LHS expression in destructuring: *ast.StarExpr" error
 	{

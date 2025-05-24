@@ -3,7 +3,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 export function main(): void {
 	// This should trigger "unhandled composite literal type: *types.Pointer"
 	// because the composite literal {} has no explicit type, but its type gets inferred as a pointer
-	let ptr: $.VarRef<{ x?: number }> | null = null
+	let ptr: { x?: number } | null = null
 	ptr = {x: 42}
 	console.log("Pointer value x:", ptr!.x)
 

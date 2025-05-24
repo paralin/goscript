@@ -25,6 +25,25 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 	c.WriteGoType(typ, GoTypeContextGeneral)
 }
 
+// WriteNonVarRefTypeExpr translates a Go abstract syntax tree (AST) expression (`ast.Expr`)
+// that represents a type into its TypeScript type equivalent, but treats pointer types
+// as non-VarRef (ElementType | null instead of $.VarRef<ElementType> | null).
+// This is useful for array element types and other contexts where pointers shouldn't
+// be automatically wrapped in VarRef.
+func (c *GoToTSCompiler) WriteNonVarRefTypeExpr(a ast.Expr) {
+	// Get type information for the expression
+	typ := c.pkg.TypesInfo.TypeOf(a)
+
+	// Special handling for pointer types - don't wrap in VarRef
+	if ptrType, isPtr := typ.(*types.Pointer); isPtr {
+		c.WriteNonVarRefPointerType(ptrType)
+		return
+	}
+
+	// For all other types, use the standard type generation
+	c.WriteGoType(typ, GoTypeContextGeneral)
+}
+
 // writeTypeDescription writes the TypeInfo for a type expr.
 func (c *GoToTSCompiler) writeTypeDescription(typeExpr ast.Expr) {
 	switch t := typeExpr.(type) {
