@@ -665,6 +665,16 @@ func (c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup) {
 // copyEmbeddedPackage recursively copies files from an embedded FS path to a filesystem directory.
 // It handles both regular files and directories.
 func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) error {
+	// Remove the output path if it exists
+	if err := os.RemoveAll(outputPath); err != nil {
+		return fmt.Errorf("failed to remove output directory %s: %w", outputPath, err)
+	}
+
+	// Create the output path
+	if err := os.MkdirAll(outputPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory %s: %w", outputPath, err)
+	}
+
 	// List the entries in the embedded path
 	entries, err := gs.GsOverrides.ReadDir(embeddedPath)
 	if err != nil {
