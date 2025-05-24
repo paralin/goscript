@@ -422,7 +422,7 @@ func (c *GoToTSCompiler) WriteSignatureType(t *types.Signature) {
 
 		// Use parameter name if available, otherwise use p0, p1, etc.
 		if param.Name() != "" {
-			c.tsw.WriteLiterally(param.Name())
+			c.tsw.WriteLiterally(c.sanitizeIdentifier(param.Name()))
 		} else {
 			c.tsw.WriteLiterallyf("p%d", i)
 		}
@@ -517,7 +517,7 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 				if paramName == "" || paramName == "_" {
 					paramName = fmt.Sprintf("_p%d", j)
 				}
-				c.tsw.WriteLiterally(paramName)
+				c.tsw.WriteLiterally(c.sanitizeIdentifier(paramName))
 				c.tsw.WriteLiterally(": ")
 				c.WriteGoType(paramVar.Type(), GoTypeContextGeneral) // Recursive call for param type
 			}
@@ -675,3 +675,4 @@ func (c *GoToTSCompiler) WriteTypeConstraint(constraint ast.Expr) {
 		c.WriteTypeExpr(constraint)
 	}
 }
+

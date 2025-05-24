@@ -1,0 +1,9 @@
+Testing single value iterator:
+value: 0
+value: 1
+value: 2
+Testing key-value iterator:
+key: 0 value: a
+key: 1 value: b
+key: 2 value: c
+test finished

@@ -146,13 +146,15 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			if err := c.WriteValueExpr(exp.X); err != nil { // This is N
 				return fmt.Errorf("failed to write range loop integer expression: %w", err)
 			}
-			c.tsw.WriteLiterallyf("; %s++) ", indexVarName)
+			c.tsw.WriteLiterallyf("; %s++) {", indexVarName)
 
 			// write body
 			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
 				return fmt.Errorf("failed to write range loop integer body: %w", err)
 			}
 
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
 			return nil
 		}
 	}
@@ -339,6 +341,207 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				return nil
 			}
 		}
+	}
+
+	// Handle iterator function signatures
+	if sig, ok := underlying.(*types.Signature); ok {
+		// Check if this is an iterator function signature
+		// Iterator functions have the form: func(yield func(...) bool)
+		params := sig.Params()
+		if params.Len() == 1 {
+			yieldParam := params.At(0).Type()
+			if yieldSig, ok := yieldParam.Underlying().(*types.Signature); ok {
+				yieldParams := yieldSig.Params()
+				yieldResults := yieldSig.Results()
+
+				// Verify the yield function returns bool
+				if yieldResults.Len() == 1 {
+					if basic, ok := yieldResults.At(0).Type().Underlying().(*types.Basic); ok && basic.Kind() == types.Bool {
+						// This is an iterator function
+						// Generate TypeScript code that calls the iterator with a yield function
+
+						if yieldParams.Len() == 0 {
+							// func(func() bool) - iterator with no values
+							c.tsw.WriteLiterally(";(() => {")
+							c.tsw.Indent(1)
+							c.tsw.WriteLine("")
+							c.tsw.WriteLiterally("let shouldContinue = true")
+							c.tsw.WriteLine("")
+							if err := c.WriteValueExpr(exp.X); err != nil {
+								return fmt.Errorf("failed to write iterator expression: %w", err)
+							}
+							c.tsw.WriteLiterally("(() => {")
+							c.tsw.Indent(1)
+							c.tsw.WriteLine("")
+							if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+								return fmt.Errorf("failed to write iterator body: %w", err)
+							}
+							c.tsw.WriteLiterally("return shouldContinue")
+							c.tsw.WriteLine("")
+							c.tsw.Indent(-1)
+							c.tsw.WriteLiterally("})")
+							c.tsw.WriteLine("")
+							c.tsw.Indent(-1)
+							c.tsw.WriteLiterally("})()")
+							return nil
+						} else if yieldParams.Len() == 1 {
+							// func(func(V) bool) - iterator with one value
+							c.tsw.WriteLiterally(";(() => {")
+							c.tsw.Indent(1)
+							c.tsw.WriteLine("")
+							c.tsw.WriteLiterally("let shouldContinue = true")
+							c.tsw.WriteLine("")
+							if err := c.WriteValueExpr(exp.X); err != nil {
+								return fmt.Errorf("failed to write iterator expression: %w", err)
+							}
+							c.tsw.WriteLiterally("((")
+							if exp.Value != nil {
+								if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+									c.WriteIdent(ident, false)
+								} else {
+									c.tsw.WriteLiterally("v")
+								}
+							} else {
+								c.tsw.WriteLiterally("v")
+							}
+							c.tsw.WriteLiterally(") => {")
+							c.tsw.Indent(1)
+							c.tsw.WriteLine("")
+							if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+								return fmt.Errorf("failed to write iterator body: %w", err)
+							}
+							c.tsw.WriteLiterally("return shouldContinue")
+							c.tsw.WriteLine("")
+							c.tsw.Indent(-1)
+							c.tsw.WriteLiterally("})")
+							c.tsw.WriteLine("")
+							c.tsw.Indent(-1)
+							c.tsw.WriteLiterally("})()")
+							return nil
+						} else if yieldParams.Len() == 2 {
+							// func(func(K, V) bool) - iterator with key-value pairs
+							c.tsw.WriteLiterally(";(() => {")
+							c.tsw.Indent(1)
+							c.tsw.WriteLine("")
+							c.tsw.WriteLiterally("let shouldContinue = true")
+							c.tsw.WriteLine("")
+							if err := c.WriteValueExpr(exp.X); err != nil {
+								return fmt.Errorf("failed to write iterator expression: %w", err)
+							}
+							c.tsw.WriteLiterally("((")
+							if exp.Key != nil {
+								if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
+									c.WriteIdent(ident, false)
+								} else {
+									c.tsw.WriteLiterally("k")
+								}
+							} else {
+								c.tsw.WriteLiterally("k")
+							}
+							c.tsw.WriteLiterally(", ")
+							if exp.Value != nil {
+								if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+									c.WriteIdent(ident, false)
+								} else {
+									c.tsw.WriteLiterally("v")
+								}
+							} else {
+								c.tsw.WriteLiterally("v")
+							}
+							c.tsw.WriteLiterally(") => {")
+							c.tsw.Indent(1)
+							c.tsw.WriteLine("")
+							if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+								return fmt.Errorf("failed to write iterator body: %w", err)
+							}
+							c.tsw.WriteLiterally("return shouldContinue")
+							c.tsw.WriteLine("")
+							c.tsw.Indent(-1)
+							c.tsw.WriteLiterally("})")
+							c.tsw.WriteLine("")
+							c.tsw.Indent(-1)
+							c.tsw.WriteLiterally("})()")
+							return nil
+						}
+					}
+				}
+			}
+		}
+	}
+
+	// Handle interface types that may represent iterators
+	if _, ok := underlying.(*types.Interface); ok {
+		// For interface types, we need to treat them as potential iterators
+		// In Go 1.23+, interfaces can represent iterator functions
+		// We'll attempt to call them as iterator functions with a yield callback
+
+		// Try to determine the iterator pattern based on context or assume key-value pairs
+		// Since we can't easily determine the exact signature from just the interface,
+		// we'll generate a generic iterator call pattern
+
+		c.tsw.WriteLiterally(";(() => {")
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+		c.tsw.WriteLiterally("let shouldContinue = true")
+		c.tsw.WriteLine("")
+
+		// Call the interface as an iterator function
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write interface iterator expression: %w", err)
+		}
+
+		// Generate the appropriate yield function based on the range variables
+		if exp.Key != nil && exp.Value != nil {
+			// Key-value iterator
+			c.tsw.WriteLiterally("((")
+			if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
+				c.WriteIdent(ident, false)
+			} else {
+				c.tsw.WriteLiterally("k")
+			}
+			c.tsw.WriteLiterally(", ")
+			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+				c.WriteIdent(ident, false)
+			} else {
+				c.tsw.WriteLiterally("v")
+			}
+			c.tsw.WriteLiterally(") => {")
+		} else if exp.Value != nil {
+			// Value-only iterator
+			c.tsw.WriteLiterally("((")
+			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+				c.WriteIdent(ident, false)
+			} else {
+				c.tsw.WriteLiterally("v")
+			}
+			c.tsw.WriteLiterally(") => {")
+		} else if exp.Key != nil {
+			// Key-only iterator (treating it as value for single-param iterator)
+			c.tsw.WriteLiterally("((")
+			if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
+				c.WriteIdent(ident, false)
+			} else {
+				c.tsw.WriteLiterally("k")
+			}
+			c.tsw.WriteLiterally(") => {")
+		} else {
+			// No variables iterator
+			c.tsw.WriteLiterally("(() => {")
+		}
+
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+		if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+			return fmt.Errorf("failed to write interface iterator body: %w", err)
+		}
+		c.tsw.WriteLiterally("return shouldContinue")
+		c.tsw.WriteLine("")
+		c.tsw.Indent(-1)
+		c.tsw.WriteLiterally("})")
+		c.tsw.WriteLine("")
+		c.tsw.Indent(-1)
+		c.tsw.WriteLiterally("})()")
+		return nil
 	}
 
 	return errors.Errorf("unsupported range loop type: %T for expression %v", underlying, exp)

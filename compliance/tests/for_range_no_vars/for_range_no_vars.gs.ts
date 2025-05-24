@@ -27,9 +27,10 @@ export async function main(): Promise<void> {
 
 	console.log("Ranging over number (no vars):")
 	let numCount = 0
-	for (let _i = 0; _i < 5; _i++) {
+	for (let _i = 0; _i < 5; _i++) {{
 		numCount++
 	}
-	console.log(numCount) // Expected output: 5
+}
+console.log(numCount) // Expected output: 5
 }
 

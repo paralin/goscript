@@ -47,7 +47,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 				if j > 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				c.tsw.WriteLiterally(name.Name)
+				c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 				c.tsw.WriteLiterally(": ")
 				typ := c.pkg.TypesInfo.TypeOf(field.Type)
 				c.WriteGoType(typ, GoTypeContextGeneral)
@@ -65,7 +65,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 				c.tsw.WriteLiterally(", ")
 			}
 			c.tsw.WriteLiterally("...")
-			c.tsw.WriteLiterally(name.Name)
+			c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 		}
 
 		c.tsw.WriteLiterally(": ")
@@ -86,7 +86,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 					if j > 0 {
 						c.tsw.WriteLiterally(", ")
 					}
-					c.tsw.WriteLiterally(name.Name)
+					c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 					c.tsw.WriteLiterally(": ")
 					typ := c.pkg.TypesInfo.TypeOf(field.Type)
 					c.WriteGoType(typ, GoTypeContextGeneral) // Use WriteGoType for parameter type
@@ -143,7 +143,7 @@ func (c *GoToTSCompiler) WriteField(field *ast.Field, isArguments bool) {
 
 		// argument names: keep original casing, no access modifier
 		if isArguments {
-			c.tsw.WriteLiterally(name.Name)
+			c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 			// Argument type is handled in WriteFieldList, so continue
 			continue
 		} else {

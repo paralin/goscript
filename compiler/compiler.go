@@ -479,8 +479,8 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool) {
 		obj = c.pkg.TypesInfo.Defs[exp]
 	}
 
-	// Write the identifier name first
-	c.tsw.WriteLiterally(exp.Name)
+	// Write the identifier name first, sanitizing if it's a reserved word
+	c.tsw.WriteLiterally(c.sanitizeIdentifier(exp.Name))
 
 	// Determine if we need to access .value based on analysis data
 	if obj != nil && accessVarRefedValue && c.analysis.NeedsVarRefAccess(obj) {
@@ -677,6 +677,96 @@ func (c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup) {
 			c.tsw.WriteCommentLine(" Unknown comment format: " + comment.Text)
 		}
 	}
+}
+
+// sanitizeIdentifier checks if an identifier is a JavaScript/TypeScript reserved word
+// and prefixes it with an underscore if it is. This prevents compilation errors
+// when Go identifiers conflict with JS/TS keywords.
+func (c *GoToTSCompiler) sanitizeIdentifier(name string) string {
+	// Don't sanitize boolean literals - they are valid in both Go and JS/TS
+	if name == "true" || name == "false" {
+		return name
+	}
+
+	// List of JavaScript/TypeScript reserved words that could conflict
+	reservedWords := map[string]bool{
+		"abstract":    true,
+		"any":         true,
+		"as":          true,
+		"asserts":     true,
+		"async":       true,
+		"await":       true,
+		"boolean":     true,
+		"break":       true,
+		"case":        true,
+		"catch":       true,
+		"class":       true,
+		"const":       true,
+		"constructor": true,
+		"continue":    true,
+		"debugger":    true,
+		"declare":     true,
+		"default":     true,
+		"delete":      true,
+		"do":          true,
+		"else":        true,
+		"enum":        true,
+		"export":      true,
+		"extends":     true,
+		"finally":     true,
+		"for":         true,
+		"from":        true,
+		"function":    true,
+		"get":         true,
+		"if":          true,
+		"implements":  true,
+		"import":      true,
+		"in":          true,
+		"instanceof":  true,
+		"interface":   true,
+		"is":          true,
+		"keyof":       true,
+		"let":         true,
+		"module":      true,
+		"namespace":   true,
+		"never":       true,
+		"new":         true,
+		"null":        true,
+		"number":      true,
+		"object":      true,
+		"of":          true,
+		"package":     true,
+		"private":     true,
+		"protected":   true,
+		"public":      true,
+		"readonly":    true,
+		"require":     true,
+		"return":      true,
+		"set":         true,
+		"static":      true,
+		"string":      true,
+		"super":       true,
+		"switch":      true,
+		"symbol":      true,
+		"this":        true,
+		"throw":       true,
+		"try":         true,
+		"type":        true,
+		"typeof":      true,
+		"undefined":   true,
+		"unique":      true,
+		"unknown":     true,
+		"var":         true,
+		"void":        true,
+		"while":       true,
+		"with":        true,
+		"yield":       true,
+	}
+
+	if reservedWords[name] {
+		return "_" + name
+	}
+	return name
 }
 
 // copyEmbeddedPackage recursively copies files from an embedded FS path to a filesystem directory.

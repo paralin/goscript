@@ -77,51 +77,52 @@ export async function main(): Promise<void> {
 	// Start 3 worker goroutines
 
 	// This will trigger a past error with *ast.Ident
-	for (let i = 0; i < 3; i++) {
+	for (let i = 0; i < 3; i++) {{
 		queueMicrotask(async () => {
 			await worker(i)
 		})
 	}
+}
 
-	// Start another worker goroutine
-	queueMicrotask(async () => {
-		await anotherWorker("test")
-	})
+// Start another worker goroutine
+queueMicrotask(async () => {
+	await anotherWorker("test")
+})
 
-	// Start an anonymous function worker
-	queueMicrotask(async () => {
-		await $.chanSend(messages, new Message({priority: 50, text: "Anonymous function worker"}))
-	})
+// Start an anonymous function worker
+queueMicrotask(async () => {
+	await $.chanSend(messages, new Message({priority: 50, text: "Anonymous function worker"}))
+})
 
-	// Add status message
-	allMessages = $.append(allMessages, new Message({priority: 1, text: "Main: Workers started"}))
+// Add status message
+allMessages = $.append(allMessages, new Message({priority: 1, text: "Main: Workers started"}))
 
-	// Collect all messages from goroutines
-	for (let i = 0; i < totalMessages; i++) {
-		allMessages = $.append(allMessages, await $.chanRecv(messages))
-	}
+// Collect all messages from goroutines
+for (let i = 0; i < totalMessages; i++) {
+	allMessages = $.append(allMessages, await $.chanRecv(messages))
+}
 
-	// Add final message
-	allMessages = $.append(allMessages, new Message({priority: 100, text: "Main: All workers completed"}))
+// Add final message
+allMessages = $.append(allMessages, new Message({priority: 100, text: "Main: All workers completed"}))
 
-	// Sort messages by priority for deterministic order
-	for (let i = 0; i < $.len(allMessages); i++) {
-		{
-			for (let j = i + 1; j < $.len(allMessages); j++) {
-				if (allMessages![i].priority > allMessages![j].priority) {
-					[allMessages![i], allMessages![j]] = [allMessages![j], allMessages![i]]
-				}
+// Sort messages by priority for deterministic order
+for (let i = 0; i < $.len(allMessages); i++) {
+	{
+		for (let j = i + 1; j < $.len(allMessages); j++) {
+			if (allMessages![i].priority > allMessages![j].priority) {
+				[allMessages![i], allMessages![j]] = [allMessages![j], allMessages![i]]
 			}
 		}
 	}
+}
 
-	// Print all messages in deterministic order
-	for (let _i = 0; _i < $.len(allMessages); _i++) {
-		const msg = allMessages![_i]
-		{
-			console.log(msg.priority, msg.text)
-		}
+// Print all messages in deterministic order
+for (let _i = 0; _i < $.len(allMessages); _i++) {
+	const msg = allMessages![_i]
+	{
+		console.log(msg.priority, msg.text)
 	}
-	console.log("done")
+}
+console.log("done")
 }
 

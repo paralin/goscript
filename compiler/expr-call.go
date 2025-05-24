@@ -424,7 +424,17 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
 				if _, ok := funType.Underlying().(*types.Signature); ok {
-					if _, isNamed := funType.(*types.Named); isNamed {
+					// Check if this is a function parameter identifier that needs not-null assertion
+					if ident, isIdent := expFun.(*ast.Ident); isIdent {
+						// Check if this identifier is a function parameter
+						if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil {
+							if _, isVar := obj.(*types.Var); isVar {
+								// This is a variable (including function parameters)
+								// Function parameters that are function types need ! assertion
+								c.tsw.WriteLiterally("!")
+							}
+						}
+					} else if _, isNamed := funType.(*types.Named); isNamed {
 						c.tsw.WriteLiterally("!")
 					}
 				}
@@ -458,7 +468,17 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
 				if _, ok := funType.Underlying().(*types.Signature); ok {
-					if _, isNamed := funType.(*types.Named); isNamed {
+					// Check if this is a function parameter identifier that needs not-null assertion
+					if ident, isIdent := expFun.(*ast.Ident); isIdent {
+						// Check if this identifier is a function parameter
+						if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil {
+							if _, isVar := obj.(*types.Var); isVar {
+								// This is a variable (including function parameters)
+								// Function parameters that are function types need ! assertion
+								c.tsw.WriteLiterally("!")
+							}
+						}
+					} else if _, isNamed := funType.(*types.Named); isNamed {
 						c.tsw.WriteLiterally("!")
 					}
 				}
