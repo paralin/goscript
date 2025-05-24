@@ -59,15 +59,15 @@ export function main(): void {
 	console.log("--- Initial Values ---")
 	console.log("s1.Val:", s1!.value.Val) // 1
 	console.log("s2.Val:", s2!.value.Val) // 2
-	console.log("p1==p2:", (false)) // true
-	console.log("p1==p3:", (false)) // false
+	console.log("p1==p2:", (true)) // true
+	console.log("p1==p3:", (p1!.value === p3!.value)) // false
 
 	// --- Pointer Comparisons ---
 	console.log("\n--- Pointer Comparisons ---")
 	// should be: console.log("pp1==pp2:", (pp1!.value === pp2))
-	console.log("pp1==pp2:", (false))
+	console.log("pp1==pp2:", (pp1!.value === pp2))
 	// should be: console.log("pp1==pp3:", (pp1!.value === pp3))
-	console.log("pp1==pp3:", (false)) // false
+	console.log("pp1==pp3:", (pp1!.value === pp3)) // false
 	console.log("*pp1==*pp2:", (pp1!.value!.value === pp2!.value)) // true
 	console.log("*pp1==*pp3:", (pp1!.value!.value === pp3!.value)) // false
 	console.log("(**pp1).Val == (**pp2).Val:", pp1!.value!.value!!.value.Val == pp2!.value!!.value.Val) // true
