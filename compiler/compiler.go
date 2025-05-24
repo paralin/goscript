@@ -117,15 +117,14 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 			}
 			processed[pkg.ID] = true
 
+			allPkgs = append(allPkgs, pkg)
+
 			// Check if this package has a handwritten equivalent
 			if hasHandwrittenEquivalent(pkg.PkgPath) {
 				// Add this package but don't visit its dependencies
-				allPkgs = append(allPkgs, pkg)
 				c.le.Debugf("Skipping dependencies of handwritten package: %s", pkg.PkgPath)
 				return
 			}
-
-			allPkgs = append(allPkgs, pkg)
 
 			// Visit all imports, including standard library packages
 			for _, imp := range pkg.Imports {
@@ -175,6 +174,7 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 	// Compile all packages
 	for _, pkg := range pkgs {
 		// Check if the package has a handwritten equivalent
+		// If the package was explicitly requested, skip this logic
 		if !slices.Contains(patternPkgPaths, pkg.PkgPath) {
 			gsSourcePath := "gs/" + pkg.PkgPath
 			_, gsErr := gs.GsOverrides.ReadDir(gsSourcePath)
