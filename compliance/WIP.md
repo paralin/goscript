@@ -55,6 +55,14 @@ We want to ALWAYS do ahead-of-time Type analysis and do the var-ref logic based 
 - Which variables need to be variable referenced (their address is taken)
 - Which variables need `.value` access when used (either they are varrefed or point to varrefed values)
 
+**Clarification on `*ast.StarExpr` (Dereference) Handling**:
+The `WriteStarExpr` function adheres to this by:
+1.  Using pre-computed analysis (e.g., `Analysis.NeedsVarRef`) for the *operand* of the dereference (the variable being dereferenced).
+2.  For the dereference operation itself (deciding whether to append `.value` after `operand!`), it performs type analysis at generation time by inspecting the type that the pointer points to. Specifically, it checks if this element type is a struct.
+    - If it points to a non-struct, `.value` is appended.
+    - If it points to a struct (including `VarRef<T>` which is a struct), `.value` is *not* appended by this step. The result is the struct instance or the `VarRef<T>` instance itself.
+This use of type information at generation time is a form of analysis and ensures decisions are not based on assumptions but on the actual types involved, consistent with `design/VAR_REFS.md`.
+
 ### 3. TODO List
 
 **Completed**:
@@ -348,6 +356,32 @@ The issue is in `WriteRangeStmt` (`compiler/stmt-range.go`, lines 263-275). The 
 **Solution**: Modified `WriteStmtRange` to use `WriteIdent(ident, false)` instead of `WriteValueExpr` for pointer variables to avoid automatic `.value` access, since the range loop explicitly adds `!.value` for pointer dereference.
 
 **Result**: ✅ `pointer_range_loop` test now passes.
+
+#### Fix 3: `pointer_composite_literal_untyped` Test - RESOLVED ✅
+
+**Issue**:
+The `pointer_composite_literal_untyped` test was failing its `TypeCheck` phase.
+The generated TypeScript for a Go variable `var ptr *struct{ x int }` was `let ptr: $.VarRef<{ x?: number }> | null`, and for `data := []*struct{ x int }{{42}, {43}}` it was `let data = $.arrayToSlice<$.VarRef<{ x?: number }> | null>([...])`.
+This was incorrect because neither `ptr` nor the elements of `data` were var-refed (their addresses were not taken in a way that necessitates a `$.VarRef` wrapper for the pointer itself). The struct literals `{x: 42}` were correctly generated, but the type of the variable/slice elements was mismatched.
+
+**Root Cause**:
+The `WritePointerType` function in `compiler/type.go` was unconditionally translating Go pointer types `*T` to `$.VarRef<T_ts> | null` in TypeScript. This did not distinguish between pointers to Go reference types (like structs or interfaces, which become reference types in TS/JS) and pointers to Go value types (like primitives, which do need a `$.VarRef` box for pointer semantics).
+
+**Solution**:
+Modified `compiler/type.go -> WritePointerType`:
+- The function now inspects the element type (`elemType`) of the Go pointer (`*types.Pointer`).
+- If `elemType.Underlying()` is a `*types.Struct` or `*types.Interface`:
+    - The TypeScript type is generated as `[Pointee_ts] | null`.
+- Otherwise (for pointers to primitives, other pointers, etc.):
+    - The TypeScript type is generated as `$.VarRef<[Pointee_ts]> | null`.
+- This change ensures that `$.VarRef` is only used for pointers when the pointee is a value type in Go, aligning with the design that structs and interfaces are inherently reference-like in the target TypeScript.
+
+**Result**:
+✅ `pointer_composite_literal_untyped` test now passes all stages, including `TypeCheck`.
+The generated TypeScript is now:
+- `let ptr: { x?: number } | null = null`
+- `let data = $.arrayToSlice<{ x?: number } | null>([{x: 42}, {x: 43}])`
+This correctly reflects that `ptr` and the elements of `data` are direct (nullable) references to struct-like objects without an unnecessary `$.VarRef` wrapper.
 
 #### Key Insights Gained
 
