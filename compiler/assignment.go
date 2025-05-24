@@ -21,7 +21,7 @@ import (
 //     to `$.mapSet(myMap_ts, key_ts, value_ts)`.
 //   - Other single-variable assignments (`variable = value`):
 //   - The LHS expression is written (caller typically ensures `.value` is appended
-//     if assigning to a boxed variable's content).
+//     if assigning to a VarRefed variable's content).
 //   - The Go assignment token (`tok`, e.g., `=`, `+=`) is translated to its
 //     TypeScript equivalent using `TokenToTs`.
 //   - The RHS expression(s) are written. If `shouldApplyClone` indicates the RHS
@@ -71,7 +71,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		// Special handling for variable referenced variables in declarations
 		if addDeclaration && tok == token.DEFINE {
 			// Determine if LHS is variable referenced
-			isLHSBoxed := false
+			isLHSVarRefed := false
 			var lhsIdent *ast.Ident
 			var lhsObj types.Object
 
@@ -86,12 +86,12 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 				// Check if this variable needs to be variable referenced
 				if lhsObj != nil && c.analysis.NeedsVarRef(lhsObj) {
-					isLHSBoxed = true
+					isLHSVarRefed = true
 				}
 			}
 
 			// Special handling for short declaration of variable referenced variables
-			if isLHSBoxed && lhsIdent != nil {
+			if isLHSVarRefed && lhsIdent != nil {
 				c.tsw.WriteLiterally("let ")
 				// Just write the identifier name without .value
 				c.tsw.WriteLiterally(lhsIdent.Name)
@@ -273,7 +273,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				lhsExprIdent, lhsExprIsIdent := l.(*ast.Ident)
 				if lhsExprIsIdent {
 					// Determine if LHS is variable referenced
-					isLHSBoxed := false
+					isLHSVarRefed := false
 					var lhsObj types.Object
 
 					// Get the types.Object from the identifier
@@ -285,11 +285,11 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 					// Check if this variable needs to be variable referenced
 					if lhsObj != nil && c.analysis.NeedsVarRef(lhsObj) {
-						isLHSBoxed = true
+						isLHSVarRefed = true
 					}
 
 					// prevent writing .value unless lhs is variable referenced
-					c.WriteIdent(lhsExprIdent, isLHSBoxed)
+					c.WriteIdent(lhsExprIdent, isLHSVarRefed)
 					continue
 				}
 			}
@@ -324,13 +324,13 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 
 		// Check if we need to access a variable referenced source value and apply clone
 		// For struct value assignments, we need to handle:
-		// 1. Unboxed source, unboxed target: source.clone()
-		// 2. Variable referenced source, unboxed target: source.value.clone()
-		// 3. Unboxed source, variable referenced target: $.varRef(source)
+		// 1. UnVarRefed source, unVarRefed target: source.clone()
+		// 2. Variable referenced source, unVarRefed target: source.value.clone()
+		// 3. UnVarRefed source, variable referenced target: $.varRef(source)
 		// 4. Variable referenced source, variable referenced target: source (straight assignment of the variable reference)
 
 		// Determine if RHS is a variable referenced variable (could be a struct or other variable)
-		needsBoxedAccessRHS := false
+		needsVarRefedAccessRHS := false
 		var rhsObj types.Object
 
 		// Check if RHS is an identifier (variable name)
@@ -345,7 +345,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			// Important: For struct copying, we need to check if the variable needs variable referenced access
 			// This is more comprehensive than just checking if it's variable referenced
 			if rhsObj != nil {
-				needsBoxedAccessRHS = c.analysis.NeedsVarRefAccess(rhsObj)
+				needsVarRefedAccessRHS = c.analysis.NeedsVarRefAccess(rhsObj)
 			}
 		}
 
@@ -363,7 +363,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 					return err
 				}
 				// Only add .value for non-identifiers that need variable referenced access
-				if needsBoxedAccessRHS {
+				if needsVarRefedAccessRHS {
 					c.tsw.WriteLiterally(".value") // Access the variable referenced value
 				}
 			}

@@ -78,7 +78,7 @@ func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Typ
 	c.tsw.WriteLine("")
 }
 
-func (c *GoToTSCompiler) writeBoxedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
+func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
 	c.tsw.WriteLiterally(fieldName)
 	c.tsw.WriteLiterally(": $.varRef(")
 

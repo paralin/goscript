@@ -111,7 +111,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				fieldKeyName = field.Name()
 			}
 
-			c.writeBoxedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
 
 			if i < numFields-1 {
 				c.tsw.WriteLine(",")

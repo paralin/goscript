@@ -49,11 +49,6 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		goType := obj.Type()
 		needsBox := c.analysis.NeedsVarRef(obj) // Check if address is taken
 
-		// Debug logging for ptr variable
-		if name.Name == "ptr" {
-			fmt.Printf("DEBUG WriteValueSpec: Variable '%s', needsBox=%v, goType=%v\n", name.Name, needsBox, goType)
-		}
-
 		hasInitializer := len(a.Values) > 0
 		var initializerExpr ast.Expr
 		if hasInitializer {
@@ -94,18 +89,9 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		// 1. Not a slice conversion (normal case), OR
 		// 2. Is a slice conversion but needs boxing (we need explicit type for $.varRef())
 		if !isSliceConversion || needsBox {
-			// Debug logging for ptr variable
-			if name.Name == "ptr" {
-				fmt.Printf("DEBUG WriteValueSpec: Writing type annotation for '%s', isSliceConversion=%v, needsBox=%v\n", name.Name, isSliceConversion, needsBox)
-			}
-
 			c.tsw.WriteLiterally(": ")
 			// Write type annotation
 			if needsBox {
-				// Debug logging for ptr variable
-				if name.Name == "ptr" {
-					fmt.Printf("DEBUG WriteValueSpec: Writing VarRef type for '%s'\n", name.Name)
-				}
 				// If boxed, the variable holds VarRef<OriginalGoType>
 				c.tsw.WriteLiterally("$.VarRef<")
 
@@ -126,10 +112,6 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 				}
 				c.tsw.WriteLiterally(">")
 			} else {
-				// Debug logging for ptr variable
-				if name.Name == "ptr" {
-					fmt.Printf("DEBUG WriteValueSpec: Writing plain type for '%s'\n", name.Name)
-				}
 				// If not boxed, the variable holds the translated Go type directly
 				c.WriteGoType(goType, GoTypeContextGeneral)
 			}
