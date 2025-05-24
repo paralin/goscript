@@ -69,6 +69,14 @@ var CompileCommands = []*cli.Command{{
 			Value:       false,
 			EnvVars:     []string{"GOSCRIPT_DISABLE_EMIT_BUILTIN"},
 		},
+		&cli.BoolFlag{
+			Name:        "all-dependencies",
+			Usage:       "compile all dependencies of the requested packages",
+			Aliases:     []string{"all-deps", "deps"},
+			Destination: &cliCompilerConfig.AllDependencies,
+			Value:       false,
+			EnvVars:     []string{"GOSCRIPT_ALL_DEPENDENCIES"},
+		},
 	},
 }}
 
