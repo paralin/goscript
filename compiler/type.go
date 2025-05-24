@@ -234,14 +234,6 @@ func (c *GoToTSCompiler) WritePointerType(t *types.Pointer) {
 	c.tsw.WriteLiterally("> | null") // Pointers are always nullable
 }
 
-// WriteNonVarRefPointerType translates a Go pointer type (*T) to its TypeScript equivalent
-// without VarRef wrapping. This is used for contexts where the pointer variable itself
-// is not varrefed and should be represented as ElementType | null.
-func (c *GoToTSCompiler) WriteNonVarRefPointerType(t *types.Pointer) {
-	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
-	c.tsw.WriteLiterally(" | null")
-}
-
 // WriteSliceType translates a Go slice type ([]T) to its TypeScript equivalent.
 // It generates $.Slice<T_ts>, where T_ts is the translated element type.
 // For []byte, it generates Uint8Array.

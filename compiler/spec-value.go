@@ -108,22 +108,12 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 						c.WriteGoType(goType, GoTypeContextGeneral)
 					}
 				} else {
-					// For varrefed variables, use standard type generation (including VarRef for pointers)
 					c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
 				}
 				c.tsw.WriteLiterally(">")
 			} else {
 				// If not varrefed, the variable holds the translated Go type directly
-				// Special case for pointer types: they should not be wrapped in VarRef
-				// unless the pointer variable itself is varrefed
-				if ptrType, isPtr := goType.(*types.Pointer); isPtr {
-					// For non-varrefed pointer variables, generate ElementType | null
-					c.WriteGoType(ptrType.Elem(), GoTypeContextGeneral)
-					c.tsw.WriteLiterally(" | null")
-				} else {
-					// For non-pointer types, use the standard type generation
-					c.WriteGoType(goType, GoTypeContextGeneral)
-				}
+				c.WriteGoType(goType, GoTypeContextGeneral)
 			}
 		}
 

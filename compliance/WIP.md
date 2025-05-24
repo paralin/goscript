@@ -401,7 +401,7 @@ if ptrType, isPtr := baseType.(*types.Pointer); isPtr {
 1. **Context Matters**: Not all `*struct` types in TypeScript are `$.VarRef<StructType>`. Some are legitimate pointer types that don't need `.value` access.
 
 2. **Creation Context**: The key difference is HOW the pointer was created:
-   - `&struct{x: 42}` → `$.varRef({x: 42})` → needs `.value` access
+   - `&struct{x int}` → `$.varRef({x: 42})` → needs `.value` access
    - Other pointer assignments might not need `.value` access
 
 3. **Analysis Integration**: We need to use the analysis results more precisely to determine when `.value` access is needed, not just rely on type patterns.
@@ -497,7 +497,7 @@ For `ptr = &struct{x int}{42}` where `ptr` has type `*struct{x int}`:
 
 For `[]*struct{x int}{{42}, {43}}`:
 
-1. **Array Elements**: Each `{42}` and `{43}` should be `$.varRef({x: 42})` and `$.varRef({x: 43})`
+1. **Array Elements**: Each `{42}` and `{43}` should be `$.varRef({x: 42})`
 2. **Element Access**: Should be `data![0]!.value.x`
 
 #### **The Core Issue**:
@@ -583,140 +583,130 @@ This proves the **ahead-of-time analysis principle** is working correctly:
 - Simple pointer cases get simple nullable types
 - Complex reference cases get VarRef wrapping only when needed
 
-## 18. LATEST FINDINGS: `pointer_composite_literal_untyped` Test - CONFIRMED PASSING ✅
+## 24. Detailed Implementation Plan for Fixing `pointer_composite_literal_untyped`
 
-### **Test Status Update - December 2024**
+After analyzing the source code and test failures in detail, here's a specific implementation plan to fix the `pointer_composite_literal_untyped` test:
 
-After investigating the user's request to run the `pointer_composite_literal_untyped` test to diagnose typecheck failures, **this test is actually PASSING completely**:
+### 1. Fix Address-Of Operation for Composite Literals
 
-```
-=== RUN   TestCompliance/pointer_composite_literal_untyped
-=== RUN   TestCompliance/pointer_composite_literal_untyped/Compile
-=== RUN   TestCompliance/pointer_composite_literal_untyped/Run
-Pointer value x: 42
-First element x: 42
-Second element x: 43
-=== RUN   TestCompliance/pointer_composite_literal_untyped/Compare
-=== RUN   TestCompliance/pointer_composite_literal_untyped/TypeCheck
---- PASS: TestCompliance/pointer_composite_literal_untyped (0.48s)
-    --- PASS: TestCompliance/pointer_composite_literal_untyped/Compile (0.14s)  
-    --- PASS: TestCompliance/pointer_composite_literal_untyped/Run (0.26s)
-    --- PASS: TestCompliance/pointer_composite_literal_untyped/Compare (0.00s)
-    --- PASS: TestCompliance/pointer_composite_literal_untyped/TypeCheck (0.07s)
-```
+In `compiler/expr.go`, we need to modify the `WriteUnaryExpr` function to handle address-of operations on composite literals:
 
-### **CRITICAL VALIDATION: User's Principle "Not all pointer types are VarRef" IS CORRECT ✅**
+```go
+if exp.Op == token.AND { // Address-of operator (&)
+    // If the operand is an identifier for a variable that is varrefed,
+    // the result of & is the varRef itself.
+    if ident, ok := exp.X.(*ast.Ident); ok {
+        // ... existing code for varrefed variables ...
+    }
 
-**Current Generated TypeScript (WORKING CORRECTLY)**:
-```typescript
-// Generated file based on pointer_composite_literal_untyped.go
-import * as $ from "@goscript/builtin/builtin.js";
+    // Check if we're taking the address of a composite literal
+    // This handles cases like &struct{x int}{42}
+    if compLit, isCompLit := exp.X.(*ast.CompositeLit); isCompLit {
+        // Generate $.varRef() wrapper around the composite literal
+        c.tsw.WriteLiterally("$.varRef(")
+        if err := c.WriteValueExpr(compLit); err != nil {
+            return fmt.Errorf("failed to write composite literal in &-operation: %w", err)
+        }
+        c.tsw.WriteLiterally(")")
+        return nil
+    }
 
-export function main(): void {
-	let ptr: { x?: number } | null = null  // ✅ Plain nullable type, NOT $.VarRef<...>
-	ptr = {x: 42}  // ✅ Direct object assignment
-	console.log("Pointer value x:", ptr!.x)  // ✅ Direct field access
-
-	let data = $.arrayToSlice<{ x?: number } | null>([{x: 42}, {x: 43}])  // ✅ Plain pointer types
-	console.log("First element x:", data![0]!.x)  // ✅ Direct field access
-	console.log("Second element x:", data![1]!.x)  // ✅ Direct field access
+    // Otherwise (&unvarrefedVar, &FuncCall(), etc.)...
+    // ... existing code ...
 }
 ```
 
-### **Analysis Results**:
+This change ensures that when we have `&struct{x int}{42}`, it generates `$.varRef({x: 42})` instead of just `{x: 42}`.
 
-1. **Pointer Variable Type**: `ptr: { x?: number } | null` - The compiler correctly determined this does NOT need VarRef wrapping
-2. **Assignment Logic**: `ptr = {x: 42}` - Direct object assignment without `$.varRef()` 
-3. **Field Access**: `ptr!.x` - Direct field access without `.value` indirection
-4. **Array Element Types**: `{ x?: number } | null` - Plain pointer types, not VarRef-wrapped
-5. **TypeScript Compilation**: ✅ ZERO errors - all types match perfectly
+### 2. Fix Array Element Generation for Pointer Types
 
-### **Why This Case Doesn't Need VarRef**:
+In `compiler/composite-lit.go`, we need to modify the array element generation logic to handle array elements that are pointer types:
 
-The analysis correctly determined:
-- `ptr` variable's address is never taken (`&ptr` doesn't appear anywhere)
-- `data` array elements' addresses aren't taken individually
-- Therefore, these variables don't need variable reference semantics
-- They can be implemented as plain nullable pointer types in TypeScript
+```go
+// In the array literal handling section, modify the WriteVarRefedValue call:
 
-### **Core Architecture Validation**:
+// Check if the array element type is a pointer type
+needsVarRef := false
+if elmTyp := c.pkg.TypesInfo.TypeOf(elm); elmTyp != nil {
+    if _, isPtr := elmTyp.(*types.Pointer); isPtr {
+        needsVarRef = true
+    }
+}
 
-This proves the **ahead-of-time analysis principle** is working correctly:
-- Analysis determines which variables need VarRef based on address-taking
-- Code generation respects the analysis results
-- Simple pointer cases get simple nullable types
-- Complex reference cases get VarRef wrapping only when needed
+if needsVarRef {
+    c.tsw.WriteLiterally("$.varRef(")
+    if err := c.WriteVarRefedValue(elm); err != nil {
+        return fmt.Errorf("failed to write array literal element: %w", err)
+    }
+    c.tsw.WriteLiterally(")")
+} else {
+    if err := c.WriteVarRefedValue(elm); err != nil {
+        return fmt.Errorf("failed to write array literal element: %w", err)
+    }
+}
+```
 
-## 19. Current Issue Landscape - 6 VarRef Tests Still Failing
+This ensures that for an array like `[]*struct{x int}{{42}, {43}}`, each element gets wrapped in `$.varRef()`.
 
-While `pointer_composite_literal_untyped` validates the core principle, there are **6 tests with VarRef-related TypeScript compilation errors**:
+### 3. Fix Field Access on VarRef-Wrapped Structs
 
-### **Failing Test Patterns**:
+In `compiler/expr-selector.go`, we need to modify the `WriteSelectorExpr` function to correctly handle field access on VarRef-wrapped structs:
 
-1. **Multi-level VarRef Nesting Issues** (`varref_assign`, `varref_pointers`, `varref`, `wip`):
+```go
+// Add a new case in the non-dereferenced selector handling section:
+
+// Check if we're accessing a field on a VarRef-wrapped struct (pointer)
+baseType := c.pkg.TypesInfo.TypeOf(exp.X)
+if baseType != nil {
+    if ptrType, isPtr := baseType.(*types.Pointer); isPtr {
+        if _, isStruct := ptrType.Elem().Underlying().(*types.Struct); isStruct {
+            // For field access on pointer to struct, we need to add .value to unwrap
+            // the VarRef wrapper. This is only needed for non-dereferenced pointers
+            // (like ptr.x instead of (*ptr).x)
+            c.tsw.WriteLiterally("!.value.")
+            c.WriteIdent(exp.Sel, false)
+            return nil
+        }
+    }
+}
+```
+
+This ensures that when accessing fields on a VarRef-wrapped struct (like `ptr.x` where `ptr: $.VarRef<{x?: number}>`), it generates `ptr!.value.x` instead of just `ptr!.x`.
+
+### 4. Integration Testing Approach
+
+To verify our changes:
+
+1. First fix the address-of operation for composite literals
+2. Test if that alone resolves the assignment issue: `ptr = $.varRef({x: 42})`
+3. If field access issues persist, implement the selector expression fix
+4. If array element issues persist, implement the array element fix
+5. Run the test after each change to see progress: 
    ```
-   Type 'VarRef<VarRef<VarRef<number> | null> | null>' is not assignable to 
-   type 'VarRef<VarRef<number> | null>'
+   go test -timeout 30s -run ^TestCompliance/pointer_composite_literal_untyped$ ./compiler -v
    ```
 
-2. **VarRef Level Mismatch** (`varref_deref_set`):
-   ```
-   Type 'VarRef<VarRef<number> | null>' is not assignable to type 'VarRef<number>'
-   ```
+### 5. Key Insight: Maintaining Type/Value Consistency
 
-3. **Pointer Assignment Compatibility** (`pointers`):
-   ```
-   Type 'VarRef<VarRef<MyStruct> | null>' is not assignable to type 'VarRef<MyStruct>'
-   ```
+The fundamental insight is that we need to maintain consistency between types and values:
 
-4. **VarRef Unwrapping** (`star_expr_destructuring`):
-   ```
-   Type 'VarRef<number>' is not assignable to type 'number'
-   ```
+1. If a variable has type `$.VarRef<{x?: number}>`, any value assigned to it must be wrapped with `$.varRef()`
+2. If a field access occurs on a value of type `$.VarRef<{x?: number}>`, we must use `.value` to unwrap it before accessing fields
 
-### **Error Pattern Analysis**:
+This ensures TypeScript type-checking passes and the code behaves correctly at runtime.
 
-The failures show:
-- **Too many VarRef layers**: Triple-nested `VarRef<VarRef<VarRef<T>>>` where only double is expected
-- **Extra nullable types**: `| null | null` patterns indicating type generation bugs
-- **Missing unwrapping**: VarRef types where plain types are expected
+### 6. Expected Type Mappings
 
-### **Root Cause Hypothesis**:
+| Go Type | TypeScript Type | Value Example | Field Access |
+|---------|----------------|---------------|--------------|
+| `*struct{x int}` | `$.VarRef<{x?: number}> \| null` | `$.varRef({x: 42})` | `ptr!.value.x` |
+| `[]*struct{x int}` | `$.arrayToSlice<$.VarRef<{x?: number}> \| null>` | `[$.varRef({x: 42}), $.varRef({x: 43})]` | `data![0]!.value.x` |
 
-These appear to be **edge case issues** in:
-1. **Complex pointer chain assignment logic**
-2. **VarRef type generation for multi-level pointers** 
-3. **Assignment type compatibility checking**
+### 7. Other Considerations
 
-The issues are NOT in the core analysis (which correctly handles `pointer_composite_literal_untyped`) but in **specific code paths** for complex VarRef scenarios.
+The solution must also handle these related cases:
+- Method calls on pointer receivers should also unwrap the VarRef
+- Compound assignments like `ptr.x += 5` should also use the unwrapped form
+- Type assertions involving pointer types should maintain VarRef wrappers
 
-## 20. Strategic Implementation Status
-
-### **✅ CONFIRMED WORKING**:
-
-1. **Core Design Principle**: ✅ **"Not all pointer types are VarRef"** - Validated by passing test
-2. **Simple Pointer Cases**: ✅ Plain nullable types when address not taken
-3. **Analysis Logic**: ✅ `NeedsVarRef`/`NeedsVarRefAccess` working correctly 
-4. **Basic Type Generation**: ✅ Correct choice between VarRef and plain nullable types
-
-### **❌ TARGETED ISSUES**:
-
-1. **Complex VarRef Chain Handling**: Multi-level pointer assignment type mismatches
-2. **VarRef Nesting Logic**: Incorrect number of VarRef layers in certain contexts
-3. **Type Compatibility**: Assignment errors in nested VarRef scenarios
-
-### **Implementation Approach**:
-
-**Build on Success**: The `pointer_composite_literal_untyped` success proves the foundation is solid. Focus on:
-
-1. **Surgical Fixes**: Target the specific VarRef nesting logic causing triple-layering
-2. **Type Generation Refinement**: Fix the assignment compatibility for complex pointer chains  
-3. **Preserve Core Logic**: Ensure fixes don't regress the working simple pointer cases
-
-### **Next Steps Priority**:
-
-1. ✅ **Document Success** - The core principle is working as intended
-2. 🔍 **Analyze Failing Patterns** - Understand the specific multi-level VarRef generation bugs
-3. 🎯 **Targeted Fixes** - Address edge cases while preserving the validated core logic
-
-**Key Insight**: User's emphasis "Not all pointer types are VarRef" is completely validated. The core architecture correctly implements this principle. Remaining work is refining edge cases in complex VarRef scenarios.
+By implementing these changes, we should be able to fix the `pointer_composite_literal_untyped` test while maintaining compatibility with all other tests.

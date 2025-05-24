@@ -41,7 +41,7 @@ class MyStruct {
 
 export function main(): void {
 	let s1 = new MyStruct({Value: 10})
-	let p: MyStruct | null = null
+	let p: $.VarRef<MyStruct> | null = null
 	p = new MyStruct({Value: 20}) // Initialize p to point to something
 
 	// This assignment should trigger the .clone() on s1

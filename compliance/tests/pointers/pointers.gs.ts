@@ -96,8 +96,8 @@ export function main(): void {
 	// --- Nil Pointers ---
 	console.log("\n--- Nil Pointers ---")
 	let np: $.VarRef<$.VarRef<MyStruct> | null> = $.varRef(null)
-	let npp: $.VarRef<MyStruct> | null | null = null
-	let nppp: $.VarRef<$.VarRef<MyStruct> | null> | null | null = null
+	let npp: $.VarRef<$.VarRef<MyStruct> | null> | null = null
+	let nppp: $.VarRef<$.VarRef<$.VarRef<MyStruct> | null> | null> | null = null
 
 	console.log("np == nil:", np!.value == null) // true
 	console.log("npp == nil:", npp == null) // true

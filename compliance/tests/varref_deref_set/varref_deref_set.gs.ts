@@ -10,7 +10,7 @@ export function main(): void {
 	// p1 is varrefed because p1_varRefer takes its address
 	let p1: $.VarRef<$.VarRef<number> | null> = $.varRef(null)
 	// Ensure p1 is varrefed
-	let p1_varRefer: $.VarRef<number> | null | null = p1
+	let p1_varRefer: $.VarRef<$.VarRef<number> | null> | null = p1
 	/* _ = */ p1_varRefer!.value
 
 	// Expected TS: p1.value = y

@@ -134,27 +134,11 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 						if arrayType, isArray := lhsObj.Type().Underlying().(*types.Array); isArray {
 							// Convert [N]T to $.Slice<T>
 							c.tsw.WriteLiterally("$.Slice<")
-							// Special handling for pointer element types - don't wrap in VarRef
-							if ptrType, isPtr := arrayType.Elem().(*types.Pointer); isPtr {
-								c.WriteNonVarRefPointerType(ptrType)
-							} else {
-								c.WriteGoType(arrayType.Elem(), GoTypeContextGeneral)
-							}
+							c.WriteGoType(arrayType.Elem(), GoTypeContextGeneral)
 							c.tsw.WriteLiterally(">")
 						} else {
 							// For slice types, write as-is (already $.Slice<T>)
-							// Check if it's a slice of pointers and handle appropriately
-							if sliceType, isSlice := lhsObj.Type().Underlying().(*types.Slice); isSlice {
-								if ptrType, isPtr := sliceType.Elem().(*types.Pointer); isPtr {
-									c.tsw.WriteLiterally("$.Slice<")
-									c.WriteNonVarRefPointerType(ptrType)
-									c.tsw.WriteLiterally(">")
-								} else {
-									c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
-								}
-							} else {
-								c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
-							}
+							c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
 						}
 					} else {
 						c.WriteGoType(lhsObj.Type(), GoTypeContextGeneral)
