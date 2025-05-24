@@ -8,7 +8,7 @@ GoScript translates Go code to TypeScript. This document outlines the design pri
 
 1.  **AST Mapping:** Aim for a close mapping between the Go AST (`go/ast`) and the TypeScript AST, simplifying the compiler logic.
 2.  **Type Preservation:** Preserve Go's static typing as much as possible using TypeScript's type system.
-3.  **Value Semantics:** Emulate Go's value semantics for basic types and structs using copying where necessary. Pointers are used to emulate reference semantics when Go uses pointers. See [Boxes and Pointers](#boxes-and-pointers).
+3.  **Value Semantics:** Emulate Go's value semantics for basic types and structs using copying where necessary. Pointers are used to emulate reference semantics when Go uses pointers. See [VarRefes and Pointers](#varRefes-and-pointers).
 4.  **Idiomatic TypeScript:** Generate TypeScript code that feels natural to TypeScript developers, even if it means minor divergences from exact Go runtime behavior (e.g., `for range` loop variable scoping).
 5.  **Readability:** Prioritize clear and understandable generated code.
 
@@ -38,7 +38,7 @@ GoScript translates Go code to TypeScript. This document outlines the design pri
     *   **Maps:** Translated to TypeScript `Map<K, V>`.
     *   **Channels:** Translated using helper classes/functions from the runtime (`$.Chan<T>`) potentially leveraging async iterators or libraries like `csp-ts`. See `DESIGN_CONCURRENCY.md` (TODO: Create this file).
     *   **Interfaces:** Translated to TypeScript interfaces. Type assertions and type switches require runtime type information or helper functions. See `DESIGN_INTERFACES.md` (TODO: Create this file).
-    *   **Pointers:** Translated using a `$.Box<T>` wrapper type from the runtime. See [Boxes and Pointers](#boxes-and-pointers).
+    *   **Pointers:** Translated using a `$.VarRef<T>` wrapper type from the runtime. See [VarRefes and Pointers](#varRefes-and-pointers).
 *   **Function Types:** Translated to TypeScript function types.
 
 ### Variables and Constants
@@ -85,7 +85,7 @@ GoScript translates Go code to TypeScript. This document outlines the design pri
 
 *   Most operators map directly (`+`, `-`, `*`, `/`, `%`, `==`, `!=`, `<`, `>`, `<=`, `>=`, `&&`, `||`, `!`).
 *   Bitwise operators (`&`, `|`, `^`, `&^`, `<<`, `>>`) require runtime helper functions (`$.bitAnd()`, etc.) especially for integer types beyond JavaScript's standard number representation or for correct handling of signed vs unsigned shifts.
-*   Pointer operations (`*`, `&`) are handled via the `$.Box<T>` type and its methods/properties (e.g., `*p` becomes `p.value`, `&x` becomes `$.box(x)` or handled implicitly via assignment).
+*   Pointer operations (`*`, `&`) are handled via the `$.VarRef<T>` type and its methods/properties (e.g., `*p` becomes `p.value`, `&x` becomes `$.varRef(x)` or handled implicitly via assignment).
 
 ### Concurrency
 

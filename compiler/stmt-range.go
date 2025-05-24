@@ -238,7 +238,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		_, isArray := elem.(*types.Array)
 		if isArray || isSlice {
 			// For pointer to array/slice, we always need to dereference with .value
-			// because the pointed-to value is boxed when its address is taken
+			// because the pointed-to value is varrefed when its address is taken
 
 			// Determine the index variable name for the generated loop
 			indexVarName := "_i" // Default name

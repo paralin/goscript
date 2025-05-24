@@ -46,7 +46,7 @@ The following is an overview of the functions within the `compiler` package.
 - `NewFileCompiler(compilerConf *Config, pkg *packages.Package, astFile *ast.File, fullPath string, analysis *Analysis) (*FileCompiler, error)`
 - `(c *FileCompiler) Compile(ctx context.Context) error`
 - `NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analysis) *GoToTSCompiler`
-- `(c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessBoxedValue bool)`
+- `(c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool)`
 - `(c *GoToTSCompiler) WriteCaseClause(exp *ast.CaseClause) error`
 - `(c *GoToTSCompiler) writeChannelReceiveWithOk(lhs []ast.Expr, unaryExpr *ast.UnaryExpr, tok token.Token) error`
 - `(c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup)`

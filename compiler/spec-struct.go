@@ -12,7 +12,7 @@ import (
 // It handles the generation of:
 //   - The class declaration.
 //   - Getters and setters for all fields (both direct and embedded).
-//   - The internal `_fields` property, which stores field values in `$.Box` containers
+//   - The internal `_fields` property, which stores field values in `$.VarRef` containers
 //     to maintain Go's value semantics.
 //   - A constructor that initializes the `_fields` and allows partial initialization.
 //   - A `clone` method for creating a deep copy of the struct instance.

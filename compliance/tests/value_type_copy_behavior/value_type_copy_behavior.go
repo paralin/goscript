@@ -19,7 +19,7 @@ func main() {
 	println("----------------------------------------------------------")
 
 	// original is the starting struct instance.
-	// We take its address later for pointerCopy, so it might be allocated on the heap (boxed).
+	// We take its address later for pointerCopy, so it might be allocated on the heap (varrefed).
 	original := MyStruct{MyInt: 42, MyString: "original"}
 
 	// === Value-Type Copy Behavior ===

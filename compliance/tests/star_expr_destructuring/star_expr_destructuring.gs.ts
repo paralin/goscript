@@ -11,7 +11,7 @@ export function main(): void {
 	let a: $.VarRef<number> = $.varRef(0)
 	let b: $.VarRef<string> = $.varRef("")
 
-	// Create pointers - these will be properly boxed
+	// Create pointers - these will be properly varrefed
 	let pA: $.VarRef<number> | null = a
 	let pB: $.VarRef<string> | null = b
 

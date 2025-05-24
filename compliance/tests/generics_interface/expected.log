@@ -1,8 +1,8 @@
 === Generic Interface Test ===
-Int box result: 42
-Int box size: 1
-String box result: hello
-String box size: 1
+Int ValueContainer result: 42
+Int ValueContainer size: 1
+String ValueContainer result: hello
+String ValueContainer size: 1
 String comparison equal: true
 String comparison not equal: false
 String comparison -1: -1

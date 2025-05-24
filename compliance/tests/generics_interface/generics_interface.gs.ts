@@ -26,7 +26,7 @@ $.registerInterfaceType(
   [{ name: "Compare", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }]
 );
 
-class Box<T extends any> {
+class VarRef<T extends any> {
 	public get value(): T {
 		return this._fields.value.value
 	}
@@ -53,8 +53,8 @@ class Box<T extends any> {
 		}
 	}
 
-	public clone(): Box<T> {
-		const cloned = new Box<T>()
+	public clone(): VarRef<T> {
+		const cloned = new VarRef<T>()
 		cloned._fields = {
 			value: $.varRef(this._fields.value.value),
 			count: $.varRef(this._fields.count.value)
@@ -80,15 +80,15 @@ class Box<T extends any> {
 
 	// Register this type with the runtime type system
 	static __typeInfo = $.registerStructType(
-	  'Box',
-	  new Box(),
+	  'VarRef',
+	  new VarRef(),
 	  [{ name: "Get", args: [], returns: [{ type: { kind: $.TypeKind.Interface, methods: [] } }] }, { name: "Set", args: [{ name: "v", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [] }, { name: "Size", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }],
-	  Box,
+	  VarRef,
 	  {"value": { kind: $.TypeKind.Interface, methods: [] }, "count": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 
-class StringBox {
+class StringVarRef {
 	public get value(): string {
 		return this._fields.value.value
 	}
@@ -106,8 +106,8 @@ class StringBox {
 		}
 	}
 
-	public clone(): StringBox {
-		const cloned = new StringBox()
+	public clone(): StringVarRef {
+		const cloned = new StringVarRef()
 		cloned._fields = {
 			value: $.varRef(this._fields.value.value)
 		}
@@ -131,10 +131,10 @@ class StringBox {
 
 	// Register this type with the runtime type system
 	static __typeInfo = $.registerStructType(
-	  'StringBox',
-	  new StringBox(),
+	  'StringVarRef',
+	  new StringVarRef(),
 	  [{ name: "Compare", args: [{ name: "other", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "other", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }],
-	  StringBox,
+	  StringVarRef,
 	  {"value": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
@@ -153,19 +153,19 @@ function checkEqual<T extends $.Comparable>(c: Comparable<T>, val: T): boolean {
 export function main(): void {
 	console.log("=== Generic Interface Test ===")
 
-	// Test Box implementing Container
-	let intBox = new Box<number>({})
-	let result = useContainer(intBox, 42)
-	console.log("Int box result:", result)
-	console.log("Int box size:", intBox!.Size())
+	// Test VarRef implementing Container
+	let intVarRef = new VarRef<number>({})
+	let result = useContainer(intVarRef, 42)
+	console.log("Int varRef result:", result)
+	console.log("Int varRef size:", intVarRef!.Size())
 
-	let stringBox = new Box<string>({})
-	let strResult = useContainer(stringBox, "hello")
-	console.log("String box result:", strResult)
-	console.log("String box size:", stringBox!.Size())
+	let stringVarRef = new VarRef<string>({})
+	let strResult = useContainer(stringVarRef, "hello")
+	console.log("String varRef result:", strResult)
+	console.log("String varRef size:", stringVarRef!.Size())
 
-	// Test StringBox implementing Comparable
-	let sb = new StringBox({value: "test"})
+	// Test StringVarRef implementing Comparable
+	let sb = new StringVarRef({value: "test"})
 	console.log("String comparison equal:", checkEqual(sb, "test"))
 	console.log("String comparison not equal:", checkEqual(sb, "other"))
 	console.log("String comparison -1:", sb!.Compare("zebra"))

@@ -9,21 +9,21 @@ type MyStruct struct {
 }
 
 func main() {
-	s1 := MyStruct{Val: 1} // p1 takes the address of s1, so s1 is boxed
-	s2 := MyStruct{Val: 2} // p2 takes the address of s2, so s2 is boxed
+	s1 := MyStruct{Val: 1} // p1 takes the address of s1, so s1 is varrefed
+	s2 := MyStruct{Val: 2} // p2 takes the address of s2, so s2 is varrefed
 
-	p1 := &s1 // *MyStruct, points to s1, pp1 takes the address of p1, so p1 is boxed
-	p2 := &s1 // *MyStruct, points to s1, pp2 takes the address of p2, so p2 is boxed
-	p3 := &s2 // *MyStruct, points to s2, pp3 takes the address of p3, so p3 is boxed
+	p1 := &s1 // *MyStruct, points to s1, pp1 takes the address of p1, so p1 is varrefed
+	p2 := &s1 // *MyStruct, points to s1, pp2 takes the address of p2, so p2 is varrefed
+	p3 := &s2 // *MyStruct, points to s2, pp3 takes the address of p3, so p3 is varrefed
 
-	p4 := &s1 // *MyStruct, points to s1, nothing takes the address of p4, so p4 is not boxed
+	p4 := &s1 // *MyStruct, points to s1, nothing takes the address of p4, so p4 is not varrefed
 	_ = p4
 
 	pp1 := &p1 // **MyStruct, points to p1
 	pp2 := &p2 // **MyStruct, points to p2
 	pp3 := &p3 // **MyStruct, points to p3
 
-	ppp1 := &pp1 // ***MyStruct, points to pp1, not boxed as nothing takes address of ppp1
+	ppp1 := &pp1 // ***MyStruct, points to pp1, not varrefed as nothing takes address of ppp1
 
 	println("--- Initial Values ---")
 	println("s1.Val:", s1.Val)   // 1

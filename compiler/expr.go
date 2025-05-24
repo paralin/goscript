@@ -157,7 +157,7 @@ func (c *GoToTSCompiler) WriteTypeAssertExpr(exp *ast.TypeAssertExpr) error {
 // of the left (X) and right (Y) operands of the binary expression.
 // Returns `true` if both operands are determined to be pointer types,
 // `false` otherwise. This is used to apply specific comparison semantics
-// for pointers (e.g., comparing the box objects directly).
+// for pointers (e.g., comparing the varRef objects directly).
 func (c *GoToTSCompiler) isPointerComparison(exp *ast.BinaryExpr) bool {
 	leftType := c.pkg.TypesInfo.TypeOf(exp.X)
 	rightType := c.pkg.TypesInfo.TypeOf(exp.Y)
@@ -195,10 +195,10 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 // It handles several cases:
 //   - Channel send (`ch <- val`): Becomes `await ch.send(val)`.
 //   - Nil comparison for pointers (`ptr == nil` or `ptr != nil`): Compares the
-//     pointer (which may be a box object or `null`) directly to `null` using
+//     pointer (which may be a varRef object or `null`) directly to `null` using
 //     the translated operator (`==` or `!=`).
 //   - Pointer comparison (non-nil, `ptr1 == ptr2` or `ptr1 != ptr2`): Compares
-//     the box objects directly using strict equality (`===` or `!==`).
+//     the varRef objects directly using strict equality (`===` or `!==`).
 //   - Bitwise operations (`&`, `|`, `^`, `<<`, `>>`, `&^`): The expression is wrapped
 //     in parentheses `()` to ensure correct precedence in TypeScript, and operators
 //     are mapped (e.g., `&^` might need special handling or is mapped to a runtime helper).
@@ -243,7 +243,7 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	}
 
 	if isNilComparison {
-		// Compare the box object directly to null
+		// Compare the varRef object directly to null
 		if err := c.WriteValueExpr(ptrExpr); err != nil {
 			return fmt.Errorf("failed to write pointer expression in nil comparison: %w", err)
 		}
@@ -258,7 +258,7 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	}
 
 	// Check if this is a pointer comparison (non-nil)
-	// Compare the box objects directly using === or !==
+	// Compare the varRef objects directly using === or !==
 	if c.isPointerComparison(exp) {
 		c.tsw.WriteLiterally("(") // Wrap comparison
 		if err := c.WriteValueExpr(exp.X); err != nil {
@@ -378,11 +378,11 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 // It handles several unary operations:
 // - Channel receive (`<-ch`): Becomes `await ch.receive()`.
 // - Address-of (`&var`):
-//   - If `var` is a boxed variable (its address was taken), `&var` evaluates
-//     to the box itself (i.e., `varName` in TypeScript, which holds the box).
-//   - Otherwise (e.g., `&unboxedVar`, `&MyStruct{}`, `&FuncCall()`), it evaluates
+//   - If `var` is a varrefed variable (its address was taken), `&var` evaluates
+//     to the varRef itself (i.e., `varName` in TypeScript, which holds the varRef).
+//   - Otherwise (e.g., `&unvarrefedVar`, `&MyStruct{}`, `&FuncCall()`), it evaluates
 //     the operand `var`. The resulting TypeScript value (e.g., a new object instance)
-//     acts as the "pointer". Boxing decisions for such pointers are handled at
+//     acts as the "pointer". VarRefing decisions for such pointers are handled at
 //     the assignment site.
 //   - Other unary operators (`+`, `-`, `!`, `^`): Mapped to their TypeScript
 //     equivalents (e.g., `+`, `-`, `!`, `~` for bitwise NOT). Parentheses are added
@@ -403,8 +403,8 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 	}
 
 	if exp.Op == token.AND { // Address-of operator (&)
-		// If the operand is an identifier for a variable that is boxed,
-		// the result of & is the box itself.
+		// If the operand is an identifier for a variable that is varrefed,
+		// the result of & is the varRef itself.
 		if ident, ok := exp.X.(*ast.Ident); ok {
 			var obj types.Object
 			obj = c.pkg.TypesInfo.Uses[ident]
@@ -418,11 +418,11 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 			}
 		}
 
-		// Otherwise (&unboxedVar, &CompositeLit{}, &FuncCall(), etc.),
+		// Otherwise (&unvarrefedVar, &CompositeLit{}, &FuncCall(), etc.),
 		// the address-of operator in Go, when used to create a pointer,
 		// translates to simply evaluating the operand in TypeScript.
 		// The resulting value (e.g., a new object instance) acts as the "pointer".
-		// Boxing decisions are handled at the assignment site based on the LHS variable.
+		// VarRefing decisions are handled at the assignment site based on the LHS variable.
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write &-operand: %w", err)
 		}

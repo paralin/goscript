@@ -14,30 +14,30 @@ type Comparable[T comparable] interface {
 }
 
 // Simple struct implementing generic interface
-type Box[T any] struct {
+type ValueContainer[T any] struct {
 	value T
 	count int
 }
 
-func (b *Box[T]) Get() T {
+func (b *ValueContainer[T]) Get() T {
 	return b.value
 }
 
-func (b *Box[T]) Set(v T) {
+func (b *ValueContainer[T]) Set(v T) {
 	b.value = v
 	b.count++
 }
 
-func (b *Box[T]) Size() int {
+func (b *ValueContainer[T]) Size() int {
 	return b.count
 }
 
 // String struct implementing comparable interface
-type StringBox struct {
+type StringValueContainer struct {
 	value string
 }
 
-func (s *StringBox) Compare(other string) int {
+func (s *StringValueContainer) Compare(other string) int {
 	if s.value < other {
 		return -1
 	} else if s.value > other {
@@ -46,7 +46,7 @@ func (s *StringBox) Compare(other string) int {
 	return 0
 }
 
-func (s *StringBox) Equal(other string) bool {
+func (s *StringValueContainer) Equal(other string) bool {
 	return s.value == other
 }
 
@@ -64,19 +64,19 @@ func checkEqual[T comparable](c Comparable[T], val T) bool {
 func main() {
 	println("=== Generic Interface Test ===")
 
-	// Test Box implementing Container
-	intBox := &Box[int]{}
-	result := useContainer(intBox, 42)
-	println("Int box result:", result)
-	println("Int box size:", intBox.Size())
+	// Test ValueContainer implementing Container
+	intValueContainer := &ValueContainer[int]{}
+	result := useContainer(intValueContainer, 42)
+	println("Int ValueContainer result:", result)
+	println("Int ValueContainer size:", intValueContainer.Size())
 
-	stringBox := &Box[string]{}
-	strResult := useContainer(stringBox, "hello")
-	println("String box result:", strResult)
-	println("String box size:", stringBox.Size())
+	stringValueContainer := &ValueContainer[string]{}
+	strResult := useContainer(stringValueContainer, "hello")
+	println("String ValueContainer result:", strResult)
+	println("String ValueContainer size:", stringValueContainer.Size())
 
-	// Test StringBox implementing Comparable
-	sb := &StringBox{value: "test"}
+	// Test StringValueContainer implementing Comparable
+	sb := &StringValueContainer{value: "test"}
 	println("String comparison equal:", checkEqual(sb, "test"))
 	println("String comparison not equal:", checkEqual(sb, "other"))
 	println("String comparison -1:", sb.Compare("zebra"))

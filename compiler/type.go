@@ -93,7 +93,7 @@ func (c *GoToTSCompiler) writePointerTypeForFunctionReturn(t *types.Pointer) {
 		c.WriteGoType(elemType, GoTypeContextFunctionReturn)
 		c.tsw.WriteLiterally(" | null")
 	} else {
-		// For pointer-to-primitive in function returns, still use boxing
+		// For pointer-to-primitive in function returns, still use varRefing
 		c.tsw.WriteLiterally("$.VarRef<")
 		c.WriteGoType(elemType, GoTypeContextFunctionReturn)
 		c.tsw.WriteLiterally("> | null")

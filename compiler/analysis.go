@@ -421,7 +421,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 						if vr, ok := def.(*types.Var); ok {
 							v.currentReceiver = vr
 							// Add the receiver variable to the VariableUsage map
-							// to ensure it is properly analyzed for boxing
+							// to ensure it is properly analyzed for varRefing
 							v.getOrCreateUsageInfo(v.currentReceiver)
 						}
 					}
@@ -551,7 +551,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 	case *ast.UnaryExpr:
 		// We handle address-of (&) within AssignStmt where it's actually used.
 		// Standalone &x doesn't directly assign, but its usage in assignments
-		// or function calls determines boxing. Assignments are handled below.
+		// or function calls determines varRefing. Assignments are handled below.
 		// Function calls like foo(&x) would require different tracking if needed.
 		// For now, we focus on assignments as per the request.
 		return v
@@ -666,7 +666,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 
 			// 2. If RHS involved a source variable (rhsSourceObj is not nil),
 			//    record that this source variable was used (its destinations).
-			//    This is CRITICAL for boxing analysis (e.g., if &rhsSourceObj was assigned).
+			//    This is CRITICAL for varRefing analysis (e.g., if &rhsSourceObj was assigned).
 			if rhsSourceObj != nil {
 				sourceUsageInfo := v.getOrCreateUsageInfo(rhsSourceObj)
 				// The 'Object' in DestinationInfo is what/where rhsSourceObj (or its address) was assigned TO.
@@ -784,7 +784,7 @@ func (v *analysisVisitor) containsDefer(block *ast.BlockStmt) bool {
 }
 
 // AnalyzeFile analyzes a Go source file AST and populates the Analysis struct with information
-// that will be used during code generation to properly handle pointers, variables that need boxing, etc.
+// that will be used during code generation to properly handle pointers, variables that need varRefing, etc.
 func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap ast.CommentMap) {
 	// Store the comment map in the analysis object
 	analysis.Cmap = cmap

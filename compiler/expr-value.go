@@ -7,7 +7,7 @@ import (
 // WriteValueExpr translates a Go abstract syntax tree (AST) expression (`ast.Expr`)
 // that represents a value into its TypeScript value equivalent.
 // This is a central dispatch function for various expression types:
-// - Identifiers (`ast.Ident`): Delegates to `WriteIdent`, potentially adding `.value` for boxed variables.
+// - Identifiers (`ast.Ident`): Delegates to `WriteIdent`, potentially adding `.value` for varrefed variables.
 // - Selector expressions (`ast.SelectorExpr`, e.g., `obj.Field` or `pkg.Var`): Delegates to `WriteSelectorExpr`.
 // - Pointer dereferences (`ast.StarExpr`, e.g., `*ptr`): Delegates to `WriteStarExpr`.
 // - Function calls (`ast.CallExpr`): Delegates to `WriteCallExpr`.

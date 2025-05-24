@@ -12,12 +12,12 @@ import (
 // declarations.
 //
 // For single variable declarations (`var x T = val` or `var x = val` or `var x T`):
-//   - It determines if the variable `x` needs to be boxed (e.g., if its address is taken)
+//   - It determines if the variable `x` needs to be varrefed (e.g., if its address is taken)
 //     using `c.analysis.NeedsVarRef(obj)`.
 //   - If variable referenced: `let x: $.VarRef<T_ts> = $.varRef(initializer_ts_or_zero_ts);`
 //     The type annotation is `$.VarRef<T_ts>`, and the initializer is wrapped in `$.varRef()`.
 //   - If not variable referenced: `let x: T_ts = initializer_ts_or_zero_ts;`
-//     The type annotation is `T_ts`. If the initializer is `&unboxedVar`, it becomes `$.varRef(unboxedVar_ts)`.
+//     The type annotation is `T_ts`. If the initializer is `&unvarrefedVar`, it becomes `$.varRef(unvarrefedVar_ts)`.
 //   - If no initializer is provided, the TypeScript zero value (from `WriteZeroValueForType`)
 //     is used.
 //   - Type `T` (or `T_ts`) is obtained from `obj.Type()` and translated via `WriteGoType`.
@@ -47,7 +47,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		}
 
 		goType := obj.Type()
-		needsBox := c.analysis.NeedsVarRef(obj) // Check if address is taken
+		needsVarRef := c.analysis.NeedsVarRef(obj) // Check if address is taken
 
 		hasInitializer := len(a.Values) > 0
 		var initializerExpr ast.Expr
@@ -87,12 +87,12 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 
 		// Write type annotation if:
 		// 1. Not a slice conversion (normal case), OR
-		// 2. Is a slice conversion but needs boxing (we need explicit type for $.varRef())
-		if !isSliceConversion || needsBox {
+		// 2. Is a slice conversion but needs varRefing (we need explicit type for $.varRef())
+		if !isSliceConversion || needsVarRef {
 			c.tsw.WriteLiterally(": ")
 			// Write type annotation
-			if needsBox {
-				// If boxed, the variable holds VarRef<OriginalGoType>
+			if needsVarRef {
+				// If varrefed, the variable holds VarRef<OriginalGoType>
 				c.tsw.WriteLiterally("$.VarRef<")
 
 				// Special case: if this is a slice conversion from an array type,
@@ -112,7 +112,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 				}
 				c.tsw.WriteLiterally(">")
 			} else {
-				// If not boxed, the variable holds the translated Go type directly
+				// If not varrefed, the variable holds the translated Go type directly
 				c.WriteGoType(goType, GoTypeContextGeneral)
 			}
 		}
@@ -138,8 +138,8 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 			}
 		}
 
-		if needsBox {
-			// Boxed variable: let v: VarRef<T> = $.varRef(init_or_zero);
+		if needsVarRef {
+			// VarRef variable: let v: VarRef<T> = $.varRef(init_or_zero);
 			c.tsw.WriteLiterally("$.varRef(")
 			if hasInitializer {
 				// Write the compiled initializer expression normally
@@ -147,31 +147,31 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 					return err
 				}
 			} else {
-				// No initializer, box the zero value
+				// No initializer, varRef the zero value
 				c.WriteZeroValueForType(goType)
 			}
 			c.tsw.WriteLiterally(")")
 		} else {
-			// Unboxed variable: let v: T = init_or_zero;
+			// Unvarrefed variable: let v: T = init_or_zero;
 			if hasInitializer {
-				// Handle &v initializer specifically for unboxed variables
+				// Handle &v initializer specifically for unvarrefed variables
 				if unaryExpr, isUnary := initializerExpr.(*ast.UnaryExpr); isUnary && unaryExpr.Op == token.AND {
 					// Initializer is &v
-					// Check if v is boxed
-					needsBoxOperand := false
+					// Check if v is varrefed
+					needsVarRefOperand := false
 					unaryExprXIdent, ok := unaryExpr.X.(*ast.Ident)
 					if ok {
 						innerObj := c.pkg.TypesInfo.Uses[unaryExprXIdent]
-						needsBoxOperand = innerObj != nil && c.analysis.NeedsVarRef(innerObj)
+						needsVarRefOperand = innerObj != nil && c.analysis.NeedsVarRef(innerObj)
 					}
 
-					// If v is boxed, assign the box itself (v)
-					// If v is not boxed, assign $.varRef(v)
-					if needsBoxOperand {
+					// If v is varrefed, assign the varRef itself (v)
+					// If v is not varrefed, assign $.varRef(v)
+					if needsVarRefOperand {
 						// special handling: do not write .value here.
 						c.WriteIdent(unaryExprXIdent, false)
 					} else {
-						// &unboxedVar -> $.varRef(unboxedVar)
+						// &unvarrefedVar -> $.varRef(unvarrefedVar)
 						c.tsw.WriteLiterally("$.varRef(")
 						if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Write 'v'
 							return err

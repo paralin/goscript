@@ -44,7 +44,7 @@ import (
 // The function ensures that the number of LHS and RHS expressions matches for
 // most cases, erroring if they don't, except for specifically handled patterns
 // like multi-assign from single call or discarded channel receive.
-// It correctly applies `let` for `:=` (define) tokens and handles boxing and
+// It correctly applies `let` for `:=` (define) tokens and handles varRefing and
 // cloning semantics based on type information and analysis.
 func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// writeMultiVarAssignFromCall handles multi-variable assignment from a single function call.

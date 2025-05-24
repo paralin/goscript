@@ -1,4 +1,4 @@
-// Generated file based on boxing_struct.go
+// Generated file based on varRefing_struct.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin/builtin.js";
@@ -40,7 +40,7 @@ class MyStruct {
 }
 
 export function main(): void {
-	// 'val' is a value type, but its address is taken, so it should be boxed in TS.
+	// 'val' is a value type, but its address is taken, so it should be varrefed in TS.
 	let val: $.VarRef<MyStruct> = $.varRef(new MyStruct({MyInt: 10}))
 	let ptrToVal = val
 

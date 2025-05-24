@@ -13,16 +13,16 @@ import (
 // access on an object or struct.
 //   - For package selectors, it writes `PackageName.IdentifierName`. The `IdentifierName`
 //     is written using `WriteIdent` which handles potential `.value` access if the
-//     package-level variable is boxed.
+//     package-level variable is varrefed.
 //   - For field or method access on an object (`exp.X`), it first writes the base
-//     expression (`exp.X`) using `WriteValueExpr` (which handles its own boxing).
+//     expression (`exp.X`) using `WriteValueExpr` (which handles its own varRefing).
 //     Then, it writes a dot (`.`) followed by the selected identifier (`exp.Sel`)
-//     using `WriteIdent`, which appends `.value` if the field itself is boxed
+//     using `WriteIdent`, which appends `.value` if the field itself is varrefed
 //     (e.g., accessing a field of primitive type through a pointer to a struct
 //     where the field's address might have been taken).
 //
 // This function aims to correctly navigate Go's automatic dereferencing and
-// TypeScript's explicit boxing model.
+// TypeScript's explicit varRefing model.
 func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	// Check if this is a package selector (e.g., time.Now)
 	if pkgIdent, isPkgIdent := exp.X.(*ast.Ident); isPkgIdent {
@@ -31,7 +31,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 				// Package selectors should never use .value on the package name
 				c.tsw.WriteLiterally(pkgIdent.Name)
 				c.tsw.WriteLiterally(".")
-				// Write the selected identifier, allowing .value if it's a boxed package variable
+				// Write the selected identifier, allowing .value if it's a varrefed package variable
 				c.WriteIdent(exp.Sel, true)
 				return nil
 			}
@@ -60,7 +60,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 							ptrObj = c.pkg.TypesInfo.ObjectOf(ptrIdent)
 						}
 
-						// Write the pointer expression (e.g., p or p.value if p is boxed)
+						// Write the pointer expression (e.g., p or p.value if p is varrefed)
 						if err := c.WriteValueExpr(starExpr.X); err != nil {
 							return fmt.Errorf("failed to write pointer expression for (*p).field: %w", err)
 						}
@@ -68,7 +68,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 						// Add ! for non-null assertion
 						c.tsw.WriteLiterally("!")
 
-						// Add .value ONLY if the pointer variable itself needs boxed access
+						// Add .value ONLY if the pointer variable itself needs varrefed access
 						// This handles the case where 'p' points to a variable referenced struct (e.g., p = s where s is VarRef<MyStruct>)
 						if ptrObj != nil && c.analysis.NeedsVarRefAccess(ptrObj) {
 							c.tsw.WriteLiterally(".value")
@@ -86,7 +86,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	// --- End Special Case ---
 
 	// Fallback / Normal Case (e.g., obj.Field, pkg.Var, method calls)
-	// WriteValueExpr handles adding .value for the base variable itself if it's boxed.
+	// WriteValueExpr handles adding .value for the base variable itself if it's varrefed.
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write selector base expression: %w", err)
 	}
@@ -116,7 +116,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 
 	// Write the field/method name.
 	// Pass 'true' to WriteIdent to potentially add '.value' if the field itself
-	// needs boxed access (e.g., accessing a primitive field via pointer where
+	// needs varrefed access (e.g., accessing a primitive field via pointer where
 	// the field's address might have been taken elsewhere - less common but possible).
 	// For simple struct field access like p.Val or (*p).Val, WriteIdent(..., true)
 	// relies on NeedsVarRefAccess for the field 'Val', which should typically be false.

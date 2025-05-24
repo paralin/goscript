@@ -5,7 +5,7 @@ type MyStruct struct {
 }
 
 func main() {
-	// 'val' is a value type, but its address is taken, so it should be boxed in TS.
+	// 'val' is a value type, but its address is taken, so it should be varrefed in TS.
 	val := MyStruct{MyInt: 10}
 	ptrToVal := &val
 
