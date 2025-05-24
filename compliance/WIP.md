@@ -6,7 +6,7 @@ After running the compliance tests for variable references and pointers, I've id
 
 ### 1. Primary Issue: Star Expression (Dereference) Not Generating Proper `.value` Access
 
-**FIXED**: The issue was that `WriteStarExpr` was using `WriteValueExpr` for its operand, which would add `.value` for variable-referenced identifiers. This caused double `.value` access.
+**PARTIALLY FIXED**: Modified `WriteStarExpr` to handle varrefed pointer variables correctly. The fix works for simple cases and pointer comparisons, but field access through pointers to varrefed structs still needs work.
 
 **The Problem**:
 - When processing `***p3`, each level of dereference calls `WriteStarExpr`
@@ -15,23 +15,36 @@ After running the compliance tests for variable references and pointers, I've id
 - `NeedsVarRefAccess(p3)` returns true because `p3` was assigned `&p2` where `p2` is variable referenced
 - This adds an extra `.value` that shouldn't be there
 
-**The Solution**:
-Modified `WriteStarExpr` to handle identifiers specially:
-- For identifier operands, call `WriteIdent(operand, false)` to prevent adding `.value`
-- For other expressions (like nested star expressions), continue using `WriteValueExpr`
-- This ensures we only add `.value` for the actual dereference, not for accessing the pointer variable
+**The Solution (Current Implementation)**:
+Modified `WriteStarExpr` to check if the operand is a varrefed identifier:
+- If the identifier is varrefed, use `WriteValueExpr` to get the `.value` access
+- If not varrefed, use `WriteIdent(operand, false)` to prevent double `.value`
+- This ensures proper dereference handling for both varrefed and non-varrefed pointers
 
 **Code Fix**:
 ```go
 // In WriteStarExpr
-switch operand := exp.X.(type) {
-case *ast.Ident:
-    // For identifiers, write without accessing .value
-    c.WriteIdent(operand, false)
-default:
-    // For other expressions, use WriteValueExpr
+isVarrefedIdent := false
+if ident, ok := exp.X.(*ast.Ident); ok {
+    if obj := c.pkg.TypesInfo.ObjectOf(ident); obj != nil {
+        isVarrefedIdent = c.analysis.NeedsVarRef(obj)
+    }
+}
+
+if isVarrefedIdent {
+    // For varrefed identifiers, we need to access the value first
     if err := c.WriteValueExpr(exp.X); err != nil {
         return err
+    }
+} else {
+    // For non-varrefed identifiers and other expressions
+    switch operand := exp.X.(type) {
+    case *ast.Ident:
+        c.WriteIdent(operand, false)
+    default:
+        if err := c.WriteValueExpr(exp.X); err != nil {
+            return err
+        }
     }
 }
 ```
@@ -49,65 +62,60 @@ We want to ALWAYS do ahead-of-time Type analysis and do the var-ref logic based 
 - [x] Test varref compliance test - **PASSED**
 - [x] Test varref_assign compliance test - **PASSED**
 - [x] Test varref_pointers compliance test - **PASSED**
+- [x] Fix pointer comparisons in pointers test (e.g., `*pp1 == *pp2`)
 
-**High Priority (Primary Issue)**:
-- [ ] Fix pointers test issues
+**High Priority (Remaining Issues)**:
+- [ ] Fix field access through pointers to varrefed structs
+- [ ] Fix nil pointer access issues
 
 **Current Issues in pointers test**:
 
-1. **Multi-level dereference with field access**: `(**pp1).Val` is being generated as `pp1!.value!.Val` but should be `pp1!.value!.value!.value.Val`
-   - The special case in `WriteSelectorExpr` is being triggered but not generating the correct output
-   - The issue is that `WriteValueExpr(starExpr)` is not generating the full dereference chain
+1. **Field access through pointers to varrefed structs**: 
+   - `(**pp1).Val` is being generated as `pp1!.value!.value!.Val` but should be `pp1!.value!.value!.value.Val`
+   - `(*p2).Val` is being generated as `p2!.value!.Val` but should be `p2!.value!.value.Val`
+   - The issue is that we're accessing `.Val` on `VarRef<MyStruct>` instead of `MyStruct`
+   - Need one more `.value` to get to the actual struct
 
-2. **Pointer comparisons**: `*pp1 == *pp2` is being generated as `pp1!.value === pp2!.value` instead of properly dereferencing
-   - This suggests that the star expression in the comparison context is not being handled correctly
-   - Should be `pp1!.value!.value === pp2!.value!.value`
-
-3. **Nil pointer access**: The code tries to access `.value` on null pointers causing runtime errors
+2. **Nil pointer access**: The code tries to access `.value` on null pointers causing runtime errors
    - Line 100: `npp!.value` when `npp` is `null`
-   - Need to handle the case where the pointer variable itself is nil (not just what it points to)
+   - Need to handle the case where the pointer variable itself is nil
 
-4. **Field access through single-level pointer**: `(*p2).Val` is being generated as `p2!.Val` instead of `p2!.value!.value.Val`
-   - This is also incorrect and shows the dereference is not working properly
+**Type Analysis for Field Access**:
+- `pp1` is `$.VarRef<$.VarRef<$.VarRef<MyStruct> | null> | null>`
+- `pp1!.value` is `$.VarRef<$.VarRef<MyStruct> | null> | null`
+- `pp1!.value!.value` is `$.VarRef<MyStruct> | null`
+- `pp1!.value!.value!.value` is `MyStruct` (this is what we need to access `.Val`)
 
 **Root Cause Analysis**:
-The core issue seems to be that our star expression handling is not generating the correct number of `.value` accesses in all contexts. The fix we applied works for simple cases like `***p3` but fails for:
-- Star expressions in comparisons (`*pp1 == *pp2`)
-- Star expressions with field access (`(**pp1).Val`)
-- Mixed cases where we have varrefed and non-varrefed pointers
+The `WriteSelectorExpr` special case for dereferenced struct field access is working but not accounting for the fact that after dereferencing, we might still have a `VarRef<MyStruct>` instead of `MyStruct` when the struct itself is varrefed.
 
 **Medium Priority (Secondary Issues)**:
 - [ ] Fix pointer range loop issues
 - [ ] Fix composite literal untyped pointer issues
 
 **Testing**:
-- [ ] Run pointers test to check for fixes
-- [ ] Run pointer_range_loop test
-- [ ] Run pointer_composite_literal_untyped test
+- [x] varref test - PASSED
+- [x] varref_assign test - PASSED  
+- [x] varref_pointers test - PASSED
+- [ ] pointers test - PARTIAL (comparisons fixed, field access and nil handling remain)
+- [ ] pointer_range_loop test
+- [ ] pointer_composite_literal_untyped test
 
-### 4. Analysis of pointers test issues
+### 4. Progress Summary
 
-Looking at the generated TypeScript vs expected behavior:
+**What's Working**:
+1. Basic variable reference handling (`***p3` correctly generates `p3!.value!.value!.value`)
+2. Pointer comparisons (`*pp1 == *pp2` correctly generates `pp1!.value!.value === pp2!.value`)
+3. Variable reference assignment and basic pointer operations
 
-**Issue 1: Field access through multi-level pointers**
-- Go: `(**pp1).Val` where `pp1` is `**MyStruct`
-- Current TS: `pp1!.value!.Val` 
-- Expected TS: `pp1!.value!.value!.value.Val`
-
-The problem is that `WriteSelectorExpr` has a special case for `(*p).field` but when it calls `WriteValueExpr(starExpr)` for multi-level dereferences, it's not generating the full chain.
-
-**Issue 2: Incorrect pointer comparisons**
-- Go: `*pp1 == *pp2` (comparing dereferenced pointers)
-- Current TS: `pp1!.value === pp2!.value` (comparing the pointers, not the values they point to)
-- Expected TS: `pp1!.value!.value === pp2!.value!.value`
-
-**Issue 3: Nil handling**
-- The generated code doesn't properly check for nil before accessing `.value`
-- Need to ensure nil checks are in place or use optional chaining
+**What Still Needs Work**:
+1. Field access through pointers to varrefed structs (missing final `.value` to get from `VarRef<MyStruct>` to `MyStruct`)
+2. Nil pointer handling (accessing `.value` on null causes runtime errors)
+3. The `WriteSelectorExpr` special case needs to account for varrefed structs
 
 ## Next Steps
 
-1. Debug why the star expression handling is not working correctly in all contexts
-2. Consider a more comprehensive rewrite of how we handle pointer dereferences
-3. Add proper nil handling
-4. Re-run pointers test
+1. Fix the field access issue by ensuring we fully dereference to the struct type before accessing fields
+2. Add proper nil handling to prevent runtime errors
+3. Re-run pointers test to verify fixes
+4. Move on to pointer_range_loop and pointer_composite_literal_untyped tests
