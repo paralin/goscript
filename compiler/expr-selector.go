@@ -79,11 +79,6 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 					return fmt.Errorf("failed to write dereferenced expression for field access: %w", err)
 				}
 
-				// For field access on dereferenced pointers, we always need an extra .value
-				// because the dereferencing operation results in VarRef<Struct> and we need
-				// to unwrap it to get to the actual Struct before accessing fields
-				c.tsw.WriteLiterally("!.value")
-
 				// Add .field
 				c.tsw.WriteLiterally(".")
 				c.WriteIdent(exp.Sel, false) // Don't add .value to the field itself

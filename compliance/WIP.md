@@ -229,3 +229,96 @@ The issue is that `arrPtr` is being treated as varrefed when it shouldn't be. Th
 - ✅ Struct field assignment (setter usage) fixed
 - ✅ Destructuring assignment to dereferenced pointers fixed
 - ✅ Basic pointer operations and comparisons working
+
+### 8. Current Analysis of Failing Tests (Latest Update)
+
+#### `varref_deref_struct` Test Issue - CRITICAL FIX NEEDED
+
+**The Problem**:
+The Go code `(*myStruct).MyInt = 5` is generating `myStruct!!.value.MyInt = 5` instead of the correct `myStruct!.MyInt = 5`.
+
+**Root Cause**:
+In `WriteSelectorExpr` function (`compiler/expr-selector.go`, lines 83-86), there's a special case for dereferenced pointer field access that incorrectly adds `!.value`:
+
+```go
+// For field access on dereferenced pointers, we always need an extra .value
+// because the dereferencing operation results in VarRef<Struct> and we need
+// to unwrap it to get to the actual Struct before accessing fields
+c.tsw.WriteLiterally("!.value")
+```
+
+**Why This Is Wrong**:
+- `myStruct := &MyStruct{}` creates `myStruct: MyStruct | null` (pointer to struct, NOT varrefed)
+- `*myStruct` should resolve to `myStruct!` (just assert non-null, no `.value` needed)
+- `(*myStruct).MyInt` should be `myStruct!.MyInt` (direct field access on the struct)
+
+**The Fix**:
+The special case logic assumes all dereferenced pointers result in `VarRef<Struct>`, but this is only true when the struct variable itself was varrefed. For pointers to structs that aren't varrefed, we shouldn't add the extra `.value`.
+
+**Type Analysis**:
+- Go: `myStruct *MyStruct` (pointer to struct, not varrefed)
+- TS: `myStruct: MyStruct | null`
+- Go: `(*myStruct).Field`
+- TS: `myStruct!.Field` (NOT `myStruct!.value.Field`)
+
+#### `pointer_range_loop` Test Issue - DOUBLE .VALUE ACCESS
+
+**The Problem**:
+Range loop over pointer-to-array is generating `arrPtr!.value!.value` instead of `arrPtr!.value`.
+
+**Go Code Analysis**:
+```go
+arr := [3]int{1, 2, 3}  // arr is varrefed because &arr is taken
+arrPtr := &arr          // arrPtr gets the VarRef object but is NOT varrefed itself
+```
+
+**Current TypeScript** (incorrect):
+```typescript
+let arr: $.VarRef<$.Slice<number>> = $.varRef($.arrayToSlice<number>([1, 2, 3]))
+let arrPtr = arr  // arrPtr is NOT varrefed, contains the VarRef object
+
+// Range loop incorrectly generates:
+arrPtr!.value!.value  // WRONG: Double .value
+```
+
+**Expected TypeScript** (correct):
+```typescript
+let arr: $.VarRef<$.Slice<number>> = $.varRef($.arrayToSlice<number>([1, 2, 3]))
+let arrPtr = arr  // arrPtr is NOT varrefed
+
+// Range loop should generate:
+arrPtr!.value  // CORRECT: Single .value to dereference the pointer
+```
+
+**Root Cause Analysis**:
+The issue is in `WriteRangeStmt` (`compiler/stmt-range.go`, lines 263-275). The code:
+1. Calls `WriteValueExpr(exp.X)` which writes `arrPtr` 
+2. `WriteValueExpr` might be incorrectly adding `.value` if it thinks `arrPtr` is varrefed
+3. Then adds another `!.value` for pointer dereference
+
+**Key Insight**:
+`arrPtr` should NOT be treated as varrefed because nothing takes `&arrPtr`. It just contains the VarRef object from `&arr`.
+
+### 9. Implementation Plan
+
+**Priority 1: Fix `varref_deref_struct`**
+1. Modify `WriteSelectorExpr` to NOT add `.value` for field access on dereferenced struct pointers
+2. The logic should distinguish between:
+   - Pointer to struct (no extra `.value` needed): `p!.Field`
+   - Pointer to varrefed struct variable (extra `.value` needed): `p!.value.Field`
+
+**Priority 2: Fix `pointer_range_loop`** 
+1. Review why `arrPtr` is being treated as varrefed in `WriteValueExpr`
+2. Fix the double `.value` issue in range loop handling
+3. Ensure ahead-of-time analysis correctly identifies varref needs
+
+**Core Principle**:
+> ALWAYS do ahead-of-time type analysis and do the var-ref logic based on that only. Never assume that a star expr actually needs a .value dereference unless the analysis says so.
+
+### 10. Next Steps
+
+1. ✅ Analyze the current failing tests and understand root causes
+2. 🔄 Fix `WriteSelectorExpr` for struct field access
+3. 🔄 Fix double `.value` issue in pointer range loops  
+4. ✅ Update WIP.md with analysis
+5. 🔄 Test fixes and iterate until compliance tests pass
