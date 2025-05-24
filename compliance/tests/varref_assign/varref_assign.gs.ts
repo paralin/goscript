@@ -1,4 +1,4 @@
-// Generated file based on varRefing_assign.go
+// Generated file based on varref_assign.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin/builtin.js";

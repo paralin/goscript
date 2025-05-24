@@ -26,7 +26,7 @@ $.registerInterfaceType(
   [{ name: "Compare", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }]
 );
 
-class VarRef<T extends any> {
+class ValueContainer<T extends any> {
 	public get value(): T {
 		return this._fields.value.value
 	}
@@ -53,8 +53,8 @@ class VarRef<T extends any> {
 		}
 	}
 
-	public clone(): VarRef<T> {
-		const cloned = new VarRef<T>()
+	public clone(): ValueContainer<T> {
+		const cloned = new ValueContainer<T>()
 		cloned._fields = {
 			value: $.varRef(this._fields.value.value),
 			count: $.varRef(this._fields.count.value)
@@ -80,15 +80,15 @@ class VarRef<T extends any> {
 
 	// Register this type with the runtime type system
 	static __typeInfo = $.registerStructType(
-	  'VarRef',
-	  new VarRef(),
+	  'ValueContainer',
+	  new ValueContainer(),
 	  [{ name: "Get", args: [], returns: [{ type: { kind: $.TypeKind.Interface, methods: [] } }] }, { name: "Set", args: [{ name: "v", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [] }, { name: "Size", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }],
-	  VarRef,
+	  ValueContainer,
 	  {"value": { kind: $.TypeKind.Interface, methods: [] }, "count": { kind: $.TypeKind.Basic, name: "number" }}
 	);
 }
 
-class StringVarRef {
+class StringValueContainer {
 	public get value(): string {
 		return this._fields.value.value
 	}
@@ -106,8 +106,8 @@ class StringVarRef {
 		}
 	}
 
-	public clone(): StringVarRef {
-		const cloned = new StringVarRef()
+	public clone(): StringValueContainer {
+		const cloned = new StringValueContainer()
 		cloned._fields = {
 			value: $.varRef(this._fields.value.value)
 		}
@@ -131,10 +131,10 @@ class StringVarRef {
 
 	// Register this type with the runtime type system
 	static __typeInfo = $.registerStructType(
-	  'StringVarRef',
-	  new StringVarRef(),
+	  'StringValueContainer',
+	  new StringValueContainer(),
 	  [{ name: "Compare", args: [{ name: "other", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "other", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }],
-	  StringVarRef,
+	  StringValueContainer,
 	  {"value": { kind: $.TypeKind.Basic, name: "string" }}
 	);
 }
@@ -153,19 +153,19 @@ function checkEqual<T extends $.Comparable>(c: Comparable<T>, val: T): boolean {
 export function main(): void {
 	console.log("=== Generic Interface Test ===")
 
-	// Test VarRef implementing Container
-	let intVarRef = new VarRef<number>({})
-	let result = useContainer(intVarRef, 42)
-	console.log("Int varRef result:", result)
-	console.log("Int varRef size:", intVarRef!.Size())
+	// Test ValueContainer implementing Container
+	let intValueContainer = new ValueContainer<number>({})
+	let result = useContainer(intValueContainer, 42)
+	console.log("Int ValueContainer result:", result)
+	console.log("Int ValueContainer size:", intValueContainer!.Size())
 
-	let stringVarRef = new VarRef<string>({})
-	let strResult = useContainer(stringVarRef, "hello")
-	console.log("String varRef result:", strResult)
-	console.log("String varRef size:", stringVarRef!.Size())
+	let stringValueContainer = new ValueContainer<string>({})
+	let strResult = useContainer(stringValueContainer, "hello")
+	console.log("String ValueContainer result:", strResult)
+	console.log("String ValueContainer size:", stringValueContainer!.Size())
 
-	// Test StringVarRef implementing Comparable
-	let sb = new StringVarRef({value: "test"})
+	// Test StringValueContainer implementing Comparable
+	let sb = new StringValueContainer({value: "test"})
 	console.log("String comparison equal:", checkEqual(sb, "test"))
 	console.log("String comparison not equal:", checkEqual(sb, "other"))
 	console.log("String comparison -1:", sb!.Compare("zebra"))

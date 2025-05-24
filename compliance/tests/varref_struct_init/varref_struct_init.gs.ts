@@ -1,4 +1,4 @@
-// Generated file based on varRefing_struct_init.go
+// Generated file based on varref_struct_init.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin/builtin.js";
@@ -40,10 +40,10 @@ class MyStruct {
 }
 
 export function main(): void {
-	// Scenario 1: Value type that NeedsVarRefed
+	// Scenario 1: Value type that NeedsVarRef
 	// 'val' is a value type, but its address is taken, so it should be varrefed in TS.
 	let val: $.VarRef<MyStruct> = $.varRef(new MyStruct({MyInt: 10}))
-	let ptrToVal = val // Makes NeedsVarRefedAccess(val) true
+	let ptrToVal = val // Makes NeedsVarRefAccess(val) true
 
 	// Accessing field on varrefed value type: Should generate val.value.MyInt
 	val!.value.MyInt = 20
