@@ -518,3 +518,140 @@ When a composite literal results in a pointer type (either through explicit `&st
 The fundamental misunderstanding is that "anonymous literals don't get var-refed" - this is wrong when the **result type** is a pointer. The var-refing is determined by the **type of the expression**, not whether it's a literal or variable.
 
 **All pointer values in TypeScript must be VarRef objects, regardless of whether they come from literals, variables, or function calls.**
+
+### 14. CRITICAL CORRECTION: VarRef Usage Understanding ⚠️
+
+**IMPORTANT**: My previous analysis contained a fundamental error. **NOT all pointer types are VarRef objects in TypeScript.**
+
+#### **Correct Understanding**:
+
+**VarRef wrapping depends on whether the VARIABLE is varrefed, not the type:**
+
+1. **Non-varrefed pointer variable**:
+   - Go: `var ptr *MyStruct` (address of `ptr` never taken)
+   - TS: `let ptr: MyStruct | null` 
+   - Assignment: `ptr = {}` (plain object)
+
+2. **Varrefed pointer variable**:
+   - Go: `var ptr *MyStruct` (address of `ptr` IS taken somewhere)
+   - TS: `let ptr: $.VarRef<MyStruct | null>`
+   - Assignment: `ptr = $.varRef({})` (wrapped in VarRef)
+
+#### **The Real Issue in `pointer_composite_literal_untyped`**:
+
+The issue is NOT that "all pointer values need VarRef wrapping." The issue is that the analysis determined that the `ptr` variable itself is varrefed (likely because of `ptr.x` field access), so assignments to `ptr` need to provide VarRef-wrapped values.
+
+#### **When VarRef Wrapping is Needed**:
+
+1. **Variable is varrefed** (address taken): All assignments must be VarRef-wrapped
+2. **Variable points to varrefed struct**: Field access needs `.value` unwrapping  
+3. **Function returns pointer**: Depends on analysis of return value usage
+
+#### **When VarRef Wrapping is NOT Needed**:
+
+1. **Variable is not varrefed**: Direct object assignment
+2. **Temporary pointer values**: May not need wrapping
+3. **Function parameters**: Depends on analysis
+
+**Key Principle**: The VarRef decision is based on USAGE ANALYSIS, not type patterns.
+
+### 15. New Issue: `pointer_composite_literal_untyped` Test - TYPECHECK FAILURE
+
+**ALL OTHER TEST CASES ARE PASSING ✅**
+
+#### **Status**: TypeScript compilation fails - generated code has type mismatches
+
+#### **The Problem**:
+The Go source code:
+```go
+var ptr *struct{ x int }
+ptr = &struct{ x int }{42}
+println("Pointer value x:", ptr.x)
+
+data := []*struct{ x int }{{42}, {43}}
+println("First element x:", data[0].x)
+println("Second element x:", data[1].x)
+```
+
+Generates incorrect TypeScript:
+```typescript
+let ptr: $.VarRef<{ x?: number }> | null = null
+ptr = {x: 42}  // ERROR: Should be $.varRef({x: 42})
+console.log("Pointer value x:", ptr!.x)  // ERROR: Should be ptr!.value.x
+
+let data = $.arrayToSlice<$.VarRef<{ x?: number }> | null>([{x: 42}, {x: 43}])  // ERROR: Plain objects in array
+console.log("First element x:", data![0]!.x)  // ERROR: Should be data![0]!.value.x
+```
+
+#### **TypeScript Compilation Errors**:
+1. `ptr = {x: 42}` - Object literal trying to assign `x` property to `VarRef<{ x?: number | undefined; }>`
+2. `ptr!.x` - Trying to access property `x` on `VarRef<{ x?: number | undefined; }>` instead of `ptr!.value.x`
+3. `[{x: 42}, {x: 43}]` - Plain objects in array expecting `VarRef<...>` types
+4. `data![0]!.x` - Missing `.value` access on VarRef elements
+
+#### **Root Cause Analysis**:
+
+**Issue 1: Composite Literal Handling**
+In `compiler/composite-lit.go`, lines 425-441, the `*types.Pointer` case for untyped composite literals:
+
+```go
+case *types.Pointer:
+    // Handle pointer to composite literal
+    ptrType := underlying.(*types.Pointer)
+    elemType := ptrType.Elem().Underlying()
+    switch elemType.(type) {
+    case *types.Struct:
+        // This is an anonymous struct literal with inferred pointer type
+        // Just create the struct object directly - no var-refing needed
+        // Anonymous literals are not variables, so they don't get var-refed
+        structType := elemType.(*types.Struct)
+        return c.writeUntypedStructLiteral(exp, structType) // true = anonymous
+```
+
+**THE ISSUE**: The comment says "no var-refing needed" and "Anonymous literals are not variables, so they don't get var-refed". This is **INCORRECT** for the case where the result type is a pointer.
+
+**Issue 2: Address-of Operator Handling** 
+In `compiler/expr.go` lines 410-467, `WriteUnaryExpr` for `&` operator:
+
+```go
+// Otherwise (&unvarrefedVar, &CompositeLit{}, &FuncCall(), etc.),
+// the address-of operator in Go, when used to create a pointer,
+// translates to simply evaluating the operand in TypeScript.
+// The resulting value (e.g., a new object instance) acts as the "pointer".
+// VarRefing decisions are handled at the assignment site based on the LHS variable.
+```
+
+The comment says "VarRefing decisions are handled at the assignment site based on the LHS variable" but this isn't happening correctly.
+
+#### **Expected Behavior**:
+
+For `ptr = &struct{x int}{42}` where `ptr` has type `*struct{x int}`:
+
+1. **Go Type**: `*struct{x int}` (pointer to struct)
+2. **TS Type**: `$.VarRef<{x?: number}> | null` (VarRef wrapper for pointer)
+3. **Assignment**: Should generate `ptr = $.varRef({x: 42})`
+4. **Field Access**: Should generate `ptr!.value.x` (access wrapped struct)
+
+For `[]*struct{x int}{{42}, {43}}`:
+
+1. **Array Elements**: Each `{42}` and `{43}` should be `$.varRef({x: 42})` and `$.varRef({x: 43})`
+2. **Element Access**: Should be `data![0]!.value.x`
+
+#### **The Core Issue**:
+
+When a composite literal results in a pointer type (either through explicit `&struct{}{}` or implicit `[]*struct{}{{}}`), the compiler needs to wrap the generated object in `$.varRef()` because:
+
+1. **Pointer types in TypeScript are represented as VarRef wrappers**
+2. **All pointer values need to be VarRef objects to support `.value` access**
+3. **Field access on pointers requires `.value` to unwrap from VarRef to actual struct**
+
+#### **Next Steps**:
+
+1. **Fix composite literal handling**: Modify `writeUntypedStructLiteral` to wrap in `$.varRef()` when the result type is a pointer
+2. **Ensure assignment logic**: Verify that assignments correctly handle VarRef wrapping for pointer types
+3. **Fix field access**: Ensure selector expressions add `.value` for field access on VarRef-wrapped structs
+
+#### **Key Insight**:
+The fundamental misunderstanding is that "anonymous literals don't get var-refed" - this is wrong when the **result type** is a pointer. The var-refing is determined by the **type of the expression**, not whether it's a literal or variable.
+
+**All pointer values in TypeScript must be VarRef objects, regardless of whether they come from literals, variables, or function calls.**
