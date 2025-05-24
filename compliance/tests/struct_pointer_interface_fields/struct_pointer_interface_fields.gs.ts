@@ -64,7 +64,7 @@ export function main(): void {
 	console.log(s.PointerField == null)
 	console.log(s.interfaceField == null)
 
-	let i: $.VarRef<number> = $.varRef(10)
+	let i = $.varRef(10)
 	s.PointerField = i
 	console.log(s.PointerField != null)
 	console.log(s.PointerField!.value)

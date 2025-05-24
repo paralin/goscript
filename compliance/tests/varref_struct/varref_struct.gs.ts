@@ -41,7 +41,7 @@ class MyStruct {
 
 export function main(): void {
 	// 'val' is a value type, but its address is taken, so it should be varrefed in TS.
-	let val: $.VarRef<MyStruct> = $.varRef(new MyStruct({MyInt: 10}))
+	let val = $.varRef(new MyStruct({MyInt: 10}))
 	let ptrToVal = val
 
 	// Accessing pointer value, should use .value

@@ -47,7 +47,7 @@ class MyStruct {
 
 export function main(): void {
 	// Create a struct value
-	let msValue: $.VarRef<MyStruct> = $.varRef(new MyStruct({MyInt: 100}))
+	let msValue = $.varRef(new MyStruct({MyInt: 100}))
 	// Create a pointer to the struct value
 	let msPointer = msValue
 

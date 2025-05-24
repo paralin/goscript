@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
-	let arr: $.VarRef<$.Slice<number>> = $.varRef($.arrayToSlice<number>([1, 2, 3]))
+	let arr = $.varRef($.arrayToSlice<number>([1, 2, 3]))
 	let arrPtr = arr
 
 	for (let i = 0; i < $.len(arrPtr!.value); i++) {
