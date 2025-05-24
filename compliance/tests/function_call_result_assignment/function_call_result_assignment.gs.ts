@@ -27,25 +27,25 @@ class MyStruct {
 	}
 
 	public _fields: {
-		MyInt: $.Box<number>;
-		MyString: $.Box<string>;
-		myBool: $.Box<boolean>;
+		MyInt: $.VarRef<number>;
+		MyString: $.VarRef<string>;
+		myBool: $.VarRef<boolean>;
 	}
 
 	constructor(init?: Partial<{MyInt?: number, MyString?: string, myBool?: boolean}>) {
 		this._fields = {
-			MyInt: $.box(init?.MyInt ?? 0),
-			MyString: $.box(init?.MyString ?? ""),
-			myBool: $.box(init?.myBool ?? false)
+			MyInt: $.varRef(init?.MyInt ?? 0),
+			MyString: $.varRef(init?.MyString ?? ""),
+			myBool: $.varRef(init?.myBool ?? false)
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			MyInt: $.box(this._fields.MyInt.value),
-			MyString: $.box(this._fields.MyString.value),
-			myBool: $.box(this._fields.myBool.value)
+			MyInt: $.varRef(this._fields.MyInt.value),
+			MyString: $.varRef(this._fields.MyString.value),
+			myBool: $.varRef(this._fields.myBool.value)
 		}
 		return cloned
 	}

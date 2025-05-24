@@ -63,3 +63,51 @@ To eliminate confusion about what "boxes" are for, we're renaming the concept th
 2. **Verify array element handling** - Ensure anonymous literals aren't incorrectly getting varRef'd
 3. **Test the existing pointer/addressing logic** - Make sure the rename didn't break anything
 4. **Update test files** - Rename boxing test directories to varRef and update test content
+
+## Current Issue: TypeScript Type Errors
+
+The compliance test is failing with TypeScript type checking errors:
+
+```
+pointer_composite_literal_untyped.gs.ts(10,9): error TS2353: Object literal may only specify known properties, and 'x' does not exist in type 'VarRef<{ x?: number | undefined; }>'.
+```
+
+### Problem Analysis
+
+Looking at the generated TypeScript:
+
+```typescript
+let ptr: $.VarRef<{ x?: number }> | null = null  // ❌ Wrong: should be { x?: number } | null
+ptr = {x: 42}  // ❌ Error: trying to assign plain object to VarRef type
+```
+
+```typescript  
+let data = $.arrayToSlice<{ x?: number } | null>([{x: 42}, {x: 43}])  // ✅ Fixed!
+```
+
+### Progress Made
+
+✅ **Fixed array type annotations**: Successfully updated array element type annotations to use `GoTypeContextArrayElement` which avoids wrapping pointer-to-struct types in VarRef for composite literals.
+
+❌ **Still broken: Variable type annotations**: The variable `ptr` is incorrectly being given a VarRef type when it should be a plain pointer type.
+
+### Root Cause
+
+The variable `ptr` is being marked by the analysis as `NeedsVarRef` when it shouldn't be. In the Go code:
+
+```go
+var ptr *struct{ x int }
+ptr = &struct{ x int }{42}
+```
+
+The variable `ptr` is just a regular pointer variable - its address is never taken, so it should NOT be wrapped in VarRef.
+
+### Issue Location
+
+The problem is in the analysis phase where variables are being incorrectly marked as needing VarRef. This happens before type generation, in the analysis that determines `NeedsVarRef(obj)`.
+
+### Next Steps
+
+1. ✅ **Fixed**: Array type annotations using GoTypeContextArrayElement  
+2. **TODO**: Debug why `ptr` variable is being marked as needing VarRef
+3. **TODO**: Fix the variable declaration type annotations

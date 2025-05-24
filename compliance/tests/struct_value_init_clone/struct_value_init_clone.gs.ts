@@ -19,22 +19,22 @@ class Point {
 	}
 
 	public _fields: {
-		X: $.Box<number>;
-		Y: $.Box<number>;
+		X: $.VarRef<number>;
+		Y: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{X?: number, Y?: number}>) {
 		this._fields = {
-			X: $.box(init?.X ?? 0),
-			Y: $.box(init?.Y ?? 0)
+			X: $.varRef(init?.X ?? 0),
+			Y: $.varRef(init?.Y ?? 0)
 		}
 	}
 
 	public clone(): Point {
 		const cloned = new Point()
 		cloned._fields = {
-			X: $.box(this._fields.X.value),
-			Y: $.box(this._fields.Y.value)
+			X: $.varRef(this._fields.X.value),
+			Y: $.varRef(this._fields.Y.value)
 		}
 		return cloned
 	}

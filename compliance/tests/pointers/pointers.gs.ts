@@ -12,19 +12,19 @@ class MyStruct {
 	}
 
 	public _fields: {
-		Val: $.Box<number>;
+		Val: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{Val?: number}>) {
 		this._fields = {
-			Val: $.box(init?.Val ?? 0)
+			Val: $.varRef(init?.Val ?? 0)
 		}
 	}
 
 	public clone(): MyStruct {
 		const cloned = new MyStruct()
 		cloned._fields = {
-			Val: $.box(this._fields.Val.value)
+			Val: $.varRef(this._fields.Val.value)
 		}
 		return cloned
 	}
@@ -40,17 +40,17 @@ class MyStruct {
 }
 
 export function main(): void {
-	let s1: $.Box<MyStruct> = $.box(new MyStruct({Val: 1})) // p1 takes the address of s1, so s1 is boxed
-	let s2: $.Box<MyStruct> = $.box(new MyStruct({Val: 2})) // p2 takes the address of s2, so s2 is boxed
+	let s1: $.VarRef<MyStruct> = $.varRef(new MyStruct({Val: 1})) // p1 takes the address of s1, so s1 is boxed
+	let s2: $.VarRef<MyStruct> = $.varRef(new MyStruct({Val: 2})) // p2 takes the address of s2, so s2 is boxed
 
-	let p1: $.Box<$.Box<MyStruct> | null> = $.box(s1) // *MyStruct, points to s1, pp1 takes the address of p1, so p1 is boxed
-	let p2: $.Box<$.Box<MyStruct> | null> = $.box(s1) // *MyStruct, points to s1, pp2 takes the address of p2, so p2 is boxed
-	let p3: $.Box<$.Box<MyStruct> | null> = $.box(s2) // *MyStruct, points to s2, pp3 takes the address of p3, so p3 is boxed
+	let p1: $.VarRef<$.VarRef<MyStruct> | null> = $.varRef(s1) // *MyStruct, points to s1, pp1 takes the address of p1, so p1 is boxed
+	let p2: $.VarRef<$.VarRef<MyStruct> | null> = $.varRef(s1) // *MyStruct, points to s1, pp2 takes the address of p2, so p2 is boxed
+	let p3: $.VarRef<$.VarRef<MyStruct> | null> = $.varRef(s2) // *MyStruct, points to s2, pp3 takes the address of p3, so p3 is boxed
 
 	let p4 = s1 // *MyStruct, points to s1, nothing takes the address of p4, so p4 is not boxed
 	/* _ = */ p4!.value
 
-	let pp1: $.Box<$.Box<$.Box<MyStruct> | null> | null> = $.box(p1) // **MyStruct, points to p1
+	let pp1: $.VarRef<$.VarRef<$.VarRef<MyStruct> | null> | null> = $.varRef(p1) // **MyStruct, points to p1
 	let pp2 = p2 // **MyStruct, points to p2
 	let pp3 = p3 // **MyStruct, points to p3
 
@@ -64,18 +64,18 @@ export function main(): void {
 
 	// --- Pointer Comparisons ---
 	console.log("\n--- Pointer Comparisons ---")
-	console.log("pp1==pp2:", (pp1!.value === pp2)) // false
-	console.log("pp1==pp3:", (pp1!.value === pp3)) // false
-	console.log("*pp1==*pp2:", (pp1!.value!.value === pp2!.value)) // true
-	console.log("*pp1==*pp3:", (pp1!.value!.value === pp3!.value)) // false
-	console.log("(**pp1).Val == (**pp2).Val:", pp1!.value!.value!.Val == pp2!.value!.Val) // true
-	console.log("(**pp1).Val == (**pp3).Val:", pp1!.value!.value!.Val == pp3!.value!.Val) // false
+	console.log("pp1==pp2:", (pp1!.value === pp2!.value)) // false
+	console.log("pp1==pp3:", (pp1!.value === pp3!.value)) // false
+	console.log("*pp1==*pp2:", (pp1!.value!.value === pp2!.value!.value)) // true
+	console.log("*pp1==*pp3:", (pp1!.value!.value === pp3!.value!.value)) // false
+	console.log("(**pp1).Val == (**pp2).Val:", pp1!.value!.value!.Val == pp2!.value!.value!.Val) // true
+	console.log("(**pp1).Val == (**pp3).Val:", pp1!.value!.value!.Val == pp3!.value!.value!.Val) // false
 
 	// Triple pointer comparisons
-	console.log("ppp1==ppp1:", (ppp1 === ppp1)) // true
-	console.log("*ppp1==pp1:", (ppp1!.value === pp1!.value)) // true
-	console.log("**ppp1==p1:", (ppp1!.value!.value === p1!.value)) // true
-	console.log("(***ppp1).Val == s1.Val:", ppp1!.value!.value!.Val == s1!.value.Val) // true
+	console.log("ppp1==ppp1:", (ppp1!.value === ppp1!.value)) // true
+	console.log("*ppp1==pp1:", (ppp1!.value!.value === pp1!.value)) // true
+	console.log("**ppp1==p1:", (ppp1!.value!.value! === p1!.value)) // true
+	console.log("(***ppp1).Val == s1.Val:", ppp1!.value!.value!!.Val == s1!.value.Val) // true
 
 	// --- Modifications through Pointers ---
 	console.log("\n--- Modifications ---")
@@ -84,10 +84,10 @@ export function main(): void {
 	console.log("  s1.Val:", s1!.value.Val) // 10
 	console.log("  (*p2).Val:", p2!.value!.value.Val) // 10
 	console.log("  (**pp1).Val:", pp1!.value!.value!.Val) // 10
-	console.log("  (***ppp1).Val:", ppp1!.value!.value!.Val) // 10
+	console.log("  (***ppp1).Val:", ppp1!.value!.value!!.Val) // 10
 	console.log("  s2.Val:", s2!.value.Val) // 2 (unmodified)
 
-	pp3!.value!.value = new MyStruct({Val: 20}) // Modify s2 via pp3 -> p3
+	pp3!.value!.value!.value = new MyStruct({Val: 20}) // Modify s2 via pp3 -> p3
 	console.log("After **pp3 = {Val: 20}:")
 	console.log("  s2.Val:", s2!.value.Val) // 20
 	console.log("  (*p3).Val:", p3!.value!.value.Val) // 20
@@ -95,17 +95,17 @@ export function main(): void {
 
 	// --- Nil Pointers ---
 	console.log("\n--- Nil Pointers ---")
-	let np: $.Box<$.Box<MyStruct> | null> = $.box(null)
-	let npp: $.Box<$.Box<MyStruct> | null> | null = null
-	let nppp: $.Box<$.Box<$.Box<MyStruct> | null> | null> | null = null
+	let np: $.VarRef<$.VarRef<MyStruct> | null> = $.varRef(null)
+	let npp: $.VarRef<$.VarRef<MyStruct> | null> | null = null
+	let nppp: $.VarRef<$.VarRef<$.VarRef<MyStruct> | null> | null> | null = null
 
 	console.log("np == nil:", np!.value == null) // true
-	console.log("npp == nil:", npp == null) // true
+	console.log("npp == nil:", npp!.value == null) // true
 	console.log("nppp == nil:", nppp == null) // true
 
 	npp = np // npp now points to np (which is nil)
 	console.log("After npp = &np:")
-	console.log("  npp == nil:", npp == null) // false
-	console.log("  *npp == nil:", npp!.value == null) // true
+	console.log("  npp == nil:", npp!.value == null) // false
+	console.log("  *npp == nil:", npp!.value!.value == null) // true
 }
 

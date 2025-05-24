@@ -18,6 +18,10 @@ const (
 	// In this context, pointer-to-struct types become `ClassName | null` instead of
 	// `$.VarRef<ClassName> | null` because function return values cannot be addressed.
 	GoTypeContextFunctionReturn
+	// GoTypeContextArrayElement is used when translating types for array elements that are
+	// composite literals. In this context, pointer-to-struct types become `ClassName | null`
+	// instead of `$.VarRef<ClassName> | null` because composite literals are not variables.
+	GoTypeContextArrayElement
 )
 
 // WriteGoType is the main dispatcher for translating Go types to their TypeScript
@@ -46,6 +50,8 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 	case *types.Pointer:
 		if context == GoTypeContextFunctionReturn {
 			c.writePointerTypeForFunctionReturn(t)
+		} else if context == GoTypeContextArrayElement {
+			c.writePointerTypeForArrayElement(t)
 		} else {
 			c.WritePointerType(t)
 		}
@@ -96,6 +102,32 @@ func (c *GoToTSCompiler) writePointerTypeForFunctionReturn(t *types.Pointer) {
 		// For pointer-to-primitive in function returns, still use boxing
 		c.tsw.WriteLiterally("$.VarRef<")
 		c.WriteGoType(elemType, GoTypeContextFunctionReturn)
+		c.tsw.WriteLiterally("> | null")
+	}
+}
+
+// writePointerTypeForArrayElement translates a Go pointer type (*T) to its TypeScript
+// equivalent for array element types. Similar to writePointerTypeForFunctionReturn,
+// this function handles pointer-to-struct types specially: they become `ClassName | null`
+// instead of `$.VarRef<ClassName> | null` because array elements from composite literals
+// are not variables and don't need boxing.
+func (c *GoToTSCompiler) writePointerTypeForArrayElement(t *types.Pointer) {
+	elemType := t.Elem()
+
+	// Check if the element type is a struct (directly or via a named type)
+	isStructType := false
+	if _, ok := elemType.Underlying().(*types.Struct); ok {
+		isStructType = true
+	}
+
+	if isStructType {
+		// For pointer-to-struct in array elements, generate ClassName | null
+		c.WriteGoType(elemType, GoTypeContextArrayElement)
+		c.tsw.WriteLiterally(" | null")
+	} else {
+		// For pointer-to-primitive in array elements, still use boxing
+		c.tsw.WriteLiterally("$.VarRef<")
+		c.WriteGoType(elemType, GoTypeContextArrayElement)
 		c.tsw.WriteLiterally("> | null")
 	}
 }

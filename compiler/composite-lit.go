@@ -92,8 +92,37 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 				// write the type annotation
 				c.tsw.WriteLiterally("<")
-				// Write the element type using the existing function
-				c.WriteTypeExpr(arrType.Elt)
+
+				// Determine if this array contains composite literals for pointer-to-struct types
+				useArrayElementContext := false
+				if elemType := c.pkg.TypesInfo.TypeOf(arrType.Elt); elemType != nil {
+					if ptrType, isPtr := elemType.(*types.Pointer); isPtr {
+						if _, isStruct := ptrType.Elem().Underlying().(*types.Struct); isStruct {
+							// Check if any elements are composite literals
+							for _, elm := range exp.Elts {
+								if _, isCompLit := elm.(*ast.CompositeLit); isCompLit {
+									useArrayElementContext = true
+									break
+								}
+								// Also check key-value pairs
+								if kv, isKV := elm.(*ast.KeyValueExpr); isKV {
+									if _, isCompLit := kv.Value.(*ast.CompositeLit); isCompLit {
+										useArrayElementContext = true
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+
+				// Write the element type with appropriate context
+				if useArrayElementContext {
+					elemGoType := c.pkg.TypesInfo.TypeOf(arrType.Elt)
+					c.WriteGoType(elemGoType, GoTypeContextArrayElement)
+				} else {
+					c.WriteTypeExpr(arrType.Elt)
+				}
 				c.tsw.WriteLiterally(">")
 			}
 

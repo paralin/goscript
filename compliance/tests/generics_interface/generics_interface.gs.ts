@@ -42,22 +42,22 @@ class Box<T extends any> {
 	}
 
 	public _fields: {
-		value: $.Box<T>;
-		count: $.Box<number>;
+		value: $.VarRef<T>;
+		count: $.VarRef<number>;
 	}
 
 	constructor(init?: Partial<{count?: number, value?: T}>) {
 		this._fields = {
-			value: $.box(init?.value ?? null!),
-			count: $.box(init?.count ?? 0)
+			value: $.varRef(init?.value ?? null!),
+			count: $.varRef(init?.count ?? 0)
 		}
 	}
 
 	public clone(): Box<T> {
 		const cloned = new Box<T>()
 		cloned._fields = {
-			value: $.box(this._fields.value.value),
-			count: $.box(this._fields.count.value)
+			value: $.varRef(this._fields.value.value),
+			count: $.varRef(this._fields.count.value)
 		}
 		return cloned
 	}
@@ -97,19 +97,19 @@ class StringBox {
 	}
 
 	public _fields: {
-		value: $.Box<string>;
+		value: $.VarRef<string>;
 	}
 
 	constructor(init?: Partial<{value?: string}>) {
 		this._fields = {
-			value: $.box(init?.value ?? "")
+			value: $.varRef(init?.value ?? "")
 		}
 	}
 
 	public clone(): StringBox {
 		const cloned = new StringBox()
 		cloned._fields = {
-			value: $.box(this._fields.value.value)
+			value: $.varRef(this._fields.value.value)
 		}
 		return cloned
 	}

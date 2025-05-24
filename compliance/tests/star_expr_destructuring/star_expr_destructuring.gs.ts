@@ -8,18 +8,18 @@ function returnTwoValues(): [number, string] {
 }
 
 export function main(): void {
-	let a: $.Box<number> = $.box(0)
-	let b: $.Box<string> = $.box("")
+	let a: $.VarRef<number> = $.varRef(0)
+	let b: $.VarRef<string> = $.varRef("")
 
 	// Create pointers - these will be properly boxed
-	let pA: $.Box<number> | null = a
-	let pB: $.Box<string> | null = b
+	let pA: $.VarRef<number> | null = a
+	let pB: $.VarRef<string> | null = b
 
 	// This should trigger the "unhandled LHS expression in destructuring: *ast.StarExpr" error
 	{
 	  const _tmp = returnTwoValues()
-	  pA!.value = _tmp[0]
-	  pB!.value = _tmp[1]
+	  pA!.value!.value = _tmp[0]
+	  pB!.value!.value = _tmp[1]
 	}
 
 	console.log("a:", a!.value)

@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"go/ast"
 	"go/token"
 	"go/types"
@@ -160,8 +161,17 @@ func (a *Analysis) NeedsVarRef(obj types.Object) bool {
 	// Check if any destination assignment involves taking the address of 'obj'
 	for _, destInfo := range usageInfo.Destinations {
 		if destInfo.Type == AddressOfAssignment {
+			// Debug logging
+			if obj.Name() == "ptr" {
+				fmt.Printf("DEBUG: Variable '%s' needs VarRef because its address is taken (destination: %v)\n", obj.Name(), destInfo.Object)
+			}
 			return true
 		}
+	}
+
+	// Debug logging for ptr variable
+	if obj.Name() == "ptr" {
+		fmt.Printf("DEBUG: Variable '%s' does NOT need VarRef (no address taken)\n", obj.Name())
 	}
 	return false
 }
