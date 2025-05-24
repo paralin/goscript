@@ -7,8 +7,8 @@ export function main(): void {
 	let arr: $.VarRef<$.Slice<number>> = $.varRef($.arrayToSlice<number>([1, 2, 3]))
 	let arrPtr = arr
 
-	for (let i = 0; i < $.len(arrPtr!.value!.value); i++) {
-		const v = arrPtr!.value!.value![i]
+	for (let i = 0; i < $.len(arrPtr!.value); i++) {
+		const v = arrPtr!.value![i]
 		{
 			console.log("index:", i, "value:", v)
 		}

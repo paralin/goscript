@@ -79,6 +79,30 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 					return fmt.Errorf("failed to write dereferenced expression for field access: %w", err)
 				}
 
+				// Check if we need an extra .value for varrefed struct access
+				// This happens when the struct being pointed to is varrefed
+				needsExtraValue := false
+				if ident, ok := currentExpr.(*ast.Ident); ok {
+					if obj := c.pkg.TypesInfo.ObjectOf(ident); obj != nil {
+						// Check if after dereferencing, we get a varrefed struct
+						ptrType := obj.Type()
+						for i := 0; i < dereferenceCount; i++ {
+							if ptr, ok := ptrType.(*types.Pointer); ok {
+								ptrType = ptr.Elem()
+							}
+						}
+						// If the final pointed-to type suggests the struct is varrefed
+						// (i.e., the dereference operation results in VarRef<Struct>)
+						if c.analysis.NeedsVarRefAccess(obj) {
+							needsExtraValue = true
+						}
+					}
+				}
+
+				if needsExtraValue {
+					c.tsw.WriteLiterally("!.value")
+				}
+
 				// Add .field
 				c.tsw.WriteLiterally(".")
 				c.WriteIdent(exp.Sel, false) // Don't add .value to the field itself
