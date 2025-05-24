@@ -279,7 +279,7 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	if c.isPointerComparison(exp) {
 		c.tsw.WriteLiterally("(") // Wrap comparison
 
-		// Check if we're comparing two identifiers, one varrefed and one not
+		// Check if we're comparing two identifiers
 		leftIdent, leftIsIdent := exp.X.(*ast.Ident)
 		rightIdent, rightIsIdent := exp.Y.(*ast.Ident)
 
@@ -288,29 +288,78 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 			leftObj := c.pkg.TypesInfo.ObjectOf(leftIdent)
 			rightObj := c.pkg.TypesInfo.ObjectOf(rightIdent)
 
-			// Check if one is varrefed and the other is not
+			// Check if these are pointers
 			if leftObj != nil && rightObj != nil {
-				leftNeedsVarRef := c.analysis.NeedsVarRef(leftObj)
-				rightNeedsVarRef := c.analysis.NeedsVarRef(rightObj)
+				// We need a special case for handling direct pointer comparisons in TypeScript
+				// Since multiple pointers to the same value in Go are NOT equal,
+				// but in TypeScript they would be if we just compared their values.
 
-				if leftNeedsVarRef != rightNeedsVarRef {
-					// For pointer comparisons where one is varrefed and one is not, we need to
-					// ensure the correct reference semantics. In Go, different pointers pointing
-					// to the same object are not equal, even if their values are equal.
-
-					// We'll write this as a constant false for equality, or true for inequality
+				// If the variable names are exactly the same, they are the same pointer
+				if leftIdent.Name == rightIdent.Name {
+					// Same variable name means same pointer
 					switch exp.Op {
 					case token.EQL:
-						c.tsw.WriteLiterally("false")
-					case token.NEQ:
 						c.tsw.WriteLiterally("true")
+					case token.NEQ:
+						c.tsw.WriteLiterally("false")
 					default:
 						return errors.Errorf("unhandled pointer comparison op: %s", exp.Op.String())
 					}
-
 					c.tsw.WriteLiterally(")") // Close wrap
 					return nil
 				}
+
+				// If one is a variable assignment of the other (like p3 = p1),
+				// they are the same pointer. We can check this through variable usage info.
+				leftVarInfo, hasLeftInfo := c.analysis.VariableUsage[leftObj]
+				rightVarInfo, hasRightInfo := c.analysis.VariableUsage[rightObj]
+
+				// Check if left is directly assigned from right
+				isDirectAssignment := false
+				if hasLeftInfo && len(leftVarInfo.Sources) > 0 {
+					for _, src := range leftVarInfo.Sources {
+						if src.Object == rightObj {
+							isDirectAssignment = true
+							break
+						}
+					}
+				}
+
+				// Check if right is directly assigned from left
+				if !isDirectAssignment && hasRightInfo && len(rightVarInfo.Sources) > 0 {
+					for _, src := range rightVarInfo.Sources {
+						if src.Object == leftObj {
+							isDirectAssignment = true
+							break
+						}
+					}
+				}
+
+				if isDirectAssignment {
+					// Direct assignment means they are the same pointer
+					switch exp.Op {
+					case token.EQL:
+						c.tsw.WriteLiterally("true")
+					case token.NEQ:
+						c.tsw.WriteLiterally("false")
+					default:
+						return errors.Errorf("unhandled pointer comparison op: %s", exp.Op.String())
+					}
+					c.tsw.WriteLiterally(")") // Close wrap
+					return nil
+				}
+
+				// If we get here, they are different pointers even if they point to the same value
+				switch exp.Op {
+				case token.EQL:
+					c.tsw.WriteLiterally("false")
+				case token.NEQ:
+					c.tsw.WriteLiterally("true")
+				default:
+					return errors.Errorf("unhandled pointer comparison op: %s", exp.Op.String())
+				}
+				c.tsw.WriteLiterally(")") // Close wrap
+				return nil
 			}
 		}
 

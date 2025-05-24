@@ -59,8 +59,8 @@ export function main(): void {
 	console.log("--- Initial Values ---")
 	console.log("s1.Val:", s1!.value.Val) // 1
 	console.log("s2.Val:", s2!.value.Val) // 2
-	console.log("p1==p2:", (p1!.value === p2!.value)) // true
-	console.log("p1==p3:", (p1!.value === p3!.value)) // false
+	console.log("p1==p2:", (false)) // true
+	console.log("p1==p3:", (false)) // false
 
 	// --- Pointer Comparisons ---
 	console.log("\n--- Pointer Comparisons ---")
@@ -74,7 +74,7 @@ export function main(): void {
 	console.log("(**pp1).Val == (**pp3).Val:", pp1!.value!.value!!.value.Val == pp3!.value!!.value.Val) // false
 
 	// Triple pointer comparisons
-	console.log("ppp1==ppp1:", (ppp1!.value === ppp1!.value)) // true
+	console.log("ppp1==ppp1:", (true)) // true
 	console.log("*ppp1==pp1:", (ppp1!.value === pp1!.value)) // true
 	console.log("**ppp1==p1:", (ppp1!.value!.value === p1!.value)) // true
 	console.log("(***ppp1).Val == s1.Val:", ppp1!.value!.value!!.value.Val == s1!.value.Val) // true
