@@ -79,6 +79,11 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 					return fmt.Errorf("failed to write dereferenced expression for field access: %w", err)
 				}
 
+				// For field access on dereferenced pointers, we always need an extra .value
+				// because the dereferencing operation results in VarRef<Struct> and we need
+				// to unwrap it to get to the actual Struct before accessing fields
+				c.tsw.WriteLiterally("!.value")
+
 				// Add .field
 				c.tsw.WriteLiterally(".")
 				c.WriteIdent(exp.Sel, false) // Don't add .value to the field itself
@@ -118,11 +123,9 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	}
 
 	// Write the field/method name.
-	// Pass 'true' to WriteIdent to potentially add '.value' if the field itself
-	// needs varrefed access (e.g., accessing a primitive field via pointer where
-	// the field's address might have been taken elsewhere - less common but possible).
-	// For simple struct field access like p.Val or (*p).Val, WriteIdent(..., true)
-	// relies on NeedsVarRefAccess for the field 'Val', which should typically be false.
-	c.WriteIdent(exp.Sel, true)
+	// Pass 'false' to WriteIdent to NOT add '.value' for struct fields.
+	// Struct fields use getters/setters, so we don't want to add .value here.
+	// The setter will handle the internal .value access.
+	c.WriteIdent(exp.Sel, false)
 	return nil
 }

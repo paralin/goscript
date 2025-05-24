@@ -182,8 +182,17 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 					}
 				} else if starExpr, ok := lhsExpr.(*ast.StarExpr); ok {
 					// Handle pointer dereference assignment: *p = value becomes p!.value = value
-					if err := c.WriteValueExpr(starExpr.X); err != nil {
-						return fmt.Errorf("failed to write star expression X in LHS: %w", err)
+					// Write the pointer variable directly without using WriteValueExpr
+					// because we don't want automatic .value access here
+					switch operand := starExpr.X.(type) {
+					case *ast.Ident:
+						// Write identifier without .value access
+						c.WriteIdent(operand, false)
+					default:
+						// For other expressions, use WriteValueExpr
+						if err := c.WriteValueExpr(starExpr.X); err != nil {
+							return fmt.Errorf("failed to write star expression X in LHS: %w", err)
+						}
 					}
 					c.tsw.WriteLiterally("!.value")
 				} else {
@@ -223,8 +232,17 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				}
 			} else if starExpr, ok := lhsExpr.(*ast.StarExpr); ok {
 				// Handle pointer dereference in destructuring: *p becomes p!.value
-				if err := c.WriteValueExpr(starExpr.X); err != nil {
-					return fmt.Errorf("failed to write star expression X in destructuring: %w", err)
+				// Write the pointer variable directly without using WriteValueExpr
+				// because we don't want automatic .value access here
+				switch operand := starExpr.X.(type) {
+				case *ast.Ident:
+					// Write identifier without .value access
+					c.WriteIdent(operand, false)
+				default:
+					// For other expressions, use WriteValueExpr
+					if err := c.WriteValueExpr(starExpr.X); err != nil {
+						return fmt.Errorf("failed to write star expression X in destructuring: %w", err)
+					}
 				}
 				c.tsw.WriteLiterally("!.value")
 			} else {

@@ -243,9 +243,26 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	}
 
 	if isNilComparison {
-		// Compare the varRef object directly to null
-		if err := c.WriteValueExpr(ptrExpr); err != nil {
-			return fmt.Errorf("failed to write pointer expression in nil comparison: %w", err)
+		// For nil comparisons, we need to decide whether to write .value or not
+		// If the pointer variable is varrefed, we need to access .value
+		if ident, ok := ptrExpr.(*ast.Ident); ok {
+			if obj := c.pkg.TypesInfo.ObjectOf(ident); obj != nil {
+				if c.analysis.NeedsVarRef(obj) {
+					// Variable is varrefed, so we need to access .value
+					c.WriteIdent(ident, true) // This will add .value
+				} else {
+					// Variable is not varrefed, write directly
+					c.WriteIdent(ident, false)
+				}
+			} else {
+				// No object info, write directly
+				c.WriteIdent(ident, false)
+			}
+		} else {
+			// For other expressions, use WriteValueExpr (but this might need review)
+			if err := c.WriteValueExpr(ptrExpr); err != nil {
+				return fmt.Errorf("failed to write pointer expression in nil comparison: %w", err)
+			}
 		}
 		c.tsw.WriteLiterally(" ")
 		tokStr, ok := TokenToTs(exp.Op)

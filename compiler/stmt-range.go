@@ -237,8 +237,8 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		_, isSlice := elem.(*types.Slice)
 		_, isArray := elem.(*types.Array)
 		if isArray || isSlice {
-			// For pointer to array/slice, we always need to dereference with .value
-			// because the pointed-to value is varrefed when its address is taken
+			// For pointer to array/slice, we need to dereference the pointer
+			// Check if the pointer variable itself is varrefed
 
 			// Determine the index variable name for the generated loop
 			indexVarName := "_i" // Default name
@@ -250,9 +250,13 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 			// If both key and value are provided, use an index loop and assign both
 			if exp.Key != nil && exp.Value != nil {
 				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-				if err := c.WriteValueExpr(exp.X); err != nil { // Write the expression for the iterable
+
+				// Write the pointer expression - let WriteValueExpr handle varref access
+				if err := c.WriteValueExpr(exp.X); err != nil {
 					return fmt.Errorf("failed to write range loop pointer array/slice expression (key and value): %w", err)
 				}
+				// Add dereference for the pointer: since we're ranging over a pointer to array/slice,
+				// we need to dereference to get to the array/slice
 				c.tsw.WriteLiterally("!.value")
 				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
 				c.tsw.Indent(1)
@@ -265,7 +269,9 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 					if err := c.WriteValueExpr(exp.X); err != nil {
 						return fmt.Errorf("failed to write range loop pointer array/slice value expression: %w", err)
 					}
-					c.tsw.WriteLiterallyf("!.value![%s]", indexVarName)
+					c.tsw.WriteLiterally("!.value![")
+					c.tsw.WriteLiterally(indexVarName)
+					c.tsw.WriteLiterally("]")
 					c.tsw.WriteLine("")
 				}
 				if err := c.WriteStmt(exp.Body); err != nil {
@@ -276,7 +282,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 				return nil
 			} else if exp.Key != nil && exp.Value == nil { // Only key provided
 				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-				// Write the expression for the iterable
+				// Write the pointer expression - let WriteValueExpr handle varref access
 				if err := c.WriteValueExpr(exp.X); err != nil {
 					return fmt.Errorf("failed to write expression for the pointer iterable: %w", err)
 				}

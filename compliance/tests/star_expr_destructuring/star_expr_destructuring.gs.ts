@@ -18,8 +18,8 @@ export function main(): void {
 	// This should trigger the "unhandled LHS expression in destructuring: *ast.StarExpr" error
 	{
 	  const _tmp = returnTwoValues()
-	  pA!.value!.value = _tmp[0]
-	  pB!.value!.value = _tmp[1]
+	  pA!.value = _tmp[0]
+	  pB!.value = _tmp[1]
 	}
 
 	console.log("a:", a!.value)
