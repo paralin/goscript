@@ -33,7 +33,9 @@ func main() {
 
 	// --- Pointer Comparisons ---
 	println("\n--- Pointer Comparisons ---")
-	println("pp1==pp2:", pp1 == pp2)                                   // false
+	// should be: console.log("pp1==pp2:", (pp1!.value === pp2))
+	println("pp1==pp2:", pp1 == pp2)
+	// should be: console.log("pp1==pp3:", (pp1!.value === pp3))
 	println("pp1==pp3:", pp1 == pp3)                                   // false
 	println("*pp1==*pp2:", *pp1 == *pp2)                               // true
 	println("*pp1==*pp3:", *pp1 == *pp3)                               // false

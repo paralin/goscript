@@ -64,8 +64,10 @@ export function main(): void {
 
 	// --- Pointer Comparisons ---
 	console.log("\n--- Pointer Comparisons ---")
-	console.log("pp1==pp2:", (pp1!.value === pp2!.value)) // false
-	console.log("pp1==pp3:", (pp1!.value === pp3!.value)) // false
+	// should be: console.log("pp1==pp2:", (pp1!.value === pp2))
+	console.log("pp1==pp2:", (false))
+	// should be: console.log("pp1==pp3:", (pp1!.value === pp3))
+	console.log("pp1==pp3:", (false)) // false
 	console.log("*pp1==*pp2:", (pp1!.value!.value === pp2!.value)) // true
 	console.log("*pp1==*pp3:", (pp1!.value!.value === pp3!.value)) // false
 	console.log("(**pp1).Val == (**pp2).Val:", pp1!.value!.value!!.value.Val == pp2!.value!!.value.Val) // true

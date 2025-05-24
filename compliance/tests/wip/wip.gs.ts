@@ -4,19 +4,22 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 export function main(): void {
-	let x: $.VarRef<number> = $.varRef(10)
+	// Create a simple integer
+	let x = $.varRef(10)
 
-	// p1 is varrefed as p2 takes its address
-	let p1: $.VarRef<$.VarRef<number> | null> = $.varRef(x)
-	// p2 is varrefed as p3 takes its address
-	let p2: $.VarRef<$.VarRef<$.VarRef<number> | null> | null> = $.varRef(p1)
-	// p3 is not varrefed as nothing takes its address
-	let p3: $.VarRef<$.VarRef<$.VarRef<number> | null> | null> | null = p2
+	// p1 will be varrefed because its address is taken later
+	let p1 = $.varRef(x)
 
-	console.log("**p3 ==", p3!.value!.value!.value)
+	// p2 is not varrefed as nothing takes its address
+	let p2 = x
 
-	// q1 is not varrefed as nothing takes its address
-	let q1: $.VarRef<number> | null = x
-	console.log("*q1 ==", q1!.value) // Should translate to q1!.value
+	// Take the address of p1 to make it varrefed
+	let pp1 = p1
+
+	// Compare the pointers - they should be different pointers
+	// but point to the same value
+	console.log("p1==p2:", (false))
+	console.log("*p1==*p2:", p1!.value!.value == p2!.value)
+	console.log("pp1 deref:", pp1!.value!.value)
 }
 

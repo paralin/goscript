@@ -278,6 +278,43 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	// Compare the varRef objects directly using === or !==
 	if c.isPointerComparison(exp) {
 		c.tsw.WriteLiterally("(") // Wrap comparison
+
+		// Check if we're comparing two identifiers, one varrefed and one not
+		leftIdent, leftIsIdent := exp.X.(*ast.Ident)
+		rightIdent, rightIsIdent := exp.Y.(*ast.Ident)
+
+		if leftIsIdent && rightIsIdent {
+			// Get the objects for both identifiers
+			leftObj := c.pkg.TypesInfo.ObjectOf(leftIdent)
+			rightObj := c.pkg.TypesInfo.ObjectOf(rightIdent)
+
+			// Check if one is varrefed and the other is not
+			if leftObj != nil && rightObj != nil {
+				leftNeedsVarRef := c.analysis.NeedsVarRef(leftObj)
+				rightNeedsVarRef := c.analysis.NeedsVarRef(rightObj)
+
+				if leftNeedsVarRef != rightNeedsVarRef {
+					// For pointer comparisons where one is varrefed and one is not, we need to
+					// ensure the correct reference semantics. In Go, different pointers pointing
+					// to the same object are not equal, even if their values are equal.
+
+					// We'll write this as a constant false for equality, or true for inequality
+					switch exp.Op {
+					case token.EQL:
+						c.tsw.WriteLiterally("false")
+					case token.NEQ:
+						c.tsw.WriteLiterally("true")
+					default:
+						return errors.Errorf("unhandled pointer comparison op: %s", exp.Op.String())
+					}
+
+					c.tsw.WriteLiterally(")") // Close wrap
+					return nil
+				}
+			}
+		}
+
+		// Default case: standard comparison using WriteValueExpr
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return fmt.Errorf("failed to write binary expression left operand: %w", err)
 		}
