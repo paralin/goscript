@@ -227,32 +227,15 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 }
 
 // WritePointerType translates a Go pointer type (*T) to its TypeScript equivalent.
-// For pointers to structs or interfaces, it generates Pointee_ts | null.
-// For other pointer types (e.g., pointers to primitives, other pointers),
-// it generates $.VarRef<Pointee_ts> | null.
+// It generally generates $.VarRef<T_ts> | null, where T_ts is the translated element type.
+// This represents the "value" of the pointer itself.
+// Special handling for non-var-refed variables holding pointer-to-struct/interface
+// is done at the variable declaration site (e.g., in writeValueSpecs).
 func (c *GoToTSCompiler) WritePointerType(t *types.Pointer) {
-	elemType := t.Elem()
-
-	// Check if the element type is a struct or interface.
-	// These are considered reference types in TS and don't need an explicit VarRef box
-	// for the pointer itself, unless the pointer variable is var-refed (handled elsewhere).
-	isRefLikePointee := false
-	switch elemType.Underlying().(type) {
-	case *types.Struct, *types.Interface:
-		isRefLikePointee = true
-	}
-
-	if isRefLikePointee {
-		// For pointer-to-struct/interface, generate Pointee_ts | null
-		c.WriteGoType(elemType, GoTypeContextGeneral) // Element type is translated in general context
-		c.tsw.WriteLiterally(" | null")
-	} else {
-		// For pointer-to-other (primitive, basic, other pointers), use VarRef
-		c.tsw.WriteLiterally("$.VarRef<")
-		c.WriteGoType(elemType, GoTypeContextGeneral) // Element type is translated in general context
-		c.tsw.WriteLiterally("> | null")
-	}
-} // Pointers are always nullable
+	c.tsw.WriteLiterally("$.VarRef<")
+	c.WriteGoType(t.Elem(), GoTypeContextGeneral) // Element type is translated in general context
+	c.tsw.WriteLiterally("> | null") // Pointers are always nullable
+}
 
 // WriteSliceType translates a Go slice type ([]T) to its TypeScript equivalent.
 // It generates $.Slice<T_ts>, where T_ts is the translated element type.

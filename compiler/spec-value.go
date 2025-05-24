@@ -108,12 +108,41 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 						c.WriteGoType(goType, GoTypeContextGeneral)
 					}
 				} else {
-					c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
+						c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
 				}
 				c.tsw.WriteLiterally(">")
 			} else {
 				// If not varrefed, the variable holds the translated Go type directly
-				c.WriteGoType(goType, GoTypeContextGeneral)
+				// Custom logic for non-var-ref'd pointers to structs/interfaces.
+				if ptrType, isPtr := goType.(*types.Pointer); isPtr {
+					elemType := ptrType.Elem()
+					actualElemType := elemType.Underlying() // Get the true underlying type (e.g., struct, interface, basic)
+
+					isStruct := false
+					if _, ok := actualElemType.(*types.Struct); ok {
+						isStruct = true
+					}
+
+					isInterface := false
+					if _, ok := actualElemType.(*types.Interface); ok {
+						isInterface = true
+					}
+
+					if isStruct || isInterface {
+						// For non-var-ref'd pointers to structs or interfaces,
+						// the type is T | null, not $.VarRef<T> | null.
+						c.WriteGoType(elemType, GoTypeContextGeneral) // Write the element type itself (e.g., MyStruct)
+						c.tsw.WriteLiterally(" | null")
+					} else {
+						// For other pointer types (e.g., *int, *string, *[]int, **MyStruct),
+						// or pointers to types that are not structs/interfaces,
+						// use the standard pointer type translation.
+						c.WriteGoType(goType, GoTypeContextGeneral)
+					}
+				} else {
+					// Not a pointer type, write as is.
+					c.WriteGoType(goType, GoTypeContextGeneral)
+				}
 			}
 		}
 

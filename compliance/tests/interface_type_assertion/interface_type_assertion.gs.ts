@@ -67,7 +67,7 @@ export function main(): void {
 	}
 
 	// try a second time since this generates something different when using = and not :=
-	({ ok: ok } = $.typeAssert<MyStruct | null>(i, {kind: $.TypeKind.Pointer, elemType: 'MyStruct'}))
+	({ ok: ok } = $.typeAssert<$.VarRef<MyStruct> | null>(i, {kind: $.TypeKind.Pointer, elemType: 'MyStruct'}))
 
 	// expected
 	if (ok) {
