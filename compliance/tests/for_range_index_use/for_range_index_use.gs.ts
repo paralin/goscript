@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let slice = $.arrayToSlice<number>([10, 20, 30, 40, 50])
 	let sum = 0
 	for (let idx = 0; idx < $.len(slice); idx++) {

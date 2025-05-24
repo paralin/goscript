@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 import * as subpkg from "@goscript/github.com/aperturerobotics/goscript/compliance/tests/package_import/subpkg/index.js"
 
-export function main(): void {
+export async function main(): Promise<void> {
 	console.log(subpkg.Greet("world"))
 }
 

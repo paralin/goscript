@@ -67,7 +67,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let rwc: ReadCloser = null
 	let s = new MyStruct({})
 	rwc = s.clone()

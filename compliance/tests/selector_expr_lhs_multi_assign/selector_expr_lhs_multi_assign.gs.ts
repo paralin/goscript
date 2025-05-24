@@ -53,7 +53,7 @@ function getCoords(): [number, number] {
 	return [10, 20]
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let p: Point = new Point()
 	// p.X and p.Y are *ast.SelectorExpr
 	// test writeMultiVarAssignFromCall in WriteStmtAssign

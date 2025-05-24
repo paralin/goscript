@@ -59,7 +59,7 @@ class FuncContainer {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// 1. Simple function type assertion
 	let i: null | any = Object.assign(greet, { __goTypeName: 'Greeter' })
 	let { value: fn, ok: ok } = $.typeAssert<Greeter>(i, {kind: $.TypeKind.Function, name: 'Greeter', params: [{ kind: $.TypeKind.Basic, name: "string" }], results: [{ kind: $.TypeKind.Basic, name: "string" }]})

@@ -39,7 +39,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let s1 = new MyStruct({Value: 10})
 	let p: MyStruct | null = null
 	p = new MyStruct({Value: 20}) // Initialize p to point to something

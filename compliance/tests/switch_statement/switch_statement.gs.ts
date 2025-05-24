@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i = 2
 	console.log("Integer switch:")
 	switch (i) {

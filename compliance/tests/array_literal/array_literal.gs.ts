@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Test basic array literal
 	//nolint:staticcheck
 	let a = $.arrayToSlice<number>([1, 2, 3])

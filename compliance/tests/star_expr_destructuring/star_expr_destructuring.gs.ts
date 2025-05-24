@@ -7,7 +7,7 @@ function returnTwoValues(): [number, string] {
 	return [42, "hello"]
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let a: $.VarRef<number> = $.varRef(0)
 	let b: $.VarRef<string> = $.varRef("")
 

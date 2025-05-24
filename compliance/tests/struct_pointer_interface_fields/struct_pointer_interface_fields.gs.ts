@@ -59,7 +59,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let s = new MyStruct({})
 	console.log(s.PointerField == null)
 	console.log(s.interfaceField == null)

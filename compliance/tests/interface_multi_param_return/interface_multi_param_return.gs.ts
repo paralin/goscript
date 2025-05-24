@@ -48,7 +48,7 @@ class MyProcessor {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let processor: MultiParamReturner = new MyProcessor({})
 
 	let data = new Uint8Array([1, 2, 3])

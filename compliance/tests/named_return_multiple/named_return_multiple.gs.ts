@@ -25,7 +25,7 @@ function processValues(input: number): [number, string, boolean] {
 	}
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let [n1, t1, o1] = processValues(10)
 	console.log(n1) // Expected: 20
 	console.log(t1) // Expected: greater than five

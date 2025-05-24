@@ -2,8 +2,7 @@ package main
 
 import "context"
 
-func main() {
-	ctx := context.Background()
+func run(ctx context.Context) {
 	sctx, sctxCancel := context.WithCancel(ctx)
 	defer sctxCancel()
 
@@ -29,4 +28,11 @@ func main() {
 	<-myCh
 
 	println("read successfully")
+}
+
+func main() {
+	ctx := context.Background()
+	run(ctx)
+
+	println("test finished")
 }

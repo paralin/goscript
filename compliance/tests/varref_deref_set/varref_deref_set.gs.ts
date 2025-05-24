@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// y is varrefed because p1 takes its address
 	let y: $.VarRef<number> = $.varRef(15)
 

@@ -39,7 +39,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// We need to make sure we don't add .value for this
 	let myStruct = new MyStruct({})
 	;myStruct!.MyInt = 5

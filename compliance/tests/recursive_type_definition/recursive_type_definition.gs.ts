@@ -62,7 +62,7 @@ $.registerInterfaceType(
   [{ name: "MethodD", args: [{ name: "c", type: "C" }], returns: [] }]
 );
 
-export function main(): void {
+export async function main(): Promise<void> {
 	console.log("recursive type definition test")
 }
 

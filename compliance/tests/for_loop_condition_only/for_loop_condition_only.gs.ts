@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i = 0
 	for (; i < 3; ) {
 		console.log("Current value:", i)

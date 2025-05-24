@@ -51,7 +51,7 @@ class TestStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let s = new TestStruct({IntField: 42, StringField: "hello"})
 	console.log("IntField:", s.IntField)
 	console.log("StringField:", s.StringField)

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// --- Original Tests ---
 	console.log("--- Original Tests ---")
 	// Create a slice of integers with length 5 and capacity 10

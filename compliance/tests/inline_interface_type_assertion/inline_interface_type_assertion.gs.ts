@@ -73,7 +73,7 @@ class MyStringer {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i: null | any = null
 	i = new Greeter({})
 

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	//nolint:staticcheck
 	let a: number = 1.23
 	let b = 4.56

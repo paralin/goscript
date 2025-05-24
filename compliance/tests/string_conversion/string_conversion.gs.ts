@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// === string(string) Conversion ===
 	let myVar = "hello world"
 	console.log(myVar)

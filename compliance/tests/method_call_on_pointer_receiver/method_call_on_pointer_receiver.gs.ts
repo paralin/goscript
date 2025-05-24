@@ -55,7 +55,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	// === Method Call on Pointer Receiver ===
 	// Calling a method with a pointer receiver (*MyStruct) using a pointer variable.

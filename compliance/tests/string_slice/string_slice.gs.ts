@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let myStr1 = "testing"
 	console.log("myStr1:", myStr1)
 	console.log("len(myStr1):", $.len(myStr1))

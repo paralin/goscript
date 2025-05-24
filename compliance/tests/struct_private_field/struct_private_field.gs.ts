@@ -39,7 +39,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let myStruct = new MyStruct({myPrivate: 4})
 	myStruct!.myPrivate = 10
 	console.log(myStruct!.myPrivate)

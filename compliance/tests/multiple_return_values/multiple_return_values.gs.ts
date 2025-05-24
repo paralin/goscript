@@ -7,7 +7,7 @@ function multipleReturnValues(): [number, string, boolean] {
 	return [42, "hello", true]
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let [a, b, c] = multipleReturnValues()
 	console.log(a)
 	console.log(b)

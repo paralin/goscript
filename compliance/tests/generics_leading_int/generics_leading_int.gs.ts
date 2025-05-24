@@ -37,7 +37,7 @@ function leadingInt<bytes extends Uint8Array | string>(s: bytes): [number, bytes
 	}
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let [x1, rem1, err1] = leadingInt($.stringToBytes("123abc456"))
 	console.log(x1, $.bytesToString(rem1), err1)
 

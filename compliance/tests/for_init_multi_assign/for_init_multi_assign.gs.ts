@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 
 	// Modify j to see a clearer change in output
 	for (let i = 0, j = 1; i < 2; i++) {

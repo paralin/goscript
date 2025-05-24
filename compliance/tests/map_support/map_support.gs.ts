@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Create map using make
 	let scores = $.makeMap<string, number>()
 	console.log("Empty map created: Expected: true, Actual:", $.len(scores) == 0)

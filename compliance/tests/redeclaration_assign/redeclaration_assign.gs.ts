@@ -7,7 +7,7 @@ function returnsOneIntOneBool(): [number, boolean] {
 	return [7, true]
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i: number = 0
 	console.log("initial i:", i) // Use i to avoid unused error before :=
 

@@ -39,7 +39,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let myStruct = new MyStruct({myPrivate: null})
 	let intVar: $.VarRef<number> = $.varRef(10)
 	myStruct!.myPrivate = intVar

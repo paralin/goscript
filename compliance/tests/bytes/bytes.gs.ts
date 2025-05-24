@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Test 1: Declaration and initialization of []byte
 	let b1: Uint8Array = new Uint8Array(0)
 	console.log("b1:", b1)

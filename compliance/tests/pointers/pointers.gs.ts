@@ -39,7 +39,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let s1 = $.varRef(new MyStruct({Val: 1})) // p1 takes the address of s1, so s1 is varrefed
 	let s2 = $.varRef(new MyStruct({Val: 2})) // p2 takes the address of s2, so s2 is varrefed
 

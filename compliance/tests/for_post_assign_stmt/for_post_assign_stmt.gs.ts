@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let x: number = 0
 	// The post statement 'x = i' is an AssignStmt
 

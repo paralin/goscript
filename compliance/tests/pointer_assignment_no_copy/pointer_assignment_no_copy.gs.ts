@@ -49,7 +49,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let original = new MyStruct({MyInt: 10, MyString: "original"})
 
 	// === Pointer Assignment (No Copy) ===

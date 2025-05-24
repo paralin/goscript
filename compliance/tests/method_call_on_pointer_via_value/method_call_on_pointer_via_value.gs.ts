@@ -51,7 +51,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Create a struct value
 	let msValue = new MyStruct({MyInt: 100})
 

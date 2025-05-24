@@ -59,7 +59,7 @@ function accessPrivateField(s: MyStruct): void {
 	console.log("Accessing privateField:", s.privateField)
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let s = NewMyStruct("hello", 123).clone()
 	accessPrivateField(s)
 }

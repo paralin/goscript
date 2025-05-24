@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let arr = $.varRef($.arrayToSlice<number>([1, 2, 3]))
 	let arrPtr = arr
 

@@ -7,7 +7,7 @@ function printVal<T extends any>(val: T): void {
 	console.log(val)
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	printVal(10)
 	printVal("hello")
 	printVal(true)

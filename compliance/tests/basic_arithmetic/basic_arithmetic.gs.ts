@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// === Basic Arithmetic ===
 	let add = 2 + 3
 	let sub = 10 - 4

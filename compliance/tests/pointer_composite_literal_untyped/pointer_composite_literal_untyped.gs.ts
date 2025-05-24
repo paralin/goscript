@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// This should trigger "unhandled composite literal type: *types.Pointer"
 	// because the composite literal {} has no explicit type, but its type gets inferred as a pointer
 	let ptr: { x?: number } | null = null

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let s = $.arrayToSlice<number>([10, 20, 30])
 	console.log("Looping over slice (key only):")
 

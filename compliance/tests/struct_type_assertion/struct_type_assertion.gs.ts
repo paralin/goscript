@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let i: null | any = {Name: "Alice", Number: 8005553424}
 
 	let { value: s, ok: ok } = $.typeAssert<{ Name?: string; Number?: number }>(i, {kind: $.TypeKind.Struct, fields: {'Name': {kind: $.TypeKind.Basic, name: 'string'}, 'Number': {kind: $.TypeKind.Basic, name: 'number'}}, methods: []})

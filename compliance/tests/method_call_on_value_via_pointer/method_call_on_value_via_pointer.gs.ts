@@ -45,7 +45,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Create a struct value
 	let msValue = $.varRef(new MyStruct({MyInt: 100}))
 	// Create a pointer to the struct value

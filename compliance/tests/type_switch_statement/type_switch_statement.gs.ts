@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Basic type switch with variable and default case
 	let i: null | any = "hello"
 	$.typeSwitch(i, [{ types: [{kind: $.TypeKind.Basic, name: 'number'}], body: (v) => {

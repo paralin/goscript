@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let myStr1 = "testing"
 	console.log("Byte from myStr1[0]:", $.indexString(myStr1, 0)) // Expected: t (byte value 116)
 	console.log("Byte from myStr1[2]:", $.indexString(myStr1, 2)) // Expected: s (byte value 115)

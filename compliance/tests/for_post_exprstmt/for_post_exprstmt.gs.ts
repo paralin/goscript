@@ -10,7 +10,7 @@ function increment_counter(): void {
 	console.log("counter incremented to", counter)
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 
 	// We need to manually increment i or change the condition
 	// to ensure the loop terminates as increment_counter() in post

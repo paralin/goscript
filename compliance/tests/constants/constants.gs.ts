@@ -14,7 +14,7 @@ let Greeting: string = "Hello, Constants!"
 
 let Nothing: null | any = null
 
-export function main(): void {
+export async function main(): Promise<void> {
 	console.log(Pi)
 	console.log(Truth)
 	// println(Big) // Commented out until large integer handling is implemented

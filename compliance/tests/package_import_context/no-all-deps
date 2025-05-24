@@ -1,2 +1,0 @@
-# This file disables AllDependencies for this test
-# We only want to compile the main package, not all standard library dependencies 

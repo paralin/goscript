@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let stdNumMonth = 1
 
 	// stdLongMonth := 3 // Not used in this specific example but good for context

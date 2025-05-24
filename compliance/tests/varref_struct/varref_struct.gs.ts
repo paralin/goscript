@@ -39,7 +39,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// 'val' is a value type, but its address is taken, so it should be varrefed in TS.
 	let val = $.varRef(new MyStruct({MyInt: 10}))
 	let ptrToVal = val

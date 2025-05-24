@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let a: number = 5
 	a += 3
 	console.log(a) // Expected output: 8

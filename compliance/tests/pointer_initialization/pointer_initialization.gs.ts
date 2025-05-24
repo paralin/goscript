@@ -49,7 +49,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// === Pointer Initialization ===
 	// Create a pointer to a MyStruct instance using a composite literal.
 	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})

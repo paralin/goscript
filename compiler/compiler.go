@@ -117,6 +117,7 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 			}
 			processed[pkg.ID] = true
 
+			// Add this package to the list of all packages
 			allPkgs = append(allPkgs, pkg)
 
 			// Check if this package has a handwritten equivalent

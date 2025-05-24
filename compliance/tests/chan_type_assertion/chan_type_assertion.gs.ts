@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let ch1 = $.makeChannel<number>(0, 0, 'both') // bidirectional int channel
 	let ch2 = $.makeChannel<string>(0, "", 'send') // send-only string channel
 	let ch3 = $.makeChannel<number>(0, 0, 'receive') // receive-only float64 channel

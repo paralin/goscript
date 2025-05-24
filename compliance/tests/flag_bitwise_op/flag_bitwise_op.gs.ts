@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let O_WRONLY: number = 0x1
 	let O_CREATE: number = 0x40
 	let O_APPEND: number = 0x400

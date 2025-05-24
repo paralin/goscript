@@ -79,6 +79,12 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
 		isAsync = c.analysis.IsAsyncFunc(obj)
 	}
+
+	// Always make main function async (only in main package)
+	if decl.Name.Name == "main" && c.pkg.Name == "main" {
+		isAsync = true
+	}
+
 	if isAsync {
 		c.tsw.WriteLiterally("async ")
 	}

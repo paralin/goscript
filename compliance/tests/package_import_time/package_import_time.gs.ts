@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 import * as time from "@goscript/time/index.js"
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let now = time.Now().clone()
 	let setTime = time.Date(2025, time.May, 15, 1, 10, 42, 0, time.UTC).clone()
 	if (now.Sub(setTime) < $.multiplyDuration(time.Hour, 24)) {

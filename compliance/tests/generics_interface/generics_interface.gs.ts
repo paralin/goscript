@@ -150,7 +150,7 @@ function checkEqual<T extends $.Comparable>(c: Comparable<T>, val: T): boolean {
 	return c!.Equal(val)
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	console.log("=== Generic Interface Test ===")
 
 	// Test ValueContainer implementing Container

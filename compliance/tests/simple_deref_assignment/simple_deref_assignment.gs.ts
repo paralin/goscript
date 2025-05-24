@@ -49,7 +49,7 @@ class MyStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let structPointer = new MyStruct({MyInt: 4, MyString: "hello world"})
 	// === Simple Dereference Assignment (Value Copy) ===
 	let simpleDereferencedCopy = structPointer!.clone()

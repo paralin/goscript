@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-export function main(): void {
+export async function main(): Promise<void> {
 	let m = $.makeMap<string, number>()
 	$.mapSet(m, "one", 1)
 	console.log("Assigning m[\"one\"] to _, _ (key exists)")

@@ -79,7 +79,7 @@ function append2<T extends any>(slice: $.Slice<T>, elem: T): $.Slice<T> {
 	return $.append(slice, elem)
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Test basic generic function
 	console.log("=== Basic Generic Function ===")
 	printVal(42)

@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 type Greeter = ((name: string) => string) | null;
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// 2. Create an inline variable with the inline function satisfying that type.
 	let theInlineVar = (name: string): string => {
 		return "Hello, " + name

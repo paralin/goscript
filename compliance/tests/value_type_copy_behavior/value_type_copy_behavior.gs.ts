@@ -95,7 +95,7 @@ class NestedStruct {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// Horizontal line for output clarity
 	console.log("----------------------------------------------------------")
 	console.log("VALUE TYPE COPY BEHAVIOR TEST")

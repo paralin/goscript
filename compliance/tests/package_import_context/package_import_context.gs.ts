@@ -5,9 +5,8 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 import * as context from "@goscript/context/index.js"
 
-export async function main(): Promise<void> {
+async function run(ctx: Context): Promise<void> {
 	await using __defer = new $.AsyncDisposableStack();
-	let ctx = context.Background()
 	let [sctx, sctxCancel] = context.WithCancel(ctx)
 	__defer.defer(() => {
 		sctxCancel!()
@@ -47,5 +46,12 @@ export async function main(): Promise<void> {
 	await $.chanRecv(myCh)
 
 	console.log("read successfully")
+}
+
+export async function main(): Promise<void> {
+	let ctx = context.Background()
+	await run(ctx)
+
+	console.log("test finished")
 }
 

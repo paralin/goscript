@@ -64,7 +64,7 @@ export function NewMyError(text: string): MyError | null {
 	return new MyError({s: text})
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	fn1 = (a: number, b: string): [boolean, $.GoError] => {
 		console.log("fn1 called with:", a, b)
 		if (a > 0) {

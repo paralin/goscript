@@ -323,7 +323,7 @@ class Manager {
 	);
 }
 
-export function main(): void {
+export async function main(): Promise<void> {
 	// --- Single Embedding Tests ---
 	let e = new Employee({ID: 123, Person: {Name: "Alice", Age: 30}})
 
