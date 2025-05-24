@@ -40,17 +40,17 @@ class MyStruct {
 }
 
 export function main(): void {
-	let s1: $.VarRef<MyStruct> = $.varRef(new MyStruct({Val: 1})) // p1 takes the address of s1, so s1 is varrefed
-	let s2: $.VarRef<MyStruct> = $.varRef(new MyStruct({Val: 2})) // p2 takes the address of s2, so s2 is varrefed
+	let s1 = $.varRef(new MyStruct({Val: 1})) // p1 takes the address of s1, so s1 is varrefed
+	let s2 = $.varRef(new MyStruct({Val: 2})) // p2 takes the address of s2, so s2 is varrefed
 
-	let p1: $.VarRef<MyStruct | null> = $.varRef(s1) // *MyStruct, points to s1, pp1 takes the address of p1, so p1 is varrefed
-	let p2: $.VarRef<MyStruct | null> = $.varRef(s1) // *MyStruct, points to s1, pp2 takes the address of p2, so p2 is varrefed
-	let p3: $.VarRef<MyStruct | null> = $.varRef(s2) // *MyStruct, points to s2, pp3 takes the address of p3, so p3 is varrefed
+	let p1 = $.varRef(s1) // *MyStruct, points to s1, pp1 takes the address of p1, so p1 is varrefed
+	let p2 = $.varRef(s1) // *MyStruct, points to s1, pp2 takes the address of p2, so p2 is varrefed
+	let p3 = $.varRef(s2) // *MyStruct, points to s2, pp3 takes the address of p3, so p3 is varrefed
 
 	let p4 = s1 // *MyStruct, points to s1, nothing takes the address of p4, so p4 is not varrefed
 	/* _ = */ p4!.value
 
-	let pp1: $.VarRef<$.VarRef<MyStruct | null> | null> = $.varRef(p1) // **MyStruct, points to p1
+	let pp1 = $.varRef(p1) // **MyStruct, points to p1
 	let pp2 = p2 // **MyStruct, points to p2
 	let pp3 = p3 // **MyStruct, points to p3
 

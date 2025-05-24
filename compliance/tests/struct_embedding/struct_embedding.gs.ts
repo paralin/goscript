@@ -348,7 +348,7 @@ export function main(): void {
 
 	// --- Multiple Embedding Tests ---
 	console.log("\n--- Multiple Embedding ---")
-	let m: $.VarRef<Manager> = $.varRef(new Manager({Level: 5, Address: {Street: "123 Main St", City: "Anytown"}, Contact: {Phone: "555-1234"}, Person: {Name: "Charlie", Age: 40}}))
+	let m = $.varRef(new Manager({Level: 5, Address: {Street: "123 Main St", City: "Anytown"}, Contact: {Phone: "555-1234"}, Person: {Name: "Charlie", Age: 40}}))
 
 	// Accessing fields from all embedded structs and the outer struct
 	console.log("Manager Name:", m!.value.Name) // From Person

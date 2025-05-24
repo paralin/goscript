@@ -245,6 +245,7 @@ func (c *GoToTSCompiler) WritePointerType(t *types.Pointer, context GoTypeContex
 	if isStruct || isInterface {
 		// For pointers to structs or interfaces, the TS type is StructName | null or InterfaceName | null.
 		// This aligns with VAR_REFS.md and JS/TS object reference semantics.
+		// TODO If the target variable is boxed, we have to wrap with VarRef as well?
 		c.WriteGoType(elemGoType, context) // Write the struct/interface type directly, pass context
 		c.tsw.WriteLiterally(" | null")
 	} else {

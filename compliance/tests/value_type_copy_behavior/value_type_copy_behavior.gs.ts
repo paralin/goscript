@@ -103,7 +103,7 @@ export function main(): void {
 
 	// original is the starting struct instance.
 	// We take its address later for pointerCopy, so it might be allocated on the heap (varrefed).
-	let original: $.VarRef<MyStruct> = $.varRef(new MyStruct({MyInt: 42, MyString: "original"}))
+	let original = $.varRef(new MyStruct({MyInt: 42, MyString: "original"}))
 
 	// === Value-Type Copy Behavior ===
 	// Assigning a struct (value type) creates independent copies.
