@@ -38,48 +38,51 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		}
 	}
 
-	// --- Special case for dereferenced pointer to struct with field access: (*p).field ---
+	// --- Special case for dereferenced pointer to struct with field access: (*p).field or (**p).field etc ---
 	var baseExpr ast.Expr = exp.X
 	// Look inside parentheses if present
 	if parenExpr, isParen := exp.X.(*ast.ParenExpr); isParen {
 		baseExpr = parenExpr.X
 	}
 
+	// Check if we have one or more star expressions (dereferences)
 	if starExpr, isStarExpr := baseExpr.(*ast.StarExpr); isStarExpr {
-		// Get the type of the pointer being dereferenced (e.g., type of 'p' in *p)
-		ptrType := c.pkg.TypesInfo.TypeOf(starExpr.X)
-		if ptrType != nil {
-			if ptrTypeUnwrapped, ok := ptrType.(*types.Pointer); ok {
-				elemType := ptrTypeUnwrapped.Elem()
-				if elemType != nil {
-					// If it's a pointer to a struct, handle field access specially
-					if _, isStruct := elemType.Underlying().(*types.Struct); isStruct {
-						// Get the object for the pointer variable itself (e.g., 'p')
-						var ptrObj types.Object
-						if ptrIdent, isIdent := starExpr.X.(*ast.Ident); isIdent {
-							ptrObj = c.pkg.TypesInfo.ObjectOf(ptrIdent)
-						}
+		// Count the levels of dereference and find the innermost expression
+		dereferenceCount := 0
+		currentExpr := baseExpr
+		for {
+			if star, ok := currentExpr.(*ast.StarExpr); ok {
+				dereferenceCount++
+				currentExpr = star.X
+			} else {
+				break
+			}
+		}
 
-						// Write the pointer expression (e.g., p or p.value if p is varrefed)
-						if err := c.WriteValueExpr(starExpr.X); err != nil {
-							return fmt.Errorf("failed to write pointer expression for (*p).field: %w", err)
-						}
-
-						// Add ! for non-null assertion
-						c.tsw.WriteLiterally("!")
-
-						// Add .value ONLY if the pointer variable itself needs varrefed access
-						// This handles the case where 'p' points to a variable referenced struct (e.g., p = s where s is VarRef<MyStruct>)
-						if ptrObj != nil && c.analysis.NeedsVarRefAccess(ptrObj) {
-							c.tsw.WriteLiterally(".value")
-						}
-
-						// Add .field
-						c.tsw.WriteLiterally(".")
-						c.WriteIdent(exp.Sel, false) // Don't add .value to the field itself
-						return nil
-					}
+		// Get the type of the innermost expression (the pointer variable)
+		innerType := c.pkg.TypesInfo.TypeOf(currentExpr)
+		if innerType != nil {
+			// Check if after all dereferences we end up with a struct
+			finalType := innerType
+			for i := 0; i < dereferenceCount; i++ {
+				if ptrType, ok := finalType.(*types.Pointer); ok {
+					finalType = ptrType.Elem()
+				} else {
+					break
 				}
+			}
+
+			// If the final type is a struct, handle field access specially
+			if _, isStruct := finalType.Underlying().(*types.Struct); isStruct {
+				// Write the fully dereferenced expression
+				if err := c.WriteValueExpr(starExpr); err != nil {
+					return fmt.Errorf("failed to write dereferenced expression for field access: %w", err)
+				}
+
+				// Add .field
+				c.tsw.WriteLiterally(".")
+				c.WriteIdent(exp.Sel, false) // Don't add .value to the field itself
+				return nil
 			}
 		}
 	}

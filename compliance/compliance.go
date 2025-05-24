@@ -415,7 +415,7 @@ func RunTypeScriptRunner(t *testing.T, workspaceDir, tempDir, tsRunner string) s
 
 	nodeBinDir := filepath.Join(workspaceDir, "node_modules", ".bin")
 	currentPath := os.Getenv("PATH")
-	newPath := fmt.Sprintf("%s%c%s", nodeBinDir, os.PathListSeparator, currentPath)
+	newPath := nodeBinDir + string(os.PathListSeparator) + currentPath
 	cmd.Env = append(os.Environ(), "PATH="+newPath)
 
 	var outBuf, errBuf bytes.Buffer
@@ -576,13 +576,9 @@ func RunTypeScriptTypeCheck(t *testing.T, workspaceDir, testDir string, tsconfig
 	t.Helper()
 	t.Run("TypeCheck", func(t *testing.T) {
 		// tsconfigPath is already testDir/tsconfig.json
-		cmd := exec.Command("tsc", "--project", filepath.Base(tsconfigPath)) // Use "tsconfig.json"
-		cmd.Dir = testDir                                                    // Run tsc from the test directory where tsconfig.json is located
-
 		nodeBinDir := filepath.Join(workspaceDir, "node_modules", ".bin")
-		currentPath := os.Getenv("PATH")
-		newPath := fmt.Sprintf("%s%c%s", nodeBinDir, os.PathListSeparator, currentPath)
-		cmd.Env = append(os.Environ(), "PATH="+newPath)
+		cmd := exec.Command(filepath.Join(nodeBinDir, "tsgo"), "--project", filepath.Base(tsconfigPath)) // Use "tsconfig.json"
+		cmd.Dir = testDir                                                                                // Run tsc from the test directory where tsconfig.json is located
 
 		output, err := cmd.CombinedOutput() // Capture both stdout and stderr
 		if err != nil {

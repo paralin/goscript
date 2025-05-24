@@ -67,9 +67,9 @@ export function main(): void {
 	let i: $.VarRef<number> = $.varRef(10)
 	s.PointerField!.value = i
 	console.log(s.PointerField!.value != null)
-	console.log(s.PointerField!.value!)
+	console.log(s.PointerField!.value!.value)
 	i!.value = 15
-	console.log(s.PointerField!.value!)
+	console.log(s.PointerField!.value!.value)
 
 	let mi: MyInterface = null
 	s.interfaceField = mi

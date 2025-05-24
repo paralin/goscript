@@ -36,17 +36,31 @@ import (
 //   - Variable referenced pointer to struct: `p.value!` (where p is VarRef<*MyStruct>)
 //   - Triple pointer: `p3!.value!.value!.value` (where p3 is VarRef<VarRef<VarRef<number> | null> | null> | null)
 func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
-	// Special handling for the operand to avoid double .value access
-	// When dereferencing, we want the pointer itself, not its value
-	switch operand := exp.X.(type) {
-	case *ast.Ident:
-		// For identifiers, write without accessing .value
-		// This prevents the double .value issue
-		c.WriteIdent(operand, false)
-	default:
-		// For other expressions (like nested star expressions), use WriteValueExpr
+	// Check if the operand is an identifier that is varrefed
+	isVarrefedIdent := false
+	if ident, ok := exp.X.(*ast.Ident); ok {
+		if obj := c.pkg.TypesInfo.ObjectOf(ident); obj != nil {
+			isVarrefedIdent = c.analysis.NeedsVarRef(obj)
+		}
+	}
+
+	// Write the operand
+	if isVarrefedIdent {
+		// For varrefed identifiers, we need to access the value first
 		if err := c.WriteValueExpr(exp.X); err != nil {
 			return err
+		}
+	} else {
+		// For non-varrefed identifiers and other expressions
+		switch operand := exp.X.(type) {
+		case *ast.Ident:
+			// Write identifier without .value access
+			c.WriteIdent(operand, false)
+		default:
+			// For other expressions (like nested star expressions), use WriteValueExpr
+			if err := c.WriteValueExpr(exp.X); err != nil {
+				return err
+			}
 		}
 	}
 
@@ -54,7 +68,6 @@ func (c *GoToTSCompiler) WriteStarExpr(exp *ast.StarExpr) error {
 	c.tsw.WriteLiterally("!")
 
 	// Check what the operand points to (not what the result is)
-	// This is the key fix: we need to check the operand type, not the result type
 	operandType := c.pkg.TypesInfo.TypeOf(exp.X)
 	if ptrType, isPtr := operandType.(*types.Pointer); isPtr {
 		elemType := ptrType.Elem()

@@ -13,10 +13,10 @@ export function main(): void {
 	// p3 is not varrefed as nothing takes its address
 	let p3: $.VarRef<$.VarRef<$.VarRef<number> | null> | null> | null = p2
 
-	console.log("**p3 ==", p3!.value!.value!!)
+	console.log("**p3 ==", p3!.value!.value!.value)
 
 	// q1 is not varrefed as nothing takes its address
 	let q1: $.VarRef<number> | null = x
-	console.log("*q1 ==", q1!.value!.value) // Should translate to q1!.value
+	console.log("*q1 ==", q1!.value) // Should translate to q1!.value
 }
 

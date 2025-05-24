@@ -44,6 +44,6 @@ export function main(): void {
 	let intVar: $.VarRef<number> = $.varRef(10)
 	myStruct!.myPrivate!.value = intVar
 	intVar!.value = 15
-	console.log(myStruct!.myPrivate!.value!)
+	console.log(myStruct!.myPrivate!.value!.value)
 }
 
