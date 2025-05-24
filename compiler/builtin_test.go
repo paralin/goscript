@@ -81,18 +81,6 @@ func TestEmitBuiltinOption(t *testing.T) {
 			t.Fatalf("Compilation failed: %v", err)
 		}
 
-		// Check that the unsafe package was copied to the output
-		unsafePath := filepath.Join(outputDir, "@goscript/unsafe")
-		if _, err := os.Stat(unsafePath); os.IsNotExist(err) {
-			t.Errorf("unsafe package was not emitted when DisableEmitBuiltin=false")
-		}
-
-		// Also check for runtime package
-		runtimePath := filepath.Join(outputDir, "@goscript/runtime")
-		if _, err := os.Stat(runtimePath); os.IsNotExist(err) {
-			t.Errorf("runtime package was not emitted when DisableEmitBuiltin=false")
-		}
-
 		// Time package should also have been emitted
 		timePath := filepath.Join(outputDir, "@goscript/time")
 		if _, err := os.Stat(timePath); os.IsNotExist(err) {

@@ -102,6 +102,13 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 		processed := make(map[string]bool)
 		var allPkgs []*packages.Package
 
+		// Helper function to check if a package has a handwritten equivalent
+		hasHandwrittenEquivalent := func(pkgPath string) bool {
+			gsSourcePath := "gs/" + pkgPath
+			_, gsErr := gs.GsOverrides.ReadDir(gsSourcePath)
+			return gsErr == nil
+		}
+
 		// Visit all packages and their dependencies
 		var visit func(pkg *packages.Package)
 		visit = func(pkg *packages.Package) {
@@ -109,6 +116,15 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 				return
 			}
 			processed[pkg.ID] = true
+
+			// Check if this package has a handwritten equivalent
+			if hasHandwrittenEquivalent(pkg.PkgPath) {
+				// Add this package but don't visit its dependencies
+				allPkgs = append(allPkgs, pkg)
+				c.le.Debugf("Skipping dependencies of handwritten package: %s", pkg.PkgPath)
+				return
+			}
+
 			allPkgs = append(allPkgs, pkg)
 
 			// Visit all imports, including standard library packages
