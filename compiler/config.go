@@ -20,6 +20,10 @@ type Config struct {
 	// AllDependencies controls whether to compile all dependencies of the requested packages.
 	// If true, all dependencies will be compiled; if false, only the requested packages are compiled.
 	AllDependencies bool
+	// DisableEmitBuiltin controls whether to emit builtin packages when they are referenced.
+	// If true, builtin packages will not be emitted; if false, they will be emitted if referenced.
+	// Default is false (emit builtin packages).
+	DisableEmitBuiltin bool
 }
 
 // Validate checks the config.

@@ -150,13 +150,39 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 	for _, pkg := range pkgs {
 		// Check if the package has a handwritten equivalent
 		if !slices.Contains(patternPkgPaths, pkg.PkgPath) {
-			_, gsErr := gs.GsOverrides.ReadDir("gs/" + pkg.PkgPath)
+			gsSourcePath := "gs/" + pkg.PkgPath
+			_, gsErr := gs.GsOverrides.ReadDir(gsSourcePath)
 			if gsErr != nil && !os.IsNotExist(gsErr) {
 				return gsErr
 			}
 			if gsErr == nil {
-				c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
-				continue
+				if c.config.DisableEmitBuiltin {
+					c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
+					continue
+				} else {
+					// If DisableEmitBuiltin is false, we need to copy the handwritten package to the output directory
+					c.le.Infof("Copying handwritten package %s to output directory", pkg.PkgPath)
+
+					// Compute output path for this package
+					outputPath := ComputeModulePath(c.config.OutputPath, pkg.PkgPath)
+
+					// Remove existing directory if it exists
+					if err := os.RemoveAll(outputPath); err != nil {
+						return fmt.Errorf("failed to remove existing output directory for %s: %w", pkg.PkgPath, err)
+					}
+
+					// Create the output directory
+					if err := os.MkdirAll(outputPath, 0o755); err != nil {
+						return fmt.Errorf("failed to create output directory for %s: %w", pkg.PkgPath, err)
+					}
+
+					// Copy files from embedded FS to output directory
+					if err := c.copyEmbeddedPackage(gsSourcePath, outputPath); err != nil {
+						return fmt.Errorf("failed to copy embedded package %s: %w", pkg.PkgPath, err)
+					}
+
+					continue
+				}
 			}
 		}
 
@@ -624,4 +650,45 @@ func (c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup) {
 			c.tsw.WriteCommentLine(" Unknown comment format: " + comment.Text)
 		}
 	}
+}
+
+// copyEmbeddedPackage recursively copies files from an embedded FS path to a filesystem directory.
+// It handles both regular files and directories.
+func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) error {
+	// List the entries in the embedded path
+	entries, err := gs.GsOverrides.ReadDir(embeddedPath)
+	if err != nil {
+		return fmt.Errorf("failed to read embedded directory %s: %w", embeddedPath, err)
+	}
+
+	// Process each entry
+	for _, entry := range entries {
+		entryPath := filepath.Join(embeddedPath, entry.Name())
+		outputEntryPath := filepath.Join(outputPath, entry.Name())
+
+		if entry.IsDir() {
+			// Create the output directory
+			if err := os.MkdirAll(outputEntryPath, 0o755); err != nil {
+				return fmt.Errorf("failed to create output directory %s: %w", outputEntryPath, err)
+			}
+
+			// Recursively copy the directory contents
+			if err := c.copyEmbeddedPackage(entryPath, outputEntryPath); err != nil {
+				return err
+			}
+		} else {
+			// Read the file content from the embedded FS
+			content, err := gs.GsOverrides.ReadFile(entryPath)
+			if err != nil {
+				return fmt.Errorf("failed to read embedded file %s: %w", entryPath, err)
+			}
+
+			// Write the content to the output file
+			if err := os.WriteFile(outputEntryPath, content, 0o644); err != nil {
+				return fmt.Errorf("failed to write file %s: %w", outputEntryPath, err)
+			}
+		}
+	}
+
+	return nil
 }

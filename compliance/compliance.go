@@ -157,9 +157,10 @@ func CompileGoToTypeScript(t *testing.T, parentModulePath, testDir, tempDir, out
 	}
 
 	conf := &compiler.Config{
-		Dir:             testDir,
-		OutputPath:      outputDir,
-		AllDependencies: allDependencies,
+		Dir:                testDir,
+		OutputPath:         outputDir,
+		AllDependencies:    allDependencies,
+		DisableEmitBuiltin: true, // We want to use the handwritten gs/ packages in compliance tests
 	}
 	if err := conf.Validate(); err != nil {
 		t.Fatalf("invalid compiler config: %v", err)
