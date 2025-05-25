@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function simpleIterator(_yield: ((p0: number) => boolean) | null): void {
+export function simpleIterator(_yield: ((p0: number) => boolean) | null): void {
 	for (let i = 0; i < 3; i++) {
 		if (!_yield!(i)) {
 			return 
@@ -11,7 +11,7 @@ function simpleIterator(_yield: ((p0: number) => boolean) | null): void {
 	}
 }
 
-function keyValueIterator(_yield: ((p0: number, p1: string) => boolean) | null): void {
+export function keyValueIterator(_yield: ((p0: number, p1: string) => boolean) | null): void {
 	let values = $.arrayToSlice<string>(["a", "b", "c"])
 	for (let i = 0; i < $.len(values); i++) {
 		const v = values![i]

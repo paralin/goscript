@@ -4,6 +4,8 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"path/filepath"
+	"strings"
 
 	"golang.org/x/tools/go/packages"
 )
@@ -81,6 +83,17 @@ type Analysis struct {
 	FuncLitData map[*ast.FuncLit]*FunctionInfo
 }
 
+// PackageAnalysis holds cross-file analysis data for a package
+type PackageAnalysis struct {
+	// FunctionDefs maps file names to the functions defined in that file
+	// Key: filename (without .go extension), Value: list of function names
+	FunctionDefs map[string][]string
+
+	// FunctionCalls maps file names to the functions they call from other files
+	// Key: filename (without .go extension), Value: map[sourceFile][]functionNames
+	FunctionCalls map[string]map[string][]string
+}
+
 // NewAnalysis creates a new Analysis instance.
 func NewAnalysis() *Analysis {
 	return &Analysis{
@@ -89,6 +102,14 @@ func NewAnalysis() *Analysis {
 		FunctionData:  make(map[types.Object]*FunctionInfo),
 		NodeData:      make(map[ast.Node]*NodeInfo),
 		FuncLitData:   make(map[*ast.FuncLit]*FunctionInfo),
+	}
+}
+
+// NewPackageAnalysis creates a new PackageAnalysis instance
+func NewPackageAnalysis() *PackageAnalysis {
+	return &PackageAnalysis{
+		FunctionDefs:  make(map[string][]string),
+		FunctionCalls: make(map[string]map[string][]string),
 	}
 }
 
@@ -843,4 +864,93 @@ func (v *analysisVisitor) getNamedReturns(funcDecl *ast.FuncDecl) []string {
 		}
 	}
 	return namedReturns
+}
+
+// AnalyzePackage performs package-level analysis to collect function definitions
+// and calls across all files in the package for auto-import generation
+func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
+	analysis := NewPackageAnalysis()
+
+	// First pass: collect all function definitions per file
+	for i, syntax := range pkg.Syntax {
+		fileName := pkg.CompiledGoFiles[i]
+		baseFileName := strings.TrimSuffix(filepath.Base(fileName), ".go")
+
+		var functions []string
+		for _, decl := range syntax.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+				// Only collect top-level functions (not methods)
+				if funcDecl.Recv == nil {
+					functions = append(functions, funcDecl.Name.Name)
+				}
+			}
+		}
+
+		if len(functions) > 0 {
+			analysis.FunctionDefs[baseFileName] = functions
+		}
+	}
+
+	// Second pass: analyze function calls and determine which need imports
+	for i, syntax := range pkg.Syntax {
+		fileName := pkg.CompiledGoFiles[i]
+		baseFileName := strings.TrimSuffix(filepath.Base(fileName), ".go")
+
+		// Find all function calls in this file
+		callsFromOtherFiles := make(map[string][]string)
+
+		ast.Inspect(syntax, func(n ast.Node) bool {
+			if callExpr, ok := n.(*ast.CallExpr); ok {
+				if ident, ok := callExpr.Fun.(*ast.Ident); ok {
+					funcName := ident.Name
+
+					// Check if this function is defined in the current file
+					currentFileFuncs := analysis.FunctionDefs[baseFileName]
+					isDefinedInCurrentFile := false
+					for _, f := range currentFileFuncs {
+						if f == funcName {
+							isDefinedInCurrentFile = true
+							break
+						}
+					}
+
+					// If not defined in current file, find which file defines it
+					if !isDefinedInCurrentFile {
+						for sourceFile, funcs := range analysis.FunctionDefs {
+							if sourceFile == baseFileName {
+								continue // Skip current file
+							}
+							for _, f := range funcs {
+								if f == funcName {
+									// Found the function in another file
+									if callsFromOtherFiles[sourceFile] == nil {
+										callsFromOtherFiles[sourceFile] = []string{}
+									}
+									// Check if already added to avoid duplicates
+									found := false
+									for _, existing := range callsFromOtherFiles[sourceFile] {
+										if existing == funcName {
+											found = true
+											break
+										}
+									}
+									if !found {
+										callsFromOtherFiles[sourceFile] = append(callsFromOtherFiles[sourceFile], funcName)
+									}
+									break
+								}
+							}
+						}
+					}
+				}
+			}
+			return true
+		})
+
+		if len(callsFromOtherFiles) > 0 {
+			analysis.FunctionCalls[baseFileName] = callsFromOtherFiles
+		}
+	}
+
+	return analysis
 }

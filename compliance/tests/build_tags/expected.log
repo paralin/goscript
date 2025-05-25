@@ -1,0 +1,4 @@
+=== Build Tags Test ===
+JS/WASM specific code compiled - CORRECT
+Generic code compiled - CORRECT
+=== End Build Tags Test === 

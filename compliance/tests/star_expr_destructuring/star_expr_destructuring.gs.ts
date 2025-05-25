@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function returnTwoValues(): [number, string] {
+export function returnTwoValues(): [number, string] {
 	return [42, "hello"]
 }
 

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function modifyGenericSlice<S extends $.Slice<E>, E extends any>(s: S, i: number, v: E): void {
+export function modifyGenericSlice<S extends $.Slice<E>, E extends any>(s: S, i: number, v: E): void {
 	// This line causes the issue: s[i] = v
 	// For generic slice types, the compiler should generate proper assignment
 	// But currently it may generate: $.indexStringOrBytes(s, i) = v

@@ -7,19 +7,19 @@ type Greeter = ((name: string) => string) | null;
 
 type Adder = ((a: number, b: number) => number) | null;
 
-function greet(name: string): string {
+export function greet(name: string): string {
 	return "Hello, " + name
 }
 
-function add(a: number, b: number): number {
+export function add(a: number, b: number): number {
 	return a + b
 }
 
-function getGreeter(): null | any {
+export function getGreeter(): null | any {
 	return Object.assign(greet, { __goTypeName: 'Greeter' })
 }
 
-function getAdder(): null | any {
+export function getAdder(): null | any {
 	return Object.assign(add, { __goTypeName: 'Adder' })
 }
 

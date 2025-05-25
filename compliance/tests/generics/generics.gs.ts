@@ -4,17 +4,17 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 // Generic function with any constraint
-function printVal<T extends any>(val: T): void {
+export function printVal<T extends any>(val: T): void {
 	console.log(val)
 }
 
 // Generic function with comparable constraint
-function equal<T extends $.Comparable>(a: T, b: T): boolean {
+export function equal<T extends $.Comparable>(a: T, b: T): boolean {
 	return a == b
 }
 
 // Generic function with union constraint
-function getLength<S extends string | Uint8Array>(s: S): number {
+export function getLength<S extends string | Uint8Array>(s: S): number {
 	return $.len(s)
 }
 
@@ -70,12 +70,12 @@ class Pair<T extends any> {
 }
 
 // Generic function returning a generic struct
-function makePair<T extends any>(a: T, b: T): Pair<T> {
+export function makePair<T extends any>(a: T, b: T): Pair<T> {
 	return new Pair<T>({First: a, Second: b})
 }
 
 // Generic slice operations
-function append2<T extends any>(slice: $.Slice<T>, elem: T): $.Slice<T> {
+export function append2<T extends any>(slice: $.Slice<T>, elem: T): $.Slice<T> {
 	return $.append(slice, elem)
 }
 

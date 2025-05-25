@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 // Test function with multiple named return values
-function processValues(input: number): [number, string, boolean] {
+export function processValues(input: number): [number, string, boolean] {
 	let num: number = 0
 	let text: string = ""
 	let ok: boolean = false

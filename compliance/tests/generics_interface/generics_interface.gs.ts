@@ -140,13 +140,13 @@ class StringValueContainer {
 }
 
 // Function that works with generic interface
-function useContainer<T extends any>(c: Container<T>, val: T): T {
+export function useContainer<T extends any>(c: Container<T>, val: T): T {
 	c!.Set(val)
 	return c!.Get()
 }
 
 // Function that works with comparable interface
-function checkEqual<T extends $.Comparable>(c: Comparable<T>, val: T): boolean {
+export function checkEqual<T extends $.Comparable>(c: Comparable<T>, val: T): boolean {
 	return c!.Equal(val)
 }
 

@@ -49,7 +49,7 @@ class Point {
 	);
 }
 
-function getCoords(): [number, number] {
+export function getCoords(): [number, number] {
 	return [10, 20]
 }
 

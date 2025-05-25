@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function multipleReturnValues(): [number, string, boolean] {
+export function multipleReturnValues(): [number, string, boolean] {
 	return [42, "hello", true]
 }
 

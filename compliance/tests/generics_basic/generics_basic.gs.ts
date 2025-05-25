@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function printVal<T extends any>(val: T): void {
+export function printVal<T extends any>(val: T): void {
 	console.log(val)
 }
 

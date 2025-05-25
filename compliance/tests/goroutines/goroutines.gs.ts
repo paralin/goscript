@@ -54,7 +54,7 @@ let messages: $.Channel<Message> | null = $.makeChannel<Message>(0, new Message(
 let totalMessages: number = 8
 
 // A worker function that will be called as a goroutine
-async function worker(id: number): Promise<void> {
+export async function worker(id: number): Promise<void> {
 	// Send worker starting message
 	await $.chanSend(messages, new Message({priority: 10 + id, text: "Worker " + String.fromCharCode(48 + id) + " starting"}))
 
@@ -63,7 +63,7 @@ async function worker(id: number): Promise<void> {
 }
 
 // Another worker function to test multiple different goroutines
-async function anotherWorker(name: string): Promise<void> {
+export async function anotherWorker(name: string): Promise<void> {
 	await $.chanSend(messages, new Message({priority: 40, text: "Another worker: " + name}))
 }
 

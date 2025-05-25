@@ -79,11 +79,11 @@ export async function main(): Promise<void> {
 	console.log(p4!.Value) // Expected: 110
 }
 
-function getStruct(): MyStruct {
+export function getStruct(): MyStruct {
 	return new MyStruct({Value: 100})
 }
 
-function getStructPointer(): MyStruct | null {
+export function getStructPointer(): MyStruct | null {
 	return new MyStruct({Value: 110})
 }
 

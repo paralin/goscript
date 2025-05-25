@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function init_func(): void {
+export function init_func(): void {
 	console.log("init_func called")
 }
 

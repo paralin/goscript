@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 // leadingInt consumes the leading [0-9]* from s.
-function leadingInt<bytes extends Uint8Array | string>(s: bytes): [number, bytes, boolean] {
+export function leadingInt<bytes extends Uint8Array | string>(s: bytes): [number, bytes, boolean] {
 	let x: number = 0
 	let rem: bytes = null!
 	let err: boolean = false

@@ -68,11 +68,9 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 		c.WriteDoc(decl.Doc)
 	}
 
-	// Exported functions start with uppercase in Go, or special-case "main" entry point
-	isExported := decl.Name.IsExported() || decl.Name.Name == "main"
-	if isExported {
-		c.tsw.WriteLiterally("export ")
-	}
+	// Export all functions for intra-package visibility
+	// This allows other files in the same package to import functions
+	c.tsw.WriteLiterally("export ")
 
 	// Check if this function is async using the analysis data
 	var isAsync bool

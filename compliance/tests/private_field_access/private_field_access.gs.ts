@@ -53,7 +53,7 @@ export function NewMyStruct(pub: string, priv: number): MyStruct {
 	return new MyStruct({privateField: priv, publicField: pub})
 }
 
-function accessPrivateField(s: MyStruct): void {
+export function accessPrivateField(s: MyStruct): void {
 	// Accessing privateField directly from a function in the same package
 	// This should trigger the generation of the _private field
 	console.log("Accessing privateField:", s.privateField)

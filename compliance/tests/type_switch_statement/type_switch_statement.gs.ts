@@ -51,7 +51,7 @@ export async function main(): Promise<void> {
 	})
 }
 
-function getInterface(): null | any {
+export function getInterface(): null | any {
 	return 42
 }
 

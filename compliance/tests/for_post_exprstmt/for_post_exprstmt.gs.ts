@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 let counter: number = 0
 
-function increment_counter(): void {
+export function increment_counter(): void {
 	counter++
 	console.log("counter incremented to", counter)
 }

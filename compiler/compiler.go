@@ -10,6 +10,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"sort"
 	"strings"
 
 	gs "github.com/aperturerobotics/goscript"
@@ -302,6 +303,9 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 		}
 	}
 
+	// Perform package-level analysis for auto-imports
+	packageAnalysis := AnalyzePackage(c.pkg)
+
 	// Track all compiled files for later generating the index.ts
 	compiledFiles := make([]string, 0, len(c.pkg.CompiledGoFiles))
 
@@ -314,7 +318,7 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 		}
 
 		c.le.WithField("file", relWdFileName).Debug("compiling file")
-		if err := c.CompileFile(ctx, fileName, f); err != nil {
+		if err := c.CompileFile(ctx, fileName, f, packageAnalysis); err != nil {
 			return err
 		}
 
@@ -364,7 +368,7 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 // about varRefing, async functions, defer statements).
 // Then, it creates a `FileCompiler` instance for the file and invokes its
 // `Compile` method to generate the TypeScript code.
-func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File) error {
+func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File, packageAnalysis *PackageAnalysis) error {
 	// Create a new analysis instance for per-file data
 	analysis := NewAnalysis()
 
@@ -374,7 +378,7 @@ func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *
 	// Analyze the file before compiling
 	AnalyzeFile(syntax, p.pkg, analysis, cmap)
 
-	fileCompiler, err := NewFileCompiler(p.compilerConf, p.pkg, syntax, name, analysis)
+	fileCompiler, err := NewFileCompiler(p.compilerConf, p.pkg, syntax, name, analysis, packageAnalysis)
 	if err != nil {
 		return err
 	}
@@ -386,12 +390,13 @@ func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *
 // initializes the `TSCodeWriter` for TypeScript code generation, and uses a
 // `GoToTSCompiler` to translate Go declarations and statements.
 type FileCompiler struct {
-	compilerConfig *Config
-	codeWriter     *TSCodeWriter
-	pkg            *packages.Package
-	ast            *ast.File
-	fullPath       string
-	Analysis       *Analysis
+	compilerConfig  *Config
+	codeWriter      *TSCodeWriter
+	pkg             *packages.Package
+	ast             *ast.File
+	fullPath        string
+	Analysis        *Analysis
+	PackageAnalysis *PackageAnalysis
 }
 
 // NewFileCompiler creates a new `FileCompiler` for a specific Go file.
@@ -404,13 +409,15 @@ func NewFileCompiler(
 	astFile *ast.File,
 	fullPath string,
 	analysis *Analysis,
+	packageAnalysis *PackageAnalysis,
 ) (*FileCompiler, error) {
 	return &FileCompiler{
-		compilerConfig: compilerConf,
-		pkg:            pkg,
-		ast:            astFile,
-		fullPath:       fullPath,
-		Analysis:       analysis,
+		compilerConfig:  compilerConf,
+		pkg:             pkg,
+		ast:             astFile,
+		fullPath:        fullPath,
+		Analysis:        analysis,
+		PackageAnalysis: packageAnalysis,
 	}, nil
 }
 
@@ -444,7 +451,21 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 
 	// Add import for the goscript runtime using namespace import and alias
 	c.codeWriter.WriteLinef("import * as $ from %q;", "@goscript/builtin/builtin.js")
-	c.codeWriter.WriteLine("") // Add a newline after the import
+
+	// Generate auto-imports for functions from other files in the same package
+	currentFileName := strings.TrimSuffix(filepath.Base(c.fullPath), ".go")
+	if imports := c.PackageAnalysis.FunctionCalls[currentFileName]; imports != nil {
+		for sourceFile, functions := range imports {
+			if len(functions) > 0 {
+				// Sort functions for consistent output
+				sort.Strings(functions)
+				c.codeWriter.WriteLinef("import { %s } from \"./%s.gs.js\";",
+					strings.Join(functions, ", "), sourceFile)
+			}
+		}
+	}
+
+	c.codeWriter.WriteLine("") // Add a newline after imports
 
 	if err := goWriter.WriteDecls(f.Decls); err != nil {
 		return fmt.Errorf("failed to write declarations: %w", err)

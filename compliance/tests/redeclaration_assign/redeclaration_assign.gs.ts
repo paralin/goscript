@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-function returnsOneIntOneBool(): [number, boolean] {
+export function returnsOneIntOneBool(): [number, boolean] {
 	return [7, true]
 }
 
