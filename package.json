@@ -71,7 +71,7 @@
     "dist",
     "cmd",
     "compiler",
-    "builtin",
+    "gs",
     "!compliance",
     "go.mod",
     "go.sum",
