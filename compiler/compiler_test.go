@@ -1,6 +1,7 @@
 package compiler_test
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -11,7 +12,9 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/aperturerobotics/goscript/compiler"
 	"github.com/aperturerobotics/goscript/compliance"
+	"github.com/sirupsen/logrus"
 )
 
 // NOTE: this is here instead of compliance/compliance_test.go so coverage ends up in this package.
@@ -136,4 +139,61 @@ func getParentGoModulePath() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+func TestUnsafePackageErrorMessage(t *testing.T) {
+	// Create a temporary directory for the test output
+	tempDir, err := os.MkdirTemp("", "goscript-test-unsafe")
+	if err != nil {
+		t.Fatalf("Failed to create temp dir: %v", err)
+	}
+	defer os.RemoveAll(tempDir)
+
+	// Setup logger
+	log := logrus.New()
+	log.SetLevel(logrus.DebugLevel)
+	le := logrus.NewEntry(log)
+
+	// Test with AllDependencies=true to ensure we get all packages including unsafe
+	config := &compiler.Config{
+		OutputPath:         tempDir,
+		AllDependencies:    true,
+		DisableEmitBuiltin: true, // This ensures handwritten packages are skipped
+	}
+
+	comp, err := compiler.NewCompiler(config, le, nil)
+	if err != nil {
+		t.Fatalf("Failed to create compiler: %v", err)
+	}
+
+	// Try to compile a package that has dependencies that import unsafe
+	// We'll use "sync/atomic" which imports unsafe but doesn't have a handwritten equivalent
+	_, err = comp.CompilePackages(context.Background(), "sync/atomic")
+
+	// We expect this to fail with an unsafe package error
+	if err == nil {
+		t.Fatalf("Expected compilation to fail due to unsafe package, but it succeeded")
+	}
+
+	errorMsg := err.Error()
+
+	// Verify the error message contains the expected text
+	if !strings.Contains(errorMsg, "cannot compile package 'unsafe'") {
+		t.Errorf("Error message should mention unsafe package, got: %s", errorMsg)
+	}
+
+	// Verify that packages with handwritten equivalents are NOT mentioned in the error
+	// These packages have handwritten equivalents in gs/ and should not be in the error message
+	handwrittenPackages := []string{"runtime", "errors", "time", "context", "slices"}
+
+	for _, pkg := range handwrittenPackages {
+		if strings.Contains(errorMsg, pkg) {
+			t.Errorf("Error message should not mention handwritten package '%s', but it does. Error: %s", pkg, errorMsg)
+		}
+	}
+
+	// The error message should mention sync/atomic since it would actually be compiled
+	if !strings.Contains(errorMsg, "sync/atomic") {
+		t.Errorf("Error message should mention 'sync/atomic' as it would be compiled, got: %s", errorMsg)
+	}
 }

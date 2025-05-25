@@ -241,14 +241,35 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 
 		// Check if this is the unsafe package, which is not supported in GoScript
 		if pkg.PkgPath == "unsafe" {
-			// Find which package depends on unsafe by looking at the import graph
+			// Find which packages that would actually be compiled depend on unsafe
 			var dependentPackages []string
 			for _, otherPkg := range pkgs {
 				if otherPkg.PkgPath != "unsafe" {
-					for importPath := range otherPkg.Imports {
-						if importPath == "unsafe" {
-							dependentPackages = append(dependentPackages, otherPkg.PkgPath)
-							break
+					// Check if this package would actually be compiled (same logic as above)
+					wouldBeCompiled := true
+
+					// If the package was not explicitly requested, check if it has a handwritten equivalent
+					if !slices.Contains(patternPkgPaths, otherPkg.PkgPath) {
+						gsSourcePath := "gs/" + otherPkg.PkgPath
+						_, gsErr := gs.GsOverrides.ReadDir(gsSourcePath)
+						if gsErr == nil {
+							// Package has handwritten equivalent, so it wouldn't be compiled
+							wouldBeCompiled = false
+						}
+					}
+
+					// Skip packages that failed to load
+					if len(otherPkg.Errors) > 0 {
+						wouldBeCompiled = false
+					}
+
+					// Only include packages that would actually be compiled and import unsafe
+					if wouldBeCompiled {
+						for importPath := range otherPkg.Imports {
+							if importPath == "unsafe" {
+								dependentPackages = append(dependentPackages, otherPkg.PkgPath)
+								break
+							}
 						}
 					}
 				}
