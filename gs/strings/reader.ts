@@ -80,8 +80,9 @@ export class Reader {
       return [0, io.EOF]
     }
     r!.prevRune = -1
-    n = copy(b, $.sliceString(r!.s, r!.i, undefined))
+    let n = $.copy(b, $.sliceString(r!.s, r!.i, undefined))
     r!.i += n as number
+    let err: $.GoError = null
     return [n, err]
   }
 
@@ -94,7 +95,8 @@ export class Reader {
     if (off >= ($.len(r!.s) as number)) {
       return [0, io.EOF]
     }
-    n = copy(b, $.sliceString(r!.s, off, undefined))
+    let n = $.copy(b, $.sliceString(r!.s, off, undefined))
+    let err: $.GoError = null
     if (n < $.len(b)) {
       err = io.EOF
     }
@@ -139,9 +141,10 @@ export class Reader {
         return [c as number, 1, null]
       }
     }
+    let ch: number, size: number
     ;[ch, size] = utf8.DecodeRuneInString($.sliceString(r!.s, r!.i, undefined))
     r!.i += size as number
-    return [ch, size, err]
+    return [ch, size, null]
   }
 
   // UnreadRune implements the [io.RuneScanner] interface.
@@ -195,12 +198,13 @@ export class Reader {
     }
     let s = $.sliceString(r!.s, r!.i, undefined)
     let m: number
+    let err: $.GoError
     ;[m, err] = io.WriteString(w, s)
     if (m > $.len(s)) {
       $.panic('strings.Reader.WriteTo: invalid WriteString count')
     }
     r!.i += m as number
-    n = m as number
+    let n = m as number
     if (m != $.len(s) && err == null) {
       err = io.ErrShortWrite
     }
@@ -210,7 +214,9 @@ export class Reader {
   // Reset resets the [Reader] to be reading from s.
   public Reset(s: string): void {
     const r = this
-    r!.value = new Reader({})
+    r!.s = s
+    r!.i = 0
+    r!.prevRune = -1
   }
 
   // Register this type with the runtime type system
@@ -441,5 +447,5 @@ export class Reader {
 // NewReader returns a new [Reader] reading from s.
 // It is similar to [bytes.NewBufferString] but more efficient and non-writable.
 export function NewReader(s: string): Reader | null {
-  return new Reader({})
+  return new Reader({ s: s })
 }

@@ -152,16 +152,16 @@ This example imports the `compile` function, configures it to compile a Go packa
 Check [the compliance tests](./compliance/COMPLIANCE.md) for implementation progress.
 
  - [X] Simple programs compile & run
- - [ ] Compliance for basic language features complete
- - [ ] Function coloring and async logic
- - [ ] Work our way up to more complex programs
+ - [X] Compliance for basic language features complete
+ - [X] Function coloring and async logic
+ - [X] Work our way up to more complex programs
+ - [ ] Implement most of the Go standard library
  - [ ] Generate init() function to recursively initialize packages
  - [ ] Tooling to integrate with typescript compiler
  - [ ] "go test" implementation with Go -> Ts transformation
     - vitest
  - [ ] performance testing
  - [ ] examples of calling Go code from TypeScript
-
 
 ## Generated Code
 

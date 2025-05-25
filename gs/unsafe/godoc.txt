@@ -1,0 +1,19 @@
+package unsafe // import "unsafe"
+
+Package unsafe contains operations that step around the type safety of Go
+programs.
+
+Packages that import unsafe may be non-portable and are not protected by the Go
+1 compatibility guidelines.
+
+func Alignof(x ArbitraryType) uintptr
+func Offsetof(x ArbitraryType) uintptr
+func Sizeof(x ArbitraryType) uintptr
+func String(ptr *byte, len IntegerType) string
+func StringData(str string) *byte
+type ArbitraryType int
+    func Slice(ptr *ArbitraryType, len IntegerType) []ArbitraryType
+    func SliceData(slice []ArbitraryType) *ArbitraryType
+type IntegerType int
+type Pointer *ArbitraryType
+    func Add(ptr Pointer, len IntegerType) Pointer

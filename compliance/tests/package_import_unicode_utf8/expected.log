@@ -1,0 +1,12 @@
+Rune count: 9
+First rune: 72 size: 1
+Valid UTF-8: true
+Byte rune count: 9
+First rune from bytes: 72 size: 1
+Valid UTF-8 bytes: true
+Encoded rune size: 3
+Rune length: 3
+Valid rune: true
+RuneSelf: 128
+MaxRune: 1114111
+UTFMax: 4

@@ -1,18 +1,16 @@
 import * as $ from '@goscript/builtin/builtin.js'
-import { makeStringFinder } from './search.gs.js'
-import { Count, HasPrefix } from './strings.gs.js'
-
+import { makeStringFinder, stringFinder } from './search.js'
+import { Count, HasPrefix } from './strings.js'
+import { Builder } from './builder.js'
 import * as io from '@goscript/io/index.js'
-
-import * as sync from '@goscript/sync/index.js'
 
 export class Replacer {
   // guards buildOnce method
-  public get once(): sync.Once {
-    return this._fields.once.value
+  public get built(): boolean {
+    return this._fields.built.value
   }
-  public set once(value: sync.Once) {
-    this._fields.once.value = value
+  public set built(value: boolean) {
+    this._fields.built.value = value
   }
 
   public get r(): replacer {
@@ -30,7 +28,7 @@ export class Replacer {
   }
 
   public _fields: {
-    once: $.VarRef<sync.Once>
+    built: $.VarRef<boolean>
     r: $.VarRef<replacer>
     oldnew: $.VarRef<$.Slice<string>>
   }
@@ -38,12 +36,12 @@ export class Replacer {
   constructor(
     init?: Partial<{
       oldnew?: $.Slice<string>
-      once?: sync.Once
+      built?: boolean
       r?: replacer
     }>,
   ) {
     this._fields = {
-      once: $.varRef(init?.once?.clone() ?? new Once()),
+      built: $.varRef(init?.built ?? false),
       r: $.varRef(init?.r ?? null),
       oldnew: $.varRef(init?.oldnew ?? null),
     }
@@ -52,7 +50,7 @@ export class Replacer {
   public clone(): Replacer {
     const cloned = new Replacer()
     cloned._fields = {
-      once: $.varRef(this._fields.once.value?.clone() ?? null),
+      built: $.varRef(this._fields.built.value),
       r: $.varRef(this._fields.r.value),
       oldnew: $.varRef(this._fields.oldnew.value),
     }
@@ -60,14 +58,31 @@ export class Replacer {
   }
 
   public buildOnce(): void {
+    if (this.built) {
+      return
+    }
     const r = this
-    r!.r = r!.build()
-    r!.oldnew = null
+    const built = r.build()
+    r.r = built
+    r.oldnew = null
+    r.built = true
   }
 
   public build(): replacer {
     const b = this
     let oldnew = b!.oldnew
+
+    // Handle empty case - no replacements to do
+    if ($.len(oldnew) == 0) {
+      return {
+        Replace: (s: string): string => s,
+        WriteString: (w: io.Writer, s: string): [number, $.GoError] => {
+          const bytes = $.stringToBytes(s)
+          return w.Write(bytes)
+        },
+      }
+    }
+
     if ($.len(oldnew) == 2 && $.len(oldnew![0]) > 1) {
       return makeSingleStringReplacer(oldnew![0], oldnew![1])
     }
@@ -81,20 +96,36 @@ export class Replacer {
       }
     }
     if (allNewBytes) {
-      let r = {}
-      for (let i = 0; i < $.len(r); i++) {
-        {
-          r![i] = $.byte(i)
-        }
+      let r: number[] = new Array(256)
+      for (let i = 0; i < r.length; i++) {
+        r[i] = i
       }
       // The first occurrence of old->new map takes precedence
       // over the others with the same old string.
       for (let i = $.len(oldnew) - 2; i >= 0; i -= 2) {
         let o = $.indexString(oldnew![i], 0)
         let n = $.indexString(oldnew![i + 1], 0)
-        r![o] = n
+        r[o] = n
       }
-      return r
+      return {
+        Replace: (s: string): string => {
+          let result = ''
+          for (let i = 0; i < s.length; i++) {
+            const charCode = s.charCodeAt(i)
+            if (charCode < 256) {
+              result += String.fromCharCode(r[charCode])
+            } else {
+              result += s[i]
+            }
+          }
+          return result
+        },
+        WriteString: (w: io.Writer, s: string): [number, $.GoError] => {
+          const replaced = this.Replace(s)
+          const bytes = $.stringToBytes(replaced)
+          return w.Write(bytes)
+        },
+      }
     }
     let r = new byteStringReplacer({
       toReplace: $.makeSlice<string>(0, $.len(oldnew) / 2),
@@ -124,15 +155,15 @@ export class Replacer {
   // Replace returns a copy of s with all replacements performed.
   public Replace(s: string): string {
     const r = this
-    r!.once.Do(r!.buildOnce)
-    return r!.r!.Replace(s)
+    r.buildOnce()
+    return r.r!.Replace(s)
   }
 
   // WriteString writes s to w with all replacements performed.
   public WriteString(w: io.Writer, s: string): [number, $.GoError] {
     const r = this
-    r!.once.Do(r!.buildOnce)
-    return r!.r!.WriteString(w, s)
+    r.buildOnce()
+    return r.r!.WriteString(w, s)
   }
 
   // Register this type with the runtime type system
@@ -175,7 +206,7 @@ export class Replacer {
     ],
     Replacer,
     {
-      once: 'Once',
+      built: { kind: $.TypeKind.Basic, name: 'boolean' },
       r: 'replacer',
       oldnew: {
         kind: $.TypeKind.Slice,
@@ -235,7 +266,7 @@ export function NewReplacer(...oldnew: string[]): Replacer | null {
   if ($.len(oldnew) % 2 == 1) {
     $.panic('strings.NewReplacer: odd argument count')
   }
-  return new Replacer({ oldnew: $.append(null, oldnew) })
+  return new Replacer({ oldnew: $.append(null, ...oldnew) })
 }
 
 class trieNode {
@@ -511,6 +542,9 @@ class genericReplacer {
     let bestPriority = 0
     let node = r!.root
     let n = 0
+    let val: string = ''
+    let keylen: number = 0
+    let found: boolean = false
     for (; node != null; ) {
       if (node!.priority > bestPriority && !(ignoreRoot && node === r!.root)) {
         bestPriority = node!.priority
@@ -527,13 +561,13 @@ class genericReplacer {
         if ((index as number) == r!.tableSize) {
           break
         }
-        node = node!.table![index]
+        node = node!.table![index]!
         s = $.sliceString(s, 1, undefined)
         n++
       } else if (node!.prefix != '' && HasPrefix(s, node!.prefix)) {
         n += $.len(node!.prefix)
         s = $.sliceString(s, $.len(node!.prefix), undefined)
-        node = node!.next
+        node = node!.next!
       } else {
         break
       }
@@ -543,15 +577,45 @@ class genericReplacer {
 
   public Replace(s: string): string {
     const r = this
-    let buf = new Uint8Array(0)
-    r!.WriteString(buf, s)
-    return $.bytesToString(buf)
+    let result = ''
+    let last = 0
+    for (let i = 0; i <= $.len(s); ) {
+      // Fast path: s[i] is not a prefix of any pattern.
+      if (i != $.len(s) && r!.root.priority == 0) {
+        let index = r!.mapping![$.indexString(s, i)] as number
+        if (index == r!.tableSize || r!.root.table![index] == null) {
+          i++
+          continue
+        }
+      }
+
+      // Ignore the empty match iff the previous loop found the empty match.
+      let [val, keylen, match] = r!.lookup(
+        $.sliceString(s, i, undefined),
+        false,
+      )
+      if (match) {
+        result += $.sliceString(s, last, i)
+        result += val
+        i += keylen
+        last = i
+        continue
+      }
+      i++
+    }
+    if (last != $.len(s)) {
+      result += $.sliceString(s, last, undefined)
+    }
+    return result
   }
 
   public WriteString(w: io.Writer, s: string): [number, $.GoError] {
     const r = this
     let sw = getStringWriter(w)
-    let [last, wn] = []
+    let last: number = 0
+    let wn: number = 0
+    let n: number = 0
+    let err: $.GoError | null = null
     let prevMatchEmpty: boolean = false
     for (let i = 0; i <= $.len(s); ) {
       // Fast path: s[i] is not a prefix of any pattern.
@@ -713,7 +777,7 @@ class stringWriter {
 
   constructor(init?: Partial<{ w?: io.Writer }>) {
     this._fields = {
-      w: $.varRef(init?.w ?? null),
+      w: $.varRef(init?.w!),
     }
   }
 
@@ -769,7 +833,7 @@ export function getStringWriter(w: io.Writer): io.StringWriter {
     'io.StringWriter',
   )
   if (!ok) {
-    sw = new stringWriter({})
+    sw = new stringWriter({ w: w })
   }
   return sw
 }
@@ -838,7 +902,10 @@ class singleStringReplacer {
   public WriteString(w: io.Writer, s: string): [number, $.GoError] {
     const r = this
     let sw = getStringWriter(w)
-    let [i, wn] = []
+    let i: number = 0
+    let wn: number = 0
+    let n: number = 0
+    let err: $.GoError | null = null
     for (;;) {
       let match = r!.finder!.next($.sliceString(s, i, undefined))
       if (match == -1) {
@@ -1080,133 +1147,6 @@ class byteStringReplacer {
           new Uint8Array(0),
           new Uint8Array(0),
           new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
-          new Uint8Array(0),
         ],
       ),
       toReplace: $.varRef(init?.toReplace ?? null),
@@ -1276,6 +1216,8 @@ class byteStringReplacer {
     const r = this
     let sw = getStringWriter(w)
     let last = 0
+    let n: number = 0
+    let err: $.GoError | null = null
     for (let i = 0; i < $.len(s); i++) {
       let b = $.indexString(s, i)
       if (r!.replacements![b] == null) {
@@ -1296,9 +1238,7 @@ class byteStringReplacer {
       }
     }
     if (last != $.len(s)) {
-      let nw: number = ((0)[(nw, err)] = sw!.WriteString(
-        $.sliceString(s, last, undefined),
-      ))
+      let [nw, err] = sw!.WriteString($.sliceString(s, last, undefined))
       n += nw
     }
     return [n, err]
@@ -1359,3 +1299,12 @@ class byteStringReplacer {
 }
 
 let countCutOff: number = 8
+
+// Helper function to copy bytes
+function copy(dst: Uint8Array, src: Uint8Array): number {
+  const n = Math.min(dst.length, src.length)
+  for (let i = 0; i < n; i++) {
+    dst[i] = src[i]
+  }
+  return n
+}

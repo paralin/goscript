@@ -1,0 +1,22 @@
+package utf8 // import "unicode/utf8"
+
+Package utf8 implements functions and constants to support text encoded
+in UTF-8. It includes functions to translate between runes and UTF-8 byte
+sequences. See https://en.wikipedia.org/wiki/UTF-8
+
+const RuneError = '\uFFFD' ...
+func AppendRune(p []byte, r rune) []byte
+func DecodeLastRune(p []byte) (r rune, size int)
+func DecodeLastRuneInString(s string) (r rune, size int)
+func DecodeRune(p []byte) (r rune, size int)
+func DecodeRuneInString(s string) (r rune, size int)
+func EncodeRune(p []byte, r rune) int
+func FullRune(p []byte) bool
+func FullRuneInString(s string) bool
+func RuneCount(p []byte) int
+func RuneCountInString(s string) (n int)
+func RuneLen(r rune) int
+func RuneStart(b byte) bool
+func Valid(p []byte) bool
+func ValidRune(r rune) bool
+func ValidString(s string) bool

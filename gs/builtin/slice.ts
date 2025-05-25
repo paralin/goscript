@@ -27,9 +27,29 @@ export type Slice<T> =
   | null
   | (T extends number ? Uint8Array : never)
 
-// asArray type-asserts a slice to an array type.
+// asArray converts a slice to a JavaScript array.
 export function asArray<T>(slice: Slice<T>): T[] {
-  return slice as T[]
+  if (slice === null || slice === undefined) {
+    return []
+  }
+
+  if (slice instanceof Uint8Array) {
+    return Array.from(slice) as T[]
+  }
+
+  if (isComplexSlice(slice)) {
+    const result: T[] = []
+    for (let i = 0; i < slice.__meta__.length; i++) {
+      result.push(slice.__meta__.backing[slice.__meta__.offset + i])
+    }
+    return result
+  }
+
+  if (Array.isArray(slice)) {
+    return slice
+  }
+
+  return []
 }
 
 /**

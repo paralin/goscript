@@ -1,7 +1,12 @@
-import * as $ from '@goscript/builtin/builtin.js'
-import { HasPrefix } from './strings.gs.js'
+import * as $ from '@goscript/builtin/index.js'
+import { HasPrefix } from './strings.js'
 
-class stringFinder {
+// Helper function for max of two numbers
+function max(a: number, b: number): number {
+  return a > b ? a : b
+}
+
+export class stringFinder {
   // pattern is the string that we are searching for in the text.
   public get pattern(): string {
     return this._fields.pattern.value
@@ -193,7 +198,7 @@ export function makeStringFinder(pattern: string): stringFinder | null {
   return f
 }
 
-export function longestCommonSuffix(a: string, b: string): [number] {
+export function longestCommonSuffix(a: string, b: string): number {
   let i: number = 0
   {
     for (; i < $.len(a) && i < $.len(b); i++) {
@@ -203,6 +208,6 @@ export function longestCommonSuffix(a: string, b: string): [number] {
         break
       }
     }
-    return [i]
+    return i
   }
 }

@@ -1,0 +1,52 @@
+package unicode // import "unicode"
+
+Package unicode provides data and functions to test some properties of Unicode
+code points.
+
+const MaxRune = '\U0010FFFF' ...
+const UpperCase = iota ...
+const UpperLower = MaxRune + 1
+const Version = "15.0.0"
+var Cc = _Cc ...
+var Adlam = _Adlam ...
+var ASCII_Hex_Digit = _ASCII_Hex_Digit ...
+var CaseRanges = _CaseRanges
+var Categories = map[string]*RangeTable{ ... }
+var FoldCategory = map[string]*RangeTable{ ... }
+var FoldScript = map[string]*RangeTable{ ... }
+var GraphicRanges = []*RangeTable{ ... }
+var PrintRanges = []*RangeTable{ ... }
+var Properties = map[string]*RangeTable{ ... }
+var Scripts = map[string]*RangeTable{ ... }
+func In(r rune, ranges ...*RangeTable) bool
+func Is(rangeTab *RangeTable, r rune) bool
+func IsControl(r rune) bool
+func IsDigit(r rune) bool
+func IsGraphic(r rune) bool
+func IsLetter(r rune) bool
+func IsLower(r rune) bool
+func IsMark(r rune) bool
+func IsNumber(r rune) bool
+func IsOneOf(ranges []*RangeTable, r rune) bool
+func IsPrint(r rune) bool
+func IsPunct(r rune) bool
+func IsSpace(r rune) bool
+func IsSymbol(r rune) bool
+func IsTitle(r rune) bool
+func IsUpper(r rune) bool
+func SimpleFold(r rune) rune
+func To(_case int, r rune) rune
+func ToLower(r rune) rune
+func ToTitle(r rune) rune
+func ToUpper(r rune) rune
+type CaseRange struct{ ... }
+type Range16 struct{ ... }
+type Range32 struct{ ... }
+type RangeTable struct{ ... }
+type SpecialCase []CaseRange
+    var AzeriCase SpecialCase = _TurkishCase
+    var TurkishCase SpecialCase = _TurkishCase
+
+BUG: There is no mechanism for full case folding, that is, for
+characters that involve multiple runes in the input or output.
+

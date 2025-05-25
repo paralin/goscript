@@ -1,11 +1,21 @@
 import * as $ from '@goscript/builtin/builtin.js'
-import { Index, IndexByte } from './strings.gs.js'
+import { Index, IndexByte } from './strings.js'
 
 import * as iter from '@goscript/iter/index.js'
 
 import * as unicode from '@goscript/unicode/index.js'
 
 import * as utf8 from '@goscript/unicode/utf8/index.js'
+
+// ASCII space characters lookup map
+const asciiSpace: { [key: number]: boolean } = {
+  9: true, // \t
+  10: true, // \n
+  11: true, // \v
+  12: true, // \f
+  13: true, // \r
+  32: true, // space
+}
 
 // Lines returns an iterator over the newline-terminated lines in the string s.
 // The lines yielded by the iterator include their terminating newlines.
@@ -100,7 +110,7 @@ export function FieldsSeq(s: string): iter.Seq<string> {
     for (let i = 0; i < $.len(s); ) {
       let size = 1
       let r = $.indexString(s, i) as number
-      let isSpace = asciiSpace![$.indexString(s, i)] != 0
+      let isSpace = asciiSpace[$.indexString(s, i)] === true
       if (r >= utf8.RuneSelf) {
         ;[r, size] = utf8.DecodeRuneInString($.sliceString(s, i, undefined))
         isSpace = unicode.IsSpace(r)
@@ -132,6 +142,9 @@ export function FieldsFuncSeq(
   f: ((p0: number) => boolean) | null,
 ): iter.Seq<string> {
   return (_yield: ((p0: string) => boolean) | null): void => {
+    if (f === null) {
+      return
+    }
     let start = -1
     for (let i = 0; i < $.len(s); ) {
       let size = 1
@@ -139,7 +152,7 @@ export function FieldsFuncSeq(
       if (r >= utf8.RuneSelf) {
         ;[r, size] = utf8.DecodeRuneInString($.sliceString(s, i, undefined))
       }
-      if (f!(r)) {
+      if (f(r)) {
         if (start >= 0) {
           if (!_yield!($.sliceString(s, start, i))) {
             return

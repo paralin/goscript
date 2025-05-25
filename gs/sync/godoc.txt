@@ -1,0 +1,21 @@
+package sync // import "sync"
+
+Package sync provides basic synchronization primitives such as mutual exclusion
+locks. Other than the Once and WaitGroup types, most are intended for use by
+low-level library routines. Higher-level synchronization is better done via
+channels and communication.
+
+Values containing the types defined in this package should not be copied.
+
+func OnceFunc(f func()) func()
+func OnceValue[T any](f func() T) func() T
+func OnceValues[T1, T2 any](f func() (T1, T2)) func() (T1, T2)
+type Cond struct{ ... }
+    func NewCond(l Locker) *Cond
+type Locker interface{ ... }
+type Map struct{ ... }
+type Mutex struct{ ... }
+type Once struct{ ... }
+type Pool struct{ ... }
+type RWMutex struct{ ... }
+type WaitGroup struct{ ... }

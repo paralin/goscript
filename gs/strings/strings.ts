@@ -161,7 +161,7 @@ export function Split(s: string, sep: string): $.Slice<string> {
 
 // SplitN slices s into substrings separated by sep and returns a slice of the substrings between those separators.
 export function SplitN(s: string, sep: string, n: number): $.Slice<string> {
-  if (n <= 0) {
+  if (n == 0) {
     return $.arrayToSlice([])
   }
   if (n === 1) {
@@ -169,11 +169,14 @@ export function SplitN(s: string, sep: string, n: number): $.Slice<string> {
   }
   if (sep === '') {
     const chars = [...s]
+    if (n < 0) {
+      return $.arrayToSlice(chars)
+    }
     return $.arrayToSlice(chars.slice(0, n))
   }
 
   const parts = s.split(sep)
-  if (parts.length <= n) {
+  if (n < 0 || parts.length <= n) {
     return $.arrayToSlice(parts)
   }
 
@@ -193,11 +196,14 @@ export function SplitAfterN(
   sep: string,
   n: number,
 ): $.Slice<string> {
-  if (n <= 0) {
+  if (n == 0) {
     return $.arrayToSlice([])
   }
   if (sep === '') {
     const chars = [...s]
+    if (n < 0) {
+      return $.arrayToSlice(chars)
+    }
     return $.arrayToSlice(chars.slice(0, n))
   }
 
@@ -205,7 +211,7 @@ export function SplitAfterN(
   let start = 0
   let count = 0
 
-  while (count < n - 1) {
+  while (n < 0 || count < n - 1) {
     const index = s.indexOf(sep, start)
     if (index === -1) break
     parts.push(s.slice(start, index + sep.length))
@@ -267,7 +273,11 @@ export function FieldsFunc(
 
 // Join concatenates the elements of elems to create a single string. The separator string sep is placed between elements in the resulting string.
 export function Join(elems: $.Slice<string>, sep: string): string {
-  return $.asArray(elems).join(sep)
+  const arr = $.asArray(elems)
+  if (!Array.isArray(arr)) {
+    return ''
+  }
+  return arr.join(sep)
 }
 
 // HasPrefix tests whether the string s begins with prefix.

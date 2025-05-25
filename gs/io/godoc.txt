@@ -1,0 +1,61 @@
+package io // import "io"
+
+Package io provides basic interfaces to I/O primitives. Its primary job is to
+wrap existing implementations of such primitives, such as those in package os,
+into shared public interfaces that abstract the functionality, plus some other
+related primitives.
+
+Because these interfaces and primitives wrap lower-level operations with various
+implementations, unless otherwise informed clients should not assume they are
+safe for parallel execution.
+
+const SeekStart = 0 ...
+var EOF = errors.New("EOF")
+var ErrClosedPipe = errors.New("io: read/write on closed pipe")
+var ErrNoProgress = errors.New("multiple Read calls return no data or error")
+var ErrShortBuffer = errors.New("short buffer")
+var ErrShortWrite = errors.New("short write")
+var ErrUnexpectedEOF = errors.New("unexpected EOF")
+func Copy(dst Writer, src Reader) (written int64, err error)
+func CopyBuffer(dst Writer, src Reader, buf []byte) (written int64, err error)
+func CopyN(dst Writer, src Reader, n int64) (written int64, err error)
+func Pipe() (*PipeReader, *PipeWriter)
+func ReadAll(r Reader) ([]byte, error)
+func ReadAtLeast(r Reader, buf []byte, min int) (n int, err error)
+func ReadFull(r Reader, buf []byte) (n int, err error)
+func WriteString(w Writer, s string) (n int, err error)
+type ByteReader interface{ ... }
+type ByteScanner interface{ ... }
+type ByteWriter interface{ ... }
+type Closer interface{ ... }
+type LimitedReader struct{ ... }
+type OffsetWriter struct{ ... }
+    func NewOffsetWriter(w WriterAt, off int64) *OffsetWriter
+type PipeReader struct{ ... }
+type PipeWriter struct{ ... }
+type ReadCloser interface{ ... }
+    func NopCloser(r Reader) ReadCloser
+type ReadSeekCloser interface{ ... }
+type ReadSeeker interface{ ... }
+type ReadWriteCloser interface{ ... }
+type ReadWriteSeeker interface{ ... }
+type ReadWriter interface{ ... }
+type Reader interface{ ... }
+    func LimitReader(r Reader, n int64) Reader
+    func MultiReader(readers ...Reader) Reader
+    func TeeReader(r Reader, w Writer) Reader
+type ReaderAt interface{ ... }
+type ReaderFrom interface{ ... }
+type RuneReader interface{ ... }
+type RuneScanner interface{ ... }
+type SectionReader struct{ ... }
+    func NewSectionReader(r ReaderAt, off int64, n int64) *SectionReader
+type Seeker interface{ ... }
+type StringWriter interface{ ... }
+type WriteCloser interface{ ... }
+type WriteSeeker interface{ ... }
+type Writer interface{ ... }
+    var Discard Writer = discard{}
+    func MultiWriter(writers ...Writer) Writer
+type WriterAt interface{ ... }
+type WriterTo interface{ ... }

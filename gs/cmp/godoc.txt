@@ -1,0 +1,8 @@
+package cmp // import "cmp"
+
+Package cmp provides types and functions related to comparing ordered values.
+
+func Compare[T Ordered](x, y T) int
+func Less[T Ordered](x, y T) bool
+func Or[T comparable](vals ...T) T
+type Ordered interface{ ... }
