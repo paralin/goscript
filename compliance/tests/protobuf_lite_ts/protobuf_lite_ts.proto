@@ -1,0 +1,7 @@
+syntax = "proto3";
+package main;
+
+message ExampleMsg {
+    bytes example_field = 1;
+    string example_text = 2;
+}

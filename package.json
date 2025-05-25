@@ -83,6 +83,7 @@
     "./{src,builtin,example}/**/(*.ts|*.tsx|*.html|*.css|*.scss)": "prettier --config .prettierrc.yaml --write"
   },
   "devDependencies": {
+    "@aptre/protobuf-es-lite": "^0.4.9",
     "@eslint/js": "^9.25.1",
     "@types/node": "^22.15.18",
     "@typescript-eslint/eslint-plugin": "^8.31.0",

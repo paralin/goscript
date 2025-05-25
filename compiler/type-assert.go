@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"strings"
 )
 
@@ -191,6 +192,92 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 		c.tsw.WriteLine("")
 
 		// Assign temporary ok to the ok variable (e.g., okName = _gs_ta_ok_; or let okName = ...)
+		if !okIsBlank {
+			if okIsNewInDefine { // okIsNewInDefine was determined earlier based on tok == token.DEFINE and Defs check
+				c.tsw.WriteLiterally("let ")
+			}
+			c.tsw.WriteLiterally(okName)
+			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally(tempOkName)
+			c.tsw.WriteLine("")
+		}
+
+	case *ast.IndexExpr:
+		// Handle slice[index], ok := expr.(Type) or map[key], ok := expr.(Type)
+		// Use unique temporary variable names to avoid redeclaration
+		tempValName := fmt.Sprintf("_gs_ta_val_%d_", vLHS.Pos()) // Unique name based on AST position
+		tempOkName := fmt.Sprintf("_gs_ta_ok_%d_", vLHS.Pos())   // Unique name based on AST position
+
+		// Declare temporary variables:
+		// let _gs_ta_val_N_: AssertedTypeTS;
+		c.tsw.WriteLiterally("let ")
+		c.tsw.WriteLiterally(tempValName)
+		c.tsw.WriteLiterally(": ")
+		c.WriteTypeExpr(assertedType) // TypeScript type for assertedType
+		c.tsw.WriteLine("")
+
+		// let _gs_ta_ok_N_: boolean;
+		c.tsw.WriteLiterally("let ")
+		c.tsw.WriteLiterally(tempOkName)
+		c.tsw.WriteLiterally(": boolean")
+		c.tsw.WriteLine("")
+
+		// Perform type assertion into temporary variables:
+		// ({ value: _gs_ta_val_N_, ok: _gs_ta_ok_N_ } = $.typeAssert<AssertedTypeTS>(expr, "GoTypeStr"));
+		c.tsw.WriteLiterally("({ value: ")
+		c.tsw.WriteLiterally(tempValName)
+		c.tsw.WriteLiterally(", ok: ")
+		c.tsw.WriteLiterally(tempOkName)
+		c.tsw.WriteLiterally(" } = $.typeAssert<")
+		c.WriteTypeExpr(assertedType) // Generic: <AssertedTypeTS>
+		c.tsw.WriteLiterally(">(")
+		if err := c.WriteValueExpr(interfaceExpr); err != nil { // Arg1: interfaceExpr
+			return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
+		}
+		c.tsw.WriteLiterally(", ")
+		c.writeTypeDescription(assertedType) // Arg2: type info for runtime
+		c.tsw.WriteLine("))")
+
+		// Check if this is a map assignment and handle it specially
+		if tv, ok := c.pkg.TypesInfo.Types[vLHS.X]; ok {
+			if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
+				// Map assignment: use $.mapSet(map, key, value)
+				c.tsw.WriteLiterally("$.mapSet(")
+				if err := c.WriteValueExpr(vLHS.X); err != nil { // Map
+					return fmt.Errorf("failed to write map expression in type assertion: %w", err)
+				}
+				c.tsw.WriteLiterally(", ")
+				if err := c.WriteValueExpr(vLHS.Index); err != nil { // Key
+					return fmt.Errorf("failed to write map key expression in type assertion: %w", err)
+				}
+				c.tsw.WriteLiterally(", ")
+				c.tsw.WriteLiterally(tempValName) // Value
+				c.tsw.WriteLine(")")
+			} else {
+				// Array/slice assignment: use direct assignment
+				// slice[index] = _gs_ta_val_N_;
+				if err := c.WriteValueExpr(vLHS.X); err != nil { // Array/slice
+					return fmt.Errorf("failed to write array/slice expression in type assertion: %w", err)
+				}
+				c.tsw.WriteLiterally("![")                           // Non-null assertion
+				if err := c.WriteValueExpr(vLHS.Index); err != nil { // Index
+					return fmt.Errorf("failed to write array/slice index expression in type assertion: %w", err)
+				}
+				c.tsw.WriteLiterally("] = ")
+				c.tsw.WriteLiterally(tempValName)
+				c.tsw.WriteLine("")
+			}
+		} else {
+			// Fallback: try direct assignment (might fail for maps)
+			if err := c.WriteValueExpr(vLHS); err != nil { // Writes indexed expression
+				return fmt.Errorf("failed to write LHS indexed expression in type assertion: %w", err)
+			}
+			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally(tempValName)
+			c.tsw.WriteLine("")
+		}
+
+		// Assign temporary ok to the ok variable (e.g., okName = _gs_ta_ok_N_; or let okName = ...)
 		if !okIsBlank {
 			if okIsNewInDefine { // okIsNewInDefine was determined earlier based on tok == token.DEFINE and Defs check
 				c.tsw.WriteLiterally("let ")
