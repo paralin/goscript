@@ -18,10 +18,14 @@ export type SliceProxy<T> = T[] & {
 /**
  * Slice<T> is a union type that is either a plain array or a proxy
  * null represents the nil state.
- * 
+ *
  * Slice<number> can be represented as Uint8Array.
  */
-export type Slice<T> = T[] | SliceProxy<T> | null | (T extends number ? Uint8Array : never)
+export type Slice<T> =
+  | T[]
+  | SliceProxy<T>
+  | null
+  | (T extends number ? Uint8Array : never)
 
 // asArray type-asserts a slice to an array type.
 export function asArray<T>(slice: Slice<T>): T[] {
@@ -47,53 +51,64 @@ function isComplexSlice<T>(slice: Slice<T>): slice is SliceProxy<T> {
  * @param capacity The capacity of the slice (optional).
  * @returns A new slice.
  */
-export const makeSlice = <T>(length: number, capacity?: number, typeHint?: string): Slice<T> => {
-  if (typeHint === "byte") {
+export const makeSlice = <T>(
+  length: number,
+  capacity?: number,
+  typeHint?: string,
+): Slice<T> => {
+  if (typeHint === 'byte') {
     // Uint8Array is initialized to zeros by default.
     // Capacity for Uint8Array is its length.
-    return new Uint8Array(length) as Slice<T>;
+    return new Uint8Array(length) as Slice<T>
   }
 
-  const actualCapacity = capacity === undefined ? length : capacity;
+  const actualCapacity = capacity === undefined ? length : capacity
   if (length < 0 || actualCapacity < 0 || length > actualCapacity) {
     throw new Error(
       `Invalid slice length (${length}) or capacity (${actualCapacity})`,
-    );
+    )
   }
 
-  let zeroVal: any;
+  let zeroVal: any
   switch (typeHint) {
-    case "number": zeroVal = 0; break;
-    case "boolean": zeroVal = false; break;
-    case "string": zeroVal = ""; break;
-    default: zeroVal = null; // Default for objects, complex types, or unspecified
+    case 'number':
+      zeroVal = 0
+      break
+    case 'boolean':
+      zeroVal = false
+      break
+    case 'string':
+      zeroVal = ''
+      break
+    default:
+      zeroVal = null // Default for objects, complex types, or unspecified
   }
 
-  const backingArr = new Array<T>(actualCapacity);
+  const backingArr = new Array<T>(actualCapacity)
   // Initialize the relevant part of the backing array
   for (let i = 0; i < length; i++) {
-    backingArr[i] = zeroVal;
+    backingArr[i] = zeroVal
   }
   // The rest of backingArr (from length to actualCapacity-1) remains uninitialized (undefined),
   // representing available capacity.
 
   // The proxyTargetArray serves as the shell for the proxy.
   // Its elements up to 'length' should reflect the initialized part of the slice.
-  const proxyTargetArray = new Array<T>(length);
+  const proxyTargetArray = new Array<T>(length)
   for (let i = 0; i < length; i++) {
-    proxyTargetArray[i] = backingArr[i]; // Or simply zeroVal
+    proxyTargetArray[i] = backingArr[i] // Or simply zeroVal
   }
 
-  const proxy = proxyTargetArray as SliceProxy<T>;
+  const proxy = proxyTargetArray as SliceProxy<T>
   proxy.__meta__ = {
     backing: backingArr,
     offset: 0,
     length: length,
     capacity: actualCapacity,
-  };
+  }
 
-  return proxy;
-};
+  return proxy
+}
 
 /**
  * goSlice creates a slice from s[low:high:max]
@@ -174,30 +189,35 @@ export const goSlice = <T>( // T can be number for Uint8Array case
 
       return Reflect.set(target, prop, value)
     },
-  };
+  }
 
   if (s instanceof Uint8Array) {
-    const actualLow = low ?? 0;
-    const actualHigh = high ?? s.length;
+    const actualLow = low ?? 0
+    const actualHigh = high ?? s.length
 
     if (actualLow < 0 || actualHigh < actualLow || actualHigh > s.length) {
-      throw new Error(`Invalid slice indices: low ${actualLow}, high ${actualHigh} for Uint8Array of length ${s.length}`);
+      throw new Error(
+        `Invalid slice indices: low ${actualLow}, high ${actualHigh} for Uint8Array of length ${s.length}`,
+      )
     }
 
-    const subArrayView = s.subarray(actualLow, actualHigh); // This is Uint8Array
+    const subArrayView = s.subarray(actualLow, actualHigh) // This is Uint8Array
 
     if (max !== undefined) {
-      if (max < actualHigh || max > s.length) { // max is relative to the original s.length (capacity)
-        throw new Error(`Invalid max index: ${max}. Constraints: low ${actualLow} <= high ${actualHigh} <= max <= original_length ${s.length}`);
+      if (max < actualHigh || max > s.length) {
+        // max is relative to the original s.length (capacity)
+        throw new Error(
+          `Invalid max index: ${max}. Constraints: low ${actualLow} <= high ${actualHigh} <= max <= original_length ${s.length}`,
+        )
       }
 
-      const newLength = subArrayView.length; // actualHigh - actualLow
-      const newCap = max - actualLow; // Capacity of the new slice view
+      const newLength = subArrayView.length // actualHigh - actualLow
+      const newCap = max - actualLow // Capacity of the new slice view
 
       if (newCap !== newLength) {
         // Capacity is different from length, so return SliceProxy<number>
         // The original s was Uint8Array, so T is effectively 'number' for this path.
-        const backingNumbers = Array.from(subArrayView); // Convert Uint8Array data to number[]
+        const backingNumbers = Array.from(subArrayView) // Convert Uint8Array data to number[]
 
         const proxyTarget = {
           __meta__: {
@@ -206,16 +226,19 @@ export const goSlice = <T>( // T can be number for Uint8Array case
             length: newLength,
             capacity: newCap,
           },
-        };
+        }
         // Explicitly cast to Slice<T> after ensuring T is number for this branch.
-        return new Proxy(proxyTarget, handler) as unknown as SliceProxy<number> as Slice<T>;
+        return new Proxy(
+          proxyTarget,
+          handler,
+        ) as unknown as SliceProxy<number> as Slice<T>
       } else {
         // newCap === newLength, standard Uint8Array is fine.
-        return subArrayView as Slice<T>; // T is number
+        return subArrayView as Slice<T> // T is number
       }
     } else {
       // max is not defined, return the Uint8Array subarray view directly.
-      return subArrayView as Slice<T>; // T is number
+      return subArrayView as Slice<T> // T is number
     }
   }
 
@@ -416,8 +439,15 @@ export const arrayToSlice = <T>(
  * @returns The length of the collection.
  */
 export const len = <T = unknown, V = unknown>(
-  obj: string | Array<T> | Slice<T> | Map<T, V> |
-   Set<T> | Uint8Array | null | undefined,
+  obj:
+    | string
+    | Array<T>
+    | Slice<T>
+    | Map<T, V>
+    | Set<T>
+    | Uint8Array
+    | null
+    | undefined,
 ): number => {
   if (obj === null || obj === undefined) {
     return 0
@@ -443,7 +473,7 @@ export const len = <T = unknown, V = unknown>(
     return obj.length
   }
 
-  throw new Error("cannot determine len of this type")
+  throw new Error('cannot determine len of this type')
 }
 
 /**
@@ -457,7 +487,7 @@ export const cap = <T>(obj: Slice<T> | Uint8Array): number => {
   }
 
   if (obj instanceof Uint8Array) {
-    return obj.length; // Uint8Array capacity is its length
+    return obj.length // Uint8Array capacity is its length
   }
 
   if (isComplexSlice(obj)) {
@@ -479,132 +509,148 @@ export const cap = <T>(obj: Slice<T> | Uint8Array): number => {
  * @param elements The elements to append.
  * @returns The modified or new slice.
  */
-export const append = <T>(slice: Slice<T> | Uint8Array, ...elements: any[]): Slice<T> => {
+export const append = <T>(
+  slice: Slice<T> | Uint8Array,
+  ...elements: any[]
+): Slice<T> => {
   // 1. Flatten all elements from the varargs `...elements` into `varargsElements`.
   // Determine if the result should be a Uint8Array.
-  const inputIsUint8Array = slice instanceof Uint8Array;
-  const appendingUint8Array = elements.some(el => el instanceof Uint8Array);
-  const produceUint8Array = inputIsUint8Array || appendingUint8Array || (slice === null && appendingUint8Array);
+  const inputIsUint8Array = slice instanceof Uint8Array
+  const appendingUint8Array = elements.some((el) => el instanceof Uint8Array)
+  const produceUint8Array =
+    inputIsUint8Array ||
+    appendingUint8Array ||
+    (slice === null && appendingUint8Array)
 
   // If producing Uint8Array, all elements must be numbers and potentially flattened from other Uint8Arrays/number slices.
   if (produceUint8Array) {
-    let combinedBytes: number[] = [];
+    let combinedBytes: number[] = []
     // Add bytes from the original slice if it exists and is numeric.
     if (inputIsUint8Array) {
-      combinedBytes.push(...Array.from(slice as Uint8Array));
-    } else if (slice !== null && slice !== undefined) { // Original was Slice<number> or number[]
-      const sliceLen = len(slice);
+      combinedBytes.push(...Array.from(slice as Uint8Array))
+    } else if (slice !== null && slice !== undefined) {
+      // Original was Slice<number> or number[]
+      const sliceLen = len(slice)
       for (let i = 0; i < sliceLen; i++) {
-        const val = (slice as any)[i];
+        const val = (slice as any)[i]
         if (typeof val !== 'number') {
-          throw new Error("Cannot produce Uint8Array: original slice contains non-number elements.");
+          throw new Error(
+            'Cannot produce Uint8Array: original slice contains non-number elements.',
+          )
         }
-        combinedBytes.push(val);
+        combinedBytes.push(val)
       }
     }
     // Add bytes from the varargs elements.
     // For Uint8Array, elements are always flattened if they are slices/Uint8Arrays.
     for (const item of elements) {
       if (item instanceof Uint8Array) {
-        combinedBytes.push(...Array.from(item));
+        combinedBytes.push(...Array.from(item))
       } else if (isComplexSlice(item) || Array.isArray(item)) {
-        const itemLen = len(item as Slice<any>);
+        const itemLen = len(item as Slice<any>)
         for (let i = 0; i < itemLen; i++) {
-          const val = (item as any)[i];
+          const val = (item as any)[i]
           if (typeof val !== 'number') {
-            throw new Error("Cannot produce Uint8Array: appended elements contain non-numbers.");
+            throw new Error(
+              'Cannot produce Uint8Array: appended elements contain non-numbers.',
+            )
           }
-          combinedBytes.push(val);
+          combinedBytes.push(val)
         }
       } else {
         if (typeof item !== 'number') {
-          throw new Error("Cannot produce Uint8Array: appended elements contain non-numbers.");
+          throw new Error(
+            'Cannot produce Uint8Array: appended elements contain non-numbers.',
+          )
         }
-        combinedBytes.push(item);
+        combinedBytes.push(item)
       }
     }
-    const newArr = new Uint8Array(combinedBytes.length);
-    newArr.set(combinedBytes);
-    return newArr as Slice<T>;
+    const newArr = new Uint8Array(combinedBytes.length)
+    newArr.set(combinedBytes)
+    return newArr as Slice<T>
   }
 
   // Handle generic Slice<T> (non-Uint8Array result).
   // In this case, `elements` are treated as individual items to append,
   // as the Go transpiler is responsible for spreading (`...`) if needed.
-  const numAdded = elements.length;
+  const numAdded = elements.length
 
   if (numAdded === 0) {
-    return slice;
+    return slice
   }
 
-  let originalElements: T[] = [];
-  let oldCapacity: number;
-  let isOriginalComplex = false;
-  let originalBacking: T[] | undefined = undefined;
-  let originalOffset = 0;
+  let originalElements: T[] = []
+  let oldCapacity: number
+  let isOriginalComplex = false
+  let originalBacking: T[] | undefined = undefined
+  let originalOffset = 0
 
   if (slice === null || slice === undefined) {
-    oldCapacity = 0;
+    oldCapacity = 0
   } else if (isComplexSlice(slice)) {
-    const meta = slice.__meta__;
-    for(let i=0; i < meta.length; i++) originalElements.push(meta.backing[meta.offset + i]);
-    oldCapacity = meta.capacity;
-    isOriginalComplex = true;
-    originalBacking = meta.backing;
-    originalOffset = meta.offset;
-  } else { // Simple T[] array
-    originalElements = (slice as T[]).slice();
-    oldCapacity = (slice as T[]).length;
+    const meta = slice.__meta__
+    for (let i = 0; i < meta.length; i++)
+      originalElements.push(meta.backing[meta.offset + i])
+    oldCapacity = meta.capacity
+    isOriginalComplex = true
+    originalBacking = meta.backing
+    originalOffset = meta.offset
+  } else {
+    // Simple T[] array
+    originalElements = (slice as T[]).slice()
+    oldCapacity = (slice as T[]).length
   }
-  const oldLength = originalElements.length;
-  const newLength = oldLength + numAdded;
+  const oldLength = originalElements.length
+  const newLength = oldLength + numAdded
 
   // Case 1: Modify in-place if original was SliceProxy and has enough capacity.
   if (isOriginalComplex && newLength <= oldCapacity && originalBacking) {
     for (let i = 0; i < numAdded; i++) {
-      originalBacking[originalOffset + oldLength + i] = elements[i] as T;
+      originalBacking[originalOffset + oldLength + i] = elements[i] as T
     }
-    const resultProxy = new Array(newLength) as SliceProxy<T>;
-    for(let i=0; i<newLength; i++) resultProxy[i] = originalBacking[originalOffset + i];
+    const resultProxy = new Array(newLength) as SliceProxy<T>
+    for (let i = 0; i < newLength; i++)
+      resultProxy[i] = originalBacking[originalOffset + i]
     resultProxy.__meta__ = {
-        backing: originalBacking,
-        offset: originalOffset,
-        length: newLength,
-        capacity: oldCapacity,
-    };
-    return resultProxy;
+      backing: originalBacking,
+      offset: originalOffset,
+      length: newLength,
+      capacity: oldCapacity,
+    }
+    return resultProxy
   }
 
   // Case 2: Reallocation is needed.
-  let newCapacity = oldCapacity;
+  let newCapacity = oldCapacity
   if (newCapacity === 0) {
-    newCapacity = newLength;
+    newCapacity = newLength
   } else if (oldLength < 1024) {
-    newCapacity = Math.max(oldCapacity * 2, newLength);
+    newCapacity = Math.max(oldCapacity * 2, newLength)
   } else {
-    newCapacity = Math.max(oldCapacity + Math.floor(oldCapacity / 4), newLength);
+    newCapacity = Math.max(oldCapacity + Math.floor(oldCapacity / 4), newLength)
   }
   if (newCapacity < newLength) {
-    newCapacity = newLength;
+    newCapacity = newLength
   }
 
-  const newBacking = new Array<T>(newCapacity);
+  const newBacking = new Array<T>(newCapacity)
   for (let i = 0; i < oldLength; i++) {
-    newBacking[i] = originalElements[i];
+    newBacking[i] = originalElements[i]
   }
   for (let i = 0; i < numAdded; i++) {
-    newBacking[oldLength + i] = elements[i] as T;
+    newBacking[oldLength + i] = elements[i] as T
   }
 
-  const resultProxy = new Array(newLength) as SliceProxy<T>;
-  for(let i=0; i<newLength; i++) resultProxy[i] = newBacking[i];
+  const resultProxy = new Array(newLength) as SliceProxy<T>
+  for (let i = 0; i < newLength; i++) resultProxy[i] = newBacking[i]
   resultProxy.__meta__ = {
-      backing: newBacking,
-      offset: 0,
-      length: newLength,
-      capacity: newCapacity,
-  };
-  return resultProxy;
+    backing: newBacking,
+    offset: 0,
+    length: newLength,
+    capacity: newCapacity,
+  }
+  return resultProxy
 }
 
 /**
@@ -618,85 +664,93 @@ export const copy = <T>(dst: Slice<T>, src: Slice<T>): number => {
     return 0
   }
 
-  const dstLen = len(dst);
-  const srcLen = len(src);
-  const count = Math.min(dstLen, srcLen);
+  const dstLen = len(dst)
+  const srcLen = len(src)
+  const count = Math.min(dstLen, srcLen)
 
   if (count === 0) {
-    return 0;
+    return 0
   }
 
-  const isDstUint8Array = dst instanceof Uint8Array;
-  const isSrcUint8Array = src instanceof Uint8Array;
+  const isDstUint8Array = dst instanceof Uint8Array
+  const isSrcUint8Array = src instanceof Uint8Array
 
   if (isDstUint8Array && isSrcUint8Array) {
-    (dst as Uint8Array).set((src as Uint8Array).subarray(0, count));
-  } else if (isDstUint8Array) { // dst is Uint8Array, src is Slice<number> or number[]
-    const dstUint8 = dst as Uint8Array;
+    ;(dst as Uint8Array).set((src as Uint8Array).subarray(0, count))
+  } else if (isDstUint8Array) {
+    // dst is Uint8Array, src is Slice<number> or number[]
+    const dstUint8 = dst as Uint8Array
     if (isComplexSlice(src)) {
-      const srcMeta = (src as SliceProxy<number>).__meta__;
+      const srcMeta = (src as SliceProxy<number>).__meta__
       for (let i = 0; i < count; i++) {
-        dstUint8[i] = srcMeta.backing[srcMeta.offset + i];
+        dstUint8[i] = srcMeta.backing[srcMeta.offset + i]
       }
-    } else { // src is number[]
-      const srcArray = src as number[];
+    } else {
+      // src is number[]
+      const srcArray = src as number[]
       for (let i = 0; i < count; i++) {
-        dstUint8[i] = srcArray[i];
+        dstUint8[i] = srcArray[i]
       }
     }
-  } else if (isSrcUint8Array) { // src is Uint8Array, dst is Slice<number> or number[]
-    const srcUint8 = src as Uint8Array;
+  } else if (isSrcUint8Array) {
+    // src is Uint8Array, dst is Slice<number> or number[]
+    const srcUint8 = src as Uint8Array
     if (isComplexSlice(dst)) {
-      const dstMeta = (dst as SliceProxy<number>).__meta__;
-      const dstBacking = dstMeta.backing;
-      const dstOffset = dstMeta.offset;
+      const dstMeta = (dst as SliceProxy<number>).__meta__
+      const dstBacking = dstMeta.backing
+      const dstOffset = dstMeta.offset
       for (let i = 0; i < count; i++) {
-        dstBacking[dstOffset + i] = srcUint8[i];
+        dstBacking[dstOffset + i] = srcUint8[i]
         // Also update the proxy view if dst is a proxy
-        (dst as any)[i] = srcUint8[i];
+        ;(dst as any)[i] = srcUint8[i]
       }
-    } else { // dst is number[]
-      const dstArray = dst as number[];
+    } else {
+      // dst is number[]
+      const dstArray = dst as number[]
       for (let i = 0; i < count; i++) {
-        dstArray[i] = srcUint8[i];
+        dstArray[i] = srcUint8[i]
       }
     }
-  } else { // Both are Slice<T> or T[] (original logic)
+  } else {
+    // Both are Slice<T> or T[] (original logic)
     if (isComplexSlice(dst)) {
-      const dstOffset = (dst as SliceProxy<T>).__meta__.offset;
-      const dstBacking = (dst as SliceProxy<T>).__meta__.backing;
+      const dstOffset = (dst as SliceProxy<T>).__meta__.offset
+      const dstBacking = (dst as SliceProxy<T>).__meta__.backing
 
       if (isComplexSlice(src)) {
-        const srcOffset = (src as SliceProxy<T>).__meta__.offset;
-        const srcBacking = (src as SliceProxy<T>).__meta__.backing;
+        const srcOffset = (src as SliceProxy<T>).__meta__.offset
+        const srcBacking = (src as SliceProxy<T>).__meta__.backing
         for (let i = 0; i < count; i++) {
-          dstBacking[dstOffset + i] = srcBacking[srcOffset + i];
-          (dst as any)[i] = srcBacking[srcOffset + i]; // Update proxy
+          dstBacking[dstOffset + i] = srcBacking[srcOffset + i]
+          ;(dst as any)[i] = srcBacking[srcOffset + i] // Update proxy
         }
-      } else { // src is T[]
-        const srcArray = src as T[];
+      } else {
+        // src is T[]
+        const srcArray = src as T[]
         for (let i = 0; i < count; i++) {
-          dstBacking[dstOffset + i] = srcArray[i];
-          (dst as any)[i] = srcArray[i]; // Update proxy
+          dstBacking[dstOffset + i] = srcArray[i]
+          ;(dst as any)[i] = srcArray[i] // Update proxy
         }
       }
-    } else { // dst is T[]
-      const dstArray = dst as T[];
+    } else {
+      // dst is T[]
+      const dstArray = dst as T[]
       if (isComplexSlice(src)) {
-        const srcOffset = (src as SliceProxy<T>).__meta__.offset;
-        const srcBacking = (src as SliceProxy<T>).__meta__.backing;
+        const srcOffset = (src as SliceProxy<T>).__meta__.offset
+        const srcBacking = (src as SliceProxy<T>).__meta__.backing
         for (let i = 0; i < count; i++) {
-          dstArray[i] = srcBacking[srcOffset + i];
+          dstArray[i] = srcBacking[srcOffset + i]
         }
-      } else { // src is T[]
-        const srcArray = src as T[];
+      } else {
+        // src is T[]
+        const srcArray = src as T[]
         for (let i = 0; i < count; i++) {
-          dstArray[i] = srcArray[i];
+          dstArray[i] = srcArray[i]
         }
       }
     }
   }
-  return count;
+  return count
 }
 
 /**
@@ -710,7 +764,10 @@ export const copy = <T>(dst: Slice<T>, src: Slice<T>): number => {
  * @returns The element or byte value at the specified index.
  * @throws Error if index is out of bounds or type is unsupported.
  */
-export function index<T>(collection: string | Slice<T> | T[], index: number): T | number {
+export function index<T>(
+  collection: string | Slice<T> | T[],
+  index: number,
+): T | number {
   if (collection === null || collection === undefined) {
     throw new Error('runtime error: index on nil or undefined collection')
   }
@@ -729,7 +786,7 @@ export function index<T>(collection: string | Slice<T> | T[], index: number): T 
       throw new Error(
         `runtime error: index out of range [${index}] with length ${collection.__meta__.length}`,
       )
-      }
+    }
     return collection.__meta__.backing[collection.__meta__.offset + index]
   } else if (Array.isArray(collection)) {
     if (index < 0 || index >= collection.length) {
@@ -835,7 +892,7 @@ export const sliceString = (
   }
 
   const slicedBytes = bytes.subarray(actualLow, actualHigh)
-  
+
   try {
     // Attempt to decode with strict UTF-8 validation
     const result = new TextDecoder('utf-8', { fatal: true }).decode(slicedBytes)
@@ -845,7 +902,7 @@ export const sliceString = (
     // This is a fundamental limitation of JavaScript string handling
     throw new Error(
       `Cannot slice string at byte indices [${actualLow}:${actualHigh}] because it would create invalid UTF-8. ` +
-      `This is a limitation of JavaScript's string handling.`
+        `This is a limitation of JavaScript's string handling.`,
     )
   }
 }
@@ -858,7 +915,7 @@ export const sliceString = (
 export const bytesToString = (bytes: Slice<number> | Uint8Array): string => {
   if (bytes === null) return ''
   if (bytes instanceof Uint8Array) {
-    return new TextDecoder().decode(bytes);
+    return new TextDecoder().decode(bytes)
   }
   // Ensure we get a plain number[] for Uint8Array.from
   let byteArray: number[]
@@ -890,7 +947,9 @@ export function stringToBytes(s: string): Uint8Array {
  * @param value Value that is either a string or Uint8Array
  * @returns The string representation
  */
-export function genericBytesOrStringToString(value: string | Uint8Array): string {
+export function genericBytesOrStringToString(
+  value: string | Uint8Array,
+): string {
   if (typeof value === 'string') {
     return value
   }
@@ -905,7 +964,10 @@ export function genericBytesOrStringToString(value: string | Uint8Array): string
  * @param index The index to access
  * @returns The byte value at the specified index
  */
-export function indexStringOrBytes(value: string | Uint8Array, index: number): number {
+export function indexStringOrBytes(
+  value: string | Uint8Array,
+  index: number,
+): number {
   if (typeof value === 'string') {
     return indexString(value, index)
   } else {

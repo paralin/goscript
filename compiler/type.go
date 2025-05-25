@@ -227,7 +227,7 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 		typePkgPath := typePkg.Path()
 
 		// Try to find the import alias by matching the package path
-		for importAlias, _ := range c.analysis.Imports {
+		for importAlias := range c.analysis.Imports {
 			// The importAlias could be either the explicit alias or the default package name
 			// If it's the default package name, it should match the last segment of the path
 			defaultPkgName := packageNameFromGoPath(typePkgPath)

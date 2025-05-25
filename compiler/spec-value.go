@@ -108,7 +108,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 						c.WriteGoType(goType, GoTypeContextGeneral)
 					}
 				} else {
-						c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
+					c.WriteGoType(goType, GoTypeContextGeneral) // Write the original Go type T
 				}
 				c.tsw.WriteLiterally(">")
 			} else {

@@ -4,14 +4,13 @@ import (
 	"context"
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
-
-	"go/constant"
 
 	gs "github.com/aperturerobotics/goscript"
 	"github.com/sirupsen/logrus"

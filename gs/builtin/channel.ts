@@ -482,9 +482,7 @@ class BufferedChannel<T> implements Channel<T> {
     const receiversToNotify = [...this.receivers]
     this.receivers = []
     for (const receiverTask of receiversToNotify) {
-      queueMicrotask(() =>
-        receiverTask.resolveReceive(this.zeroValue),
-      )
+      queueMicrotask(() => receiverTask.resolveReceive(this.zeroValue))
     }
 
     const receiversWithOkToNotify = [...this.receiversWithOk]

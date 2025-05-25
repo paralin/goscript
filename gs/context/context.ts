@@ -1,66 +1,65 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from '@goscript/builtin/builtin.js'
 
-
-export const Canceled = new Error("context canceled");
-Canceled.name = "CanceledError";
+export const Canceled = new Error('context canceled')
+Canceled.name = 'CanceledError'
 
 export class DeadlineExceededError extends Error {
   constructor() {
-    super("context deadline exceeded");
-    this.name = "DeadlineExceededError";
+    super('context deadline exceeded')
+    this.name = 'DeadlineExceededError'
   }
 }
-export const DeadlineExceeded = new DeadlineExceededError();
+export const DeadlineExceeded = new DeadlineExceededError()
 
 // Function types
-export type CancelFunc = () => void;
-export type CancelCauseFunc = (cause: Error | null) => void;
+export type CancelFunc = () => void
+export type CancelCauseFunc = (cause: Error | null) => void
 
 // Context interface matching Go's context.Context
 export interface Context {
   // Deadline returns the time when work done on behalf of this context should be canceled
-  Deadline(): [Date | null, boolean];
-  
+  Deadline(): [Date | null, boolean]
+
   // Done returns a channel that's closed when work done on behalf of this context should be canceled
-  Done(): $.Channel<{}>;
-  
+  Done(): $.Channel<{}>
+
   // Err returns a non-nil error value after Done is closed
-  Err(): Error | null;
-  
+  Err(): Error | null
+
   // Value returns the value associated with this context for key, or null
-  Value(key: any): any;
+  Value(key: any): any
 }
 
 // Base implementation for all contexts
 abstract class baseContext implements Context {
-  abstract Deadline(): [Date | null, boolean];
-  abstract Done(): $.Channel<{}>;
-  abstract Err(): Error | null;
-  abstract Value(key: any): any;
+  abstract Deadline(): [Date | null, boolean]
+  abstract Done(): $.Channel<{}>
+  abstract Err(): Error | null
+  abstract Value(key: any): any
 }
 
 // Background/TODO context that is never canceled
 class backgroundContext extends baseContext {
-  private static readonly neverClosedChannel = $.makeChannel<{}>(0, {}, 'both');
+  private static readonly neverClosedChannel = $.makeChannel<{}>(0, {}, 'both')
 
   static getNeverClosedChannel(): $.Channel<{}> {
-    return backgroundContext.neverClosedChannel;
+    return backgroundContext.neverClosedChannel
   }
 
   Deadline(): [Date | null, boolean] {
-    return [null, false];
+    return [null, false]
   }
 
   Done(): $.Channel<{}> {
-    return backgroundContext.neverClosedChannel;
+    return backgroundContext.neverClosedChannel
   }
 
   Err(): Error | null {
-    return null;
+    return null
   }
 
   Value(key: any): any {
-    return null;
+    return null
   }
 }
 
@@ -69,172 +68,172 @@ class valueContext extends baseContext {
   constructor(
     private parent: Context,
     private key: any,
-    private val: any
+    private val: any,
   ) {
-    super();
+    super()
   }
 
   getParent(): Context {
-    return this.parent;
+    return this.parent
   }
 
   Deadline(): [Date | null, boolean] {
-    return this.parent.Deadline();
+    return this.parent.Deadline()
   }
 
   Done(): $.Channel<{}> {
-    return this.parent.Done();
+    return this.parent.Done()
   }
 
   Err(): Error | null {
-    return this.parent.Err();
+    return this.parent.Err()
   }
 
   Value(key: any): any {
     if (this.key === key) {
-      return this.val;
+      return this.val
     }
-    return this.parent.Value(key);
+    return this.parent.Value(key)
   }
 }
 
 // Cancel context that can be canceled
 class cancelContext extends baseContext {
-  protected doneChannel: $.Channel<{}>;
-  protected err: Error | null = null;
-  protected cause: Error | null = null;
-  protected children: Set<cancelContext> = new Set();
-  protected parent: Context;
-  protected parentCancelCtx: cancelContext | null = null;
-  protected removeFromParent: (() => void) | null = null;
+  protected doneChannel: $.Channel<{}>
+  protected err: Error | null = null
+  protected cause: Error | null = null
+  protected children: Set<cancelContext> = new Set()
+  protected parent: Context
+  protected parentCancelCtx: cancelContext | null = null
+  protected removeFromParent: (() => void) | null = null
 
   constructor(parent: Context) {
-    super();
-    this.parent = parent;
-    this.doneChannel = $.makeChannel<{}>(0, {}, 'both');
+    super()
+    this.parent = parent
+    this.doneChannel = $.makeChannel<{}>(0, {}, 'both')
   }
 
   Deadline(): [Date | null, boolean] {
-    return this.parent.Deadline();
+    return this.parent.Deadline()
   }
 
   Done(): $.Channel<{}> {
-    return this.doneChannel;
+    return this.doneChannel
   }
 
   Err(): Error | null {
-    return this.err;
+    return this.err
   }
 
   Value(key: any): any {
-    return this.parent.Value(key);
+    return this.parent.Value(key)
   }
 
   getCause(): Error | null {
     if (this.cause !== null) {
-      return this.cause;
+      return this.cause
     }
-    return this.err;
+    return this.err
   }
 
   cancel(removeFromParent: boolean, err: Error, cause: Error | null): void {
     if (this.err !== null) {
-      return; // Already canceled
+      return // Already canceled
     }
 
-    this.err = err;
-    this.cause = cause;
-    this.doneChannel.close();
+    this.err = err
+    this.cause = cause
+    this.doneChannel.close()
 
     // Cancel all children
     for (const child of this.children) {
-      child.cancel(false, err, cause);
+      child.cancel(false, err, cause)
     }
-    this.children.clear();
+    this.children.clear()
 
     // Remove from parent's children if requested
     if (removeFromParent && this.removeFromParent) {
-      this.removeFromParent();
-      this.removeFromParent = null;
+      this.removeFromParent()
+      this.removeFromParent = null
     }
   }
 
   propagateCancel(): void {
     // Find parent cancelContext if any
-    let parent = this.parent;
+    let parent = this.parent
     while (parent instanceof valueContext) {
-      parent = (parent as valueContext).getParent();
+      parent = (parent as valueContext).getParent()
     }
 
     if (parent instanceof cancelContext) {
       // Parent is a cancel context, register as child
-      this.parentCancelCtx = parent;
+      this.parentCancelCtx = parent
       if (parent.err !== null) {
         // Parent already canceled
-        this.cancel(false, parent.err, parent.cause);
+        this.cancel(false, parent.err, parent.cause)
       } else {
-        parent.children.add(this);
+        parent.children.add(this)
         this.removeFromParent = () => {
-          parent.children.delete(this);
-        };
+          parent.children.delete(this)
+        }
       }
     } else {
       // Watch parent's Done channel
-      this.watchParentDone();
+      this.watchParentDone()
     }
   }
 
   private watchParentDone(): void {
-    const parentDone = this.parent.Done();
-    (async () => {
+    const parentDone = this.parent.Done()
+    ;(async () => {
       try {
-        await parentDone.receive();
+        await parentDone.receive()
       } catch {
         // Channel closed
       }
       // Parent is done, cancel this context
-      const parentErr = this.parent.Err();
+      const parentErr = this.parent.Err()
       if (parentErr && this.err === null) {
-        this.cancel(false, parentErr, null);
+        this.cancel(false, parentErr, null)
       }
-    })();
+    })()
   }
 }
 
 // Timer context with deadline
 class timerContext extends cancelContext {
-  private deadline: Date;
-  private timer: any;
+  private deadline: Date
+  private timer: any
 
   constructor(parent: Context, deadline: Date) {
-    super(parent);
-    this.deadline = deadline;
+    super(parent)
+    this.deadline = deadline
   }
 
   Deadline(): [Date | null, boolean] {
-    return [this.deadline, true];
+    return [this.deadline, true]
   }
 
   startTimer(): void {
-    const now = Date.now();
-    const duration = this.deadline.getTime() - now;
-    
+    const now = Date.now()
+    const duration = this.deadline.getTime() - now
+
     if (duration <= 0) {
       // Already expired
-      this.cancel(true, DeadlineExceeded, null);
-      return;
+      this.cancel(true, DeadlineExceeded, null)
+      return
     }
 
     this.timer = setTimeout(() => {
-      this.cancel(true, DeadlineExceeded, null);
-    }, duration);
+      this.cancel(true, DeadlineExceeded, null)
+    }, duration)
   }
 
   cancel(removeFromParent: boolean, err: Error, cause: Error | null): void {
-    super.cancel(removeFromParent, err, cause);
+    super.cancel(removeFromParent, err, cause)
     if (this.timer) {
-      clearTimeout(this.timer);
-      this.timer = null;
+      clearTimeout(this.timer)
+      this.timer = null
     }
   }
 }
@@ -242,141 +241,161 @@ class timerContext extends cancelContext {
 // Without cancel context - inherits values but not cancellation
 class withoutCancelContext extends baseContext {
   constructor(private parent: Context) {
-    super();
+    super()
   }
 
   Deadline(): [Date | null, boolean] {
-    return [null, false];
+    return [null, false]
   }
 
   Done(): $.Channel<{}> {
-    return backgroundContext.getNeverClosedChannel();
+    return backgroundContext.getNeverClosedChannel()
   }
 
   Err(): Error | null {
-    return null;
+    return null
   }
 
   Value(key: any): any {
-    return this.parent.Value(key);
+    return this.parent.Value(key)
   }
 }
 
 // Singleton contexts
-const background = new backgroundContext();
-const todo = new backgroundContext();
+const background = new backgroundContext()
+const todo = new backgroundContext()
 
 // Background returns a non-nil, empty Context that is never canceled
 export function Background(): Context {
-  return background;
+  return background
 }
 
 // TODO returns a non-nil, empty Context
 export function TODO(): Context {
-  return todo;
+  return todo
 }
 
 // WithCancel returns a copy of parent with a new Done channel
 export function WithCancel(parent: Context): [Context, CancelFunc] {
-  const ctx = new cancelContext(parent);
-  ctx.propagateCancel();
-  
-  return [ctx, () => {
-    ctx.cancel(true, Canceled, null);
-  }];
+  const ctx = new cancelContext(parent)
+  ctx.propagateCancel()
+
+  return [
+    ctx,
+    () => {
+      ctx.cancel(true, Canceled, null)
+    },
+  ]
 }
 
 // WithCancelCause returns a copy of parent with a new Done channel and cause recording
 export function WithCancelCause(parent: Context): [Context, CancelCauseFunc] {
-  const ctx = new cancelContext(parent);
-  ctx.propagateCancel();
-  
-  return [ctx, (cause: Error | null) => {
-    ctx.cancel(true, Canceled, cause);
-  }];
+  const ctx = new cancelContext(parent)
+  ctx.propagateCancel()
+
+  return [
+    ctx,
+    (cause: Error | null) => {
+      ctx.cancel(true, Canceled, cause)
+    },
+  ]
 }
 
 // WithDeadline returns a copy of parent with the deadline adjusted to be no later than d
 export function WithDeadline(parent: Context, d: Date): [Context, CancelFunc] {
-  return WithDeadlineCause(parent, d, null);
+  return WithDeadlineCause(parent, d, null)
 }
 
 // WithDeadlineCause is like WithDeadline but also sets the cause
-export function WithDeadlineCause(parent: Context, d: Date, cause: Error | null): [Context, CancelFunc] {
+export function WithDeadlineCause(
+  parent: Context,
+  d: Date,
+  cause: Error | null,
+): [Context, CancelFunc] {
   // Check if parent deadline is already earlier
-  const [parentDeadline, ok] = parent.Deadline();
+  const [parentDeadline, ok] = parent.Deadline()
   if (ok && parentDeadline && parentDeadline <= d) {
     // Parent deadline is already sooner
-    return WithCancel(parent);
+    return WithCancel(parent)
   }
 
-  const ctx = new timerContext(parent, d);
-  ctx.propagateCancel();
-  ctx.startTimer();
-  
-  return [ctx, () => {
-    ctx.cancel(true, Canceled, cause);
-  }];
+  const ctx = new timerContext(parent, d)
+  ctx.propagateCancel()
+  ctx.startTimer()
+
+  return [
+    ctx,
+    () => {
+      ctx.cancel(true, Canceled, cause)
+    },
+  ]
 }
 
 // WithTimeout returns WithDeadline(parent, Date.now() + timeout)
-export function WithTimeout(parent: Context, timeout: number): [Context, CancelFunc] {
-  return WithDeadline(parent, new Date(Date.now() + timeout));
+export function WithTimeout(
+  parent: Context,
+  timeout: number,
+): [Context, CancelFunc] {
+  return WithDeadline(parent, new Date(Date.now() + timeout))
 }
 
 // WithTimeoutCause is like WithTimeout but also sets the cause
-export function WithTimeoutCause(parent: Context, timeout: number, cause: Error | null): [Context, CancelFunc] {
-  return WithDeadlineCause(parent, new Date(Date.now() + timeout), cause);
+export function WithTimeoutCause(
+  parent: Context,
+  timeout: number,
+  cause: Error | null,
+): [Context, CancelFunc] {
+  return WithDeadlineCause(parent, new Date(Date.now() + timeout), cause)
 }
 
 // WithValue returns a copy of parent with the value associated with key
 export function WithValue(parent: Context, key: any, val: any): Context {
-  return new valueContext(parent, key, val);
+  return new valueContext(parent, key, val)
 }
 
 // WithoutCancel returns a context that inherits values but not cancellation
 export function WithoutCancel(parent: Context): Context {
-  return new withoutCancelContext(parent);
+  return new withoutCancelContext(parent)
 }
 
 // Cause returns the underlying cause of the context's cancellation
 export function Cause(ctx: Context): Error | null {
-  let c = ctx;
+  let c = ctx
   // Unwrap value contexts
   while (c instanceof valueContext) {
-    c = (c as valueContext).getParent();
+    c = (c as valueContext).getParent()
   }
-  
+
   if (c instanceof cancelContext) {
-    return c.getCause();
+    return c.getCause()
   }
-  
-  return c.Err();
+
+  return c.Err()
 }
 
 // AfterFunc runs f in a separate goroutine after ctx is done
 export function AfterFunc(ctx: Context, f: () => void): () => boolean {
-  let stopped = false;
-  let done = false;
+  let stopped = false
+  let done = false
 
   const promise = (async () => {
     try {
-      await ctx.Done().receive();
+      await ctx.Done().receive()
     } catch {
       // Channel closed
     }
     if (!stopped) {
-      done = true;
+      done = true
       // Run in next tick to simulate goroutine
-      setImmediate(f);
+      setImmediate(f)
     }
-  })();
+  })()
 
   return () => {
     if (!done) {
-      stopped = true;
-      return true;
+      stopped = true
+      return true
     }
-    return false;
-  };
+    return false
+  }
 }

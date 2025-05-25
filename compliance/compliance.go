@@ -445,7 +445,6 @@ func copyDependenciesToDepsFromResult(t *testing.T, parentModulePath, testDir st
 
 			return copyFile(srcPath, destPath)
 		})
-
 		if err != nil {
 			t.Logf("warning: failed to copy dependency package %s: %v", depPkg, err)
 		}
