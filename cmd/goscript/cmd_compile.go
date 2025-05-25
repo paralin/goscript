@@ -8,9 +8,6 @@ import (
 	"github.com/aperturerobotics/goscript/compiler"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
-
-	// _ ensure we include the gs package
-	_ "github.com/aperturerobotics/goscript"
 )
 
 var (

@@ -82,6 +82,9 @@ type Analysis struct {
 	// Keep specialized maps that serve different purposes
 	// FuncLitData tracks function literal specific data since they don't have types.Object
 	FuncLitData map[*ast.FuncLit]*FunctionInfo
+
+	// PackageMetadata holds package-level metadata
+	PackageMetadata map[string]interface{}
 }
 
 // PackageAnalysis holds cross-file analysis data for a package
@@ -98,11 +101,12 @@ type PackageAnalysis struct {
 // NewAnalysis creates a new Analysis instance.
 func NewAnalysis() *Analysis {
 	return &Analysis{
-		VariableUsage: make(map[types.Object]*VariableUsageInfo),
-		Imports:       make(map[string]*fileImport),
-		FunctionData:  make(map[types.Object]*FunctionInfo),
-		NodeData:      make(map[ast.Node]*NodeInfo),
-		FuncLitData:   make(map[*ast.FuncLit]*FunctionInfo),
+		VariableUsage:   make(map[types.Object]*VariableUsageInfo),
+		Imports:         make(map[string]*fileImport),
+		FunctionData:    make(map[types.Object]*FunctionInfo),
+		NodeData:        make(map[ast.Node]*NodeInfo),
+		FuncLitData:     make(map[*ast.FuncLit]*FunctionInfo),
+		PackageMetadata: make(map[string]interface{}),
 	}
 }
 
@@ -747,6 +751,37 @@ func (v *analysisVisitor) containsAsyncOperations(node ast.Node) bool {
 				}
 			}
 
+			// Check for method calls on imported types (e.g., sync.Mutex.Lock())
+			if selExpr, ok := s.Fun.(*ast.SelectorExpr); ok {
+				// Check if this is a method call on a variable (e.g., mu.Lock())
+				if ident, ok := selExpr.X.(*ast.Ident); ok {
+					// Get the type of the receiver
+					if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil {
+						if varObj, ok := obj.(*types.Var); ok {
+							// Get the type name and package
+							if namedType, ok := varObj.Type().(*types.Named); ok {
+								typeName := namedType.Obj().Name()
+								methodName := selExpr.Sel.Name
+
+								// Check if the type is from an imported package
+								if typePkg := namedType.Obj().Pkg(); typePkg != nil && typePkg != v.pkg.Types {
+									pkgPath := typePkg.Path()
+									// Extract package name from path (e.g., "sync" from "github.com/.../gs/sync")
+									parts := strings.Split(pkgPath, "/")
+									pkgName := parts[len(parts)-1]
+
+									// Check if this method is async based on metadata
+									if v.analysis.IsMethodAsync(pkgName, typeName, methodName) {
+										hasAsync = true
+										return false
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+
 			// TODO: Add detection of method calls on async types
 		}
 
@@ -779,6 +814,9 @@ func (v *analysisVisitor) containsDefer(block *ast.BlockStmt) bool {
 func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap ast.CommentMap) {
 	// Store the comment map in the analysis object
 	analysis.Cmap = cmap
+
+	// Load package metadata for async function detection
+	analysis.LoadPackageMetadata()
 
 	// Process imports from the file
 	for _, imp := range file.Imports {
@@ -923,4 +961,90 @@ func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
 	}
 
 	return analysis
+}
+
+// LoadPackageMetadata loads metadata from gs packages to determine which functions are async
+func (a *Analysis) LoadPackageMetadata() {
+	// List of gs packages that have metadata
+	metadataPackages := []string{
+		"github.com/aperturerobotics/goscript/gs/sync",
+		"github.com/aperturerobotics/goscript/gs/unicode",
+	}
+
+	for _, pkgPath := range metadataPackages {
+		cfg := &packages.Config{
+			Mode: packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax,
+		}
+
+		pkgs, err := packages.Load(cfg, pkgPath)
+		if err != nil || len(pkgs) == 0 {
+			continue // Skip if package can't be loaded
+		}
+
+		pkg := pkgs[0]
+		if pkg.Types == nil {
+			continue
+		}
+
+		// Extract the package name (e.g., "sync" from "github.com/aperturerobotics/goscript/gs/sync")
+		parts := strings.Split(pkgPath, "/")
+		pkgName := parts[len(parts)-1]
+
+		// Look for metadata variables in the package scope
+		scope := pkg.Types.Scope()
+		for _, name := range scope.Names() {
+			obj := scope.Lookup(name)
+			if obj == nil {
+				continue
+			}
+
+			// Check if this is a metadata variable (ends with "Info")
+			if strings.HasSuffix(name, "Info") {
+				if varObj, ok := obj.(*types.Var); ok {
+					// Store the metadata with a key like "sync.MutexLock"
+					methodName := strings.TrimSuffix(name, "Info")
+					key := pkgName + "." + methodName
+					a.PackageMetadata[key] = varObj
+				}
+			}
+		}
+	}
+}
+
+// IsMethodAsync checks if a method call is async based on package metadata
+func (a *Analysis) IsMethodAsync(pkgName, typeName, methodName string) bool {
+	// The metadata keys are stored as "sync.MutexLock", "sync.WaitGroupWait", etc.
+	// We need to match "sync.Mutex.Lock" -> "sync.MutexLock"
+	key := pkgName + "." + typeName + methodName
+
+	if metaObj, exists := a.PackageMetadata[key]; exists {
+		if varObj, ok := metaObj.(*types.Var); ok {
+			// Try to get the actual value of the variable
+			// For now, we'll use the variable name to determine if it's async
+			// The variable names follow the pattern: MutexLockInfo, WaitGroupWaitInfo, etc.
+			// We can check if the corresponding metadata indicates IsAsync: true
+			varName := varObj.Name()
+
+			// Based on our metadata definitions, these should be async:
+			asyncMethods := map[string]bool{
+				"MutexLockInfo":        true,
+				"RWMutexLockInfo":      true,
+				"RWMutexRLockInfo":     true,
+				"WaitGroupWaitInfo":    true,
+				"OnceDoInfo":           true,
+				"CondWaitInfo":         true,
+				"MapDeleteInfo":        true,
+				"MapLoadInfo":          true,
+				"MapLoadAndDeleteInfo": true,
+				"MapLoadOrStoreInfo":   true,
+				"MapRangeInfo":         true,
+				"MapStoreInfo":         true,
+			}
+
+			isAsync := asyncMethods[varName]
+			return isAsync
+		}
+	}
+
+	return false
 }

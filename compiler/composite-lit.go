@@ -199,6 +199,7 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 				if underlyingStruct, ok := namedType.Underlying().(*types.Struct); ok {
 					structType = underlyingStruct
 					isStructLiteral = true
+
 					// Named struct, use constructor
 					c.tsw.WriteLiterally("new ")
 					c.WriteTypeExpr(exp.Type)

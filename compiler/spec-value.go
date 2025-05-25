@@ -205,7 +205,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 					// If v is varrefed, assign the varRef itself (v)
 					// If v is not varrefed, assign $.varRef(v)
 					if needsVarRefOperand {
-						// special handling: do not write .value here.
+						// do not write .value here.
 						c.WriteIdent(unaryExprXIdent, false)
 					} else {
 						// &unvarrefedVar -> $.varRef(unvarrefedVar)

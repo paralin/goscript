@@ -151,7 +151,10 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 		// Handle named types, especially struct types
 		if _, isStruct := t.Underlying().(*types.Struct); isStruct {
 			// Initialize struct types with a new instance
-			c.tsw.WriteLiterallyf("new %s()", t.Obj().Name())
+			// Use the same logic as WriteNamedType to handle imported types
+			c.tsw.WriteLiterally("new ")
+			c.WriteNamedType(t)
+			c.tsw.WriteLiterally("()")
 			return
 		}
 		// For other named types, use the zero value of the underlying type

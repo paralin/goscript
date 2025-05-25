@@ -68,7 +68,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			return nil
 		}
 
-		// Special handling for variable referenced variables in declarations
+		// Handle variable referenced variables in declarations
 		if addDeclaration && tok == token.DEFINE {
 			// Determine if LHS is variable referenced
 			isLHSVarRefed := false
@@ -90,7 +90,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				}
 			}
 
-			// Special handling for short declaration of variable referenced variables
+			// Handle short declaration of variable referenced variables
 			if isLHSVarRefed && lhsIdent != nil {
 				c.tsw.WriteLiterally("let ")
 				// Just write the identifier name without .value

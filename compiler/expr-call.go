@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strings"
 
 	"github.com/pkg/errors"
 )
@@ -325,6 +326,53 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 										}
 									}
 								}
+							} else {
+								// Handle named types with slice underlying types: make(NamedSliceType, len, cap)
+								// This handles cases like: type appendSliceWriter []byte; make(appendSliceWriter, 0, len(s))
+								namedType := typeName.Type()
+								if sliceType, isSlice := namedType.Underlying().(*types.Slice); isSlice {
+									goElemType := sliceType.Elem()
+
+									// Check if it's a named type with []byte underlying type
+									if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
+										c.tsw.WriteLiterally("new Uint8Array(")
+										if len(exp.Args) >= 2 {
+											if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+												return err
+											}
+											// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+										} else {
+											// If no length is provided, default to 0
+											c.tsw.WriteLiterally("0")
+										}
+										c.tsw.WriteLiterally(")")
+										return nil // Handled make for named []byte type
+									}
+
+									// Handle other named slice types
+									c.tsw.WriteLiterally("$.makeSlice<")
+									c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
+									c.tsw.WriteLiterally(">(")
+
+									if len(exp.Args) >= 2 {
+										if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+											return err
+										}
+										if len(exp.Args) == 3 {
+											c.tsw.WriteLiterally(", ")
+											if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+												return err
+											}
+										} else if len(exp.Args) > 3 {
+											return errors.New("makeSlice expects 2 or 3 arguments")
+										}
+									} else {
+										// If no length is provided, default to 0
+										c.tsw.WriteLiterally("0")
+									}
+									c.tsw.WriteLiterally(")")
+									return nil // Handled make for named slice type
+								}
 							}
 						}
 					}
@@ -554,6 +602,36 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			return nil // Handled regular function call
 		}
 	} else {
+		// Check if this is an async method call (e.g., mu.Lock())
+		if selExpr, ok := expFun.(*ast.SelectorExpr); ok {
+			// Check if this is a method call on a variable (e.g., mu.Lock())
+			if ident, ok := selExpr.X.(*ast.Ident); ok {
+				// Get the type of the receiver
+				if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil {
+					if varObj, ok := obj.(*types.Var); ok {
+						// Get the type name and package
+						if namedType, ok := varObj.Type().(*types.Named); ok {
+							typeName := namedType.Obj().Name()
+							methodName := selExpr.Sel.Name
+
+							// Check if the type is from an imported package
+							if typePkg := namedType.Obj().Pkg(); typePkg != nil && typePkg != c.pkg.Types {
+								pkgPath := typePkg.Path()
+								// Extract package name from path (e.g., "sync" from "github.com/.../gs/sync")
+								parts := strings.Split(pkgPath, "/")
+								pkgName := parts[len(parts)-1]
+
+								// Check if this method is async based on metadata
+								if c.analysis.IsMethodAsync(pkgName, typeName, methodName) {
+									c.tsw.WriteLiterally("await ")
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+
 		// If expFun is a function literal, it needs to be wrapped in parentheses for IIFE syntax
 		if _, isFuncLit := expFun.(*ast.FuncLit); isFuncLit {
 			c.tsw.WriteLiterally("(")

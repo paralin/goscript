@@ -388,7 +388,7 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 		isBitwise = true
 	}
 
-	// Special handling for large bit shift expressions that would overflow in JavaScript
+	// Handle large bit shift expressions that would overflow in JavaScript
 	if exp.Op == token.SHL {
 		// Check if this is 1 << 63 pattern
 		if leftLit, leftIsLit := exp.X.(*ast.BasicLit); leftIsLit && leftLit.Value == "1" {

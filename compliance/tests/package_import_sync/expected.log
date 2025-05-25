@@ -1,0 +1,21 @@
+Mutex locked
+Mutex unlocked
+TryLock succeeded
+WaitGroup counter set to 1
+WaitGroup counter decremented
+WaitGroup wait completed
+Once function executed, counter: 1
+Final counter: 1
+OnceFunc executed
+OnceValue function executed
+OnceValue results: 42 42
+Stored key1
+Loaded key1: value1
+Stored key2: value2
+Range: key1 -> value1
+Range: key2 -> value2
+key1 deleted successfully
+Pool creating new object
+Got from pool: new object
+Got from pool: reused object
+test finished

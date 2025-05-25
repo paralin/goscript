@@ -1,0 +1,38 @@
+Testing character classification:
+IsLetter('A'): true
+IsLetter('1'): false
+IsDigit('5'): true
+IsDigit('a'): false
+IsUpper('Z'): true
+IsUpper('z'): false
+IsLower('b'): true
+IsLower('B'): false
+IsSpace(' '): true
+IsSpace('x'): false
+IsPunct('!'): true
+IsPunct('a'): false
+
+Testing case conversion:
+ToUpper('a'): A
+ToUpper('Z'): Z
+ToLower('A'): a
+ToLower('z'): z
+ToTitle('a'): A
+To(UpperCase, 'b'): B
+To(LowerCase, 'C'): c
+SimpleFold('A'): a
+SimpleFold('a'): A
+
+Testing constants:
+MaxRune: 1114111
+Version: 15.0.0
+
+Testing range tables:
+Is(Letter, 'A'): true
+Is(Letter, '1'): false
+Is(Digit, '5'): true
+Is(Digit, 'x'): false
+In('A', Letter, Digit): true
+In('5', Letter, Digit): true
+In('!', Letter, Digit): false
+test finished
