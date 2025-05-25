@@ -48,3 +48,64 @@ export function multiplyDuration(duration: any, multiplier: number): any {
 
   throw new Error(`Cannot multiply duration of type ${typeof duration}`)
 }
+
+/**
+ * Normalizes various byte representations into a `Uint8Array` for protobuf compatibility.
+ *
+ * @param {Uint8Array | number[] | null | undefined | { data: number[] } | { valueOf(): number[] }} bytes
+ *   The input to normalize. Accepted types:
+ *   - `Uint8Array`: Returned as-is.
+ *   - `number[]`: Converted to a `Uint8Array`.
+ *   - `null` or `undefined`: Returns an empty `Uint8Array`.
+ *   - `{ data: number[] }`: An object with a `data` property (e.g., `$.Slice<number>`), where `data` is a `number[]`.
+ *   - `{ valueOf(): number[] }`: An object with a `valueOf` method that returns a `number[]`.
+ * @returns {Uint8Array} A normalized `Uint8Array` representation of the input.
+ * @throws {Error} If the input type is unsupported or cannot be normalized.
+ */
+export function normalizeBytes(
+  bytes:
+    | Uint8Array
+    | number[]
+    | null
+    | undefined
+    | { data: number[] }
+    | { valueOf(): number[] },
+): Uint8Array {
+  if (bytes === null || bytes === undefined) {
+    return new Uint8Array(0)
+  }
+
+  if (bytes instanceof Uint8Array) {
+    return bytes
+  }
+
+  // Handle $.Slice<number> (which has a .data property that's a number[])
+  if (
+    bytes &&
+    typeof bytes === 'object' &&
+    'data' in bytes &&
+    Array.isArray(bytes.data)
+  ) {
+    return new Uint8Array(bytes.data)
+  }
+
+  // Handle plain number arrays
+  if (Array.isArray(bytes)) {
+    return new Uint8Array(bytes)
+  }
+
+  // Handle objects with valueOf() method that returns a number array
+  if (
+    bytes &&
+    typeof bytes === 'object' &&
+    'valueOf' in bytes &&
+    typeof bytes.valueOf === 'function'
+  ) {
+    const value = bytes.valueOf()
+    if (Array.isArray(value)) {
+      return new Uint8Array(value)
+    }
+  }
+
+  throw new Error(`Cannot normalize bytes of type ${typeof bytes}: ${bytes}`)
+}

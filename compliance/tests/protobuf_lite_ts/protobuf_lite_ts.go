@@ -22,4 +22,21 @@ func main() {
 	}
 
 	println("out:", out)
+
+	jdata, err := msg.MarshalJSON()
+	if err != nil {
+		println("error marshalling to json:", err.Error())
+		return
+	}
+
+	println("json marshaled:", string(jdata))
+
+	out = &ExampleMsg{}
+	err2 := out.UnmarshalJSON(jdata)
+	if err2 != nil {
+		println("error unmarshalling from json:", err.Error())
+		return
+	}
+
+	println("json unmarshaled:", out)
 }

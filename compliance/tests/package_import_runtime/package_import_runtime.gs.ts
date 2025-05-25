@@ -8,9 +8,10 @@ import * as runtime from "@goscript/runtime/index.js"
 export async function main(): Promise<void> {
 	// Test basic runtime functions
 	console.log("GOOS:", runtime.GOOS)
-	console.log("GOARCH:", runtime.GOARCH)
+
 	// println("Version:", runtime.Version()) - not stable for the test (go.mod may change)
-	console.log("NumCPU:", runtime.NumCPU())
+	// println("NumCPU:", runtime.NumCPU()) - not stable for the test (number of cores may change)
+	console.log("GOARCH:", runtime.GOARCH)
 
 	// Test GOMAXPROCS
 	let procs = runtime.GOMAXPROCS(0) // Get current value

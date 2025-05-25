@@ -39,6 +39,11 @@ import (
 func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	expFun := exp.Fun
 
+	// Handle protobuf method calls
+	if handled, err := c.writeProtobufMethodCall(exp); handled {
+		return err
+	}
+
 	// Handle any type conversion with nil argument
 	if len(exp.Args) == 1 {
 		if nilIdent, isIdent := exp.Args[0].(*ast.Ident); isIdent && nilIdent.Name == "nil" {

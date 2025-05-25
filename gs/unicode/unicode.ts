@@ -1,11 +1,11 @@
 // Package unicode provides data and functions to test some properties of Unicode code points.
 
 // Constants
-export const MaxRune = 0x10FFFF
-export const ReplacementChar = 0xFFFD
-export const MaxASCII = 0x7F
-export const MaxLatin1 = 0xFF
-export const Version = "15.0.0"
+export const MaxRune = 0x10ffff
+export const ReplacementChar = 0xfffd
+export const MaxASCII = 0x7f
+export const MaxLatin1 = 0xff
+export const Version = '15.0.0'
 
 // Case constants
 export const UpperCase = 0
@@ -55,7 +55,11 @@ export class RangeTable {
   public R32: Range32[]
   public LatinOffset: number
 
-  constructor(r16: Range16[] = [], r32: Range32[] = [], latinOffset: number = 0) {
+  constructor(
+    r16: Range16[] = [],
+    r32: Range32[] = [],
+    latinOffset: number = 0,
+  ) {
     this.R16 = r16
     this.R32 = r32
     this.LatinOffset = latinOffset
@@ -63,9 +67,9 @@ export class RangeTable {
 
   public clone(): RangeTable {
     return new RangeTable(
-      this.R16.map(r => r.clone()),
-      this.R32.map(r => r.clone()),
-      this.LatinOffset
+      this.R16.map((r) => r.clone()),
+      this.R32.map((r) => r.clone()),
+      this.LatinOffset,
     )
   }
 }
@@ -83,7 +87,11 @@ export class CaseRange {
   }
 
   public clone(): CaseRange {
-    return new CaseRange(this.Lo, this.Hi, [...this.Delta] as [number, number, number])
+    return new CaseRange(this.Lo, this.Hi, [...this.Delta] as [
+      number,
+      number,
+      number,
+    ])
   }
 }
 
@@ -225,7 +233,7 @@ export function To(_case: number, r: number): number {
 // SimpleFold returns the next rune in the simple case folding sequence
 export function SimpleFold(r: number): number {
   if (r < 0 || r > MaxRune) return r
-  
+
   // Simple implementation - just toggle between upper and lower case
   if (IsUpper(r)) {
     return ToLower(r)
@@ -238,7 +246,7 @@ export function SimpleFold(r: number): number {
 // Is reports whether the rune is in the specified table of ranges
 export function Is(rangeTab: RangeTable, r: number): boolean {
   if (r < 0 || r > MaxRune) return false
-  
+
   // Check 16-bit ranges
   for (const range of rangeTab.R16) {
     if (r < range.Lo) break
@@ -246,7 +254,7 @@ export function Is(rangeTab: RangeTable, r: number): boolean {
       return range.Stride === 1 || (r - range.Lo) % range.Stride === 0
     }
   }
-  
+
   // Check 32-bit ranges
   for (const range of rangeTab.R32) {
     if (r < range.Lo) break
@@ -254,7 +262,7 @@ export function Is(rangeTab: RangeTable, r: number): boolean {
       return range.Stride === 1 || (r - range.Lo) % range.Stride === 0
     }
   }
-  
+
   return false
 }
 
@@ -278,40 +286,40 @@ export function IsOneOf(ranges: RangeTable[], r: number): boolean {
 // the complete Unicode range data
 
 export const Letter = new RangeTable(
-  [new Range16(0x0041, 0x005A, 1), new Range16(0x0061, 0x007A, 1)], // Basic Latin letters
-  []
+  [new Range16(0x0041, 0x005a, 1), new Range16(0x0061, 0x007a, 1)], // Basic Latin letters
+  [],
 )
 
 export const Digit = new RangeTable(
   [new Range16(0x0030, 0x0039, 1)], // ASCII digits
-  []
+  [],
 )
 
 export const Space = new RangeTable(
-  [new Range16(0x0009, 0x000D, 1), new Range16(0x0020, 0x0020, 1)], // Basic whitespace
-  []
+  [new Range16(0x0009, 0x000d, 1), new Range16(0x0020, 0x0020, 1)], // Basic whitespace
+  [],
 )
 
 export const Upper = new RangeTable(
-  [new Range16(0x0041, 0x005A, 1)], // ASCII uppercase
-  []
+  [new Range16(0x0041, 0x005a, 1)], // ASCII uppercase
+  [],
 )
 
 export const Lower = new RangeTable(
-  [new Range16(0x0061, 0x007A, 1)], // ASCII lowercase
-  []
+  [new Range16(0x0061, 0x007a, 1)], // ASCII lowercase
+  [],
 )
 
 export const Title = new RangeTable([], [])
 
 export const Punct = new RangeTable(
   [
-    new Range16(0x0021, 0x002F, 1), // !"#$%&'()*+,-./
-    new Range16(0x003A, 0x0040, 1), // :;<=>?@
-    new Range16(0x005B, 0x0060, 1), // [\]^_`
-    new Range16(0x007B, 0x007E, 1)  // {|}~
+    new Range16(0x0021, 0x002f, 1), // !"#$%&'()*+,-./
+    new Range16(0x003a, 0x0040, 1), // :;<=>?@
+    new Range16(0x005b, 0x0060, 1), // [\]^_`
+    new Range16(0x007b, 0x007e, 1), // {|}~
   ],
-  []
+  [],
 )
 
 export const Symbol = new RangeTable([], [])
@@ -320,7 +328,7 @@ export const Mark = new RangeTable([], [])
 
 export const Number = new RangeTable(
   [new Range16(0x0030, 0x0039, 1)], // ASCII digits
-  []
+  [],
 )
 
 // Categories map
@@ -334,7 +342,7 @@ export const Categories = new Map<string, RangeTable>([
   ['Nd', Digit],
   ['P', Punct],
   ['S', Symbol],
-  ['Z', Space]
+  ['Z', Space],
 ])
 
 // Scripts and Properties maps (simplified)
@@ -346,7 +354,7 @@ export const FoldScript = new Map<string, RangeTable>()
 // Graphic ranges
 export const GraphicRanges = [Letter, Mark, Number, Punct, Symbol]
 
-// Print ranges  
+// Print ranges
 export const PrintRanges = [Letter, Mark, Number, Punct, Symbol, Space]
 
 // Case ranges (simplified)
@@ -357,10 +365,13 @@ export const TurkishCase: SpecialCase = []
 export const AzeriCase: SpecialCase = TurkishCase
 
 // Predefined character categories (simplified implementations)
-export const Cc = new RangeTable([new Range16(0x0000, 0x001F, 1), new Range16(0x007F, 0x009F, 1)], [])
+export const Cc = new RangeTable(
+  [new Range16(0x0000, 0x001f, 1), new Range16(0x007f, 0x009f, 1)],
+  [],
+)
 export const Cf = new RangeTable([], [])
 export const Co = new RangeTable([], [])
-export const Cs = new RangeTable([new Range16(0xD800, 0xDFFF, 1)], [])
+export const Cs = new RangeTable([new Range16(0xd800, 0xdfff, 1)], [])
 export const Lm = new RangeTable([], [])
 export const Lo = new RangeTable([], [])
 export const Mc = new RangeTable([], [])
@@ -368,17 +379,40 @@ export const Me = new RangeTable([], [])
 export const Mn = new RangeTable([], [])
 export const Nl = new RangeTable([], [])
 export const No = new RangeTable([], [])
-export const Pc = new RangeTable([new Range16(0x005F, 0x005F, 1)], []) // underscore
-export const Pd = new RangeTable([new Range16(0x002D, 0x002D, 1)], []) // hyphen
-export const Pe = new RangeTable([new Range16(0x0029, 0x0029, 1), new Range16(0x005D, 0x005D, 1), new Range16(0x007D, 0x007D, 1)], [])
+export const Pc = new RangeTable([new Range16(0x005f, 0x005f, 1)], []) // underscore
+export const Pd = new RangeTable([new Range16(0x002d, 0x002d, 1)], []) // hyphen
+export const Pe = new RangeTable(
+  [
+    new Range16(0x0029, 0x0029, 1),
+    new Range16(0x005d, 0x005d, 1),
+    new Range16(0x007d, 0x007d, 1),
+  ],
+  [],
+)
 export const Pf = new RangeTable([], [])
 export const Pi = new RangeTable([], [])
-export const Po = new RangeTable([new Range16(0x0021, 0x0023, 1), new Range16(0x0025, 0x0027, 1)], [])
-export const Ps = new RangeTable([new Range16(0x0028, 0x0028, 1), new Range16(0x005B, 0x005B, 1), new Range16(0x007B, 0x007B, 1)], [])
+export const Po = new RangeTable(
+  [new Range16(0x0021, 0x0023, 1), new Range16(0x0025, 0x0027, 1)],
+  [],
+)
+export const Ps = new RangeTable(
+  [
+    new Range16(0x0028, 0x0028, 1),
+    new Range16(0x005b, 0x005b, 1),
+    new Range16(0x007b, 0x007b, 1),
+  ],
+  [],
+)
 export const Sc = new RangeTable([new Range16(0x0024, 0x0024, 1)], []) // dollar sign
-export const Sk = new RangeTable([new Range16(0x005E, 0x005E, 1), new Range16(0x0060, 0x0060, 1)], [])
-export const Sm = new RangeTable([new Range16(0x002B, 0x002B, 1), new Range16(0x003C, 0x003E, 1)], [])
+export const Sk = new RangeTable(
+  [new Range16(0x005e, 0x005e, 1), new Range16(0x0060, 0x0060, 1)],
+  [],
+)
+export const Sm = new RangeTable(
+  [new Range16(0x002b, 0x002b, 1), new Range16(0x003c, 0x003e, 1)],
+  [],
+)
 export const So = new RangeTable([], [])
 export const Zl = new RangeTable([], [])
 export const Zp = new RangeTable([], [])
-export const Zs = new RangeTable([new Range16(0x0020, 0x0020, 1)], []) // space 
+export const Zs = new RangeTable([new Range16(0x0020, 0x0020, 1)], []) // space

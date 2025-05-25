@@ -47,9 +47,9 @@ export class Mutex implements Locker {
     if (!this._locked) {
       throw new Error('sync: unlock of unlocked mutex')
     }
-    
+
     this._locked = false
-    
+
     // Wake up the next waiting goroutine
     if (this._waitQueue.length > 0) {
       const next = this._waitQueue.shift()!
@@ -102,7 +102,7 @@ export class RWMutex {
     if (!this._writer) {
       throw new Error('sync: unlock of unlocked RWMutex')
     }
-    
+
     this._writer = false
     this._wakeUpWaiters()
   }
@@ -136,7 +136,7 @@ export class RWMutex {
     if (this._readers === 0) {
       throw new Error('sync: RUnlock of unlocked RWMutex')
     }
-    
+
     this._readers--
     if (this._readers === 0) {
       this._wakeUpWaiters()
@@ -153,7 +153,7 @@ export class RWMutex {
       // Wake up all waiting readers
       const readers = this._readerWaitQueue.splice(0)
       queueMicrotask(() => {
-        readers.forEach(reader => reader())
+        readers.forEach((reader) => reader())
       })
     }
   }
@@ -183,7 +183,7 @@ export class WaitGroup {
       // Wake up all waiters
       const waiters = this._waiters.splice(0)
       queueMicrotask(() => {
-        waiters.forEach(waiter => waiter())
+        waiters.forEach((waiter) => waiter())
       })
     }
   }
@@ -255,7 +255,7 @@ export class Cond {
   public Broadcast(): void {
     const waiters = this._waiters.splice(0)
     queueMicrotask(() => {
-      waiters.forEach(waiter => waiter())
+      waiters.forEach((waiter) => waiter())
     })
   }
 
@@ -270,7 +270,7 @@ export class Cond {
   // Wait atomically unlocks c.L and suspends execution of the calling goroutine
   public async Wait(): Promise<void> {
     this._l.Unlock()
-    
+
     return new Promise<void>((resolve) => {
       this._waiters.push(async () => {
         await this._l.Lock()
@@ -382,7 +382,7 @@ export class Pool {
   public New?: () => any
   private _pool: any[] = []
 
-  constructor(init?: Partial<{New?: () => any}>) {
+  constructor(init?: Partial<{ New?: () => any }>) {
     this.New = init?.New
   }
 
@@ -406,7 +406,7 @@ export class Pool {
 
   // clone returns a copy of this Pool instance
   public clone(): Pool {
-    return new Pool({New: this.New})
+    return new Pool({ New: this.New })
   }
 }
 
@@ -446,4 +446,4 @@ export function OnceValues<T1, T2>(f: () => [T1, T2]): () => [T1, T2] {
     }
     return [value1, value2]
   }
-} 
+}

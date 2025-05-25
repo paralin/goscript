@@ -231,7 +231,9 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 		if recvName != "_" {
 			c.tsw.WriteLine("{")
 			c.tsw.Indent(1)
-			c.tsw.WriteLinef("const %s = this", recvName)
+			// Sanitize the receiver name to avoid conflicts with TypeScript reserved words
+			sanitizedRecvName := c.sanitizeIdentifier(recvName)
+			c.tsw.WriteLinef("const %s = this", sanitizedRecvName)
 
 			// Add using statement if needed
 			if c.analysis.NeedsDefer(decl.Body) {

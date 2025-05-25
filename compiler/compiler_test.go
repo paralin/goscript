@@ -169,7 +169,6 @@ func TestUnsafePackageCompilation(t *testing.T) {
 	// Try to compile a package that has dependencies that import unsafe
 	// We'll use "sync/atomic" which imports unsafe but doesn't have a handwritten equivalent
 	result, err := comp.CompilePackages(context.Background(), "sync/atomic")
-
 	// This should now succeed since we have a handwritten unsafe package
 	if err != nil {
 		t.Fatalf("Expected compilation to succeed with handwritten unsafe package, but it failed: %v", err)

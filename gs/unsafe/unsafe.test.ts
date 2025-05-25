@@ -3,35 +3,51 @@ import * as unsafe from './unsafe.js'
 
 describe('unsafe package', () => {
   it('should throw error for Alignof', () => {
-    expect(() => unsafe.Alignof({})).toThrow('unsafe.Alignof is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.Alignof({})).toThrow(
+      'unsafe.Alignof is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should throw error for Offsetof', () => {
-    expect(() => unsafe.Offsetof({})).toThrow('unsafe.Offsetof is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.Offsetof({})).toThrow(
+      'unsafe.Offsetof is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should throw error for Sizeof', () => {
-    expect(() => unsafe.Sizeof({})).toThrow('unsafe.Sizeof is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.Sizeof({})).toThrow(
+      'unsafe.Sizeof is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should throw error for Add', () => {
-    expect(() => unsafe.Add(null, 1)).toThrow('unsafe.Add is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.Add(null, 1)).toThrow(
+      'unsafe.Add is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should throw error for Slice', () => {
-    expect(() => unsafe.Slice(null, 1)).toThrow('unsafe.Slice is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.Slice(null, 1)).toThrow(
+      'unsafe.Slice is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should throw error for SliceData', () => {
-    expect(() => unsafe.SliceData([])).toThrow('unsafe.SliceData is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.SliceData([])).toThrow(
+      'unsafe.SliceData is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should throw error for String', () => {
-    expect(() => unsafe.String(null, 1)).toThrow('unsafe.String is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.String(null, 1)).toThrow(
+      'unsafe.String is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should throw error for StringData', () => {
-    expect(() => unsafe.StringData('test')).toThrow('unsafe.StringData is not supported in JavaScript/TypeScript')
+    expect(() => unsafe.StringData('test')).toThrow(
+      'unsafe.StringData is not supported in JavaScript/TypeScript',
+    )
   })
 
   it('should export IntegerType as number type', () => {
@@ -49,4 +65,4 @@ describe('unsafe package', () => {
     expect(arbitrary).toBe('anything')
     expect(pointer).toBe(null)
   })
-}) 
+})

@@ -912,8 +912,12 @@ export const sliceString = (
  * @param bytes The Slice<number> to convert.
  * @returns The resulting string.
  */
-export const bytesToString = (bytes: Slice<number> | Uint8Array): string => {
+export const bytesToString = (
+  bytes: Slice<number> | Uint8Array | string,
+): string => {
   if (bytes === null) return ''
+  // If it's already a string, just return it
+  if (typeof bytes === 'string') return bytes
   if (bytes instanceof Uint8Array) {
     return new TextDecoder().decode(bytes)
   }
