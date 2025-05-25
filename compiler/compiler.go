@@ -238,50 +238,6 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			continue
 		}
 
-		// Check if this is the unsafe package, which is not supported in GoScript
-		if pkg.PkgPath == "unsafe" {
-			// Find which packages that would actually be compiled depend on unsafe
-			var dependentPackages []string
-			for _, otherPkg := range pkgs {
-				if otherPkg.PkgPath != "unsafe" {
-					// Check if this package would actually be compiled (same logic as above)
-					wouldBeCompiled := true
-
-					// If the package was not explicitly requested, check if it has a handwritten equivalent
-					if !slices.Contains(patternPkgPaths, otherPkg.PkgPath) {
-						gsSourcePath := "gs/" + otherPkg.PkgPath
-						_, gsErr := gs.GsOverrides.ReadDir(gsSourcePath)
-						if gsErr == nil {
-							// Package has handwritten equivalent, so it wouldn't be compiled
-							wouldBeCompiled = false
-						}
-					}
-
-					// Skip packages that failed to load
-					if len(otherPkg.Errors) > 0 {
-						wouldBeCompiled = false
-					}
-
-					// Only include packages that would actually be compiled and import unsafe
-					if wouldBeCompiled {
-						for importPath := range otherPkg.Imports {
-							if importPath == "unsafe" {
-								dependentPackages = append(dependentPackages, otherPkg.PkgPath)
-								break
-							}
-						}
-					}
-				}
-			}
-
-			dependentList := "unknown package"
-			if len(dependentPackages) > 0 {
-				dependentList = strings.Join(dependentPackages, ", ")
-			}
-
-			return nil, fmt.Errorf("cannot compile package 'unsafe': GoScript does not support the unsafe package due to its low-level memory operations that are incompatible with TypeScript/JavaScript. This package is required by: %s. Consider using alternative approaches that don't require unsafe operations", dependentList)
-		}
-
 		pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create package compiler for %s: %w", pkg.PkgPath, err)

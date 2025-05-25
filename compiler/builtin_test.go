@@ -42,7 +42,7 @@ func TestEmitBuiltinOption(t *testing.T) {
 			t.Fatalf("Compilation failed: %v", err)
 		}
 
-		// Check that the unsafe package wasn't emitted (we know it's handwritten)
+		// Check that handwritten packages like unsafe aren't emitted when DisableEmitBuiltin=true
 		unsafePath := filepath.Join(outputDir, "@goscript/unsafe")
 		if _, err := os.Stat(unsafePath); !os.IsNotExist(err) {
 			t.Errorf("unsafe package was emitted when DisableEmitBuiltin=true")

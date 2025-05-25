@@ -49,7 +49,7 @@
     "test": "npm run test:go && npm run test:js",
     "test:go": "go test -v ./...",
     "test:js": "npm run typecheck && vitest run",
-    "typecheck": "tsgo --noEmit",
+    "typecheck": "tsgo --noEmit -p tsconfig.build.json",
     "format": "npm run format:go && npm run format:js && npm run format:config",
     "format:config": "prettier --write tsconfig.json package.json",
     "format:go": "gofumpt -w .",

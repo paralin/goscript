@@ -141,7 +141,7 @@ func getParentGoModulePath() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-func TestUnsafePackageErrorMessage(t *testing.T) {
+func TestUnsafePackageCompilation(t *testing.T) {
 	// Create a temporary directory for the test output
 	tempDir, err := os.MkdirTemp("", "goscript-test-unsafe")
 	if err != nil {
@@ -154,11 +154,11 @@ func TestUnsafePackageErrorMessage(t *testing.T) {
 	log.SetLevel(logrus.DebugLevel)
 	le := logrus.NewEntry(log)
 
-	// Test with AllDependencies=true to ensure we get all packages including unsafe
+	// Test with AllDependencies=true and DisableEmitBuiltin=false to ensure handwritten packages are copied
 	config := &compiler.Config{
 		OutputPath:         tempDir,
 		AllDependencies:    true,
-		DisableEmitBuiltin: true, // This ensures handwritten packages are skipped
+		DisableEmitBuiltin: false, // This ensures handwritten packages are copied to output
 	}
 
 	comp, err := compiler.NewCompiler(config, le, nil)
@@ -168,32 +168,26 @@ func TestUnsafePackageErrorMessage(t *testing.T) {
 
 	// Try to compile a package that has dependencies that import unsafe
 	// We'll use "sync/atomic" which imports unsafe but doesn't have a handwritten equivalent
-	_, err = comp.CompilePackages(context.Background(), "sync/atomic")
+	result, err := comp.CompilePackages(context.Background(), "sync/atomic")
 
-	// We expect this to fail with an unsafe package error
-	if err == nil {
-		t.Fatalf("Expected compilation to fail due to unsafe package, but it succeeded")
+	// This should now succeed since we have a handwritten unsafe package
+	if err != nil {
+		t.Fatalf("Expected compilation to succeed with handwritten unsafe package, but it failed: %v", err)
 	}
 
-	errorMsg := err.Error()
-
-	// Verify the error message contains the expected text
-	if !strings.Contains(errorMsg, "cannot compile package 'unsafe'") {
-		t.Errorf("Error message should mention unsafe package, got: %s", errorMsg)
+	// Verify that the unsafe package was copied (not compiled) since it has a handwritten equivalent
+	if !slices.Contains(result.CopiedPackages, "unsafe") {
+		t.Errorf("Expected unsafe package to be in CopiedPackages, but it wasn't. CopiedPackages: %v", result.CopiedPackages)
 	}
 
-	// Verify that packages with handwritten equivalents are NOT mentioned in the error
-	// These packages have handwritten equivalents in gs/ and should not be in the error message
-	handwrittenPackages := []string{"runtime", "errors", "time", "context", "slices"}
-
-	for _, pkg := range handwrittenPackages {
-		if strings.Contains(errorMsg, pkg) {
-			t.Errorf("Error message should not mention handwritten package '%s', but it does. Error: %s", pkg, errorMsg)
-		}
+	// Verify that sync/atomic was compiled
+	if !slices.Contains(result.CompiledPackages, "sync/atomic") {
+		t.Errorf("Expected sync/atomic package to be in CompiledPackages, but it wasn't. CompiledPackages: %v", result.CompiledPackages)
 	}
 
-	// The error message should mention sync/atomic since it would actually be compiled
-	if !strings.Contains(errorMsg, "sync/atomic") {
-		t.Errorf("Error message should mention 'sync/atomic' as it would be compiled, got: %s", errorMsg)
+	// Check that the unsafe package directory exists in the output
+	unsafePath := filepath.Join(tempDir, "@goscript/unsafe")
+	if _, err := os.Stat(unsafePath); os.IsNotExist(err) {
+		t.Errorf("unsafe package directory was not created at %s", unsafePath)
 	}
 }
