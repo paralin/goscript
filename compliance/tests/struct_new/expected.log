@@ -1,0 +1,12 @@
+ptr.MyInt (default): 0
+ptr.MyString (default): 
+ptr.myBool (default): false
+ptr.MyInt (assigned): 42
+ptr.MyString (assigned): hello
+ptr.myBool (assigned): true
+s.MyInt (default): 0
+s.MyString (default): 
+s.myBool (default): false
+s.MyInt (assigned): 100
+s.MyString (assigned): world
+s.myBool (assigned): false

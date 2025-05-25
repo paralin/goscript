@@ -111,6 +111,15 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				return errors.Errorf("unhandled cap call with incorrect number of arguments: %d != 1", len(exp.Args))
 			}
 			c.tsw.WriteLiterally("$.cap")
+		case "new":
+			// Translate new(T) to new T_ts()
+			if len(exp.Args) != 1 {
+				return errors.Errorf("unhandled new call with incorrect number of arguments: %d != 1", len(exp.Args))
+			}
+			c.tsw.WriteLiterally("new ")
+			c.WriteTypeExpr(exp.Args[0]) // This should write the TypeScript type T_ts
+			c.tsw.WriteLiterally("()")
+			return nil // Prevent falling through to generic argument handling
 		case "delete":
 			// Translate delete(map, key) to $.deleteMapEntry(map, key)
 			if len(exp.Args) != 2 {
