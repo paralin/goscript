@@ -37,7 +37,7 @@ func TestBuildRunExampleSimple(t *testing.T) {
 	}
 
 	// Compile the package
-	if err := comp.CompilePackages(context.Background(), "."); err != nil {
+	if _, err := comp.CompilePackages(context.Background(), "."); err != nil {
 		t.Fatalf("compilation failed: %v", err)
 	}
 

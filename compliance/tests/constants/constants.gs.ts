@@ -15,11 +15,11 @@ let Greeting: string = "Hello, Constants!"
 let Nothing: null | any = null
 
 export async function main(): Promise<void> {
-	console.log(Pi)
-	console.log(Truth)
+	console.log(3.14)
+	console.log(false)
 	// println(Big) // Commented out until large integer handling is implemented
 	// println(Small) // Commented out as it depends on Big
-	console.log(Greeting)
+	console.log("Hello, Constants!")
 	console.log($.byte(4))
 }
 

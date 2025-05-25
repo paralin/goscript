@@ -38,7 +38,7 @@ The following is an overview of the functions within the `compiler` package.
 
 ## compiler.go
 - `NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compiler, error)`
-- `(c *Compiler) CompilePackages(ctx context.Context, patterns ...string) error`
+- `(c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*CompilationResult, error)`
 - `NewPackageCompiler(le *logrus.Entry, compilerConf *Config, pkg *packages.Package) (*PackageCompiler, error)`
 - `(c *PackageCompiler) Compile(ctx context.Context) error`
 - `(c *PackageCompiler) generateIndexFile(compiledFiles []string) error`

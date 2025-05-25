@@ -95,7 +95,7 @@ func main() {
 
     // Compile the desired Go package(s)
     // Replace "." with the specific Go import path of the package you want to compile
-    if err := comp.CompilePackages(context.Background(), "your/go/package/path"); err != nil {
+    if _, err := comp.CompilePackages(context.Background(), "your/go/package/path"); err != nil {
         log.Fatalf("compilation failed: %v", err)
     }
 

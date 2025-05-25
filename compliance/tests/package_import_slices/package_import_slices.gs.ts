@@ -19,6 +19,7 @@ export async function main(): Promise<void> {
 			return shouldContinue
 		})
 	})()
+
 	console.log("test finished")
 }
 

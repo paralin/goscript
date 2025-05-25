@@ -11,6 +11,8 @@ import (
 	"slices"
 	"strings"
 
+	"go/constant"
+
 	gs "github.com/aperturerobotics/goscript"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/tools/go/packages"
@@ -72,6 +74,16 @@ func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compil
 	return &Compiler{config: *conf, le: le, opts: *opts}, nil
 }
 
+// CompilationResult contains information about what was compiled
+type CompilationResult struct {
+	// CompiledPackages contains the package paths of all packages that were actually compiled to TypeScript
+	CompiledPackages []string
+	// CopiedPackages contains the package paths of all packages that were copied from handwritten sources
+	CopiedPackages []string
+	// OriginalPackages contains the package paths that were explicitly requested for compilation
+	OriginalPackages []string
+}
+
 // CompilePackages loads Go packages based on the provided patterns and
 // then compiles each loaded package into TypeScript. It uses the context for
 // cancellation and applies the compiler's configured options during package loading.
@@ -79,7 +91,8 @@ func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compil
 // invokes its `Compile` method.
 // If c.config.AllDependencies is true, it will also compile all dependencies
 // of the requested packages, including standard library dependencies.
-func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) error {
+// Returns a CompilationResult with information about what was compiled.
+func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*CompilationResult, error) {
 	opts := c.opts
 	opts.Context = ctx
 
@@ -87,13 +100,17 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 	opts.Mode |= packages.NeedImports
 	pkgs, err := packages.Load(&opts, patterns...)
 	if err != nil {
-		return fmt.Errorf("failed to load packages: %w", err)
+		return nil, fmt.Errorf("failed to load packages: %w", err)
 	}
 
 	// build a list of packages that patterns matched
 	patternPkgPaths := make([]string, 0, len(pkgs))
 	for _, pkg := range pkgs {
 		patternPkgPaths = append(patternPkgPaths, pkg.PkgPath)
+	}
+
+	result := &CompilationResult{
+		OriginalPackages: patternPkgPaths,
 	}
 
 	// If AllDependencies is true, we need to collect all dependencies
@@ -168,8 +185,9 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 		builtinPath := "gs/builtin"
 		outputPath := ComputeModulePath(c.config.OutputPath, "builtin")
 		if err := c.copyEmbeddedPackage(builtinPath, outputPath); err != nil {
-			return fmt.Errorf("failed to copy builtin package to output directory: %w", err)
+			return nil, fmt.Errorf("failed to copy builtin package to output directory: %w", err)
 		}
+		result.CopiedPackages = append(result.CopiedPackages, "builtin")
 	}
 
 	// Compile all packages
@@ -180,11 +198,12 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 			gsSourcePath := "gs/" + pkg.PkgPath
 			_, gsErr := gs.GsOverrides.ReadDir(gsSourcePath)
 			if gsErr != nil && !os.IsNotExist(gsErr) {
-				return gsErr
+				return nil, gsErr
 			}
 			if gsErr == nil {
 				if c.config.DisableEmitBuiltin {
 					c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
+					result.CopiedPackages = append(result.CopiedPackages, pkg.PkgPath)
 					continue
 				} else {
 					// If DisableEmitBuiltin is false, we need to copy the handwritten package to the output directory
@@ -195,19 +214,20 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 
 					// Remove existing directory if it exists
 					if err := os.RemoveAll(outputPath); err != nil {
-						return fmt.Errorf("failed to remove existing output directory for %s: %w", pkg.PkgPath, err)
+						return nil, fmt.Errorf("failed to remove existing output directory for %s: %w", pkg.PkgPath, err)
 					}
 
 					// Create the output directory
 					if err := os.MkdirAll(outputPath, 0o755); err != nil {
-						return fmt.Errorf("failed to create output directory for %s: %w", pkg.PkgPath, err)
+						return nil, fmt.Errorf("failed to create output directory for %s: %w", pkg.PkgPath, err)
 					}
 
 					// Copy files from embedded FS to output directory
 					if err := c.copyEmbeddedPackage(gsSourcePath, outputPath); err != nil {
-						return fmt.Errorf("failed to copy embedded package %s: %w", pkg.PkgPath, err)
+						return nil, fmt.Errorf("failed to copy embedded package %s: %w", pkg.PkgPath, err)
 					}
 
+					result.CopiedPackages = append(result.CopiedPackages, pkg.PkgPath)
 					continue
 				}
 			}
@@ -219,17 +239,42 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) erro
 			continue
 		}
 
+		// Check if this is the unsafe package, which is not supported in GoScript
+		if pkg.PkgPath == "unsafe" {
+			// Find which package depends on unsafe by looking at the import graph
+			var dependentPackages []string
+			for _, otherPkg := range pkgs {
+				if otherPkg.PkgPath != "unsafe" {
+					for importPath := range otherPkg.Imports {
+						if importPath == "unsafe" {
+							dependentPackages = append(dependentPackages, otherPkg.PkgPath)
+							break
+						}
+					}
+				}
+			}
+
+			dependentList := "unknown package"
+			if len(dependentPackages) > 0 {
+				dependentList = strings.Join(dependentPackages, ", ")
+			}
+
+			return nil, fmt.Errorf("cannot compile package 'unsafe': GoScript does not support the unsafe package due to its low-level memory operations that are incompatible with TypeScript/JavaScript. This package is required by: %s. Consider using alternative approaches that don't require unsafe operations", dependentList)
+		}
+
 		pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkg)
 		if err != nil {
-			return fmt.Errorf("failed to create package compiler for %s: %w", pkg.PkgPath, err)
+			return nil, fmt.Errorf("failed to create package compiler for %s: %w", pkg.PkgPath, err)
 		}
 
 		if err := pkgCompiler.Compile(ctx); err != nil {
-			return fmt.Errorf("failed to compile package %s: %w", pkg.PkgPath, err)
+			return nil, fmt.Errorf("failed to compile package %s: %w", pkg.PkgPath, err)
 		}
+
+		result.CompiledPackages = append(result.CompiledPackages, pkg.PkgPath)
 	}
 
-	return nil
+	return result, nil
 }
 
 // PackageCompiler is responsible for compiling an entire Go package into
@@ -460,6 +505,7 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 // WriteIdent translates a Go identifier (`ast.Ident`) used as a value (e.g.,
 // variable, function name) into its TypeScript equivalent.
 //   - If the identifier is `nil`, it writes `null`.
+//   - If the identifier refers to a constant, it writes the constant's evaluated value.
 //   - Otherwise, it writes the identifier's name.
 //   - If `accessVarRefedValue` is true and the analysis (`c.analysis.NeedsVarRefAccess`)
 //     indicates the variable is variable referenced, `.value` is appended to access the contained value.
@@ -477,6 +523,20 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool) {
 	obj = c.pkg.TypesInfo.Uses[exp]
 	if obj == nil {
 		obj = c.pkg.TypesInfo.Defs[exp]
+	}
+
+	// Check if this identifier refers to a constant
+	if obj != nil {
+		if constObj, isConst := obj.(*types.Const); isConst {
+			// Only evaluate constants from the current package being compiled
+			// Don't evaluate constants from imported packages (they should use their exported names)
+			// Special case: predeclared constants like iota have a nil package, so we should evaluate them
+			if constObj.Pkg() == c.pkg.Types || constObj.Pkg() == nil {
+				// Write the constant's evaluated value instead of the identifier name
+				c.writeConstantValue(constObj)
+				return
+			}
+		}
 	}
 
 	// Write the identifier name first, sanitizing if it's a reserved word
@@ -767,6 +827,39 @@ func (c *GoToTSCompiler) sanitizeIdentifier(name string) string {
 		return "_" + name
 	}
 	return name
+}
+
+// writeConstantValue writes the evaluated value of a Go constant to TypeScript.
+// It handles different constant types (integer, float, string, boolean, complex)
+// and writes the appropriate TypeScript literal.
+func (c *GoToTSCompiler) writeConstantValue(constObj *types.Const) {
+	val := constObj.Val()
+
+	switch val.Kind() {
+	case constant.Int:
+		// For integer constants, write the string representation
+		c.tsw.WriteLiterally(val.String())
+	case constant.Float:
+		// For float constants, write the string representation
+		c.tsw.WriteLiterally(val.String())
+	case constant.String:
+		// For string constants, write as a quoted string literal
+		c.tsw.WriteLiterally(val.String()) // val.String() already includes quotes
+	case constant.Bool:
+		// For boolean constants, write true/false
+		if constant.BoolVal(val) {
+			c.tsw.WriteLiterally("true")
+		} else {
+			c.tsw.WriteLiterally("false")
+		}
+	case constant.Complex:
+		// For complex constants, we need to handle them specially
+		// For now, write as a comment indicating unsupported
+		c.tsw.WriteLiterally("/* complex constant: " + val.String() + " */")
+	default:
+		// For unknown constant types, write as a comment
+		c.tsw.WriteLiterally("/* unknown constant: " + val.String() + " */")
+	}
 }
 
 // copyEmbeddedPackage recursively copies files from an embedded FS path to a filesystem directory.

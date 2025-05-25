@@ -71,8 +71,44 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 		}
 
 		// Check if it's a type parameter with a union constraint (e.g., string | []byte)
-		if _, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
-			// For type parameters with string | []byte constraint, use specialized function
+		if typeParam, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
+			// Check if the type parameter is constrained to slice types
+			constraint := typeParam.Constraint()
+			if constraint != nil {
+				underlying := constraint.Underlying()
+				if iface, isInterface := underlying.(*types.Interface); isInterface {
+					// Check if this is a mixed string/byte constraint (like string | []byte)
+					if hasMixedStringByteConstraint(iface) {
+						// For mixed constraints, use specialized function that returns number (byte value)
+						c.tsw.WriteLiterally("$.indexStringOrBytes(")
+						if err := c.WriteValueExpr(exp.X); err != nil {
+							return err
+						}
+						c.tsw.WriteLiterally(", ")
+						if err := c.WriteValueExpr(exp.Index); err != nil {
+							return err
+						}
+						c.tsw.WriteLiterally(")")
+						return nil
+					}
+
+					// Check if the constraint includes only slice types (pure slice constraint)
+					if hasSliceConstraint(iface) {
+						// This is a pure slice type parameter, use regular slice indexing
+						if err := c.WriteValueExpr(exp.X); err != nil {
+							return err
+						}
+						c.tsw.WriteLiterally("![") // non-null assertion
+						if err := c.WriteValueExpr(exp.Index); err != nil {
+							return err
+						}
+						c.tsw.WriteLiterally("]")
+						return nil
+					}
+				}
+			}
+
+			// For other type parameters, use specialized function as fallback
 			// that returns number (byte value) for better TypeScript typing
 			c.tsw.WriteLiterally("$.indexStringOrBytes(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
@@ -377,6 +413,7 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	if !ok {
 		return errors.Errorf("unhandled binary op: %s", exp.Op.String())
 	}
+
 	c.tsw.WriteLiterally(tokStr)
 	c.tsw.WriteLiterally(" ")
 	if err := c.WriteValueExpr(exp.Y); err != nil {
@@ -452,6 +489,13 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 	if !ok {
 		return errors.Errorf("unhandled unary op: %s", exp.Op.String())
 	}
+
+	// Special case: In Go, ^ is bitwise NOT when used as unary operator
+	// In TypeScript, bitwise NOT is ~, not ^
+	if exp.Op == token.XOR {
+		tokStr = "~"
+	}
+
 	c.tsw.WriteLiterally(tokStr)
 
 	// Add space if operator is not postfix (e.g., !)

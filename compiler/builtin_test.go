@@ -37,7 +37,7 @@ func TestEmitBuiltinOption(t *testing.T) {
 		}
 
 		// Compile a package that depends on builtin (time)
-		err = compiler.CompilePackages(context.Background(), "time")
+		_, err = compiler.CompilePackages(context.Background(), "time")
 		if err != nil {
 			t.Fatalf("Compilation failed: %v", err)
 		}
@@ -76,7 +76,7 @@ func TestEmitBuiltinOption(t *testing.T) {
 		}
 
 		// Compile a package that depends on builtin (time)
-		err = compiler.CompilePackages(context.Background(), "time")
+		_, err = compiler.CompilePackages(context.Background(), "time")
 		if err != nil {
 			t.Fatalf("Compilation failed: %v", err)
 		}

@@ -205,6 +205,33 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 						return nil // Handled make for []byte
 					}
 
+					// Check if the element type is a generic type parameter
+					if _, isTypeParam := goElemType.(*types.TypeParam); isTypeParam {
+						// This is make([]E, n) where E is a type parameter
+						c.tsw.WriteLiterally("$.makeSlice<")
+						c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type parameter
+						c.tsw.WriteLiterally(">(")
+
+						if len(exp.Args) >= 2 {
+							if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+								return err
+							}
+							if len(exp.Args) == 3 {
+								c.tsw.WriteLiterally(", ")
+								if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+									return err
+								}
+							} else if len(exp.Args) > 3 {
+								return errors.New("makeSlice expects 2 or 3 arguments")
+							}
+						} else {
+							// If no length is provided, default to 0
+							c.tsw.WriteLiterally("0")
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled make for []E where E is type parameter
+					}
+
 					c.tsw.WriteLiterally("$.makeSlice<")
 					c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
 					c.tsw.WriteLiterally(">(")
@@ -227,6 +254,71 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					}
 					c.tsw.WriteLiterally(")")
 					return nil // Handled make for slice
+				}
+
+				// Handle generic type parameter make calls: make(S, len, cap) where S ~[]E
+				if ident, ok := exp.Args[0].(*ast.Ident); ok {
+					// Check if this identifier refers to a type parameter
+					if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil {
+						if typeName, isTypeName := obj.(*types.TypeName); isTypeName {
+							if typeParam, isTypeParam := typeName.Type().(*types.TypeParam); isTypeParam {
+								// Check if the type parameter is constrained to slice types
+								constraint := typeParam.Constraint()
+								if constraint != nil {
+									underlying := constraint.Underlying()
+									if iface, isInterface := underlying.(*types.Interface); isInterface {
+										// Check if the constraint includes slice types
+										// For constraints like ~[]E, we need to look at the type terms
+										if hasSliceConstraint(iface) {
+											// This is a generic slice type parameter
+											// We need to determine the element type from the constraint
+											elemType := getSliceElementTypeFromConstraint(iface)
+											if elemType != nil {
+												// Check if it's make(S, ...) where S constrains to []byte
+												if basicElem, isBasic := elemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
+													c.tsw.WriteLiterally("new Uint8Array(")
+													if len(exp.Args) >= 2 {
+														if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+															return err
+														}
+														// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+													} else {
+														// If no length is provided, default to 0
+														c.tsw.WriteLiterally("0")
+													}
+													c.tsw.WriteLiterally(")")
+													return nil // Handled make for generic []byte
+												}
+
+												c.tsw.WriteLiterally("$.makeSlice<")
+												c.WriteGoType(elemType, GoTypeContextGeneral) // Write the element type
+												c.tsw.WriteLiterally(">(")
+
+												if len(exp.Args) >= 2 {
+													if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+														return err
+													}
+													if len(exp.Args) == 3 {
+														c.tsw.WriteLiterally(", ")
+														if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+															return err
+														}
+													} else if len(exp.Args) > 3 {
+														return errors.New("makeSlice expects 2 or 3 arguments")
+													}
+												} else {
+													// If no length is provided, default to 0
+													c.tsw.WriteLiterally("0")
+												}
+												c.tsw.WriteLiterally(")")
+												return nil // Handled make for generic slice
+											}
+										}
+									}
+								}
+							}
+						}
+					}
 				}
 			}
 			// Fallthrough for unhandled make calls (e.g., channels)
@@ -496,4 +588,93 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 	}
 	c.tsw.WriteLiterally(")")
 	return nil
+}
+
+// hasSliceConstraint checks if an interface constraint includes slice types
+// For constraints like ~[]E, this returns true
+func hasSliceConstraint(iface *types.Interface) bool {
+	// Check if the interface has type terms that include slice types
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		embedded := iface.EmbeddedType(i)
+		if union, ok := embedded.(*types.Union); ok {
+			for j := 0; j < union.Len(); j++ {
+				term := union.Term(j)
+				if _, isSlice := term.Type().Underlying().(*types.Slice); isSlice {
+					return true
+				}
+			}
+		} else if _, isSlice := embedded.Underlying().(*types.Slice); isSlice {
+			return true
+		}
+	}
+	return false
+}
+
+// getSliceElementTypeFromConstraint extracts the element type from a slice constraint
+// For constraints like ~[]E, this returns E
+func getSliceElementTypeFromConstraint(iface *types.Interface) types.Type {
+	// Check if the interface has type terms that include slice types
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		embedded := iface.EmbeddedType(i)
+		if union, ok := embedded.(*types.Union); ok {
+			for j := 0; j < union.Len(); j++ {
+				term := union.Term(j)
+				if sliceType, isSlice := term.Type().Underlying().(*types.Slice); isSlice {
+					return sliceType.Elem()
+				}
+			}
+		} else if sliceType, isSlice := embedded.Underlying().(*types.Slice); isSlice {
+			return sliceType.Elem()
+		}
+	}
+	return nil
+}
+
+// hasMixedStringByteConstraint checks if an interface constraint includes both string and []byte types
+// For constraints like string | []byte, this returns true
+// For pure slice constraints like ~[]E, this returns false
+func hasMixedStringByteConstraint(iface *types.Interface) bool {
+	hasString := false
+	hasByteSlice := false
+
+	// Check if the interface has type terms that include both string and []byte
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		embedded := iface.EmbeddedType(i)
+		if union, ok := embedded.(*types.Union); ok {
+			for j := 0; j < union.Len(); j++ {
+				term := union.Term(j)
+				termType := term.Type().Underlying()
+
+				// Check for string type
+				if basicType, isBasic := termType.(*types.Basic); isBasic && (basicType.Info()&types.IsString) != 0 {
+					hasString = true
+				}
+
+				// Check for []byte type
+				if sliceType, isSlice := termType.(*types.Slice); isSlice {
+					if elemType, isBasic := sliceType.Elem().(*types.Basic); isBasic && elemType.Kind() == types.Uint8 {
+						hasByteSlice = true
+					}
+				}
+			}
+		} else {
+			// Handle non-union embedded types
+			termType := embedded.Underlying()
+
+			// Check for string type
+			if basicType, isBasic := termType.(*types.Basic); isBasic && (basicType.Info()&types.IsString) != 0 {
+				hasString = true
+			}
+
+			// Check for []byte type
+			if sliceType, isSlice := termType.(*types.Slice); isSlice {
+				if elemType, isBasic := sliceType.Elem().(*types.Basic); isBasic && elemType.Kind() == types.Uint8 {
+					hasByteSlice = true
+				}
+			}
+		}
+	}
+
+	// Return true only if we have both string and []byte in the constraint
+	return hasString && hasByteSlice
 }

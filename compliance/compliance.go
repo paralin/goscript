@@ -54,6 +54,8 @@ var (
 	parentGoModulePathOnce sync.Once
 	// parentGoModulePathErr stores any error encountered while determining the parent Go module path.
 	parentGoModulePathErr error
+	// depsCopyMutex provides thread safety when copying dependency packages
+	depsCopyMutex sync.Mutex
 )
 
 // getParentGoModulePath retrieves the Go module path of the parent project.
@@ -248,8 +250,13 @@ func CompileGoToTypeScript(t *testing.T, parentModulePath, testDir, tempDir, out
 	}
 
 	t.Logf("Compiling packages: %v", pkgsToCompile)
-	cmpErr := comp.CompilePackages(context.Background(), pkgsToCompile...)
+	compilationResult, cmpErr := comp.CompilePackages(context.Background(), pkgsToCompile...)
 	// We will check cmpErr after attempting to copy files.
+
+	// Copy dependency packages to compliance/deps/ for git tracking
+	if compilationResult != nil {
+		copyDependenciesToDepsFromResult(t, parentModulePath, testDir, compilationResult)
+	}
 
 	// Log generated TypeScript files and copy them back to testDir
 	testName := filepath.Base(testDir)
@@ -326,6 +333,122 @@ func CompileGoToTypeScript(t *testing.T, parentModulePath, testDir, tempDir, out
 	}
 	if cmpErr != nil {
 		t.Fatalf("compilation failed: %v", cmpErr)
+	}
+}
+
+// copyDependenciesToDepsFromResult detects and copies dependency packages to compliance/deps/
+// for git tracking using the compilation result information.
+func copyDependenciesToDepsFromResult(t *testing.T, parentModulePath, testDir string, compilationResult *compiler.CompilationResult) {
+	t.Helper()
+
+	// Find the workspace directory (parent of compliance/)
+	workspaceDir := filepath.Dir(filepath.Dir(filepath.Dir(testDir))) // testDir is workspace/compliance/tests/testname
+	depsDir := filepath.Join(workspaceDir, "compliance", "deps")
+
+	// Global lock for thread safety when copying dependencies
+	depsCopyMutex.Lock()
+	defer depsCopyMutex.Unlock()
+
+	// Create a set of original package paths for quick lookup
+	originalPkgSet := make(map[string]bool)
+	for _, pkg := range compilationResult.OriginalPackages {
+		originalPkgSet[pkg] = true
+	}
+
+	// Identify dependency packages (compiled packages that are not original packages)
+	var dependencyPackages []string
+	testModulePrefix := parentModulePath + "/compliance/tests"
+
+	for _, pkg := range compilationResult.CompiledPackages {
+		// Skip test packages
+		if strings.HasPrefix(pkg, testModulePrefix) {
+			continue
+		}
+		// Skip original packages
+		if originalPkgSet[pkg] {
+			continue
+		}
+		// This is a dependency
+		dependencyPackages = append(dependencyPackages, pkg)
+	}
+
+	// Also include copied packages as dependencies (like handwritten packages)
+	for _, pkg := range compilationResult.CopiedPackages {
+		// Skip test packages
+		if strings.HasPrefix(pkg, testModulePrefix) {
+			continue
+		}
+		// Skip original packages
+		if originalPkgSet[pkg] {
+			continue
+		}
+		// Skip builtin package as it's not a dependency in the traditional sense
+		if pkg == "builtin" {
+			continue
+		}
+		// This is a dependency
+		dependencyPackages = append(dependencyPackages, pkg)
+	}
+
+	if len(dependencyPackages) == 0 {
+		t.Logf("No dependency packages found for test %s", filepath.Base(testDir))
+		return
+	}
+
+	t.Logf("Found %d dependency packages: %v", len(dependencyPackages), dependencyPackages)
+
+	// For each dependency package, copy it to compliance/deps/
+	for _, depPkg := range dependencyPackages {
+		// Use the last component of the package path as the directory name
+		packageName := filepath.Base(depPkg)
+		destDir := filepath.Join(depsDir, packageName)
+
+		// Find the source directory in the output
+		// We need to construct the path based on the compiler's output structure
+		sourcePath := filepath.Join(workspaceDir, "compliance", "tests", filepath.Base(testDir), "run", "output", "@goscript", depPkg)
+
+		// Check if the source path exists
+		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
+			t.Logf("Warning: dependency package source not found at %s", sourcePath)
+			continue
+		}
+
+		t.Logf("Copying dependency package %s from %s to %s", depPkg, sourcePath, destDir)
+
+		// Remove existing directory if it exists
+		if err := os.RemoveAll(destDir); err != nil {
+			t.Logf("warning: failed to remove existing deps directory %s: %v", destDir, err)
+		}
+
+		// Create destination directory
+		if err := os.MkdirAll(destDir, 0o755); err != nil {
+			t.Logf("warning: failed to create deps directory %s: %v", destDir, err)
+			continue
+		}
+
+		// Copy all files from the dependency package
+		err := filepath.WalkDir(sourcePath, func(srcPath string, srcInfo os.DirEntry, srcErr error) error {
+			if srcErr != nil {
+				return srcErr
+			}
+
+			srcRel, err := filepath.Rel(sourcePath, srcPath)
+			if err != nil {
+				return err
+			}
+
+			destPath := filepath.Join(destDir, srcRel)
+
+			if srcInfo.IsDir() {
+				return os.MkdirAll(destPath, 0o755)
+			}
+
+			return copyFile(srcPath, destPath)
+		})
+
+		if err != nil {
+			t.Logf("warning: failed to copy dependency package %s: %v", depPkg, err)
+		}
 	}
 }
 
@@ -539,10 +662,11 @@ func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir 
 
 	// Alias for this test's own generated packages
 	builtinTsRelPath := filepath.ToSlash(filepath.Join(relWorkspacePath, "gs", "*"))
+	depsRelPath := filepath.ToSlash(filepath.Join(relWorkspacePath, "compliance", "deps", "*"))
 	testPkgGoPathPrefix := fmt.Sprintf("%s/compliance/tests/%s", parentModulePath, testName)
 	compilerOptions["paths"] = map[string][]string{
 		fmt.Sprintf("@goscript/%s/*", testPkgGoPathPrefix): {"./*"},
-		"@goscript/*": {builtinTsRelPath},
+		"@goscript/*": {builtinTsRelPath, depsRelPath},
 	}
 	tsconfig["compilerOptions"] = compilerOptions
 
@@ -660,12 +784,20 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 	}
 	relGsBuiltinPath = filepath.ToSlash(relGsBuiltinPath) // Ensure forward slashes for tsconfig
 
+	// Calculate the relative path from tempDir to compliance/deps
+	depsPath := filepath.Join(workspaceDir, "compliance", "deps", "*")
+	relDepsPath, err := filepath.Rel(tempDir, depsPath)
+	if err != nil {
+		t.Fatalf("failed to calculate relative path from tempDir (%s) to compliance/deps (%s): %v", tempDir, depsPath, err)
+	}
+	relDepsPath = filepath.ToSlash(relDepsPath) // Ensure forward slashes for tsconfig
+
 	// tsconfig.json for the runner execution in tempDir
 	runnerTsConfig := maps.Clone(baseTsConfig)
 	runnerCompilerOptions := maps.Clone(runnerTsConfig["compilerOptions"].(map[string]interface{}))
 	runnerCompilerOptions["baseUrl"] = "." // tempDir is baseUrl
 	runnerCompilerOptions["paths"] = map[string][]string{
-		"@goscript/*": {"./output/@goscript/*", relGsBuiltinPath},
+		"@goscript/*": {"./output/@goscript/*", relGsBuiltinPath, relDepsPath},
 	}
 	runnerTsConfig["compilerOptions"] = runnerCompilerOptions
 

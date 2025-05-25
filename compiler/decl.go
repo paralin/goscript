@@ -37,7 +37,7 @@ func (c *GoToTSCompiler) WriteDecls(decls []ast.Decl) error {
 				c.tsw.WriteLine("") // Add space after spec
 			}
 		default:
-			fmt.Printf("unknown decl: %#v\n", decl)
+			return fmt.Errorf("unknown decl: %#v", decl)
 		}
 	}
 	return nil

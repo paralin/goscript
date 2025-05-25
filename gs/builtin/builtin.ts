@@ -6,6 +6,16 @@ export * from './map.js'
 export * from './slice.js'
 export * from './type.js'
 
+// Copy is the Go builtin function that copies the contents of one slice to another.
+// It returns the number of elements copied.
+export function copy<T>(dst: T[], src: T[]): number {
+  const n = Math.min(dst.length, src.length);
+  for (let i = 0; i < n; i++) {
+    dst[i] = src[i];
+  }
+  return n;
+}
+
 // Duration multiplication helper for time package operations
 // Handles expressions like time.Hour * 24
 export function multiplyDuration(duration: any, multiplier: number): any {

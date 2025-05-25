@@ -553,7 +553,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		// Standalone &x doesn't directly assign, but its usage in assignments
 		// or function calls determines varRefing. Assignments are handled below.
 		// Function calls like foo(&x) would require different tracking if needed.
-		// For now, we focus on assignments as per the request.
+		// TODO: for now, we focus on assignments
 		return v
 
 	case *ast.CallExpr:

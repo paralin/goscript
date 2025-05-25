@@ -68,6 +68,15 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 	case *types.TypeParam:
 		// For type parameters, write the type parameter name (e.g., "T", "K", etc.)
 		c.tsw.WriteLiterally(t.Obj().Name())
+	case *types.Union:
+		// Handle union types (e.g., string | []byte)
+		for i := 0; i < t.Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(" | ")
+			}
+			term := t.Term(i)
+			c.WriteGoType(term.Type(), context)
+		}
 	default:
 		// For other types, just write "any" and add a comment
 		c.tsw.WriteLiterally("any")
@@ -675,4 +684,3 @@ func (c *GoToTSCompiler) WriteTypeConstraint(constraint ast.Expr) {
 		c.WriteTypeExpr(constraint)
 	}
 }
-

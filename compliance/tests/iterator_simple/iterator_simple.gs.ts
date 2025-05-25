@@ -34,6 +34,7 @@ export async function main(): Promise<void> {
 			return shouldContinue
 		})
 	})()
+
 	console.log("Testing key-value iterator:")
 	;(() => {
 		let shouldContinue = true
@@ -44,6 +45,7 @@ export async function main(): Promise<void> {
 			return shouldContinue
 		})
 	})()
+
 	console.log("test finished")
 }
 

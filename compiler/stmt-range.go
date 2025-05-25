@@ -382,7 +382,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 							c.tsw.WriteLiterally("})")
 							c.tsw.WriteLine("")
 							c.tsw.Indent(-1)
-							c.tsw.WriteLiterally("})()")
+							c.tsw.WriteLine("})()")
 							return nil
 						} else if yieldParams.Len() == 1 {
 							// func(func(V) bool) - iterator with one value
@@ -416,7 +416,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 							c.tsw.WriteLiterally("})")
 							c.tsw.WriteLine("")
 							c.tsw.Indent(-1)
-							c.tsw.WriteLiterally("})()")
+							c.tsw.WriteLine("})()")
 							return nil
 						} else if yieldParams.Len() == 2 {
 							// func(func(K, V) bool) - iterator with key-value pairs
@@ -460,7 +460,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 							c.tsw.WriteLiterally("})")
 							c.tsw.WriteLine("")
 							c.tsw.Indent(-1)
-							c.tsw.WriteLiterally("})()")
+							c.tsw.WriteLine("})()")
 							return nil
 						}
 					}
@@ -540,7 +540,7 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 		c.tsw.WriteLiterally("})")
 		c.tsw.WriteLine("")
 		c.tsw.Indent(-1)
-		c.tsw.WriteLiterally("})()")
+		c.tsw.WriteLine("})()")
 		return nil
 	}
 
