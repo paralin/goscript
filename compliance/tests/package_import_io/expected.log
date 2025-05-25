@@ -1,0 +1,9 @@
+EOF: EOF
+ErrClosedPipe: io: read/write on closed pipe
+ErrShortWrite: short write
+ErrUnexpectedEOF: unexpected EOF
+SeekStart: 0
+SeekCurrent: 1
+SeekEnd: 2
+WriteString to Discard - bytes: 11 err: true
+test finished

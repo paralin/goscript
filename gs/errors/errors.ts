@@ -1,5 +1,4 @@
 import * as $ from '@goscript/builtin/builtin.js'
-import { GoError } from '@goscript/builtin/io.js'
 
 // GoScriptError implements the Go error interface
 class GoScriptError {
@@ -16,7 +15,7 @@ class GoScriptError {
 
 // New returns an error that formats as the given text.
 // Each call to New returns a distinct error value even if the text is identical.
-export function New(text: string): GoError {
+export function New(text: string): $.GoError {
   return new GoScriptError(text)
 }
 
@@ -35,7 +34,7 @@ export const ErrUnsupported = New('unsupported operation')
 // Unwrap returns the result of calling the Unwrap method on err, if err's
 // type contains an Unwrap method returning error.
 // Otherwise, Unwrap returns nil.
-export function Unwrap(err: GoError): GoError {
+export function Unwrap(err: $.GoError): $.GoError {
   if (err === null) {
     return null
   }
@@ -77,7 +76,7 @@ export function Unwrap(err: GoError): GoError {
 // then Is(MyError{}, fs.ErrExist) returns true. See syscall.Errno.Is for
 // an example in the standard library. An Is method should only shallowly
 // compare err and the target and not call Unwrap on either.
-export function Is(err: GoError, target: GoError): boolean {
+export function Is(err: $.GoError, target: $.GoError): boolean {
   if (target === null) {
     return err === null
   }
@@ -145,7 +144,7 @@ export function Is(err: GoError, target: GoError): boolean {
 //
 // As panics if target is not a non-nil pointer to either a type that implements
 // error, or to any interface type.
-export function As(err: GoError, target: any): boolean {
+export function As(err: $.GoError, target: any): boolean {
   if (err === null) {
     return false
   }
@@ -201,7 +200,7 @@ export function As(err: GoError, target: any): boolean {
 // between each string.
 //
 // A non-nil error returned by Join implements the Unwrap() []error method.
-export function Join(...errs: GoError[]): GoError {
+export function Join(...errs: $.GoError[]): $.GoError {
   const nonNilErrs = errs.filter((err) => err !== null)
 
   if (nonNilErrs.length === 0) {
@@ -216,7 +215,7 @@ export function Join(...errs: GoError[]): GoError {
   const joinedError = new GoScriptError(message)
 
   // Add Unwrap method that returns the array of errors
-  ;(joinedError as any).Unwrap = function (): GoError[] {
+  ;(joinedError as any).Unwrap = function (): $.GoError[] {
     return nonNilErrs
   }
 

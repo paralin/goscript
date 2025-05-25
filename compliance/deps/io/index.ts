@@ -1,3 +1,0 @@
-export { ByteReader, ByteScanner, ByteWriter, Closer, Copy, CopyBuffer, CopyN, Discard, EOF, ErrNoProgress, ErrShortBuffer, ErrShortWrite, ErrUnexpectedEOF, LimitReader, LimitedReader, NewOffsetWriter, NewSectionReader, NopCloser, OffsetWriter, ReadAll, ReadAtLeast, ReadCloser, ReadFull, ReadSeekCloser, ReadSeeker, ReadWriteCloser, ReadWriteSeeker, ReadWriter, Reader, ReaderAt, ReaderFrom, RuneReader, RuneScanner, SectionReader, SeekCurrent, SeekEnd, SeekStart, Seeker, StringWriter, TeeReader, WriteCloser, WriteSeeker, WriteString, Writer, WriterAt, WriterTo } from "./io.gs.js"
-export { MultiReader, MultiWriter } from "./multi.gs.js"
-export { ErrClosedPipe, Pipe, PipeReader, PipeWriter } from "./pipe.gs.js"

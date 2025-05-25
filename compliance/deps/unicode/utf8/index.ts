@@ -1,1 +1,0 @@
-export { AppendRune, DecodeLastRune, DecodeLastRuneInString, DecodeRune, DecodeRuneInString, EncodeRune, FullRune, FullRuneInString, MaxRune, RuneCount, RuneCountInString, RuneError, RuneLen, RuneSelf, RuneStart, UTFMax, Valid, ValidRune, ValidString } from "./utf8.gs.js"
