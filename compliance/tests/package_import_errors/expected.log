@@ -1,0 +1,6 @@
+err1: first error
+err2: second error
+err1 == err2: false
+err1 == nil: false
+nilErr == nil: true
+test finished
