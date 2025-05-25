@@ -3,8 +3,9 @@ export const GOOS = 'js'
 export const GOARCH = 'wasm'
 
 // Version returns the Go version as a string
+export const GOVERSION = 'go1.24.3'
 export function Version(): string {
-  return 'go1.22.0' // Static version for goscript compatibility
+  return GOVERSION
 }
 
 // GOMAXPROCS sets the maximum number of operating system threads

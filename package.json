@@ -42,7 +42,8 @@
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "build": "npm run build:updategover && tsc -p tsconfig.build.json",
+    "build:updategover": "node -e \"const fs = require('fs'); const { execSync } = require('child_process'); const goVersion = execSync('go mod edit -json', { encoding: 'utf8' }); const goData = JSON.parse(goVersion); const version = goData.Go; const runtimePath = 'gs/runtime/runtime.ts'; const content = fs.readFileSync(runtimePath, 'utf8'); const updatedContent = content.replace(/export const GOVERSION = 'go[^']*'/, \\`export const GOVERSION = 'go\\${version}'\\`); fs.writeFileSync(runtimePath, updatedContent);\"",
     "prepublishOnly": "npm run build",
     "example": "cd ./example/simple && bash run.bash",
     "test": "npm run test:go && npm run test:js",
