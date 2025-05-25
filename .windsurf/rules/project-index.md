@@ -12,8 +12,6 @@ The following is an overview of the functions within the `compiler` package.
 - `(a *Analysis) IsFuncLitAsync(funcLit *ast.FuncLit) bool`
 - `(a *Analysis) NeedsVarRef(obj types.Object) bool`
 - `(a *Analysis) NeedsVarRefAccess(obj types.Object) bool`
-- `(a *Analysis) NeedsVarRefDeref(ptrType types.Type) bool`
-- `(a *Analysis) NeedsVarRefFieldAccess(ptrType types.Type) bool`
 - `(v *analysisVisitor) getOrCreateUsageInfo(obj types.Object) *VariableUsageInfo`
 - `(v *analysisVisitor) Visit(node ast.Node) ast.Visitor`
 - `(v *analysisVisitor) containsAsyncOperations(node ast.Node) bool`

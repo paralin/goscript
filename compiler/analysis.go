@@ -231,56 +231,6 @@ func (a *Analysis) NeedsVarRefAccess(obj types.Object) bool {
 	return false
 }
 
-// NeedsVarRefDeref determines whether a pointer dereference operation (*ptr) needs
-// additional .value access beyond the standard !.value pattern.
-//
-// Standard pattern: ptr!.value  (for *int, *string, etc.)
-// Enhanced pattern: ptr.value!.value  (when ptr itself is variable referenced)
-//
-// This function returns true when the pointer variable itself is variable referenced,
-// meaning we need an extra .value to access the actual pointer before dereferencing.
-//
-// Examples:
-//   - ptr := &x (ptr not variable referenced): *ptr => ptr!.value
-//   - ptrPtr := &ptr (ptr is variable referenced): *ptr => ptr.value!.value
-//
-// Args:
-//
-//	ptrType: The type of the pointer being dereferenced
-//
-// Returns:
-//
-//	true if additional .value access is needed due to the pointer being variable referenced
-func (a *Analysis) NeedsVarRefDeref(ptrType types.Type) bool {
-	// For now, return false - this would need more sophisticated analysis
-	// to track when pointer variables themselves are variable referenced
-	return false
-}
-
-// NeedsVarRefFieldAccess determines whether a pointer variable needs the .value
-// access when performing field access through the pointer.
-//
-// In Go, field access through pointers is automatically dereferenced:
-//
-//	ptr.Field  // equivalent to (*ptr).Field
-//
-// In TypeScript, we need to determine if the pointer is:
-//  1. A simple pointer: ptr.Field  (no .value needed)
-//  2. A variable-referenced pointer: ptr.value.Field  (needs .value)
-//
-// Args:
-//
-//	ptrType: The pointer type being used for field access
-//
-// Returns:
-//
-//	true if .value access is needed before field access
-func (a *Analysis) NeedsVarRefFieldAccess(ptrType types.Type) bool {
-	// This would require analysis of the specific pointer variable
-	// For now, return false as a conservative default
-	return false
-}
-
 // analysisVisitor implements ast.Visitor and is used to traverse the AST during analysis.
 type analysisVisitor struct {
 	// analysis stores information gathered during the traversal
