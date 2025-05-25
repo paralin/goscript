@@ -81,8 +81,13 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 			}
 		}
 
-		// Start declaration - add export for Go-exported symbols
-		if name.IsExported() {
+		// Start declaration - add export for Go-exported symbols (but not if inside a function)
+		isInsideFunction := false
+		if nodeInfo := c.analysis.NodeData[a]; nodeInfo != nil {
+			isInsideFunction = nodeInfo.IsInsideFunction
+		}
+
+		if name.IsExported() && !isInsideFunction {
 			c.tsw.WriteLiterally("export ")
 		}
 		c.tsw.WriteLiterally("let ")

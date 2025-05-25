@@ -165,8 +165,13 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 	case *ast.InterfaceType:
 		return c.WriteInterfaceTypeSpec(a, t)
 	default:
-		// type alias - add export for Go-exported types
-		if a.Name.IsExported() {
+		// type alias - add export for Go-exported types (but not if inside a function)
+		isInsideFunction := false
+		if nodeInfo := c.analysis.NodeData[a]; nodeInfo != nil {
+			isInsideFunction = nodeInfo.IsInsideFunction
+		}
+
+		if a.Name.IsExported() && !isInsideFunction {
 			c.tsw.WriteLiterally("export ")
 		}
 		c.tsw.WriteLiterally("type ")
@@ -182,8 +187,13 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 // WriteInterfaceTypeSpec writes the TypeScript type for a Go interface type.
 func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.InterfaceType) error {
-	// Add export for Go-exported interfaces
-	if a.Name.IsExported() {
+	// Add export for Go-exported interfaces (but not if inside a function)
+	isInsideFunction := false
+	if nodeInfo := c.analysis.NodeData[a]; nodeInfo != nil {
+		isInsideFunction = nodeInfo.IsInsideFunction
+	}
+
+	if a.Name.IsExported() && !isInsideFunction {
 		c.tsw.WriteLiterally("export ")
 	}
 	c.tsw.WriteLiterally("type ")

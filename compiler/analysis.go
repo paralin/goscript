@@ -56,6 +56,7 @@ type NodeInfo struct {
 	IsBareReturn      bool
 	EnclosingFuncDecl *ast.FuncDecl
 	EnclosingFuncLit  *ast.FuncLit
+	IsInsideFunction  bool // true if this declaration is inside a function body
 }
 
 // Analysis holds information gathered during the analysis phase of the Go code compilation.
@@ -685,6 +686,25 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 						v.analysis.NodeData[n] = &NodeInfo{}
 					}
 					v.analysis.NodeData[n].IsBareReturn = true
+				}
+			}
+		}
+		return v // Continue traversal
+
+	case *ast.DeclStmt:
+		// Handle declarations inside functions (const, var, type declarations within function bodies)
+		// These should not have export modifiers in TypeScript
+		if genDecl, ok := n.Decl.(*ast.GenDecl); ok {
+			// Check if we're inside a function (either FuncDecl or FuncLit)
+			isInsideFunction := v.currentFuncDecl != nil || v.currentFuncLit != nil
+
+			if isInsideFunction {
+				// Mark all specs in this declaration as being inside a function
+				for _, spec := range genDecl.Specs {
+					if v.analysis.NodeData[spec] == nil {
+						v.analysis.NodeData[spec] = &NodeInfo{}
+					}
+					v.analysis.NodeData[spec].IsInsideFunction = true
 				}
 			}
 		}

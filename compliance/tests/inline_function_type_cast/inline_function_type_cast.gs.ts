@@ -19,7 +19,7 @@ export async function main(): Promise<void> {
 	console.log(castedGreeter!("Inline World"))
 
 	// Test with a different signature
-	export type Adder = ((a: number, b: number) => number) | null;
+	type Adder = ((a: number, b: number) => number) | null;
 	let theInlineAdder = (a: number, b: number): number => {
 		return a + b
 	}
