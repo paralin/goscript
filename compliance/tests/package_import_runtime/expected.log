@@ -1,6 +1,5 @@
 GOOS: js
 GOARCH: wasm
-NumCPU: 12
 GOMAXPROCS(-1): 1
 GOMAXPROCS(0): 1
 NumGoroutine: 1

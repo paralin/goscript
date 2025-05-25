@@ -200,18 +200,33 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					structType = underlyingStruct
 					isStructLiteral = true
 
-					// Named struct, use constructor
-					c.tsw.WriteLiterally("new ")
-					c.WriteTypeExpr(exp.Type)
+					// Check if this is a protobuf type
+					if handled, err := c.writeProtobufCompositeLit(exp, litType); handled {
+						if err != nil {
+							return err
+						}
+					} else {
+						// Named struct, use constructor
+						c.tsw.WriteLiterally("new ")
+						c.WriteTypeExpr(exp.Type)
+					}
 				}
 			} else if ptrType, ok := litType.(*types.Pointer); ok {
 				if namedElem, ok := ptrType.Elem().(*types.Named); ok {
 					if underlyingStruct, ok := namedElem.Underlying().(*types.Struct); ok {
 						structType = underlyingStruct
 						isStructLiteral = true // Treat pointer-to-struct literal similarly
-						// Named struct pointer, use constructor
-						c.tsw.WriteLiterally("new ")
-						c.WriteTypeExpr(exp.Type)
+
+						// Check if this is a protobuf type
+						if handled, err := c.writeProtobufCompositeLit(exp, litType); handled {
+							if err != nil {
+								return err
+							}
+						} else {
+							// Named struct pointer, use constructor
+							c.tsw.WriteLiterally("new ")
+							c.WriteTypeExpr(exp.Type)
+						}
 					}
 				}
 			} else if underlyingStruct, ok := litType.Underlying().(*types.Struct); ok {
@@ -340,7 +355,11 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					if firstFieldWritten {
 						c.tsw.WriteLiterally(", ")
 					}
-					c.tsw.WriteLiterally(keyName)
+
+					// Convert field name for protobuf types
+					fieldName := c.convertProtobufFieldNameInLiteral(keyName, litType)
+
+					c.tsw.WriteLiterally(fieldName)
 					c.tsw.WriteLiterally(": ")
 					if err := c.WriteVarRefedValue(directFields[keyName]); err != nil {
 						return err
@@ -539,7 +558,11 @@ func (c *GoToTSCompiler) writeUntypedStructLiteral(exp *ast.CompositeLit, struct
 		if firstFieldWritten {
 			c.tsw.WriteLiterally(", ")
 		}
-		c.tsw.WriteLiterally(keyName)
+
+		// Convert field name for protobuf types
+		fieldName := c.convertProtobufFieldNameInLiteral(keyName, structType.Underlying())
+
+		c.tsw.WriteLiterally(fieldName)
 		c.tsw.WriteLiterally(": ")
 		if err := c.WriteVarRefedValue(directFields[keyName]); err != nil {
 			return err

@@ -146,6 +146,18 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 
 			// Visit all imports, including standard library packages
 			for _, imp := range pkg.Imports {
+				// Skip protobuf-go-lite packages and their dependencies
+				if isProtobufGoLitePackage(imp.PkgPath) {
+					c.le.Debugf("Skipping protobuf-go-lite package: %s", imp.PkgPath)
+					continue
+				}
+
+				// Skip packages that are only used by .pb.go files
+				if isPackageOnlyUsedByProtobufFiles(pkg, imp.PkgPath) {
+					c.le.Debugf("Skipping package only used by .pb.go files: %s", imp.PkgPath)
+					continue
+				}
+
 				visit(imp)
 			}
 		}
@@ -317,13 +329,35 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 			return err
 		}
 
+		// Check if this is a .pb.go file that should be skipped
+		baseFileName := filepath.Base(fileName)
+		if strings.HasSuffix(baseFileName, ".pb.go") {
+			// Check if there's a corresponding .pb.ts file
+			pbTsFileName := strings.TrimSuffix(baseFileName, ".pb.go") + ".pb.ts"
+			packageDir := filepath.Dir(fileName)
+			pbTsPath := filepath.Join(packageDir, pbTsFileName)
+
+			if _, err := os.Stat(pbTsPath); err == nil {
+				// .pb.ts file exists, copy it instead of transpiling .pb.go
+				c.le.WithField("file", relWdFileName).Debug("found .pb.ts file, copying instead of transpiling .pb.go")
+
+				if err := c.copyProtobufTSFile(pbTsPath, pbTsFileName); err != nil {
+					return fmt.Errorf("failed to copy protobuf .pb.ts file: %w", err)
+				}
+
+				// Add the .pb file to our compiled files list for index generation
+				pbFileName := strings.TrimSuffix(baseFileName, ".pb.go") + ".pb"
+				compiledFiles = append(compiledFiles, pbFileName)
+				continue // Skip transpiling this .pb.go file
+			}
+		}
+
 		c.le.WithField("file", relWdFileName).Debug("compiling file")
 		if err := c.CompileFile(ctx, fileName, f, packageAnalysis); err != nil {
 			return err
 		}
 
 		// Add the base filename to our list for the index.ts generation
-		baseFileName := filepath.Base(fileName)
 		// Strip .go extension and add .gs
 		gsFileName := strings.TrimSuffix(baseFileName, ".go") + ".gs"
 		compiledFiles = append(compiledFiles, gsFileName)
@@ -415,6 +449,16 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 
 	// Write selective re-exports for each compiled file
 	for _, fileName := range compiledFiles {
+		// Check if this is a protobuf file
+		if strings.HasSuffix(fileName, ".pb") {
+			// For protobuf files, add a simple re-export
+			pbTsFileName := fileName + ".ts"
+			if err := c.writeProtobufExports(indexFile, fileName, pbTsFileName); err != nil {
+				return err
+			}
+			continue
+		}
+
 		// Find which symbols this file exports
 		var fileSymbols []string
 
@@ -559,6 +603,11 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	// Add import for the goscript runtime using namespace import and alias
 	c.codeWriter.WriteLinef("import * as $ from %q;", "@goscript/builtin/builtin.js")
 
+	// Check if there are any .pb.go files in this package and add imports for them
+	if err := c.addProtobufImports(); err != nil {
+		return fmt.Errorf("failed to add protobuf imports: %w", err)
+	}
+
 	// Generate auto-imports for functions from other files in the same package
 	currentFileName := strings.TrimSuffix(filepath.Base(c.fullPath), ".go")
 	if imports := c.PackageAnalysis.FunctionCalls[currentFileName]; imports != nil {
@@ -587,7 +636,6 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 // decisions about code generation (e.g., varRefing, async behavior).
 type GoToTSCompiler struct {
 	tsw *TSCodeWriter
-
 	pkg *packages.Package
 
 	analysis *Analysis

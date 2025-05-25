@@ -7,7 +7,7 @@ func main() {
 	println("GOOS:", runtime.GOOS)
 	println("GOARCH:", runtime.GOARCH)
 	// println("Version:", runtime.Version()) - not stable for the test (go.mod may change)
-	println("NumCPU:", runtime.NumCPU())
+	// println("NumCPU:", runtime.NumCPU()) - not stable for the test (number of cores may change)
 
 	// Test GOMAXPROCS
 	procs := runtime.GOMAXPROCS(0) // Get current value

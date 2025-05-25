@@ -384,6 +384,27 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	// Handle multi-variable assignment from a single expression.
 	if len(exp.Lhs) > 1 && len(exp.Rhs) == 1 {
 		rhsExpr := exp.Rhs[0]
+
+		// Check for protobuf method calls first
+		if callExpr, ok := rhsExpr.(*ast.CallExpr); ok {
+			// Handle protobuf MarshalVT: data, err := msg.MarshalVT()
+			if len(exp.Lhs) == 2 && c.isProtobufMethodCall(callExpr, "MarshalVT") {
+				err := c.writeProtobufMarshalAssignment(exp.Lhs, callExpr, exp.Tok)
+				if err != nil {
+					return err
+				}
+				return nil
+			}
+			// Handle protobuf MarshalJSON: data, err := msg.MarshalJSON()
+			if len(exp.Lhs) == 2 && c.isProtobufMethodCall(callExpr, "MarshalJSON") {
+				err := c.writeProtobufMarshalJSONAssignment(exp.Lhs, callExpr, exp.Tok)
+				if err != nil {
+					return err
+				}
+				return nil
+			}
+		}
+
 		if typeAssertExpr, ok := rhsExpr.(*ast.TypeAssertExpr); ok {
 			return c.writeTypeAssert(exp.Lhs, typeAssertExpr, exp.Tok)
 		} else if indexExpr, ok := rhsExpr.(*ast.IndexExpr); ok {
@@ -410,6 +431,20 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			return writeMultiVarAssignFromCall(exp.Lhs, callExpr, exp.Tok)
 		}
 		// If none of the specific multi-assign patterns match, fall through to the error check below
+	}
+
+	// Check for single-variable protobuf method calls before general assignment handling
+	if len(exp.Lhs) == 1 && len(exp.Rhs) == 1 {
+		if callExpr, ok := exp.Rhs[0].(*ast.CallExpr); ok {
+			// Handle protobuf UnmarshalVT: err = out.UnmarshalVT(data)
+			if c.isProtobufMethodCall(callExpr, "UnmarshalVT") {
+				return c.writeProtobufUnmarshalAssignment(exp.Lhs, callExpr, exp.Tok)
+			}
+			// Handle protobuf UnmarshalJSON: err = out.UnmarshalJSON(data)
+			if c.isProtobufMethodCall(callExpr, "UnmarshalJSON") {
+				return c.writeProtobufUnmarshalJSONAssignment(exp.Lhs, callExpr, exp.Tok)
+			}
+		}
 	}
 
 	// Ensure LHS and RHS have the same length for valid Go code in these cases

@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from '@goscript/builtin/builtin.js'
 
 // Clone returns a fresh copy of s.
 // It guarantees to make a copy of s into a new allocation,
@@ -11,8 +11,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 // For strings of length zero the string "" will be returned
 // and no allocation is made.
 export function Clone(s: string): string {
-	// In JavaScript, strings are immutable, so we can just return the string
-	// But to match Go semantics, we'll create a new string
-	return String(s)
+  // In JavaScript, strings are immutable, so we can just return the string
+  // But to match Go semantics, we'll create a new string
+  return String(s)
 }
-

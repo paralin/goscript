@@ -25,15 +25,17 @@ function newError(message: string): $.GoError {
 // Error variables
 export const EOF = newError('EOF')
 export const ErrClosedPipe = newError('io: read/write on closed pipe')
-export const ErrNoProgress = newError('multiple Read calls return no data or error')
+export const ErrNoProgress = newError(
+  'multiple Read calls return no data or error',
+)
 export const ErrShortBuffer = newError('short buffer')
 export const ErrShortWrite = newError('short write')
 export const ErrUnexpectedEOF = newError('unexpected EOF')
 
 // Seek whence values
-export const SeekStart = 0   // seek relative to the origin of the file
+export const SeekStart = 0 // seek relative to the origin of the file
 export const SeekCurrent = 1 // seek relative to the current offset
-export const SeekEnd = 2     // seek relative to the end
+export const SeekEnd = 2 // seek relative to the end
 
 // Core interfaces
 
@@ -131,7 +133,7 @@ export function WriteString(w: Writer, s: string): [number, $.GoError] {
   if ('WriteString' in w && typeof (w as any).WriteString === 'function') {
     return (w as StringWriter).WriteString(s)
   }
-  
+
   // Convert string to bytes and write
   const bytes = new TextEncoder().encode(s)
   return w.Write(bytes)
@@ -151,12 +153,12 @@ export class LimitedReader implements Reader {
     if (this.N <= 0) {
       return [0, EOF]
     }
-    
+
     let readBuf = p
     if (p.length > this.N) {
       readBuf = p.subarray(0, this.N)
     }
-    
+
     const [n, err] = this.R.Read(readBuf)
     this.N -= n
     return [n, err]
@@ -186,12 +188,12 @@ export class SectionReader implements Reader, Seeker, ReaderAt {
     if (this.off >= this.limit) {
       return [0, EOF]
     }
-    
+
     let max = this.limit - this.off
     if (p.length > max) {
       p = p.subarray(0, max)
     }
-    
+
     const [n, err] = this.r.ReadAt(p, this.off)
     this.off += n
     return [n, err]
@@ -212,11 +214,11 @@ export class SectionReader implements Reader, Seeker, ReaderAt {
       default:
         return [0, newError('io.SectionReader.Seek: invalid whence')]
     }
-    
+
     if (abs < this.base) {
       return [0, newError('io.SectionReader.Seek: negative position')]
     }
-    
+
     this.off = abs
     return [abs - this.base, null]
   }
@@ -225,7 +227,7 @@ export class SectionReader implements Reader, Seeker, ReaderAt {
     if (off < 0 || off >= this.limit - this.base) {
       return [0, EOF]
     }
-    
+
     off += this.base
     if (off + p.length > this.limit) {
       p = p.subarray(0, this.limit - off)
@@ -235,7 +237,7 @@ export class SectionReader implements Reader, Seeker, ReaderAt {
       }
       return [n, err]
     }
-    
+
     return this.r.ReadAt(p, off)
   }
 
@@ -245,7 +247,11 @@ export class SectionReader implements Reader, Seeker, ReaderAt {
 }
 
 // NewSectionReader returns a SectionReader that reads from r starting at offset off and stops with EOF after n bytes
-export function NewSectionReader(r: ReaderAt, off: number, n: number): SectionReader {
+export function NewSectionReader(
+  r: ReaderAt,
+  off: number,
+  n: number,
+): SectionReader {
   return new SectionReader(r, off, n)
 }
 
@@ -286,11 +292,11 @@ export class OffsetWriter implements Writer, WriterAt {
       default:
         return [0, newError('io.OffsetWriter.Seek: invalid whence')]
     }
-    
+
     if (abs < 0) {
       return [0, newError('io.OffsetWriter.Seek: negative position')]
     }
-    
+
     this.off = abs
     return [abs, null]
   }
@@ -307,21 +313,25 @@ export function Copy(dst: Writer, src: Reader): [number, $.GoError] {
 }
 
 // CopyBuffer is identical to Copy except that it stages through the provided buffer
-export function CopyBuffer(dst: Writer, src: Reader, buf: Uint8Array | null): [number, $.GoError] {
+export function CopyBuffer(
+  dst: Writer,
+  src: Reader,
+  buf: Uint8Array | null,
+): [number, $.GoError] {
   // If src implements WriterTo, use it
   if ('WriteTo' in src && typeof (src as any).WriteTo === 'function') {
     return (src as WriterTo).WriteTo(dst)
   }
-  
+
   // If dst implements ReaderFrom, use it
   if ('ReadFrom' in dst && typeof (dst as any).ReadFrom === 'function') {
     return (dst as ReaderFrom).ReadFrom(src)
   }
-  
+
   if (buf === null) {
     buf = new Uint8Array(32 * 1024) // 32KB default buffer
   }
-  
+
   let written = 0
   while (true) {
     const [nr, er] = src.Read(buf)
@@ -352,7 +362,11 @@ export function CopyBuffer(dst: Writer, src: Reader, buf: Uint8Array | null): [n
 }
 
 // CopyN copies n bytes (or until an error) from src to dst
-export function CopyN(dst: Writer, src: Reader, n: number): [number, $.GoError] {
+export function CopyN(
+  dst: Writer,
+  src: Reader,
+  n: number,
+): [number, $.GoError] {
   const [written, err] = Copy(dst, LimitReader(src, n))
   if (written === n) {
     return [written, null]
@@ -365,11 +379,15 @@ export function CopyN(dst: Writer, src: Reader, n: number): [number, $.GoError] 
 }
 
 // ReadAtLeast reads from r into buf until it has read at least min bytes
-export function ReadAtLeast(r: Reader, buf: Uint8Array, min: number): [number, $.GoError] {
+export function ReadAtLeast(
+  r: Reader,
+  buf: Uint8Array,
+  min: number,
+): [number, $.GoError] {
   if (buf.length < min) {
     return [0, ErrShortBuffer]
   }
-  
+
   let n = 0
   while (n < min) {
     const [nn, err] = r.Read(buf.subarray(n))
@@ -397,7 +415,7 @@ export function ReadAll(r: Reader): [Uint8Array, $.GoError] {
   const chunks: Uint8Array[] = []
   let totalLength = 0
   const buf = new Uint8Array(512)
-  
+
   while (true) {
     const [n, err] = r.Read(buf)
     if (n > 0) {
@@ -411,7 +429,7 @@ export function ReadAll(r: Reader): [Uint8Array, $.GoError] {
       return [new Uint8Array(0), err]
     }
   }
-  
+
   // Combine all chunks
   const result = new Uint8Array(totalLength)
   let offset = 0
@@ -419,7 +437,7 @@ export function ReadAll(r: Reader): [Uint8Array, $.GoError] {
     result.set(chunk, offset)
     offset += chunk.length
   }
-  
+
   return [result, null]
 }
 
@@ -427,7 +445,7 @@ export function ReadAll(r: Reader): [Uint8Array, $.GoError] {
 export function NopCloser(r: Reader): ReadCloser {
   return {
     Read: r.Read.bind(r),
-    Close: () => null
+    Close: () => null,
   }
 }
 
@@ -454,7 +472,7 @@ class multiReader implements Reader {
         }
         return [n, err]
       }
-      
+
       const [n, err] = this.readers[0].Read(p)
       if (err === EOF) {
         this.readers.shift() // Remove first reader
@@ -525,4 +543,4 @@ class teeReader implements Reader {
     }
     return [n, err]
   }
-} 
+}

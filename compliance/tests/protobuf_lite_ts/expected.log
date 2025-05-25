@@ -1,0 +1,14 @@
+data: Uint8Array(14) [
+   10,   5, 104, 101, 108,
+  108, 111,  18,   5, 119,
+  111, 114, 108, 100
+]
+out: {
+  exampleField: Uint8Array(5) [ 104, 101, 108, 108, 111 ],
+  exampleText: 'world'
+}
+json marshaled: {"exampleField":"aGVsbG8=","exampleText":"world"}
+json unmarshaled: {
+  exampleField: Uint8Array(5) [ 104, 101, 108, 108, 111 ],
+  exampleText: 'world'
+}
