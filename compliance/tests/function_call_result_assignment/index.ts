@@ -1,1 +1,1 @@
-export * from "./function_call_result_assignment.gs.js"
+export { MyStruct, NewMyStruct } from "./function_call_result_assignment.gs.js"

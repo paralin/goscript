@@ -1,1 +1,1 @@
-export * from "./goroutines_selector.gs.js"
+export { Foo, NewFoo } from "./goroutines_selector.gs.js"

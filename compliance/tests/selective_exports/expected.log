@@ -1,0 +1,6 @@
+=== Selective Exports Test ===
+ExportedFunc called
+unexportedFunc called
+ExportedFromUtils called
+unexportedFromUtils called
+=== End Selective Exports Test === 

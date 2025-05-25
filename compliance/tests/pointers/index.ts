@@ -1,1 +1,1 @@
-export * from "./pointers.gs.js"
+export { MyStruct } from "./pointers.gs.js"

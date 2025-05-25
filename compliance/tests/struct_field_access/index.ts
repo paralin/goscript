@@ -1,1 +1,1 @@
-export * from "./struct_field_access.gs.js"
+export { MyStruct } from "./struct_field_access.gs.js"

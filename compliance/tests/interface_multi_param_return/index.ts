@@ -1,1 +1,1 @@
-export * from "./interface_multi_param_return.gs.js"
+export { MultiParamReturner, MyProcessor } from "./interface_multi_param_return.gs.js"
