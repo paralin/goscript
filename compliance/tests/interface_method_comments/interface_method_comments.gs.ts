@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type MyInterface = null | {
+export type MyInterface = null | {
 	// MyMethod is a method with a comment
 	MyMethod(): void
 }

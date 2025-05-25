@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type MyInterface = null | {
+export type MyInterface = null | {
 	Method1(): number
 }
 
@@ -13,7 +13,7 @@ $.registerInterfaceType(
   [{ name: "Method1", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }]
 );
 
-class MyStruct {
+export class MyStruct {
 	public get Value(): number {
 		return this._fields.Value.value
 	}
@@ -54,7 +54,7 @@ class MyStruct {
 	);
 }
 
-type MyOtherInterface = null | {
+export type MyOtherInterface = null | {
 	Method1(): number
 }
 

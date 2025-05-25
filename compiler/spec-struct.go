@@ -20,6 +20,10 @@ import (
 //   - Wrapper methods for promoted fields and methods from embedded structs,
 //     ensuring correct access and behavior.
 func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType) error {
+	// Add export for Go-exported structs
+	if a.Name.IsExported() {
+		c.tsw.WriteLiterally("export ")
+	}
 	c.tsw.WriteLiterally("class ")
 	if err := c.WriteValueExpr(a.Name); err != nil {
 		return err

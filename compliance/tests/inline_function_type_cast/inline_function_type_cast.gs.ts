@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type Greeter = ((name: string) => string) | null;
+export type Greeter = ((name: string) => string) | null;
 
 export async function main(): Promise<void> {
 	// 2. Create an inline variable with the inline function satisfying that type.
@@ -19,7 +19,7 @@ export async function main(): Promise<void> {
 	console.log(castedGreeter!("Inline World"))
 
 	// Test with a different signature
-	type Adder = ((a: number, b: number) => number) | null;
+	export type Adder = ((a: number, b: number) => number) | null;
 	let theInlineAdder = (a: number, b: number): number => {
 		return a + b
 	}

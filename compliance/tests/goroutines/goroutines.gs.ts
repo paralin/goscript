@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class Message {
+export class Message {
 	public get priority(): number {
 		return this._fields.priority.value
 	}

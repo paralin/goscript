@@ -3,60 +3,60 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type ByteSize = number;
+export type ByteSize = number;
 
 // ignore first value by assigning to blank identifier
 let _: number = 0
 
-let KB: ByteSize = (1 << (10 * 0))
+export let KB: ByteSize = (1 << (10 * 0))
 
-let MB: ByteSize = 0
+export let MB: ByteSize = 0
 
-let GB: ByteSize = 0
+export let GB: ByteSize = 0
 
-let TB: ByteSize = 0
+export let TB: ByteSize = 0
 
-type Direction = number;
+export type Direction = number;
 
-let North: Direction = 0
+export let North: Direction = 0
 
-let East: Direction = 0
+export let East: Direction = 0
 
-let South: Direction = 0
+export let South: Direction = 0
 
-let West: Direction = 0
+export let West: Direction = 0
 
-let Red: number = 0
+export let Red: number = 0
 
-let Green: number = 0
+export let Green: number = 0
 
-let Blue: number = 0
+export let Blue: number = 0
 
-let Sunday: number = 0
+export let Sunday: number = 0
 
-let Monday: number = 0
+export let Monday: number = 0
 
-let Tuesday: number = 0
+export let Tuesday: number = 0
 
-let Wednesday: number = 0
+export let Wednesday: number = 0
 
-let Thursday: number = 0
+export let Thursday: number = 0
 
-let Friday: number = 0
+export let Friday: number = 0
 
-let Saturday: number = 0
+export let Saturday: number = 0
 
-let First: number = 0 + 1
+export let First: number = 0 + 1
 
-let Second: number = 0 + 1
+export let Second: number = 0 + 1
 
-let Third: number = 0 + 1
+export let Third: number = 0 + 1
 
-let A: number = 0 * 2
+export let A: number = 0 * 2
 
-let B: number = 0
+export let B: number = 0
 
-let C: number = 0
+export let C: number = 0
 
 export async function main(): Promise<void> {
 	console.log("ByteSize constants:")

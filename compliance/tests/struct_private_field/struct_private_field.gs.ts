@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class MyStruct {
+export class MyStruct {
 	public get myPrivate(): number {
 		return this._fields.myPrivate.value
 	}

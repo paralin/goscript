@@ -81,7 +81,10 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 			}
 		}
 
-		// Start declaration
+		// Start declaration - add export for Go-exported symbols
+		if name.IsExported() {
+			c.tsw.WriteLiterally("export ")
+		}
 		c.tsw.WriteLiterally("let ")
 		c.tsw.WriteLiterally(name.Name)
 

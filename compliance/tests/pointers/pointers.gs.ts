@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class MyStruct {
+export class MyStruct {
 	public get Val(): number {
 		return this._fields.Val.value
 	}

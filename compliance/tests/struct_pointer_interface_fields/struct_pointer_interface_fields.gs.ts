@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type MyInterface = null | {
+export type MyInterface = null | {
 	Method(): void
 }
 
@@ -13,7 +13,7 @@ $.registerInterfaceType(
   [{ name: "Method", args: [], returns: [] }]
 );
 
-class MyStruct {
+export class MyStruct {
 	public get PointerField(): $.VarRef<number> | null {
 		return this._fields.PointerField.value
 	}

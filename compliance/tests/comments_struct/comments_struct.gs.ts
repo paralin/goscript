@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class TestStruct {
+export class TestStruct {
 	// IntField is a commented integer field.
 	public get IntField(): number {
 		return this._fields.IntField.value

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class Foo {
+export class Foo {
 	public get done(): $.Channel<boolean> | null {
 		return this._fields.done.value
 	}

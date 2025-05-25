@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class Greeter {
+export class Greeter {
 	public _fields: {
 	}
 
@@ -33,7 +33,7 @@ class Greeter {
 	);
 }
 
-type Stringer = null | {
+export type Stringer = null | {
 	String(): string
 }
 
@@ -43,7 +43,7 @@ $.registerInterfaceType(
   [{ name: "String", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }]
 );
 
-class MyStringer {
+export class MyStringer {
 	public _fields: {
 	}
 

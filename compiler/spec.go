@@ -165,7 +165,10 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 	case *ast.InterfaceType:
 		return c.WriteInterfaceTypeSpec(a, t)
 	default:
-		// type alias
+		// type alias - add export for Go-exported types
+		if a.Name.IsExported() {
+			c.tsw.WriteLiterally("export ")
+		}
 		c.tsw.WriteLiterally("type ")
 		if err := c.WriteValueExpr(a.Name); err != nil {
 			return err
@@ -179,6 +182,10 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 // WriteInterfaceTypeSpec writes the TypeScript type for a Go interface type.
 func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.InterfaceType) error {
+	// Add export for Go-exported interfaces
+	if a.Name.IsExported() {
+		c.tsw.WriteLiterally("export ")
+	}
 	c.tsw.WriteLiterally("type ")
 	if err := c.WriteValueExpr(a.Name); err != nil {
 		return err

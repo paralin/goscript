@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type Reader = null | {
+export type Reader = null | {
 	// Read reads data from the reader.
 	Read(_p0: Uint8Array): [number, $.GoError]
 }
@@ -14,7 +14,7 @@ $.registerInterfaceType(
   [{ name: "Read", args: [{ name: "", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }, { type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }]
 );
 
-type Closer = null | {
+export type Closer = null | {
 	Close(): $.GoError
 }
 
@@ -24,7 +24,7 @@ $.registerInterfaceType(
   [{ name: "Close", args: [], returns: [{ type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }]
 );
 
-type ReadCloser = null | Reader & Closer
+export type ReadCloser = null | Reader & Closer
 
 $.registerInterfaceType(
   'ReadCloser',
@@ -32,7 +32,7 @@ $.registerInterfaceType(
   []
 );
 
-class MyStruct {
+export class MyStruct {
 	public _fields: {
 	}
 

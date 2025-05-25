@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type A = null | {
+export type A = null | {
 	MethodA(a: A): void
 }
 
@@ -13,7 +13,7 @@ $.registerInterfaceType(
   [{ name: "MethodA", args: [{ name: "a", type: "A" }], returns: [] }]
 );
 
-class B {
+export class B {
 	public _fields: {
 	}
 
@@ -42,7 +42,7 @@ class B {
 	);
 }
 
-type C = null | {
+export type C = null | {
 	MethodC(d: D): void
 }
 
@@ -52,7 +52,7 @@ $.registerInterfaceType(
   [{ name: "MethodC", args: [{ name: "d", type: "D" }], returns: [] }]
 );
 
-type D = null | {
+export type D = null | {
 	MethodD(c: C): void
 }
 

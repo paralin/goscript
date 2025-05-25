@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type Container<T extends any> = null | {
+export type Container<T extends any> = null | {
 	Get(): T
 	Set(_p0: T): void
 	Size(): number
@@ -15,7 +15,7 @@ $.registerInterfaceType(
   [{ name: "Get", args: [], returns: [{ type: { kind: $.TypeKind.Interface, methods: [] } }] }, { name: "Set", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [] }, { name: "Size", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }]
 );
 
-type Comparable<T extends $.Comparable> = null | {
+export type Comparable<T extends $.Comparable> = null | {
 	Compare(_p0: T): number
 	Equal(_p0: T): boolean
 }
@@ -26,7 +26,7 @@ $.registerInterfaceType(
   [{ name: "Compare", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }]
 );
 
-class ValueContainer<T extends any> {
+export class ValueContainer<T extends any> {
 	public get value(): T {
 		return this._fields.value.value
 	}
@@ -88,7 +88,7 @@ class ValueContainer<T extends any> {
 	);
 }
 
-class StringValueContainer {
+export class StringValueContainer {
 	public get value(): string {
 		return this._fields.value.value
 	}

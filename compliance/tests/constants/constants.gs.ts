@@ -3,16 +3,16 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-let Pi: number = 3.14
+export let Pi: number = 3.14
 
-let Truth: boolean = false
+export let Truth: boolean = false
 
 // TODO: Handle large integer constants and bit shifts exceeding JS number limits.
 // Big      = 1 << 60
 // Small    = Big >> 59 // Commented out as it depends on Big
-let Greeting: string = "Hello, Constants!"
+export let Greeting: string = "Hello, Constants!"
 
-let Nothing: null | any = null
+export let Nothing: null | any = null
 
 export async function main(): Promise<void> {
 	console.log(3.14)

@@ -3,23 +3,23 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type Func1 = ((a: number, b: string) => [boolean, $.GoError]) | null;
+export type Func1 = ((a: number, b: string) => [boolean, $.GoError]) | null;
 
 let fn1: Func1 = null
 
-type Func2 = ((p0: number, p1: string) => boolean) | null;
+export type Func2 = ((p0: number, p1: string) => boolean) | null;
 
 let fn2: Func2 = null
 
-type Func3 = (() => void) | null;
+export type Func3 = (() => void) | null;
 
 let fn3: Func3 = null
 
-type Func4 = ((a: number, ...b: string[]) => void) | null;
+export type Func4 = ((a: number, ...b: string[]) => void) | null;
 
 let fn4: Func4 = null
 
-class MyError {
+export class MyError {
 	public get s(): string {
 		return this._fields.s.value
 	}

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class Person {
+export class Person {
 	public get Name(): string {
 		return this._fields.Name.value
 	}
@@ -54,7 +54,7 @@ class Person {
 	);
 }
 
-class Employee {
+export class Employee {
 	public get ID(): number {
 		return this._fields.ID.value
 	}
@@ -118,7 +118,7 @@ class Employee {
 	);
 }
 
-class Address {
+export class Address {
 	public get Street(): string {
 		return this._fields.Street.value
 	}
@@ -169,7 +169,7 @@ class Address {
 	);
 }
 
-class Contact {
+export class Contact {
 	public get Phone(): string {
 		return this._fields.Phone.value
 	}
@@ -210,7 +210,7 @@ class Contact {
 	);
 }
 
-class Manager {
+export class Manager {
 	public get Level(): number {
 		return this._fields.Level.value
 	}

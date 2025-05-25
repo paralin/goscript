@@ -2,8 +2,8 @@
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin/builtin.js";
-import { testGeneric } from "./build_tags_generic.gs.js";
 import { testJSWasm } from "./build_tags_js.gs.js";
+import { testGeneric } from "./build_tags_generic.gs.js";
 
 export async function main(): Promise<void> {
 	console.log("=== Build Tags Test ===")

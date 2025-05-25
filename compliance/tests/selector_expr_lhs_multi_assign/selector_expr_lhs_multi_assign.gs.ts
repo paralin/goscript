@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-class Point {
+export class Point {
 	public get X(): number {
 		return this._fields.X.value
 	}

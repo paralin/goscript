@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type MultiParamReturner = null | {
+export type MultiParamReturner = null | {
 	Process(data: Uint8Array, count: number, _p2: string): [boolean, $.GoError]
 }
 
@@ -13,7 +13,7 @@ $.registerInterfaceType(
   [{ name: "Process", args: [{ name: "data", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }, { name: "count", type: { kind: $.TypeKind.Basic, name: "number" } }, { name: "_", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }, { type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }]
 );
 
-class MyProcessor {
+export class MyProcessor {
 	public _fields: {
 	}
 

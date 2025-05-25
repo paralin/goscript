@@ -3,9 +3,9 @@
 
 import * as $ from "@goscript/builtin/builtin.js";
 
-type Greeter = ((name: string) => string) | null;
+export type Greeter = ((name: string) => string) | null;
 
-type Adder = ((a: number, b: number) => number) | null;
+export type Adder = ((a: number, b: number) => number) | null;
 
 export function greet(name: string): string {
 	return "Hello, " + name
@@ -23,7 +23,7 @@ export function getAdder(): null | any {
 	return Object.assign(add, { __goTypeName: 'Adder' })
 }
 
-class FuncContainer {
+export class FuncContainer {
 	public get myFunc(): null | any {
 		return this._fields.myFunc.value
 	}

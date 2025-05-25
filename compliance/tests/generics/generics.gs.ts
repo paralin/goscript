@@ -18,7 +18,7 @@ export function getLength<S extends string | Uint8Array>(s: S): number {
 	return $.len(s)
 }
 
-class Pair<T extends any> {
+export class Pair<T extends any> {
 	public get First(): T {
 		return this._fields.First.value
 	}
