@@ -9,7 +9,7 @@ export async function main(): Promise<void> {
 	// Test basic runtime functions
 	console.log("GOOS:", runtime.GOOS)
 	console.log("GOARCH:", runtime.GOARCH)
-	console.log("Version:", runtime.Version())
+	// println("Version:", runtime.Version()) - not stable for the test (go.mod may change)
 	console.log("NumCPU:", runtime.NumCPU())
 
 	// Test GOMAXPROCS

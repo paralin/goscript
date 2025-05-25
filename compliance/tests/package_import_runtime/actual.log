@@ -1,8 +1,0 @@
-GOOS: js
-GOARCH: wasm
-Version: go1.22.0
-NumCPU: 12
-GOMAXPROCS(-1): 1
-GOMAXPROCS(0): 1
-NumGoroutine: 1
-GC called successfully

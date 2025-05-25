@@ -6,7 +6,7 @@ func main() {
 	// Test basic runtime functions
 	println("GOOS:", runtime.GOOS)
 	println("GOARCH:", runtime.GOARCH)
-	println("Version:", runtime.Version())
+	// println("Version:", runtime.Version()) - not stable for the test (go.mod may change)
 	println("NumCPU:", runtime.NumCPU())
 
 	// Test GOMAXPROCS
