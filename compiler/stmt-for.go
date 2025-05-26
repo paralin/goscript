@@ -120,8 +120,22 @@ func (c *GoToTSCompiler) WriteStmtForInit(stmt ast.Stmt) error {
 					}
 				}
 			}
-			// If not a map access, fall through to error
-			return errors.Errorf("no corresponding rhs to lhs: %v", s)
+			// Handle general multi-assignment case with array destructuring
+			// e.g., for value, ok := getValues(); ... becomes for (let [value, ok] = getValues(); ...)
+			c.tsw.WriteLiterally("let [")
+			for i, lhs := range s.Lhs {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				if err := c.WriteValueExpr(lhs); err != nil {
+					return err
+				}
+			}
+			c.tsw.WriteLiterally("] = ")
+			if err := c.WriteValueExpr(rhsExpr); err != nil {
+				return err
+			}
+			return nil
 		} else if s.Tok == token.DEFINE && len(s.Lhs) > 1 && len(s.Rhs) > 0 {
 			// For loop initialization with multiple variables (e.g., let i = 0, j = 10)
 			c.tsw.WriteLiterally("let ")
