@@ -5,10 +5,12 @@ export * from './io.js'
 export * from './map.js'
 export * from './slice.js'
 export * from './type.js'
+import type { Slice, SliceProxy } from './slice.js'
+import { isSliceProxy } from './slice.js'
 
 // Bytes represents all valid []byte representations in TypeScript
 // This includes Uint8Array (the preferred representation) and $.Slice<number> (which includes null)
-export type Bytes = Uint8Array | import('./slice.js').Slice<number>
+export type Bytes = Uint8Array | Slice<number>
 
 // int converts a value to a Go int type, handling proper signed integer conversion
 // This ensures that values like 2147483648 (2^31) are properly handled according to Go semantics
@@ -179,7 +181,7 @@ export function normalizeBytes(
  * Handles all slice types including null, arrays, Uint8Array, and SliceProxy.
  * @param s The slice to sort in place
  */
-export function sortSlice<T extends string | number>(s: import('./slice.js').Slice<T>): void {
+export function sortSlice<T extends string | number>(s: Slice<T>): void {
   if (s === null || s === undefined) {
     return // Nothing to sort for nil slice
   }
@@ -195,8 +197,8 @@ export function sortSlice<T extends string | number>(s: import('./slice.js').Sli
   }
   
   // Handle SliceProxy case - sort the backing array in-place within the slice bounds
-  if (s && typeof s === 'object' && '__meta__' in s) {
-    const proxy = s as import('./slice.js').SliceProxy<T>
+  if (isSliceProxy(s)) {
+    const proxy = s as SliceProxy<T>
     const meta = proxy.__meta__
     const section = meta.backing.slice(meta.offset, meta.offset + meta.length)
     section.sort()

@@ -66,6 +66,14 @@ function isComplexSlice<T>(slice: Slice<T>): slice is SliceProxy<T> {
 }
 
 /**
+ * isSliceProxy checks if a slice is a SliceProxy (has __meta__ property)
+ * This is an alias for isComplexSlice for better type hinting
+ */
+export function isSliceProxy<T>(slice: Slice<T>): slice is SliceProxy<T> {
+  return isComplexSlice(slice)
+}
+
+/**
  * Creates a new slice with the specified length and capacity.
  * @param length The length of the slice.
  * @param capacity The capacity of the slice (optional).
