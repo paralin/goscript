@@ -1,0 +1,22 @@
+arr1[0]: 
+arr1[1]: first
+arr1[2]: 
+arr1[3]: third
+arr1[4]: 
+arr2[10]: 
+arr2[11]: at index 11
+arr2[12]: 
+arr2[13]: at index 13
+arr2[14]: 
+arr3[0]: 1
+arr3[1]: 2
+arr3[2]: 0
+arr3[5]: 100
+arr3[6]: 200
+arr3[7]: 0
+slice1[0]: 
+slice1[1]: 
+slice1[2]: second
+slice1[3]: 
+slice1[4]: fourth
+keyed array literal test completed

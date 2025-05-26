@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	"go/constant"
 	"go/token"
 	"go/types"
 	"slices"
@@ -108,6 +109,9 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 				if at, ok := typ.Underlying().(*types.Array); ok {
 					arrayLen = int(at.Len())
 					goElemType = at.Elem()
+				} else if st, ok := typ.Underlying().(*types.Slice); ok {
+					// For slices, get the element type
+					goElemType = st.Elem()
 				}
 			}
 			if arrType.Len != nil {
@@ -139,17 +143,36 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						}
 						hasKeyedElements = true
 					} else {
-						c.tsw.WriteCommentInline("unhandled keyed array literal key type")
-						if err := c.WriteVarRefedValue(elm); err != nil {
-							return fmt.Errorf("failed to write keyed array literal element with unhandled key type: %w", err)
+						// Try to evaluate the key expression as a constant
+						if keyValue := c.evaluateConstantExpr(kv.Key); keyValue != nil {
+							if index, ok := keyValue.(int); ok {
+								elements[index] = kv.Value
+								if index > maxIndex {
+									maxIndex = index
+								}
+								hasKeyedElements = true
+							} else {
+								return fmt.Errorf("keyed array literal key must evaluate to an integer, got %T", keyValue)
+							}
+						} else {
+							return fmt.Errorf("keyed array literal key must be a constant expression")
 						}
 					}
 				} else {
-					elements[orderedCount] = elm
-					if orderedCount > maxIndex {
-						maxIndex = orderedCount
+					// For unkeyed elements, place them at the next available index
+					// If we have keyed elements, start after the highest keyed index
+					currentIndex := orderedCount
+					if hasKeyedElements && orderedCount <= maxIndex {
+						currentIndex = maxIndex + 1
+						for elements[currentIndex] != nil {
+							currentIndex++
+						}
 					}
-					orderedCount++
+					elements[currentIndex] = elm
+					if currentIndex > maxIndex {
+						maxIndex = currentIndex
+					}
+					orderedCount = currentIndex + 1
 				}
 			}
 
@@ -638,4 +661,29 @@ func (c *GoToTSCompiler) WriteVarRefedValue(expr ast.Expr) error {
 		// For other expression types, use WriteValueExpr
 		return c.WriteValueExpr(expr)
 	}
+}
+
+// evaluateConstantExpr attempts to evaluate a Go expression as a compile-time constant.
+// It returns the constant value if successful, or nil if the expression is not a constant.
+// This is used for evaluating array literal keys that are constant expressions.
+func (c *GoToTSCompiler) evaluateConstantExpr(expr ast.Expr) interface{} {
+	// Use the type checker's constant evaluation
+	if tv, ok := c.pkg.TypesInfo.Types[expr]; ok && tv.Value != nil {
+		// The expression has a constant value
+		switch tv.Value.Kind() {
+		case constant.Int:
+			if val, exact := constant.Int64Val(tv.Value); exact {
+				return int(val)
+			}
+		case constant.Float:
+			if val, exact := constant.Float64Val(tv.Value); exact {
+				return val
+			}
+		case constant.String:
+			return constant.StringVal(tv.Value)
+		case constant.Bool:
+			return constant.BoolVal(tv.Value)
+		}
+	}
+	return nil
 }

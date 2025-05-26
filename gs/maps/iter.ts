@@ -8,10 +8,8 @@ import * as iter from "@goscript/iter/index.js"
 export function All<K extends $.Comparable, V>(m: Map<K, V>): iter.Seq2<K, V> {
 	return (_yield: ((p0: K, p1: V) => boolean) | null): void => {
 		for (const [k, v] of m.entries()) {
-			{
-				if (!_yield!(k, v)) {
-					return 
-				}
+			if (!_yield!(k, v)) {
+				return 
 			}
 		}
 	}
@@ -23,10 +21,8 @@ export function All<K extends $.Comparable, V>(m: Map<K, V>): iter.Seq2<K, V> {
 export function Keys<K extends $.Comparable, V>(m: Map<K, V>): iter.Seq<K> {
 	return (_yield: ((p0: K) => boolean) | null): void => {
 		for (const [k, _v] of m.entries()) {
-			{
-				if (!_yield!(k)) {
-					return 
-				}
+			if (!_yield!(k)) {
+				return 
 			}
 		}
 	}
@@ -38,10 +34,8 @@ export function Keys<K extends $.Comparable, V>(m: Map<K, V>): iter.Seq<K> {
 export function Values<K extends $.Comparable, V>(m: Map<K, V>): iter.Seq<V> {
 	return (_yield: ((p0: V) => boolean) | null): void => {
 		for (const [_k, v] of m.entries()) {
-			{
-				if (!_yield!(v)) {
-					return 
-				}
+			if (!_yield!(v)) {
+				return 
 			}
 		}
 	}
@@ -53,9 +47,7 @@ export function Insert<K extends $.Comparable, V>(m: Map<K, V>, seq: iter.Seq2<K
 	;(() => {
 		let shouldContinue = true
 		seq!((k, v) => {
-			{
-				$.mapSet(m, k, v)
-			}
+			$.mapSet(m, k, v)
 			return shouldContinue
 		})
 	})()
