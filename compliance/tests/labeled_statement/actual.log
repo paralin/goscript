@@ -1,7 +1,6 @@
 continue test i: 0
 continue test i: 2
 x: 42
-this should be skipped
 y: 100
 i: 0
 i: 1

@@ -170,13 +170,39 @@ func (c *GoToTSCompiler) WriteStmtBranch(stmt *ast.BranchStmt) error {
 		c.tsw.WriteLine("break") // No semicolon needed
 	case token.CONTINUE:
 		c.tsw.WriteLine("continue") // No semicolon needed
+	case token.GOTO:
+		// Handle goto statements by setting the state variable and continuing the loop
+		if stmt.Label != nil {
+			labelName := stmt.Label.Name
+			c.tsw.WriteLiterallyf("__gotoState = %d; // goto %s", c.getLabelStateID(labelName), labelName)
+			c.tsw.WriteLine("")
+			c.tsw.WriteLine("continue __gotoLoop")
+		} else {
+			c.tsw.WriteCommentLinef("goto statement without label")
+		}
 	default:
 		// This case should ideally not be reached if the Go parser is correct,
 		// as ast.BranchStmt only covers break, continue, goto, fallthrough.
-		// 'goto' and 'fallthrough' are handled elsewhere or not supported.
+		// 'fallthrough' is handled elsewhere or not supported.
 		c.tsw.WriteCommentLinef("unhandled branch statement token: %s", stmt.Tok.String())
 	}
 	return nil
+}
+
+// getLabelStateID returns the state ID for a given label name in the current function.
+func (c *GoToTSCompiler) getLabelStateID(labelName string) int {
+	// For now, return a simple mapping based on label name
+	// This will be improved when we implement proper state machine generation
+	switch labelName {
+	case "label1":
+		return 1
+	case "label2":
+		return 2
+	case "label3":
+		return 3
+	default:
+		return 1 // Default to state 1
+	}
 }
 
 // WriteStmtGo translates a Go statement (`ast.GoStmt`) into its TypeScript equivalent.

@@ -47,6 +47,9 @@ type VariableUsageInfo struct {
 type FunctionInfo struct {
 	IsAsync      bool
 	NamedReturns []string
+	HasGoto      bool            // true if function contains goto statements
+	Labels       map[string]int  // maps label names to state IDs
+	GotoTargets  map[string]bool // tracks which labels are goto targets
 }
 
 // NodeInfo consolidates node-related tracking data.
@@ -247,6 +250,30 @@ func (a *Analysis) IsMethodValue(node *ast.SelectorExpr) bool {
 		return false
 	}
 	return nodeInfo.IsMethodValue
+}
+
+// HasGoto returns whether the given function object contains goto statements.
+func (a *Analysis) HasGoto(obj types.Object) bool {
+	if obj == nil {
+		return false
+	}
+	funcInfo := a.FunctionData[obj]
+	if funcInfo == nil {
+		return false
+	}
+	return funcInfo.HasGoto
+}
+
+// GetGotoLabels returns the label-to-state mapping for a function with goto statements.
+func (a *Analysis) GetGotoLabels(obj types.Object) map[string]int {
+	if obj == nil {
+		return nil
+	}
+	funcInfo := a.FunctionData[obj]
+	if funcInfo == nil {
+		return nil
+	}
+	return funcInfo.Labels
 }
 
 // analysisVisitor implements ast.Visitor and is used to traverse the AST during analysis.
@@ -735,6 +762,49 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 					}
 					v.analysis.NodeData[spec].IsInsideFunction = true
 				}
+			}
+		}
+		return v // Continue traversal
+
+	case *ast.BranchStmt:
+		// Handle goto statements
+		if n.Tok == token.GOTO && v.currentFuncObj != nil {
+			// Mark the current function as having goto
+			if v.analysis.FunctionData[v.currentFuncObj] == nil {
+				v.analysis.FunctionData[v.currentFuncObj] = &FunctionInfo{}
+			}
+			v.analysis.FunctionData[v.currentFuncObj].HasGoto = true
+
+			// Initialize goto targets map if needed
+			if v.analysis.FunctionData[v.currentFuncObj].GotoTargets == nil {
+				v.analysis.FunctionData[v.currentFuncObj].GotoTargets = make(map[string]bool)
+			}
+
+			// Record the target label
+			if n.Label != nil {
+				v.analysis.FunctionData[v.currentFuncObj].GotoTargets[n.Label.Name] = true
+			}
+		}
+		return v // Continue traversal
+
+	case *ast.LabeledStmt:
+		// Handle labeled statements
+		if v.currentFuncObj != nil {
+			// Initialize function data if needed
+			if v.analysis.FunctionData[v.currentFuncObj] == nil {
+				v.analysis.FunctionData[v.currentFuncObj] = &FunctionInfo{}
+			}
+
+			// Initialize labels map if needed
+			if v.analysis.FunctionData[v.currentFuncObj].Labels == nil {
+				v.analysis.FunctionData[v.currentFuncObj].Labels = make(map[string]int)
+			}
+
+			// Assign a state ID to this label (we'll finalize these after analysis)
+			labelName := n.Label.Name
+			if _, exists := v.analysis.FunctionData[v.currentFuncObj].Labels[labelName]; !exists {
+				// Assign a temporary state ID (we'll reassign proper IDs later)
+				v.analysis.FunctionData[v.currentFuncObj].Labels[labelName] = len(v.analysis.FunctionData[v.currentFuncObj].Labels) + 1
 			}
 		}
 		return v // Continue traversal
