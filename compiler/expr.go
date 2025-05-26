@@ -415,13 +415,18 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 
 	// Handle large bit shift expressions that would overflow in JavaScript
 	if exp.Op == token.SHL {
-		// Check if this is 1 << 63 pattern
-		if leftLit, leftIsLit := exp.X.(*ast.BasicLit); leftIsLit && leftLit.Value == "1" {
-			if rightLit, rightIsLit := exp.Y.(*ast.BasicLit); rightIsLit && rightLit.Value == "63" {
-				// Replace 1 << 63 with Number.MAX_SAFE_INTEGER (9007199254740991)
-				// This is the largest integer that can be exactly represented in JavaScript
-				c.tsw.WriteLiterally("Number.MAX_SAFE_INTEGER")
-				return nil
+		// Check if this is 1 << 63 pattern using constant evaluation
+		leftValue := c.evaluateConstantExpr(exp.X)
+		rightValue := c.evaluateConstantExpr(exp.Y)
+
+		if leftValue != nil && rightValue != nil {
+			if leftInt, leftOk := leftValue.(int); leftOk && leftInt == 1 {
+				if rightInt, rightOk := rightValue.(int); rightOk && rightInt == 63 {
+					// Replace 1 << 63 with Number.MAX_SAFE_INTEGER (9007199254740991)
+					// This is the largest integer that can be exactly represented in JavaScript
+					c.tsw.WriteLiterally("Number.MAX_SAFE_INTEGER")
+					return nil
+				}
 			}
 		}
 	}

@@ -120,6 +120,13 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 					if _, err := fmt.Sscan(bl.Value, &arrayLen); err != nil {
 						return fmt.Errorf("failed to parse array length from basic literal: %w", err)
 					}
+				} else {
+					// Try to evaluate as a constant expression (e.g., const N = 5; [N]int{})
+					if lenValue := c.evaluateConstantExpr(arrType.Len); lenValue != nil {
+						if length, ok := lenValue.(int); ok {
+							arrayLen = length
+						}
+					}
 				}
 			}
 			elemType = arrType.Elt
@@ -132,31 +139,19 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 
 			for _, elm := range exp.Elts {
 				if kv, ok := elm.(*ast.KeyValueExpr); ok {
-					if lit, ok := kv.Key.(*ast.BasicLit); ok && lit.Kind == token.INT {
-						var index int
-						if _, err := fmt.Sscan(lit.Value, &index); err != nil {
-							return fmt.Errorf("failed to parse array index from basic literal: %w", err)
-						}
-						elements[index] = kv.Value
-						if index > maxIndex {
-							maxIndex = index
-						}
-						hasKeyedElements = true
-					} else {
-						// Try to evaluate the key expression as a constant
-						if keyValue := c.evaluateConstantExpr(kv.Key); keyValue != nil {
-							if index, ok := keyValue.(int); ok {
-								elements[index] = kv.Value
-								if index > maxIndex {
-									maxIndex = index
-								}
-								hasKeyedElements = true
-							} else {
-								return fmt.Errorf("keyed array literal key must evaluate to an integer, got %T", keyValue)
+					// Try to evaluate the key expression as a constant (handles both literals and expressions)
+					if keyValue := c.evaluateConstantExpr(kv.Key); keyValue != nil {
+						if index, ok := keyValue.(int); ok {
+							elements[index] = kv.Value
+							if index > maxIndex {
+								maxIndex = index
 							}
+							hasKeyedElements = true
 						} else {
-							return fmt.Errorf("keyed array literal key must be a constant expression")
+							return fmt.Errorf("keyed array literal key must evaluate to an integer, got %T", keyValue)
 						}
+					} else {
+						return fmt.Errorf("keyed array literal key must be a constant expression")
 					}
 				} else {
 					// For unkeyed elements, place them at the next available index
