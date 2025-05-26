@@ -144,7 +144,7 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 		// Declare named return variables and initialize them to their zero values
 		for _, field := range exp.Type.Results.List {
 			for _, name := range field.Names {
-				c.tsw.WriteLiterallyf("let %s: ", name.Name)
+				c.tsw.WriteLiterallyf("let %s: ", c.sanitizeIdentifier(name.Name))
 				c.WriteTypeExpr(field.Type)
 				c.tsw.WriteLiterally(" = ")
 				c.WriteZeroValueForType(c.pkg.TypesInfo.TypeOf(field.Type))

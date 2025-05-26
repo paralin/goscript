@@ -520,13 +520,17 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 			}
 		}
 
-		if len(namedReturns) > 0 {
+		if len(namedReturns) == 1 {
+			// Single named return - don't wrap in array
+			c.tsw.WriteLiterally(c.sanitizeIdentifier(namedReturns[0]))
+		} else if len(namedReturns) > 1 {
+			// Multiple named returns - wrap in array
 			c.tsw.WriteLiterally("[")
 			for i, name := range namedReturns {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				c.tsw.WriteLiterally(name)
+				c.tsw.WriteLiterally(c.sanitizeIdentifier(name))
 			}
 			c.tsw.WriteLiterally("]")
 		}
@@ -849,15 +853,28 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 }
 
 // WriteStmtLabeled handles labeled statements (ast.LabeledStmt), such as "label: statement".
-// In TypeScript, this translates to "label: statement" directly.
+// In TypeScript, labels cannot be used with variable declarations, so we need to handle this case specially.
 func (c *GoToTSCompiler) WriteStmtLabeled(stmt *ast.LabeledStmt) error {
-	// Write the label name followed by a colon
-	c.tsw.WriteLiterally(stmt.Label.Name)
-	c.tsw.WriteLiterally(": ")
+	// Check if the labeled statement is a declaration statement
+	if declStmt, ok := stmt.Stmt.(*ast.DeclStmt); ok {
+		// For declaration statements, we need to put the label on a separate line
+		// because TypeScript doesn't allow labels with declarations
+		c.tsw.WriteLiterally(stmt.Label.Name)
+		c.tsw.WriteLine(": {}")
 
-	// Write the labeled statement
-	if err := c.WriteStmt(stmt.Stmt); err != nil {
-		return fmt.Errorf("failed to write labeled statement: %w", err)
+		// Write the declaration statement without the label
+		if err := c.WriteStmt(declStmt); err != nil {
+			return fmt.Errorf("failed to write labeled declaration statement: %w", err)
+		}
+	} else {
+		// For non-declaration statements, write the label normally
+		c.tsw.WriteLiterally(stmt.Label.Name)
+		c.tsw.WriteLiterally(": ")
+
+		// Write the labeled statement
+		if err := c.WriteStmt(stmt.Stmt); err != nil {
+			return fmt.Errorf("failed to write labeled statement: %w", err)
+		}
 	}
 
 	return nil

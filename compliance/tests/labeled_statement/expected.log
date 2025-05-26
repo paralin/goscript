@@ -1,0 +1,11 @@
+continue test i: 0
+continue test i: 2
+x: 42
+y: 100
+i: 0
+i: 1
+i: 2
+nested: 0 0
+nested: 0 2
+nested: 1 0
+test finished

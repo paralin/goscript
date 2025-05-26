@@ -418,12 +418,12 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		}
 
-		// Store named return variables
+		// Store named return variables (sanitized for TypeScript)
 		if n.Type != nil && n.Type.Results != nil {
 			var namedReturns []string
 			for _, field := range n.Type.Results.List {
 				for _, name := range field.Names {
-					namedReturns = append(namedReturns, name.Name)
+					namedReturns = append(namedReturns, sanitizeIdentifier(name.Name))
 				}
 			}
 			if len(namedReturns) > 0 {

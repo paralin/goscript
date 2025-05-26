@@ -1,4 +1,5 @@
 new: 42
 class: test
 typeof: true
+named return result: 100
 test finished

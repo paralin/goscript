@@ -1,0 +1,14 @@
+continue test i: 0
+continue test i: 2
+x: 42
+this should be skipped
+y: 100
+i: 0
+i: 1
+i: 2
+nested: 0 0
+nested: 0 2
+nested: 1 0
+nested: 2 0
+nested: 2 2
+test finished

@@ -369,12 +369,12 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 		if isAsync {
 			c.tsw.WriteLiterally("Promise<")
 		}
-		if len(exp.Results.List) == 1 && len(exp.Results.List[0].Names) == 0 {
-			// Single unnamed return type
+		if len(exp.Results.List) == 1 {
+			// Single return type (named or unnamed)
 			typ := c.pkg.TypesInfo.TypeOf(exp.Results.List[0].Type)
 			c.WriteGoType(typ, GoTypeContextFunctionReturn)
 		} else {
-			// Multiple or named return types -> tuple
+			// Multiple return types -> tuple
 			c.tsw.WriteLiterally("[")
 			for i, field := range exp.Results.List {
 				if i > 0 {

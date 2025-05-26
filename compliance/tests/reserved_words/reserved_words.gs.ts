@@ -14,6 +14,18 @@ export async function main(): Promise<void> {
 	console.log("class:", _class)
 	console.log("typeof:", _typeof)
 
+	// Test function with named return that uses reserved word
+	let result = testNamedReturn()
+	console.log("named return result:", result)
+
 	console.log("test finished")
+}
+
+export function testNamedReturn(): number {
+	let _new: number = 0
+	{
+		_new = 100
+		return _new
+	}
 }
 

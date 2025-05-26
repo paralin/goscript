@@ -11,5 +11,14 @@ func main() {
 	println("class:", class)
 	println("typeof:", typeof)
 
+	// Test function with named return that uses reserved word
+	result := testNamedReturn()
+	println("named return result:", result)
+
 	println("test finished")
+}
+
+func testNamedReturn() (new int) {
+	new = 100
+	return
 }
