@@ -414,6 +414,12 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 		if err := c.WriteValueExpr(a.Name); err != nil {
 			return err
 		}
+
+		// Write type parameters if present (for generics)
+		if a.TypeParams != nil {
+			c.WriteTypeParameters(a.TypeParams)
+		}
+
 		c.tsw.WriteLiterally(" = ")
 		c.WriteTypeExpr(a.Type) // The aliased type
 		c.tsw.WriteLine(";")

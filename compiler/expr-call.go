@@ -437,6 +437,114 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					}
 				}
 			}
+			// Handle instantiated generic types: make(GenericType[TypeArg], ...)
+			// This handles cases like: make(Ints[int64]) where Ints[T] is a generic type
+			if indexExpr, ok := exp.Args[0].(*ast.IndexExpr); ok {
+				// Get the type information for the instantiated generic type
+				if typ := c.pkg.TypesInfo.TypeOf(indexExpr); typ != nil {
+					// Check the underlying type of the instantiated generic type
+					underlying := typ.Underlying()
+
+					// Handle instantiated generic map types: make(GenericMap[K, V])
+					if mapType, isMap := underlying.(*types.Map); isMap {
+						c.tsw.WriteLiterally("$.makeMap<")
+						c.WriteGoType(mapType.Key(), GoTypeContextGeneral) // Write the key type
+						c.tsw.WriteLiterally(", ")
+						c.WriteGoType(mapType.Elem(), GoTypeContextGeneral) // Write the value type
+						c.tsw.WriteLiterally(">()")
+						return nil // Handled make for instantiated generic map type
+					}
+
+					// Handle instantiated generic slice types: make(GenericSlice[T], len, cap)
+					if sliceType, isSlice := underlying.(*types.Slice); isSlice {
+						goElemType := sliceType.Elem()
+
+						// Check if it's an instantiated generic type with []byte underlying type
+						if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
+							c.tsw.WriteLiterally("new Uint8Array(")
+							if len(exp.Args) >= 2 {
+								if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+									return err
+								}
+								// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+							} else {
+								// If no length is provided, default to 0
+								c.tsw.WriteLiterally("0")
+							}
+							c.tsw.WriteLiterally(")")
+							return nil // Handled make for instantiated generic []byte type
+						}
+
+						// Handle other instantiated generic slice types
+						c.tsw.WriteLiterally("$.makeSlice<")
+						c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
+						c.tsw.WriteLiterally(">(")
+
+						if len(exp.Args) >= 2 {
+							if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+								return err
+							}
+							if len(exp.Args) == 3 {
+								c.tsw.WriteLiterally(", ")
+								if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+									return err
+								}
+							} else if len(exp.Args) > 3 {
+								return errors.New("makeSlice expects 2 or 3 arguments")
+							}
+						} else {
+							// If no length is provided, default to 0
+							c.tsw.WriteLiterally("0")
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled make for instantiated generic slice type
+					}
+
+					// Handle instantiated generic channel types: make(GenericChannel[T], bufferSize)
+					if chanType, isChan := underlying.(*types.Chan); isChan {
+						c.tsw.WriteLiterally("$.makeChannel<")
+						c.WriteGoType(chanType.Elem(), GoTypeContextGeneral)
+						c.tsw.WriteLiterally(">(")
+
+						// If buffer size is provided, add it
+						if len(exp.Args) >= 2 {
+							if err := c.WriteValueExpr(exp.Args[1]); err != nil {
+								return fmt.Errorf("failed to write buffer size in makeChannel: %w", err)
+							}
+						} else {
+							// Default to 0 (unbuffered channel)
+							c.tsw.WriteLiterally("0")
+						}
+
+						c.tsw.WriteLiterally(", ") // Add comma for zero value argument
+
+						// Write the zero value for the channel's element type
+						if chanType.Elem().String() == "struct{}" {
+							c.tsw.WriteLiterally("{}")
+						} else {
+							c.WriteZeroValueForType(chanType.Elem())
+						}
+
+						// Add direction parameter
+						c.tsw.WriteLiterally(", ")
+
+						// Determine channel direction
+						switch chanType.Dir() {
+						case types.SendRecv:
+							c.tsw.WriteLiterally("'both'")
+						case types.SendOnly:
+							c.tsw.WriteLiterally("'send'")
+						case types.RecvOnly:
+							c.tsw.WriteLiterally("'receive'")
+						default:
+							c.tsw.WriteLiterally("'both'") // Default to bidirectional
+						}
+
+						c.tsw.WriteLiterally(")")
+						return nil // Handled make for instantiated generic channel type
+					}
+				}
+			}
 			// Fallthrough for unhandled make calls (e.g., channels)
 			return errors.New("unhandled make call")
 		case "string":
