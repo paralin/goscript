@@ -222,10 +222,25 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		}
 
 		// For simple cases without selector expressions, use array destructuring
+		// Add semicolon before destructuring assignment to prevent TypeScript
+		// from interpreting it as array access on the previous line
+		if tok != token.DEFINE {
+			c.tsw.WriteLiterally(";")
+		}
 		c.tsw.WriteLiterally("[")
 
+		// Find the last non-blank identifier to avoid trailing commas
+		lastNonBlankIndex := -1
+		for i := len(lhs) - 1; i >= 0; i-- {
+			if ident, ok := lhs[i].(*ast.Ident); !ok || ident.Name != "_" {
+				lastNonBlankIndex = i
+				break
+			}
+		}
+
 		for i, lhsExpr := range lhs {
-			if i != 0 {
+			// Write comma before non-first elements
+			if i > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
 
@@ -234,6 +249,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				if ident.Name != "_" {
 					c.WriteIdent(ident, false)
 				}
+				// For blank identifiers, we write nothing (empty slot)
 			} else if selectorExpr, ok := lhsExpr.(*ast.SelectorExpr); ok {
 				// Handle selector expressions (e.g., a.b) by using WriteValueExpr
 				if err := c.WriteValueExpr(selectorExpr); err != nil {
@@ -262,6 +278,11 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 			} else {
 				// Should not happen for valid Go code in this context, but handle defensively
 				return errors.Errorf("unhandled LHS expression in destructuring: %T", lhsExpr)
+			}
+
+			// Stop writing if we've reached the last non-blank element
+			if i == lastNonBlankIndex {
+				break
 			}
 		}
 		c.tsw.WriteLiterally("] = ")
