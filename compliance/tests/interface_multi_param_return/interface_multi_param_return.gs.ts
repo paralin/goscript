@@ -61,7 +61,7 @@ export async function main(): Promise<void> {
 	}
 
 	// test case: re-use success variable, ignore second variable
-	[success, ] = processor!.Process(data, 5, "unused")
+	;[success] = processor!.Process(data, 5, "unused")
 	if (success) {
 		console.log("Main: Success reported")
 	} else {
