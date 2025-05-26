@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import * as $ from '@goscript/builtin/builtin.js'
 import {
   Lines,
   SplitSeq,

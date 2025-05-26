@@ -13,7 +13,7 @@ export function int(value: number): number {
   // we need to handle the conversion properly. The issue is that JavaScript's number type
   // can represent values larger than 32-bit signed integers, but when cast in certain contexts
   // they get interpreted as signed 32-bit integers.
-  
+
   // For Go's int type on 64-bit systems, we should preserve the full value
   // since JavaScript numbers can safely represent integers up to Number.MAX_SAFE_INTEGER
   return Math.trunc(value)

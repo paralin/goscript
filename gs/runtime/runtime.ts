@@ -11,7 +11,7 @@ export function Version(): string {
 // GOMAXPROCS sets the maximum number of operating system threads
 //
 // JavaScript is single threaded so this always returns 1.
-export function GOMAXPROCS(n: number): number {
+export function GOMAXPROCS(_n: number): number {
   // In a full implementation, we would set the max procs
   // Since JavaScript only supports 1, just return 1.
   return 1
@@ -69,7 +69,7 @@ export function _decrementGoroutineCount(): void {
 
 // Caller returns details about the calling goroutine's stack.
 // This is a simplified version for goscript
-export function Caller(skip: number): [number, string, number, boolean] {
+export function Caller(_skip: number): [number, string, number, boolean] {
   // In JavaScript, we can use Error stack trace, but it's limited
   // Return dummy values for goscript compatibility
   const pc = 0 // program counter (not meaningful in JS)
@@ -159,8 +159,8 @@ export class PanicError implements Error {
 // SetFinalizer sets the finalizer associated with obj to the provided finalizer function.
 // In goscript/TypeScript environment, finalizers are not supported, so this throws an error.
 export function SetFinalizer(
-  obj: object,
-  finalizer: ((obj: object) => void) | null,
+  _obj: object,
+  _finalizer: ((obj: object) => void) | null,
 ): void {
   throw new Error(
     'runtime.SetFinalizer is not supported in goscript TypeScript environment',

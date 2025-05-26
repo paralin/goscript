@@ -4,7 +4,7 @@ export class Builder {
   private _content: string = ''
   private _addr: Builder | null = null
 
-  constructor(init?: Partial<{}>) {
+  constructor(_init?: Partial<{}>) {
     // Simple constructor - no complex initialization needed
   }
 

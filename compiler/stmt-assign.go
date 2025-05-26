@@ -151,6 +151,10 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				hasSelectors = true
 				break
 			}
+			if _, ok := lhsExpr.(*ast.IndexExpr); ok {
+				hasSelectors = true
+				break
+			}
 		}
 
 		// If we have selector expressions, we need to ensure variables are initialized
@@ -195,6 +199,11 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 						}
 					}
 					c.tsw.WriteLiterally("!.value")
+				} else if indexExpr, ok := lhsExpr.(*ast.IndexExpr); ok {
+					// Handle index expressions (e.g., arr[i], slice[j]) by using WriteValueExpr
+					if err := c.WriteValueExpr(indexExpr); err != nil {
+						return fmt.Errorf("failed to write index expression in LHS: %w", err)
+					}
 				} else {
 					return errors.Errorf("unhandled LHS expression in assignment: %T", lhsExpr)
 				}
@@ -245,6 +254,11 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 					}
 				}
 				c.tsw.WriteLiterally("!.value")
+			} else if indexExpr, ok := lhsExpr.(*ast.IndexExpr); ok {
+				// Handle index expressions (e.g., arr[i], slice[j]) by using WriteValueExpr
+				if err := c.WriteValueExpr(indexExpr); err != nil {
+					return fmt.Errorf("failed to write index expression in destructuring: %w", err)
+				}
 			} else {
 				// Should not happen for valid Go code in this context, but handle defensively
 				return errors.Errorf("unhandled LHS expression in destructuring: %T", lhsExpr)

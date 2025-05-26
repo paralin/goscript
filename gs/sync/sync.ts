@@ -14,7 +14,7 @@ export class Mutex implements Locker {
   private _locked: boolean = false
   private _waitQueue: Array<() => void> = []
 
-  constructor(init?: Partial<{}>) {
+  constructor(_init?: Partial<{}>) {
     // Mutex has no public fields to initialize
   }
 
@@ -72,7 +72,7 @@ export class RWMutex {
   private _readerWaitQueue: Array<() => void> = []
   private _writerWaitQueue: Array<() => void> = []
 
-  constructor(init?: Partial<{}>) {
+  constructor(_init?: Partial<{}>) {
     // RWMutex has no public fields to initialize
   }
 
@@ -169,7 +169,7 @@ export class WaitGroup {
   private _counter: number = 0
   private _waiters: Array<() => void> = []
 
-  constructor(init?: Partial<{}>) {
+  constructor(_init?: Partial<{}>) {
     // WaitGroup has no public fields to initialize
   }
 
@@ -215,7 +215,7 @@ export class Once {
   private _done: boolean = false
   private _m: Mutex = new Mutex()
 
-  constructor(init?: Partial<{}>) {
+  constructor(_init?: Partial<{}>) {
     // Once has no public fields to initialize
   }
 
@@ -295,7 +295,7 @@ export class Map {
   private _m: RWMutex = new RWMutex()
   private _data: globalThis.Map<any, any> = new globalThis.Map()
 
-  constructor(init?: Partial<{}>) {
+  constructor(_init?: Partial<{}>) {
     // Map has no public fields to initialize
   }
 

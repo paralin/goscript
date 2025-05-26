@@ -16,7 +16,7 @@ export function Pull<V>(
   let nextValue: V | undefined
   let hasNext = false
 
-  const iterator = seq(function (value: V): boolean {
+  const _iterator = seq(function (value: V): boolean {
     nextValue = value
     hasNext = true
     return false // Stop iteration after getting one value

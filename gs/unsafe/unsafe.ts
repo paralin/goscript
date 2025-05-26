@@ -14,7 +14,7 @@ export type IntegerType = number
 
 // Alignof returns the alignment of the (type of the) variable in bytes
 // This operation is not meaningful in JavaScript/TypeScript
-export function Alignof(variable: ArbitraryType): number {
+export function Alignof(_variable: ArbitraryType): number {
   throw new Error(
     'unsafe.Alignof is not supported in JavaScript/TypeScript: memory alignment is not a meaningful concept in JavaScript',
   )
@@ -22,7 +22,7 @@ export function Alignof(variable: ArbitraryType): number {
 
 // Offsetof returns the field offset in bytes relative to the struct's address
 // This operation is not meaningful in JavaScript/TypeScript
-export function Offsetof(selector: ArbitraryType): number {
+export function Offsetof(_selector: ArbitraryType): number {
   throw new Error(
     'unsafe.Offsetof is not supported in JavaScript/TypeScript: memory layout and field offsets are not meaningful concepts in JavaScript',
   )
@@ -30,7 +30,7 @@ export function Offsetof(selector: ArbitraryType): number {
 
 // Sizeof returns the size of the (type of the) variable in bytes
 // This operation is not meaningful in JavaScript/TypeScript
-export function Sizeof(variable: ArbitraryType): number {
+export function Sizeof(_variable: ArbitraryType): number {
   throw new Error(
     'unsafe.Sizeof is not supported in JavaScript/TypeScript: memory size is not a meaningful concept in JavaScript',
   )
@@ -38,7 +38,7 @@ export function Sizeof(variable: ArbitraryType): number {
 
 // Add adds len to ptr and returns the updated pointer
 // Pointer arithmetic is not supported in JavaScript/TypeScript
-export function Add(ptr: Pointer, len: IntegerType): Pointer {
+export function Add(_ptr: Pointer, _len: IntegerType): Pointer {
   throw new Error(
     'unsafe.Add is not supported in JavaScript/TypeScript: pointer arithmetic is not available in JavaScript',
   )
@@ -46,7 +46,7 @@ export function Add(ptr: Pointer, len: IntegerType): Pointer {
 
 // Slice returns a slice whose underlying array starts at ptr
 // This operation is not meaningful in JavaScript/TypeScript
-export function Slice(ptr: Pointer, len: IntegerType): any[] {
+export function Slice(_ptr: Pointer, _len: IntegerType): any[] {
   throw new Error(
     'unsafe.Slice is not supported in JavaScript/TypeScript: direct memory access is not available in JavaScript',
   )
@@ -54,7 +54,7 @@ export function Slice(ptr: Pointer, len: IntegerType): any[] {
 
 // SliceData returns a pointer to the underlying array of the slice
 // This operation is not meaningful in JavaScript/TypeScript
-export function SliceData(slice: any[]): Pointer {
+export function SliceData(_slice: any[]): Pointer {
   throw new Error(
     'unsafe.SliceData is not supported in JavaScript/TypeScript: direct memory access is not available in JavaScript',
   )
@@ -62,7 +62,7 @@ export function SliceData(slice: any[]): Pointer {
 
 // String returns a string value whose underlying bytes start at ptr
 // This operation is not meaningful in JavaScript/TypeScript
-export function String(ptr: Pointer, len: IntegerType): string {
+export function String(_ptr: Pointer, _len: IntegerType): string {
   throw new Error(
     'unsafe.String is not supported in JavaScript/TypeScript: direct memory access is not available in JavaScript',
   )
@@ -70,7 +70,7 @@ export function String(ptr: Pointer, len: IntegerType): string {
 
 // StringData returns a pointer to the underlying bytes of the str
 // This operation is not meaningful in JavaScript/TypeScript
-export function StringData(str: string): Pointer {
+export function StringData(_str: string): Pointer {
   throw new Error(
     'unsafe.StringData is not supported in JavaScript/TypeScript: direct memory access is not available in JavaScript',
   )

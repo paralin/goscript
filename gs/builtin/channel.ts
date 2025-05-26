@@ -539,7 +539,7 @@ export interface ChannelRef<T> {
  * A bidirectional channel reference.
  */
 export class BidirectionalChannelRef<T> implements ChannelRef<T> {
-  direction: 'both' = 'both'
+  direction = 'both' as const
 
   constructor(public channel: Channel<T>) {}
 
@@ -581,7 +581,7 @@ export class BidirectionalChannelRef<T> implements ChannelRef<T> {
  * A send-only channel reference.
  */
 export class SendOnlyChannelRef<T> implements ChannelRef<T> {
-  direction: 'send' = 'send'
+  direction = 'send' as const
 
   constructor(public channel: Channel<T>) {}
 
@@ -616,7 +616,7 @@ export class SendOnlyChannelRef<T> implements ChannelRef<T> {
     return false
   }
 
-  selectReceive(id: number): Promise<SelectResult<T>> {
+  selectReceive(_id: number): Promise<SelectResult<T>> {
     throw new Error('Cannot receive from send-only channel')
   }
 }
@@ -625,7 +625,7 @@ export class SendOnlyChannelRef<T> implements ChannelRef<T> {
  * A receive-only channel reference.
  */
 export class ReceiveOnlyChannelRef<T> implements ChannelRef<T> {
-  direction: 'receive' = 'receive'
+  direction = 'receive' as const
 
   constructor(public channel: Channel<T>) {}
 
@@ -647,7 +647,7 @@ export class ReceiveOnlyChannelRef<T> implements ChannelRef<T> {
   }
 
   // Disallow send operations
-  send(value: T): Promise<void> {
+  send(_value: T): Promise<void> {
     throw new Error('Cannot send to receive-only channel')
   }
 
@@ -660,7 +660,7 @@ export class ReceiveOnlyChannelRef<T> implements ChannelRef<T> {
     return false
   }
 
-  selectSend(value: T, id: number): Promise<SelectResult<boolean>> {
+  selectSend(_value: T, _id: number): Promise<SelectResult<boolean>> {
     throw new Error('Cannot send to receive-only channel')
   }
 }

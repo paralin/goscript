@@ -761,8 +761,6 @@ export function makeGenericReplacer(
   return r
 }
 
-type appendSliceWriter = Uint8Array
-
 class stringWriter {
   public get w(): io.Writer {
     return this._fields.w.value
@@ -777,7 +775,7 @@ class stringWriter {
 
   constructor(init?: Partial<{ w?: io.Writer }>) {
     this._fields = {
-      w: $.varRef(init?.w!),
+      w: $.varRef(init!.w!),
     }
   }
 
@@ -981,8 +979,6 @@ export function makeSingleStringReplacer(
     value: value,
   })
 }
-
-type byteReplacer = number[]
 
 class byteStringReplacer {
   // replacements contains replacement byte slices indexed by old byte.
@@ -1240,6 +1236,9 @@ class byteStringReplacer {
     if (last != $.len(s)) {
       let [nw, err] = sw!.WriteString($.sliceString(s, last, undefined))
       n += nw
+      if (err != null) {
+        return [n, err]
+      }
     }
     return [n, err]
   }
@@ -1297,8 +1296,6 @@ class byteStringReplacer {
     },
   )
 }
-
-let countCutOff: number = 8
 
 // Helper function to copy bytes
 function copy(dst: Uint8Array, src: Uint8Array): number {

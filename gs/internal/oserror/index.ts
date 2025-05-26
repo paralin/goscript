@@ -1,1 +1,7 @@
-export { ErrClosed, ErrExist, ErrInvalid, ErrNotExist, ErrPermission } from "./errors.js"
+export {
+  ErrClosed,
+  ErrExist,
+  ErrInvalid,
+  ErrNotExist,
+  ErrPermission,
+} from './errors.js'

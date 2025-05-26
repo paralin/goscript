@@ -5,7 +5,12 @@ export class Time {
   private _monotonic?: number // high-resolution monotonic timestamp in nanoseconds
   private _location: Location // timezone location
 
-  constructor(date: globalThis.Date, nsec: number = 0, monotonic?: number, location?: Location) {
+  constructor(
+    date: globalThis.Date,
+    nsec: number = 0,
+    monotonic?: number,
+    location?: Location,
+  ) {
     this._date = new globalThis.Date(date.getTime())
     this._nsec = nsec
     this._monotonic = monotonic
@@ -21,16 +26,16 @@ export class Time {
   public Format(layout: string): string {
     // Implementation of Go's time formatting based on reference time:
     // "Mon Jan 2 15:04:05 MST 2006" (Unix time 1136239445)
-    
+
     // Calculate the time in the timezone of this Time object
     let year: number, month0: number, dayOfMonth: number, dayOfWeek: number
     let hour24: number, minute: number, second: number
-    
+
     if (this._location.offsetSeconds !== undefined) {
       // For fixed timezone locations, adjust the UTC time by the offset
       const offsetMs = this._location.offsetSeconds * 1000
       const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
-      
+
       year = adjustedTime.getUTCFullYear()
       month0 = adjustedTime.getUTCMonth() // 0-11 for array indexing
       dayOfMonth = adjustedTime.getUTCDate() // 1-31
@@ -48,13 +53,47 @@ export class Time {
       minute = this._date.getMinutes() // 0-59
       second = this._date.getSeconds() // 0-59
     }
-    
+
     const nsec = this._nsec // Nanoseconds (0-999,999,999)
 
-    const shortMonthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
-    const longMonthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"]
-    const shortDayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
-    const longDayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    const shortMonthNames = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ]
+    const longMonthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ]
+    const shortDayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+    const longDayNames = [
+      'Sunday',
+      'Monday',
+      'Tuesday',
+      'Wednesday',
+      'Thursday',
+      'Friday',
+      'Saturday',
+    ]
 
     const hour12 = hour24 % 12 || 12 // 12 for 0h and 12h
     const ampmUpper = hour24 < 12 ? 'AM' : 'PM'
@@ -64,18 +103,18 @@ export class Time {
     let tzOffsetSeconds = 0
     let tzName = this._location.name
     let isUTC = false
-    
+
     if (this._location.offsetSeconds !== undefined) {
       // Use the fixed offset from the location
       tzOffsetSeconds = this._location.offsetSeconds
-      isUTC = tzOffsetSeconds === 0 && this._location.name === "UTC"
+      isUTC = tzOffsetSeconds === 0 && this._location.name === 'UTC'
     } else {
       // Fall back to JavaScript's timezone offset (for local time)
       const tzOffsetMinutesJS = this._date.getTimezoneOffset()
       tzOffsetSeconds = -tzOffsetMinutesJS * 60 // Convert to seconds, negate because JS offset is opposite
       isUTC = tzOffsetSeconds === 0
     }
-    
+
     let tzSign = '+'
     if (tzOffsetSeconds < 0) {
       tzSign = '-'
@@ -83,7 +122,7 @@ export class Time {
     const absTzOffsetSeconds = Math.abs(tzOffsetSeconds)
     const tzOffsetHours = Math.floor(absTzOffsetSeconds / 3600)
     const tzOffsetMins = Math.floor((absTzOffsetSeconds % 3600) / 60)
-    
+
     // Helper function to format fractional seconds
     const formatFracSeconds = (n: number, trimZeros: boolean): string => {
       if (n === 0 && trimZeros) return ''
@@ -96,14 +135,14 @@ export class Time {
 
     let result = ''
     let i = 0
-    
+
     // Process layout character by character, matching Go's nextStdChunk logic
     while (i < layout.length) {
       let matched = false
-      
+
       // Check for multi-character patterns first (longest matches first)
       const remaining = layout.slice(i)
-      
+
       // Fractional seconds with comma/period
       if (remaining.match(/^[.,]999999999/)) {
         result += formatFracSeconds(nsec, true).replace('.', remaining[0])
@@ -128,11 +167,19 @@ export class Time {
         i += 10
         matched = true
       } else if (remaining.match(/^[.,]000000/)) {
-        result += remaining[0] + Math.floor(nsec / 1000).toString().padStart(6, '0')
+        result +=
+          remaining[0] +
+          Math.floor(nsec / 1000)
+            .toString()
+            .padStart(6, '0')
         i += 7
         matched = true
       } else if (remaining.match(/^[.,]000/)) {
-        result += remaining[0] + Math.floor(nsec / 1000000).toString().padStart(3, '0')
+        result +=
+          remaining[0] +
+          Math.floor(nsec / 1000000)
+            .toString()
+            .padStart(3, '0')
         i += 4
         matched = true
       }
@@ -253,7 +300,8 @@ export class Time {
         i += 2
         matched = true
       } else if (remaining.startsWith('_2')) {
-        result += dayOfMonth < 10 ? ' ' + dayOfMonth.toString() : dayOfMonth.toString()
+        result +=
+          dayOfMonth < 10 ? ' ' + dayOfMonth.toString() : dayOfMonth.toString()
         i += 2
         matched = true
       } else if (remaining.startsWith('03')) {
@@ -278,15 +326,24 @@ export class Time {
         matched = true
       }
       // Single digit patterns (must come after two-digit patterns)
-      else if (layout[i] === '3' && (i === 0 || !'0123456789'.includes(layout[i-1]))) {
+      else if (
+        layout[i] === '3' &&
+        (i === 0 || !'0123456789'.includes(layout[i - 1]))
+      ) {
         result += hour12.toString()
         i += 1
         matched = true
-      } else if (layout[i] === '2' && (i === 0 || !'0123456789'.includes(layout[i-1]))) {
+      } else if (
+        layout[i] === '2' &&
+        (i === 0 || !'0123456789'.includes(layout[i - 1]))
+      ) {
         result += dayOfMonth.toString()
         i += 1
         matched = true
-      } else if (layout[i] === '1' && (i === 0 || !'0123456789'.includes(layout[i-1]))) {
+      } else if (
+        layout[i] === '1' &&
+        (i === 0 || !'0123456789'.includes(layout[i - 1]))
+      ) {
         result += (month0 + 1).toString()
         i += 1
         matched = true
@@ -297,7 +354,7 @@ export class Time {
         i += 1
         matched = true
       }
-      
+
       // If no pattern matched, copy the character literally
       if (!matched) {
         result += layout[i]
@@ -369,7 +426,7 @@ export class Time {
 
   // Round returns the result of rounding t to the nearest multiple of d
   // Strips monotonic reading as per Go specification
-  public Round(d: Duration): Time {
+  public Round(_d: Duration): Time {
     // Implementation would round to nearest duration
     // For now, simplified version that strips monotonic reading
     return new Time(this._date, this._nsec, undefined, this._location)
@@ -377,7 +434,7 @@ export class Time {
 
   // Truncate returns the result of rounding t down to a multiple of d
   // Strips monotonic reading as per Go specification
-  public Truncate(d: Duration): Time {
+  public Truncate(_d: Duration): Time {
     // Implementation would truncate to duration
     // For now, simplified version that strips monotonic reading
     return new Time(this._date, this._nsec, undefined, this._location)
@@ -511,7 +568,7 @@ export function Date(
   loc: Location,
 ): Time {
   let date: globalThis.Date
-  
+
   if (loc.offsetSeconds !== undefined) {
     // For fixed timezone locations, create the date in the local timezone and then convert to UTC
     const localTime = globalThis.Date.UTC(
@@ -579,7 +636,7 @@ export async function Sleep(d: Duration): Promise<void> {
 export const May = Month.May
 
 // Time layout constants (matching Go's time package)
-export const DateTime = "2006-01-02 15:04:05"
+export const DateTime = '2006-01-02 15:04:05'
 export const Layout = "01/02 03:04:05PM '06 -0700"
-export const RFC3339 = "2006-01-02T15:04:05Z07:00"
-export const Kitchen = "3:04PM"
+export const RFC3339 = '2006-01-02T15:04:05Z07:00'
+export const Kitchen = '3:04PM'

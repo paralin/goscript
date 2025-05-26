@@ -1,5 +1,3 @@
-import * as $ from '@goscript/builtin/builtin.js'
-
 // Clone returns a fresh copy of s.
 // It guarantees to make a copy of s into a new allocation,
 // which can be important when retaining only a small substring

@@ -437,15 +437,8 @@ export const arrayToSlice = <T>(
   if (depth > 1 && arr.length > 0) {
     for (let i = 0; i < arr.length; i++) {
       const item = arr[i]
-      if (isComplexSlice(item as any)) {
-      } else if (Array.isArray(item)) {
+      if (!isComplexSlice(item as any) && Array.isArray(item)) {
         arr[i] = arrayToSlice(item as any[], depth - 1) as any
-      } else if (
-        item &&
-        typeof item === 'object' &&
-        isComplexSlice(item as any)
-      ) {
-        // Preserve capacity information for complex slices
       }
     }
   }
@@ -917,7 +910,8 @@ export const sliceString = (
     // Attempt to decode with strict UTF-8 validation
     const result = new TextDecoder('utf-8', { fatal: true }).decode(slicedBytes)
     return result
-  } catch (e) {
+  } catch (_e) {
+    //eslint-disable-line @typescript-eslint/no-unused-vars
     // If we get here, the slice would create invalid UTF-8
     // This is a fundamental limitation of JavaScript string handling
     throw new Error(

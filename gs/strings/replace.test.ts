@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import * as $ from '@goscript/builtin/builtin.js'
-import { Replacer, NewReplacer } from './replace.js'
-import * as io from '@goscript/io/index.js'
+import { NewReplacer } from './replace.js'
+import * as io from '../io/index.js'
 
 describe('strings/Replacer', () => {
   describe('NewReplacer', () => {
@@ -99,7 +98,7 @@ describe('strings/Replacer', () => {
       const r = NewReplacer('hello', 'hi')
       if (r) {
         const errorWriter: io.Writer = {
-          Write: (p: Uint8Array) => {
+          Write: (_p: Uint8Array) => {
             return [0, new Error('write error')]
           },
         }

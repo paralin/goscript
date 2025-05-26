@@ -91,7 +91,7 @@ describe('strings', () => {
     it('should check if any rune satisfies predicate', () => {
       expect(ContainsFunc('hello', (r) => r === 101)).toBe(true) // 'e'
       expect(ContainsFunc('hello', (r) => r === 120)).toBe(false) // 'x'
-      expect(ContainsFunc('', (r) => true)).toBe(false)
+      expect(ContainsFunc('', () => true)).toBe(false)
       expect(ContainsFunc('abc', null)).toBe(false)
     })
   })
@@ -171,7 +171,7 @@ describe('strings', () => {
       const result = FieldsFunc('a,b,c', (r) => r === 44) // comma
       expect($.asArray(result)).toEqual(['a', 'b', 'c'])
 
-      const empty = FieldsFunc('', (r) => true)
+      const empty = FieldsFunc('', () => true)
       expect($.asArray(empty)).toEqual([])
 
       const noSplit = FieldsFunc('abc', null)
@@ -226,7 +226,7 @@ describe('strings', () => {
     it('should find first index where predicate is true', () => {
       expect(IndexFunc('hello', (r) => r === 101)).toBe(1) // 'e'
       expect(IndexFunc('hello', (r) => r === 120)).toBe(-1) // 'x'
-      expect(IndexFunc('', (r) => true)).toBe(-1)
+      expect(IndexFunc('', () => true)).toBe(-1)
       expect(IndexFunc('abc', null)).toBe(-1)
     })
   })
@@ -280,7 +280,7 @@ describe('strings', () => {
     it('should find last index where predicate is true', () => {
       expect(LastIndexFunc('hello', (r) => r === 108)).toBe(3) // 'l'
       expect(LastIndexFunc('hello', (r) => r === 120)).toBe(-1) // 'x'
-      expect(LastIndexFunc('', (r) => true)).toBe(-1)
+      expect(LastIndexFunc('', () => true)).toBe(-1)
       expect(LastIndexFunc('abc', null)).toBe(-1)
     })
   })
@@ -288,7 +288,7 @@ describe('strings', () => {
   describe('Map', () => {
     it('should apply mapping function to each rune', () => {
       expect(Map((r) => r + 1, 'abc')).toBe('bcd')
-      expect(Map((r) => 65, 'hello')).toBe('AAAAA') // all to 'A'
+      expect(Map(() => 65, 'hello')).toBe('AAAAA') // all to 'A'
       expect(Map(null, 'hello')).toBe('hello')
       expect(Map((r) => r, '')).toBe('')
     })
@@ -413,7 +413,7 @@ describe('strings', () => {
     it('should trim runes satisfying predicate from both ends', () => {
       expect(TrimFunc('   hello   ', (r) => r === 32)).toBe('hello') // space
       expect(TrimFunc('hello', (r) => r === 120)).toBe('hello') // 'x'
-      expect(TrimFunc('', (r) => true)).toBe('')
+      expect(TrimFunc('', () => true)).toBe('')
       expect(TrimFunc('abc', null)).toBe('abc')
     })
   })

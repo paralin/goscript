@@ -58,7 +58,7 @@ class backgroundContext extends baseContext {
     return null
   }
 
-  Value(key: any): any {
+  Value(_key: any): any {
     return null
   }
 }
@@ -378,7 +378,7 @@ export function AfterFunc(ctx: Context, f: () => void): () => boolean {
   let stopped = false
   let done = false
 
-  const promise = (async () => {
+  const _promise = (async () => {
     try {
       await ctx.Done().receive()
     } catch {

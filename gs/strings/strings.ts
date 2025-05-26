@@ -1,19 +1,5 @@
 import * as $ from '@goscript/builtin/builtin.js'
 
-// Helper function to convert string to runes (code points)
-function stringToRunes(s: string): number[] {
-  const runes: number[] = []
-  for (const char of s) {
-    runes.push(char.codePointAt(0) || 0)
-  }
-  return runes
-}
-
-// Helper function to convert runes to string
-function runesToString(runes: number[]): string {
-  return String.fromCodePoint(...runes)
-}
-
 // Count counts the number of non-overlapping instances of substr in s.
 // If substr is an empty string, Count returns 1 + the number of Unicode code points in s.
 export function Count(s: string, substr: string): number {
