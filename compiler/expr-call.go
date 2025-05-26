@@ -545,6 +545,114 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					}
 				}
 			}
+			// Handle selector expressions: make(pkg.TypeName, ...)
+			// This handles cases like: make(fstest.MapFS) where fstest.MapFS is map[string]*MapFile
+			if selectorExpr, ok := exp.Args[0].(*ast.SelectorExpr); ok {
+				// Get the type information for the selector expression
+				if typ := c.pkg.TypesInfo.TypeOf(selectorExpr); typ != nil {
+					// Check the underlying type of the selector expression
+					underlying := typ.Underlying()
+
+					// Handle selector expression map types: make(pkg.MapType)
+					if mapType, isMap := underlying.(*types.Map); isMap {
+						c.tsw.WriteLiterally("$.makeMap<")
+						c.WriteGoType(mapType.Key(), GoTypeContextGeneral) // Write the key type
+						c.tsw.WriteLiterally(", ")
+						c.WriteGoType(mapType.Elem(), GoTypeContextGeneral) // Write the value type
+						c.tsw.WriteLiterally(">()")
+						return nil // Handled make for selector expression map type
+					}
+
+					// Handle selector expression slice types: make(pkg.SliceType, len, cap)
+					if sliceType, isSlice := underlying.(*types.Slice); isSlice {
+						goElemType := sliceType.Elem()
+
+						// Check if it's a selector expression with []byte underlying type
+						if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
+							c.tsw.WriteLiterally("new Uint8Array(")
+							if len(exp.Args) >= 2 {
+								if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+									return err
+								}
+								// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+							} else {
+								// If no length is provided, default to 0
+								c.tsw.WriteLiterally("0")
+							}
+							c.tsw.WriteLiterally(")")
+							return nil // Handled make for selector expression []byte type
+						}
+
+						// Handle other selector expression slice types
+						c.tsw.WriteLiterally("$.makeSlice<")
+						c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
+						c.tsw.WriteLiterally(">(")
+
+						if len(exp.Args) >= 2 {
+							if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+								return err
+							}
+							if len(exp.Args) == 3 {
+								c.tsw.WriteLiterally(", ")
+								if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+									return err
+								}
+							} else if len(exp.Args) > 3 {
+								return errors.New("makeSlice expects 2 or 3 arguments")
+							}
+						} else {
+							// If no length is provided, default to 0
+							c.tsw.WriteLiterally("0")
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled make for selector expression slice type
+					}
+
+					// Handle selector expression channel types: make(pkg.ChannelType, bufferSize)
+					if chanType, isChan := underlying.(*types.Chan); isChan {
+						c.tsw.WriteLiterally("$.makeChannel<")
+						c.WriteGoType(chanType.Elem(), GoTypeContextGeneral)
+						c.tsw.WriteLiterally(">(")
+
+						// If buffer size is provided, add it
+						if len(exp.Args) >= 2 {
+							if err := c.WriteValueExpr(exp.Args[1]); err != nil {
+								return fmt.Errorf("failed to write buffer size in makeChannel: %w", err)
+							}
+						} else {
+							// Default to 0 (unbuffered channel)
+							c.tsw.WriteLiterally("0")
+						}
+
+						c.tsw.WriteLiterally(", ") // Add comma for zero value argument
+
+						// Write the zero value for the channel's element type
+						if chanType.Elem().String() == "struct{}" {
+							c.tsw.WriteLiterally("{}")
+						} else {
+							c.WriteZeroValueForType(chanType.Elem())
+						}
+
+						// Add direction parameter
+						c.tsw.WriteLiterally(", ")
+
+						// Determine channel direction
+						switch chanType.Dir() {
+						case types.SendRecv:
+							c.tsw.WriteLiterally("'both'")
+						case types.SendOnly:
+							c.tsw.WriteLiterally("'send'")
+						case types.RecvOnly:
+							c.tsw.WriteLiterally("'receive'")
+						default:
+							c.tsw.WriteLiterally("'both'") // Default to bidirectional
+						}
+
+						c.tsw.WriteLiterally(")")
+						return nil // Handled make for selector expression channel type
+					}
+				}
+			}
 			// Fallthrough for unhandled make calls (e.g., channels)
 			return errors.New("unhandled make call")
 		case "string":

@@ -864,8 +864,8 @@ func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap
 				importVars: make(map[string]struct{}),
 			}
 
-			// Use the import name or path as the key
-			key := path
+			// Use the import name or package name as the key
+			key := packageNameFromGoPath(path)
 			if name != "" {
 				key = name
 			}
