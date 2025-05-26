@@ -378,6 +378,60 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 									c.tsw.WriteLiterally(")")
 									return nil // Handled make for named slice type
 								}
+
+								// Handle named types with map underlying types: make(NamedMapType)
+								if mapType, isMap := namedType.Underlying().(*types.Map); isMap {
+									c.tsw.WriteLiterally("$.makeMap<")
+									c.WriteGoType(mapType.Key(), GoTypeContextGeneral) // Write the key type
+									c.tsw.WriteLiterally(", ")
+									c.WriteGoType(mapType.Elem(), GoTypeContextGeneral) // Write the value type
+									c.tsw.WriteLiterally(">()")
+									return nil // Handled make for named map type
+								}
+
+								// Handle named types with channel underlying types: make(NamedChannelType, bufferSize)
+								if chanType, isChan := namedType.Underlying().(*types.Chan); isChan {
+									c.tsw.WriteLiterally("$.makeChannel<")
+									c.WriteGoType(chanType.Elem(), GoTypeContextGeneral)
+									c.tsw.WriteLiterally(">(")
+
+									// If buffer size is provided, add it
+									if len(exp.Args) >= 2 {
+										if err := c.WriteValueExpr(exp.Args[1]); err != nil {
+											return fmt.Errorf("failed to write buffer size in makeChannel: %w", err)
+										}
+									} else {
+										// Default to 0 (unbuffered channel)
+										c.tsw.WriteLiterally("0")
+									}
+
+									c.tsw.WriteLiterally(", ") // Add comma for zero value argument
+
+									// Write the zero value for the channel's element type
+									if chanType.Elem().String() == "struct{}" {
+										c.tsw.WriteLiterally("{}")
+									} else {
+										c.WriteZeroValueForType(chanType.Elem())
+									}
+
+									// Add direction parameter
+									c.tsw.WriteLiterally(", ")
+
+									// Determine channel direction
+									switch chanType.Dir() {
+									case types.SendRecv:
+										c.tsw.WriteLiterally("'both'")
+									case types.SendOnly:
+										c.tsw.WriteLiterally("'send'")
+									case types.RecvOnly:
+										c.tsw.WriteLiterally("'receive'")
+									default:
+										c.tsw.WriteLiterally("'both'") // Default to bidirectional
+									}
+
+									c.tsw.WriteLiterally(")")
+									return nil // Handled make for named channel type
+								}
 							}
 						}
 					}
