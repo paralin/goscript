@@ -611,7 +611,15 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	// Generate auto-imports for functions from other files in the same package
 	currentFileName := strings.TrimSuffix(filepath.Base(c.fullPath), ".go")
 	if imports := c.PackageAnalysis.FunctionCalls[currentFileName]; imports != nil {
-		for sourceFile, functions := range imports {
+		// Sort source files for consistent import order
+		var sourceFiles []string
+		for sourceFile := range imports {
+			sourceFiles = append(sourceFiles, sourceFile)
+		}
+		sort.Strings(sourceFiles)
+
+		for _, sourceFile := range sourceFiles {
+			functions := imports[sourceFile]
 			if len(functions) > 0 {
 				// Sort functions for consistent output
 				sort.Strings(functions)
