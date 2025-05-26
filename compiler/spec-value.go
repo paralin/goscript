@@ -91,7 +91,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 			c.tsw.WriteLiterally("export ")
 		}
 		c.tsw.WriteLiterally("let ")
-		c.tsw.WriteLiterally(name.Name)
+		c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 
 		// Write type annotation if:
 		// 1. Not a slice conversion (normal case), OR
@@ -315,7 +315,7 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
-		c.tsw.WriteLiterally(name.Name)
+		c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 		// TODO: Add type annotations for multi-var declarations if possible/needed
 	}
 	c.tsw.WriteLiterally("]")

@@ -94,7 +94,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			if isLHSVarRefed && lhsIdent != nil {
 				c.tsw.WriteLiterally("let ")
 				// Just write the identifier name without .value
-				c.tsw.WriteLiterally(lhsIdent.Name)
+				c.tsw.WriteLiterally(c.sanitizeIdentifier(lhsIdent.Name))
 				// No type annotation, allow TypeScript to infer it from varRef.
 				c.tsw.WriteLiterally(" = ")
 
