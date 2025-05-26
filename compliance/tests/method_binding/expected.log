@@ -1,0 +1,9 @@
+Initial value: 0
+After calling Increment via parameter: 1
+After calling Increment via variable: 2
+Value from assigned method: 2
+Value from method via parameter: 2
+Initial value2: 10
+After calling IncrementValue via parameter (should be unchanged): 10
+After calling IncrementValue via variable (should be unchanged): 10
+Value from assigned value method: 10

@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import * as $ from '@goscript/builtin/builtin.js'
 import { Reader, NewReader } from './reader.js'
 import * as io from '@goscript/io/index.js'
 

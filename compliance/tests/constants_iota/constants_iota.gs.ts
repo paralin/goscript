@@ -60,16 +60,16 @@ export let C: number = 0
 
 export async function main(): Promise<void> {
 	console.log("ByteSize constants:")
-	console.log("KB:", (1024 as number))
-	console.log("MB:", (1048576 as number))
-	console.log("GB:", (1073741824 as number))
-	console.log("TB:", (1099511627776 as number))
+	console.log("KB:", $.int(1024))
+	console.log("MB:", $.int(1048576))
+	console.log("GB:", $.int(1073741824))
+	console.log("TB:", $.int(1099511627776))
 
 	console.log("Direction constants:")
-	console.log("North:", (0 as number))
-	console.log("East:", (1 as number))
-	console.log("South:", (2 as number))
-	console.log("West:", (3 as number))
+	console.log("North:", $.int(0))
+	console.log("East:", $.int(1))
+	console.log("South:", $.int(2))
+	console.log("West:", $.int(3))
 
 	console.log("Color constants:")
 	console.log("Red:", 0)

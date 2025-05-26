@@ -57,6 +57,7 @@ type NodeInfo struct {
 	EnclosingFuncDecl *ast.FuncDecl
 	EnclosingFuncLit  *ast.FuncLit
 	IsInsideFunction  bool // true if this declaration is inside a function body
+	IsMethodValue     bool // true if this SelectorExpr is a method value that needs binding
 }
 
 // Analysis holds information gathered during the analysis phase of the Go code compilation.
@@ -234,6 +235,18 @@ func (a *Analysis) NeedsVarRefAccess(obj types.Object) bool {
 	}
 
 	return false
+}
+
+// IsMethodValue returns whether the given SelectorExpr node is a method value that needs binding.
+func (a *Analysis) IsMethodValue(node *ast.SelectorExpr) bool {
+	if node == nil {
+		return false
+	}
+	nodeInfo := a.NodeData[node]
+	if nodeInfo == nil {
+		return false
+	}
+	return nodeInfo.IsMethodValue
 }
 
 // analysisVisitor implements ast.Visitor and is used to traverse the AST during analysis.
@@ -566,8 +579,20 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		return v
 
 	case *ast.SelectorExpr:
-		// No need to track private field access since all fields are public
-		return v
+		// Initialize NodeData for this selector expression
+		if v.analysis.NodeData[n] == nil {
+			v.analysis.NodeData[n] = &NodeInfo{}
+		}
+		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
+
+		// Check if this is a method value (method being used as a value, not called immediately)
+		if selection := v.pkg.TypesInfo.Selections[n]; selection != nil {
+			if selection.Kind() == types.MethodVal {
+				// This is a method value - mark it for binding during code generation
+				v.analysis.NodeData[n].IsMethodValue = true
+			}
+		}
+		return v // Continue traversal
 
 	case *ast.AssignStmt:
 		for i, currentLHSExpr := range n.Lhs {
@@ -859,6 +884,20 @@ func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap
 
 	// Walk the AST with our visitor
 	ast.Walk(visitor, file)
+
+	// Post-processing: Find all CallExpr nodes and unmark their Fun SelectorExpr as method values
+	// This distinguishes between method calls (obj.Method()) and method values (obj.Method)
+	ast.Inspect(file, func(n ast.Node) bool {
+		if callExpr, ok := n.(*ast.CallExpr); ok {
+			if selExpr, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
+				// This SelectorExpr is the function being called, so it's NOT a method value
+				if nodeInfo := analysis.NodeData[selExpr]; nodeInfo != nil {
+					nodeInfo.IsMethodValue = false
+				}
+			}
+		}
+		return true
+	})
 }
 
 // getNamedReturns retrieves the named returns for a function

@@ -1,0 +1,10 @@
+Clean result: /a/c/d
+Join result: a/b/c
+Base result: c.txt
+Dir result: /a/b
+Ext result: .txt
+IsAbs result: true
+Split dir: /a/b/
+Split file: c.txt
+Match result: true
+test finished

@@ -1,0 +1,12 @@
+ValidPath('hello/world.txt'): true
+ValidPath('../invalid'): false
+ValidPath('.'): true
+ValidPath(''): false
+ErrInvalid: invalid argument
+ErrNotExist: file does not exist
+ErrExist: file already exists
+ErrPermission: permission denied
+ErrClosed: file already closed
+ModeDir: 2147483648
+ModePerm: 511
+test finished

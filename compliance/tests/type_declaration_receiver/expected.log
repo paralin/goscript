@@ -1,0 +1,10 @@
+FileMode(0).String(): none
+FileMode(0).IsZero(): true
+FileMode(5).String(): some
+FileMode(5).IsZero(): false
+FileMode(3).Add(2): 5
+FileMode(3).Add(2).String(): some
+CustomString("hello").Length(): 5
+CustomString("hello").Upper(): HELLO
+CustomString("world").Length(): 5
+CustomString("world").Upper(): WORLD

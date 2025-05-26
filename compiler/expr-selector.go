@@ -38,6 +38,14 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 		}
 	}
 
+	// Check if this is a method value (method being used as a value, not called immediately)
+	if c.analysis.IsMethodValue(exp) {
+		// This is a method value - we need to bind it properly
+		if selection := c.pkg.TypesInfo.Selections[exp]; selection != nil {
+			return c.writeMethodValue(exp, selection)
+		}
+	}
+
 	// --- Special case for dereferenced pointer to struct with field access: (*p).field or (**p).field etc ---
 	var baseExpr ast.Expr = exp.X
 	// Look inside parentheses if present
@@ -146,5 +154,97 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	// Struct fields use getters/setters, so we don't want to add .value here.
 	// The setter will handle the internal .value access.
 	c.WriteIdent(exp.Sel, false)
+	return nil
+}
+
+// writeMethodValue handles method values (methods used as values, not called immediately)
+// and generates proper binding code to maintain the 'this' context.
+func (c *GoToTSCompiler) writeMethodValue(exp *ast.SelectorExpr, selection *types.Selection) error {
+	// Get the method signature to understand the receiver type
+	methodObj := selection.Obj().(*types.Func)
+	sig := methodObj.Type().(*types.Signature)
+	recv := sig.Recv()
+
+	if recv == nil {
+		// This shouldn't happen for method values, but handle gracefully
+		return fmt.Errorf("method value has no receiver: %s", methodObj.Name())
+	}
+
+	// Determine if this is a pointer receiver or value receiver
+	recvType := recv.Type()
+	isPointerReceiver := false
+	if _, ok := recvType.(*types.Pointer); ok {
+		isPointerReceiver = true
+	}
+
+	// Get the base expression type to understand what we're working with
+	baseType := c.pkg.TypesInfo.TypeOf(exp.X)
+	baseIsPointer := false
+	if _, ok := baseType.(*types.Pointer); ok {
+		baseIsPointer = true
+	}
+
+	// Write the receiver expression
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write method value receiver: %w", err)
+	}
+
+	// Add null assertion if needed
+	if baseIsPointer {
+		c.tsw.WriteLiterally("!")
+	}
+
+	// Handle different receiver type combinations according to Go semantics
+	if isPointerReceiver && !baseIsPointer {
+		// Pointer receiver method on value type: t.Mp equivalent to (&t).Mp
+		// The receiver should be the address of the value
+		c.tsw.WriteLiterally(".")
+		c.WriteIdent(exp.Sel, false)
+		c.tsw.WriteLiterally(".bind(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write method value receiver for binding: %w", err)
+		}
+		if baseIsPointer {
+			c.tsw.WriteLiterally("!")
+		}
+		c.tsw.WriteLiterally(")")
+	} else if !isPointerReceiver && baseIsPointer {
+		// Value receiver method on pointer type: pt.Mv equivalent to (*pt).Mv
+		// The receiver should be a copy of the dereferenced value
+		c.tsw.WriteLiterally(".value.")
+		c.WriteIdent(exp.Sel, false)
+		c.tsw.WriteLiterally(".bind(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write method value receiver for binding: %w", err)
+		}
+		c.tsw.WriteLiterally("!.value.clone())")
+	} else if !isPointerReceiver && !baseIsPointer {
+		// Value receiver method on value type: t.Mv
+		// The receiver should be a copy of the value
+		c.tsw.WriteLiterally(".")
+		c.WriteIdent(exp.Sel, false)
+		c.tsw.WriteLiterally(".bind(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write method value receiver for binding: %w", err)
+		}
+		if baseIsPointer {
+			c.tsw.WriteLiterally("!")
+		}
+		c.tsw.WriteLiterally(".clone())")
+	} else {
+		// Pointer receiver method on pointer type: pt.Mp
+		// The receiver should be the pointer itself
+		c.tsw.WriteLiterally(".")
+		c.WriteIdent(exp.Sel, false)
+		c.tsw.WriteLiterally(".bind(")
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write method value receiver for binding: %w", err)
+		}
+		if baseIsPointer {
+			c.tsw.WriteLiterally("!")
+		}
+		c.tsw.WriteLiterally(")")
+	}
+
 	return nil
 }

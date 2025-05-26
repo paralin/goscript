@@ -1,0 +1,35 @@
+package fs // import "io/fs"
+
+Package fs defines basic interfaces to a file system. A file system can be
+provided by the host operating system but also by other packages.
+
+See the testing/fstest package for support with testing implementations of file
+systems.
+
+var ErrInvalid = errInvalid() ...
+var SkipAll = errors.New("skip everything and stop the walk")
+var SkipDir = errors.New("skip this directory")
+func FormatDirEntry(dir DirEntry) string
+func FormatFileInfo(info FileInfo) string
+func Glob(fsys FS, pattern string) (matches []string, err error)
+func ReadFile(fsys FS, name string) ([]byte, error)
+func ValidPath(name string) bool
+func WalkDir(fsys FS, root string, fn WalkDirFunc) error
+type DirEntry interface{ ... }
+    func FileInfoToDirEntry(info FileInfo) DirEntry
+    func ReadDir(fsys FS, name string) ([]DirEntry, error)
+type FS interface{ ... }
+    func Sub(fsys FS, dir string) (FS, error)
+type File interface{ ... }
+type FileInfo interface{ ... }
+    func Stat(fsys FS, name string) (FileInfo, error)
+type FileMode uint32
+    const ModeDir FileMode = 1 << (32 - 1 - iota) ...
+type GlobFS interface{ ... }
+type PathError struct{ ... }
+type ReadDirFS interface{ ... }
+type ReadDirFile interface{ ... }
+type ReadFileFS interface{ ... }
+type StatFS interface{ ... }
+type SubFS interface{ ... }
+type WalkDirFunc func(path string, d DirEntry, err error) error

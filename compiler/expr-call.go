@@ -513,16 +513,51 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			return errors.New("unhandled append call with incorrect number of arguments")
 		case "byte":
-			// Translate byte(val) to $.byte(val)
+			// Translate byte(arg) to $.byte(arg)
+			if len(exp.Args) != 1 {
+				return errors.Errorf("unhandled byte call with incorrect number of arguments: %d != 1", len(exp.Args))
+			}
+			c.tsw.WriteLiterally("$.byte(")
+			if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+				return fmt.Errorf("failed to write argument for byte() conversion: %w", err)
+			}
+			c.tsw.WriteLiterally(")")
+			return nil // Handled byte() conversion
+		case "int":
+			// Handle int() conversion
 			if len(exp.Args) == 1 {
-				c.tsw.WriteLiterally("$.byte(")
+				arg := exp.Args[0]
+
+				// Check if we're converting FROM a type with receiver methods TO int
+				if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
+					if namedArgType, isNamed := argType.(*types.Named); isNamed {
+						argTypeName := namedArgType.Obj().Name()
+						// Check if the argument type has receiver methods
+						if c.hasReceiverMethods(argTypeName) {
+							// Check if we're converting to int (the underlying type)
+							if types.Identical(types.Typ[types.Int], namedArgType.Underlying()) {
+								// This is a conversion from a type with methods to int
+								// Use valueOf() instead of $.int()
+								if err := c.WriteValueExpr(arg); err != nil {
+									return fmt.Errorf("failed to write argument for valueOf conversion: %w", err)
+								}
+								c.tsw.WriteLiterally(".valueOf()")
+								return nil // Handled conversion from type with methods to int
+							}
+						}
+					}
+				}
+
+				// Default case: Translate int(value) to $.int(value)
+				c.tsw.WriteLiterally("$.int(")
 				if err := c.WriteValueExpr(exp.Args[0]); err != nil {
-					return err
+					return fmt.Errorf("failed to write argument for int() conversion: %w", err)
 				}
 				c.tsw.WriteLiterally(")")
-				return nil // Handled byte
+				return nil // Handled int() conversion
 			}
-			return errors.New("unhandled byte call with incorrect number of arguments")
+			// Return error for incorrect number of arguments
+			return fmt.Errorf("unhandled int conversion with incorrect number of arguments: %d != 1", len(exp.Args))
 		default:
 			// Check if this is a type conversion to a function type
 			if funIdent != nil {
@@ -531,6 +566,30 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					if typeName, isType := obj.(*types.TypeName); isType {
 						// Make sure we have exactly one argument
 						if len(exp.Args) == 1 {
+							arg := exp.Args[0]
+
+							// Check if we're converting FROM a type with receiver methods TO its underlying type
+							if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
+								if namedArgType, isNamed := argType.(*types.Named); isNamed {
+									argTypeName := namedArgType.Obj().Name()
+									// Check if the argument type has receiver methods
+									if c.hasReceiverMethods(argTypeName) {
+										// Check if we're converting to the underlying type
+										targetType := typeName.Type()
+										underlyingType := namedArgType.Underlying()
+										if types.Identical(targetType, underlyingType) {
+											// This is a conversion from a type with methods to its underlying type
+											// Use valueOf() instead of TypeScript cast
+											if err := c.WriteValueExpr(arg); err != nil {
+												return fmt.Errorf("failed to write argument for valueOf conversion: %w", err)
+											}
+											c.tsw.WriteLiterally(".valueOf()")
+											return nil // Handled conversion from type with methods to underlying type
+										}
+									}
+								}
+							}
+
 							// Check if this is a function type
 							if _, isFuncType := typeName.Type().Underlying().(*types.Signature); isFuncType {
 								// For function types, we need to add a __goTypeName property
@@ -545,17 +604,30 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 								c.tsw.WriteLiterallyf(", { __goTypeName: '%s' })", funIdent.String())
 								return nil // Handled function type cast
 							} else {
-								// For non-function types, use the TypeScript "as" operator
-								c.tsw.WriteLiterally("(")
-								if err := c.WriteValueExpr(exp.Args[0]); err != nil {
-									return fmt.Errorf("failed to write argument for type cast: %w", err)
-								}
+								// Check if this type has receiver methods
+								if c.hasReceiverMethods(funIdent.String()) {
+									// For types with methods, use class constructor
+									c.tsw.WriteLiterally("new ")
+									c.tsw.WriteLiterally(funIdent.String())
+									c.tsw.WriteLiterally("(")
+									if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+										return fmt.Errorf("failed to write argument for type constructor: %w", err)
+									}
+									c.tsw.WriteLiterally(")")
+									return nil // Handled type with methods conversion
+								} else {
+									// For non-function types without methods, use the TypeScript "as" operator
+									c.tsw.WriteLiterally("(")
+									if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+										return fmt.Errorf("failed to write argument for type cast: %w", err)
+									}
 
-								// Then use the TypeScript "as" operator with the mapped type name
-								c.tsw.WriteLiterally(" as ")
-								c.WriteGoType(typeName.Type(), GoTypeContextGeneral)
-								c.tsw.WriteLiterally(")")
-								return nil // Handled non-function type cast
+									// Then use the TypeScript "as" operator with the mapped type name
+									c.tsw.WriteLiterally(" as ")
+									c.WriteGoType(typeName.Type(), GoTypeContextGeneral)
+									c.tsw.WriteLiterally(")")
+									return nil // Handled non-function type cast
+								}
 							}
 						}
 					}

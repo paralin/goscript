@@ -150,6 +150,237 @@ func (c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType
 	c.tsw.WriteLiterally(")")
 }
 
+// hasReceiverMethods checks if a type declaration has any receiver methods defined
+func (c *GoToTSCompiler) hasReceiverMethods(typeName string) bool {
+	for _, fileSyntax := range c.pkg.Syntax {
+		for _, decl := range fileSyntax.Decls {
+			funcDecl, isFunc := decl.(*ast.FuncDecl)
+			if !isFunc || funcDecl.Recv == nil || len(funcDecl.Recv.List) == 0 {
+				continue
+			}
+			recvField := funcDecl.Recv.List[0]
+			recvType := recvField.Type
+			if starExpr, ok := recvType.(*ast.StarExpr); ok {
+				recvType = starExpr.X
+			}
+
+			// Check for both simple identifiers (FileMode) and generic types (FileMode[T])
+			var recvTypeName string
+			if ident, ok := recvType.(*ast.Ident); ok {
+				recvTypeName = ident.Name
+			} else if indexExpr, ok := recvType.(*ast.IndexExpr); ok {
+				if ident, ok := indexExpr.X.(*ast.Ident); ok {
+					recvTypeName = ident.Name
+				}
+			}
+
+			if recvTypeName == typeName {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+// WriteNamedTypeWithMethods generates a TypeScript class for a Go named type that has receiver methods
+func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
+	className := a.Name.Name
+	underlyingType := c.pkg.TypesInfo.TypeOf(a.Type)
+
+	// Add export for Go-exported types (but not if inside a function)
+	isInsideFunction := false
+	if nodeInfo := c.analysis.NodeData[a]; nodeInfo != nil {
+		isInsideFunction = nodeInfo.IsInsideFunction
+	}
+
+	if a.Name.IsExported() && !isInsideFunction {
+		c.tsw.WriteLiterally("export ")
+	}
+
+	c.tsw.WriteLiterallyf("class %s {", className)
+	c.tsw.WriteLine("")
+	c.tsw.Indent(1)
+
+	// Constructor that takes the underlying type value
+	c.tsw.WriteLiterally("constructor(private _value: ")
+	c.WriteGoType(underlyingType, GoTypeContextGeneral)
+	c.tsw.WriteLine(") {}")
+	c.tsw.WriteLine("")
+
+	// valueOf method to get the underlying value (for type conversions and operations)
+	c.tsw.WriteLiterally("valueOf(): ")
+	c.WriteGoType(underlyingType, GoTypeContextGeneral)
+	c.tsw.WriteLine(" {")
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("return this._value")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	c.tsw.WriteLine("")
+
+	// toString method for string conversion
+	c.tsw.WriteLine("toString(): string {")
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("return String(this._value)")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	c.tsw.WriteLine("")
+
+	// Static from method for type conversion
+	c.tsw.WriteLiterallyf("static from(value: ")
+	c.WriteGoType(underlyingType, GoTypeContextGeneral)
+	c.tsw.WriteLiterallyf("): %s {", className)
+	c.tsw.WriteLine("")
+	c.tsw.Indent(1)
+	c.tsw.WriteLiterallyf("return new %s(value)", className)
+	c.tsw.WriteLine("")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+
+	// Add receiver methods for this type
+	for _, fileSyntax := range c.pkg.Syntax {
+		for _, decl := range fileSyntax.Decls {
+			funcDecl, isFunc := decl.(*ast.FuncDecl)
+			if !isFunc || funcDecl.Recv == nil || len(funcDecl.Recv.List) == 0 {
+				continue
+			}
+			recvField := funcDecl.Recv.List[0]
+			recvType := recvField.Type
+			if starExpr, ok := recvType.(*ast.StarExpr); ok {
+				recvType = starExpr.X
+			}
+
+			// Check for both simple identifiers (FileMode) and generic types (FileMode[T])
+			var recvTypeName string
+			if ident, ok := recvType.(*ast.Ident); ok {
+				recvTypeName = ident.Name
+			} else if indexExpr, ok := recvType.(*ast.IndexExpr); ok {
+				if ident, ok := indexExpr.X.(*ast.Ident); ok {
+					recvTypeName = ident.Name
+				}
+			}
+
+			if recvTypeName == className {
+				c.tsw.WriteLine("")
+				if err := c.writeNamedTypeMethod(funcDecl, className); err != nil {
+					return err
+				}
+			}
+		}
+	}
+
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+
+	return nil
+}
+
+// writeNamedTypeMethod writes a method for a named type, handling receiver binding properly
+func (c *GoToTSCompiler) writeNamedTypeMethod(decl *ast.FuncDecl, className string) error {
+	if decl.Doc != nil {
+		c.WriteDoc(decl.Doc)
+	}
+
+	// Determine if method is async
+	var isAsync bool
+	if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
+		isAsync = c.analysis.IsAsyncFunc(obj)
+	}
+
+	// Methods are typically public in the TS output
+	c.tsw.WriteLiterally("public ")
+
+	// Add async modifier if needed
+	if isAsync {
+		c.tsw.WriteLiterally("async ")
+	}
+
+	// Keep original Go casing for method names
+	if err := c.WriteValueExpr(decl.Name); err != nil { // Method name is a value identifier
+		return err
+	}
+
+	// Write signature (parameters and return type)
+	funcType := decl.Type
+	c.tsw.WriteLiterally("(")
+	if funcType.Params != nil {
+		c.WriteFieldList(funcType.Params, true) // true = arguments
+	}
+	c.tsw.WriteLiterally(")")
+
+	// Handle return type
+	if funcType.Results != nil && len(funcType.Results.List) > 0 {
+		c.tsw.WriteLiterally(": ")
+		if isAsync {
+			c.tsw.WriteLiterally("Promise<")
+		}
+		if len(funcType.Results.List) == 1 {
+			// Single return value
+			resultType := funcType.Results.List[0].Type
+			c.WriteTypeExpr(resultType)
+		} else {
+			// Multiple return values -> tuple type
+			c.tsw.WriteLiterally("[")
+			for i, field := range funcType.Results.List {
+				if i > 0 {
+					c.tsw.WriteLiterally(", ")
+				}
+				c.WriteTypeExpr(field.Type)
+			}
+			c.tsw.WriteLiterally("]")
+		}
+		if isAsync {
+			c.tsw.WriteLiterally(">")
+		}
+	} else {
+		// No return value -> void
+		if isAsync {
+			c.tsw.WriteLiterally(": Promise<void>")
+		} else {
+			c.tsw.WriteLiterally(": void")
+		}
+	}
+
+	c.tsw.WriteLiterally(" ")
+
+	// For named types with methods, bind receiver name to this._value
+	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
+		recvName := recvField.Names[0].Name
+		if recvName != "_" {
+			c.tsw.WriteLine("{")
+			c.tsw.Indent(1)
+			// Bind the receiver name to this._value for value types
+			sanitizedRecvName := c.sanitizeIdentifier(recvName)
+			c.tsw.WriteLinef("const %s = this._value", sanitizedRecvName)
+
+			// Add using statement if needed
+			if c.analysis.NeedsDefer(decl.Body) {
+				if c.analysis.IsInAsyncFunction(decl) {
+					c.tsw.WriteLine("await using __defer = new $.AsyncDisposableStack();")
+				} else {
+					c.tsw.WriteLine("using cleanup = new $.DisposableStack();")
+				}
+			}
+
+			// write method body without outer braces
+			for _, stmt := range decl.Body.List {
+				if err := c.WriteStmt(stmt); err != nil {
+					return fmt.Errorf("failed to write statement in function body: %w", err)
+				}
+			}
+			c.tsw.Indent(-1)
+			c.tsw.WriteLine("}")
+
+			return nil
+		}
+	}
+	// no named receiver, write whole body
+	if err := c.WriteStmt(decl.Body); err != nil {
+		return fmt.Errorf("failed to write function body: %w", err)
+	}
+
+	return nil
+}
+
 // WriteTypeSpec writes the type specification to the output.
 func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 	if a.Doc != nil {
@@ -165,6 +396,11 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 	case *ast.InterfaceType:
 		return c.WriteInterfaceTypeSpec(a, t)
 	default:
+		// Check if this type has receiver methods
+		if c.hasReceiverMethods(a.Name.Name) {
+			return c.WriteNamedTypeWithMethods(a)
+		}
+
 		// type alias - add export for Go-exported types (but not if inside a function)
 		isInsideFunction := false
 		if nodeInfo := c.analysis.NodeData[a]; nodeInfo != nil {
