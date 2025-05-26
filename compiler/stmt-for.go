@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 
 	"github.com/pkg/errors"
 )
@@ -64,7 +65,64 @@ func (c *GoToTSCompiler) WriteStmtForInit(stmt ast.Stmt) error {
 	case *ast.AssignStmt:
 		// Handle assignment in init (e.g., i := 0 or i = 0)
 		// For TypeScript for-loop init, we need to handle multi-variable declarations differently
-		if s.Tok == token.DEFINE && len(s.Lhs) > 1 && len(s.Rhs) > 0 {
+		if s.Tok == token.DEFINE && len(s.Lhs) > 1 && len(s.Rhs) == 1 {
+			// Handle the case where we have multiple LHS variables but only one RHS expression
+			// This could be a map access with comma-ok idiom: value, ok := m["key"]
+			rhsExpr := s.Rhs[0]
+			if indexExpr, ok := rhsExpr.(*ast.IndexExpr); ok && len(s.Lhs) == 2 {
+				// Check if this is a map lookup (comma-ok idiom)
+				if c.pkg != nil && c.pkg.TypesInfo != nil {
+					tv, typeOk := c.pkg.TypesInfo.Types[indexExpr.X]
+					if typeOk {
+						// Check if it's a map type
+						if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
+							// Handle map comma-ok idiom in for loop initialization
+							c.tsw.WriteLiterally("let ")
+
+							// Write the value variable
+							if err := c.WriteValueExpr(s.Lhs[0]); err != nil {
+								return err
+							}
+							c.tsw.WriteLiterally(" = ")
+							c.tsw.WriteLiterally("$.mapGet(")
+							if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
+								return err
+							}
+							c.tsw.WriteLiterally(", ")
+							if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
+								return err
+							}
+							c.tsw.WriteLiterally(", ")
+							// Write the zero value for the map's value type
+							if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
+								c.WriteZeroValueForType(mapType.Elem())
+							} else {
+								c.tsw.WriteLiterally("null")
+							}
+							c.tsw.WriteLiterally("), ")
+
+							// Write the ok variable
+							if err := c.WriteValueExpr(s.Lhs[1]); err != nil {
+								return err
+							}
+							c.tsw.WriteLiterally(" = ")
+							c.tsw.WriteLiterally("$.mapHas(")
+							if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
+								return err
+							}
+							c.tsw.WriteLiterally(", ")
+							if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
+								return err
+							}
+							c.tsw.WriteLiterally(")")
+							return nil
+						}
+					}
+				}
+			}
+			// If not a map access, fall through to error
+			return errors.Errorf("no corresponding rhs to lhs: %v", s)
+		} else if s.Tok == token.DEFINE && len(s.Lhs) > 1 && len(s.Rhs) > 0 {
 			// For loop initialization with multiple variables (e.g., let i = 0, j = 10)
 			c.tsw.WriteLiterally("let ")
 
