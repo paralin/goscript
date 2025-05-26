@@ -185,17 +185,17 @@ export function sortSlice<T extends string | number>(s: Slice<T>): void {
   if (s === null || s === undefined) {
     return // Nothing to sort for nil slice
   }
-  
+
   if (Array.isArray(s)) {
     s.sort()
     return
   }
-  
+
   if (s instanceof Uint8Array) {
     s.sort()
     return
   }
-  
+
   // Handle SliceProxy case - sort the backing array in-place within the slice bounds
   if (isSliceProxy(s)) {
     const proxy = s as SliceProxy<T>

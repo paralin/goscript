@@ -88,6 +88,20 @@ func main() {
 				"data": {NeedsVarRef: false, NeedsVarRefAccess: false}, // Should NOT be varrefed
 			},
 		},
+		{
+			name: "var_declaration_composite_literal",
+			code: `package main
+type MockInode struct {
+	Value int
+}
+func main() {
+	var childInode *MockInode = &MockInode{Value: 42}
+	println("childInode.Value:", childInode.Value)
+}`,
+			expected: map[string]AnalysisExpectation{
+				"childInode": {NeedsVarRef: false, NeedsVarRefAccess: false}, // Should NOT be varrefed
+			},
+		},
 	}
 
 	for _, tt := range tests {

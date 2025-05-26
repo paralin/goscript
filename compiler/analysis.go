@@ -317,9 +317,6 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 						if lhsObj == nil {
 							continue
 						}
-						// Ensure usage info exists for LHS
-						lhsUsageInfo := v.getOrCreateUsageInfo(lhsObj)
-
 						// Check if there's a corresponding initial value (RHS)
 						if valueSpec.Values != nil && i < len(valueSpec.Values) {
 							rhsExpr := valueSpec.Values[i]
@@ -327,12 +324,18 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 							// --- Analyze RHS and Update Usage Info (similar to AssignStmt) ---
 							assignmentType := DirectAssignment
 							var sourceObj types.Object
+							shouldTrackUsage := true
 
 							if unaryExpr, ok := rhsExpr.(*ast.UnaryExpr); ok && unaryExpr.Op == token.AND {
-								// Case: var lhs = &rhs_ident
+								// Case: var lhs = &rhs_expr
 								assignmentType = AddressOfAssignment
 								if rhsIdent, ok := unaryExpr.X.(*ast.Ident); ok {
+									// Case: var lhs = &rhs_ident (taking address of a variable)
 									sourceObj = v.pkg.TypesInfo.ObjectOf(rhsIdent)
+								} else {
+									// Case: var lhs = &CompositeLit{} (taking address of composite literal)
+									// No variable tracking needed - this doesn't create VarRef requirements
+									shouldTrackUsage = false
 								}
 							} else if rhsIdent, ok := rhsExpr.(*ast.Ident); ok {
 								// Case: var lhs = rhs_ident
@@ -341,21 +344,26 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 							}
 
 							// --- Record Usage ---
-							if sourceObj != nil {
-								// Record source for LHS
-								lhsUsageInfo.Sources = append(lhsUsageInfo.Sources, AssignmentInfo{
-									Object: sourceObj,
-									Type:   assignmentType,
-								})
+							// Only create usage tracking if we're dealing with variable references
+							if shouldTrackUsage {
+								// Ensure usage info exists for LHS only when needed
+								lhsUsageInfo := v.getOrCreateUsageInfo(lhsObj)
 
-								// Record destination for RHS source
-								sourceUsageInfo := v.getOrCreateUsageInfo(sourceObj)
-								sourceUsageInfo.Destinations = append(sourceUsageInfo.Destinations, AssignmentInfo{
-									Object: lhsObj,
-									Type:   assignmentType,
-								})
+								if sourceObj != nil {
+									// Record source for LHS
+									lhsUsageInfo.Sources = append(lhsUsageInfo.Sources, AssignmentInfo{
+										Object: sourceObj,
+										Type:   assignmentType,
+									})
+
+									// Record destination for RHS source
+									sourceUsageInfo := v.getOrCreateUsageInfo(sourceObj)
+									sourceUsageInfo.Destinations = append(sourceUsageInfo.Destinations, AssignmentInfo{
+										Object: lhsObj,
+										Type:   assignmentType,
+									})
+								}
 							}
-							// Note: We might need to handle var lhs = &T{} cases later if necessary.
 						}
 					}
 				}

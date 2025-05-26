@@ -918,7 +918,8 @@ export const sliceString = (
     // Attempt to decode with strict UTF-8 validation
     const result = new TextDecoder('utf-8', { fatal: true }).decode(slicedBytes)
     return result
-  } catch (_e) { //eslint-disable-line @typescript-eslint/no-unused-vars
+  } catch (_e) {
+    //eslint-disable-line @typescript-eslint/no-unused-vars
     // If we get here, the slice would create invalid UTF-8
     // This is a fundamental limitation of JavaScript string handling
     throw new Error(
@@ -1028,12 +1029,9 @@ export function indexStringOrBytes(
  * @param max Capacity limit (only used for bytes, ignored for strings)
  * @returns The sliced value of the same type as input
  */
-export function sliceStringOrBytes<T extends string | import('./builtin.js').Bytes>(
-  value: T,
-  low?: number,
-  high?: number,
-  max?: number,
-): T {
+export function sliceStringOrBytes<
+  T extends string | import('./builtin.js').Bytes,
+>(value: T, low?: number, high?: number, max?: number): T {
   if (typeof value === 'string') {
     // For strings, use sliceString and ignore max parameter
     return sliceString(value, low, high) as T

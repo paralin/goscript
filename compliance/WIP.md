@@ -64,3 +64,61 @@ The `//go:linkname` directive is not currently processed by the compiler. This d
 2. Verify TypeScript compilation succeeds
 3. Verify runtime behavior matches Go output
 4. Test with different linkname scenarios 
+
+# VarRef Composite Literal Issue
+
+## Problem
+
+When we have a variable declaration like:
+```go
+var childInode *MockInode = &MockInode{Value: 42}
+```
+
+The compiler incorrectly generates:
+```typescript
+let childInode: MockInode | null = $.varRef(new MockInode({Value: 42}))
+```
+
+But it should generate:
+```typescript
+let childInode: MockInode | null = new MockInode({Value: 42})
+```
+
+## Root Cause
+
+The issue is in the analysis logic in `compiler/analysis.go`. The analysis is incorrectly marking `childInode` as needing VarRef when it shouldn't be.
+
+The key distinction is:
+- `var x T = someValue; p := &x` - Here `x` needs VarRef because we're taking the address of a variable
+- `var p *T = &T{}` - Here `p` does NOT need VarRef because we're taking the address of a composite literal, not a variable
+
+## Analysis
+
+In `compiler/analysis.go`, the `GenDecl` case (lines ~325-350) handles variable declarations. When it sees:
+```go
+var lhs = &rhs_expr
+```
+
+It correctly identifies this as `AddressOfAssignment`, but the current logic doesn't distinguish between:
+1. `&variable` (should mark the variable as needing VarRef)
+2. `&compositeLiteral` (should NOT mark anything as needing VarRef)
+
+The analysis currently only checks if `rhsExpr` is an identifier (`rhsIdent`), but doesn't handle the case where we're taking the address of a composite literal.
+
+## Solution
+
+The fix should be in the `GenDecl` case in `compiler/analysis.go`. We need to modify the logic to:
+
+1. When we see `&compositeLiteral`, don't create any VarRef tracking entries
+2. Only create VarRef tracking when we see `&variable`
+
+The key is that taking the address of a composite literal (`&T{}`) creates a pointer directly, without needing to track any variable references.
+
+## Files to Modify
+
+- `compiler/analysis.go` - Fix the GenDecl case to handle composite literals correctly
+- Potentially `compiler/spec-value.go` - May need updates to variable declaration generation
+
+## Test Case
+
+The `compliance/tests/varref_composite_lit` test demonstrates this issue and should pass once fixed. 

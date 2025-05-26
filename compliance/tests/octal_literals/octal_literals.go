@@ -2,10 +2,10 @@ package main
 
 func main() {
 	// Test octal literals that cause TypeScript compilation errors
-	perm1 := 0777
-	perm2 := 0666
-	perm3 := 0644
-	perm4 := 0755
+	perm1 := 0o777
+	perm2 := 0o666
+	perm3 := 0o644
+	perm4 := 0o755
 
 	println("perm1:", perm1)
 	println("perm2:", perm2)

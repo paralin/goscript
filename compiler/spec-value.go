@@ -193,27 +193,34 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 			if hasInitializer {
 				// Handle &v initializer specifically for unvarrefed variables
 				if unaryExpr, isUnary := initializerExpr.(*ast.UnaryExpr); isUnary && unaryExpr.Op == token.AND {
-					// Initializer is &v
-					// Check if v is varrefed
-					needsVarRefOperand := false
-					unaryExprXIdent, ok := unaryExpr.X.(*ast.Ident)
-					if ok {
+					// Initializer is &expr
+					// Check if expr is an identifier (variable) or something else (e.g., composite literal)
+					if unaryExprXIdent, ok := unaryExpr.X.(*ast.Ident); ok {
+						// Case: &variable
+						// Check if the variable is varrefed
 						innerObj := c.pkg.TypesInfo.Uses[unaryExprXIdent]
-						needsVarRefOperand = innerObj != nil && c.analysis.NeedsVarRef(innerObj)
-					}
+						needsVarRefOperand := innerObj != nil && c.analysis.NeedsVarRef(innerObj)
 
-					// If v is varrefed, assign the varRef itself (v)
-					// If v is not varrefed, assign $.varRef(v)
-					if needsVarRefOperand {
-						// do not write .value here.
-						c.WriteIdent(unaryExprXIdent, false)
+						// If variable is varrefed, assign the varRef itself (variable)
+						// If variable is not varrefed, assign $.varRef(variable)
+						if needsVarRefOperand {
+							// do not write .value here.
+							c.WriteIdent(unaryExprXIdent, false)
+						} else {
+							// &unvarrefedVar -> $.varRef(unvarrefedVar)
+							c.tsw.WriteLiterally("$.varRef(")
+							if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Write 'variable'
+								return err
+							}
+							c.tsw.WriteLiterally(")")
+						}
 					} else {
-						// &unvarrefedVar -> $.varRef(unvarrefedVar)
-						c.tsw.WriteLiterally("$.varRef(")
-						if err := c.WriteValueExpr(unaryExpr.X); err != nil { // Write 'v'
+						// Case: &compositeLiteral or &otherExpression
+						// For composite literals and other expressions, just write the expression directly
+						// Example: &MyStruct{} -> new MyStruct({})
+						if err := c.WriteValueExpr(unaryExpr.X); err != nil {
 							return err
 						}
-						c.tsw.WriteLiterally(")")
 					}
 				} else {
 					// Check if this is a named type with methods and the initializer is a basic value
