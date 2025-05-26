@@ -11,7 +11,6 @@ export async function main(): Promise<void> {
 		return "Hello, " + name
 	}
 
-
 	// 3. Use Greeter(theInlineVar) to cast to the Greeter declared function type.
 	let castedGreeter = Object.assign(theInlineVar, { __goTypeName: 'Greeter' })
 
@@ -23,7 +22,6 @@ export async function main(): Promise<void> {
 	let theInlineAdder = (a: number, b: number): number => {
 		return a + b
 	}
-
 	let castedAdder = Object.assign(theInlineAdder, { __goTypeName: 'Adder' })
 	console.log(castedAdder!(5, 7))
 }

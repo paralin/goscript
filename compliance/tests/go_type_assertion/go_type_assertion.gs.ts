@@ -7,7 +7,6 @@ export async function main(): Promise<void> {
 	let x: null | any = (): void => {
 		console.log("goroutine executed")
 	}
-
 	queueMicrotask(() => {
 		$.mustTypeAssert<(() => void) | null>(x, {kind: $.TypeKind.Function})!()
 	})

@@ -12,7 +12,7 @@ export async function main(): Promise<void> {
 	// slices.All returns an iterator interface that can be ranged over
 	;(() => {
 		let shouldContinue = true
-		slices.All(s)((i, v) => {
+		slices.All(s)!((i, v) => {
 			{
 				console.log("index:", i, "value:", v)
 			}

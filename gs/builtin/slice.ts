@@ -974,20 +974,20 @@ export function genericBytesOrStringToString(
 }
 
 /**
- * Indexes into a value that could be either a string or Uint8Array.
+ * Indexes into a value that could be either a string or bytes.
  * Used for generic type parameters with constraint string | []byte.
  * Both cases return a byte value (number).
- * @param value Value that is either a string or Uint8Array
+ * @param value Value that is either a string or bytes (Uint8Array or Slice<number>)
  * @param index The index to access
  * @returns The byte value at the specified index
  */
 export function indexStringOrBytes(
-  value: string | Uint8Array,
+  value: string | import('./builtin.js').Bytes,
   index: number,
 ): number {
   if (typeof value === 'string') {
     return indexString(value, index)
-  } else {
+  } else if (value instanceof Uint8Array) {
     // For Uint8Array, direct access returns the byte value
     if (index < 0 || index >= value.length) {
       throw new Error(
@@ -995,19 +995,32 @@ export function indexStringOrBytes(
       )
     }
     return value[index]
+  } else if (value === null) {
+    throw new Error(
+      `runtime error: index out of range [${index}] with length 0`,
+    )
+  } else {
+    // For Slice<number> (including SliceProxy)
+    const length = len(value)
+    if (index < 0 || index >= length) {
+      throw new Error(
+        `runtime error: index out of range [${index}] with length ${length}`,
+      )
+    }
+    return (value as any)[index] as number
   }
 }
 
 /**
- * Slices a value that could be either a string or Uint8Array.
+ * Slices a value that could be either a string or bytes.
  * Used for generic type parameters with constraint string | []byte.
- * @param value Value that is either a string or Uint8Array
+ * @param value Value that is either a string or bytes (Uint8Array or Slice<number>)
  * @param low Starting index (inclusive). Defaults to 0.
  * @param high Ending index (exclusive). Defaults to length.
- * @param max Capacity limit (only used for Uint8Array, ignored for strings)
+ * @param max Capacity limit (only used for bytes, ignored for strings)
  * @returns The sliced value of the same type as input
  */
-export function sliceStringOrBytes<T extends string | Uint8Array>(
+export function sliceStringOrBytes<T extends string | import('./builtin.js').Bytes>(
   value: T,
   low?: number,
   high?: number,
@@ -1017,7 +1030,7 @@ export function sliceStringOrBytes<T extends string | Uint8Array>(
     // For strings, use sliceString and ignore max parameter
     return sliceString(value, low, high) as T
   } else {
-    // For Uint8Array, use goSlice
+    // For bytes (Uint8Array or Slice<number>), use goSlice
     return goSlice(value as Slice<number>, low, high, max) as T
   }
 }

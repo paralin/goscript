@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 export async function main(): Promise<void> {
 	// Test 1: Declaration and initialization of []byte
-	let b1: Uint8Array = new Uint8Array(0)
+	let b1: $.Bytes = new Uint8Array(0)
 	console.log("b1:", b1)
 
 	let b2 = new Uint8Array([72, 101, 108, 108, 111]) // "Hello"

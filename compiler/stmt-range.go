@@ -46,503 +46,375 @@ func (c *GoToTSCompiler) WriteStmtRange(exp *ast.RangeStmt) error {
 	iterType := c.pkg.TypesInfo.TypeOf(exp.X)
 	underlying := iterType.Underlying()
 
-	// Handle map types
-	if _, ok := underlying.(*types.Map); ok {
-		// Use for-of with entries() for proper Map iteration
-		c.tsw.WriteLiterally("for (const [k, v] of ")
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write range loop map expression: %w", err)
-		}
-		c.tsw.WriteLiterally(".entries()) {")
-		c.tsw.Indent(1)
-		c.tsw.WriteLine("")
-		// If a key variable is provided and is not blank, declare it as a constant
-		if exp.Key != nil {
-			if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
-				c.tsw.WriteLiterally("const ")
-				c.WriteIdent(ident, false)
-				c.tsw.WriteLiterally(" = k")
-				c.tsw.WriteLine("")
-			}
-		}
-		// If a value variable is provided and is not blank, use the value from entries()
-		if exp.Value != nil {
-			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-				c.tsw.WriteLiterally("const ")
-				c.WriteIdent(ident, false)
-				c.tsw.WriteLiterally(" = v")
-				c.tsw.WriteLine("")
-			}
-		}
-		// Write the loop body
-		if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-			return fmt.Errorf("failed to write range loop map body: %w", err)
-		}
-		c.tsw.Indent(-1)
-		c.tsw.WriteLine("}")
-		return nil
+	// Handle map types (both concrete maps and type parameters constrained to maps)
+	if c.isMapType(iterType, underlying) {
+		return c.writeMapRange(exp)
 	}
 
 	// Handle basic types (string, integer)
 	if basic, ok := underlying.(*types.Basic); ok {
 		if basic.Info()&types.IsString != 0 {
-			// Add a scope to avoid collision of _runes variable
-			c.tsw.WriteLine("{")
-			c.tsw.Indent(1)
-
-			// Convert the string to runes using $.stringToRunes
-			c.tsw.WriteLiterally("const _runes = $.stringToRunes(")
-			if err := c.WriteValueExpr(exp.X); err != nil {
-				return fmt.Errorf("failed to write range loop string conversion expression: %w", err)
-			}
-			c.tsw.WriteLiterally(")")
-			c.tsw.WriteLine("")
-
-			// Determine the index variable name for the generated loop
-			indexVarName := "i" // Default name
-			if exp.Key != nil {
-				if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
-					indexVarName = keyIdent.Name
-				}
-			}
-			c.tsw.WriteLiterallyf("for (let %s = 0; %s < _runes.length; %s++) {", indexVarName, indexVarName, indexVarName)
-			c.tsw.Indent(1)
-			c.tsw.WriteLine("")
-			// Declare value if provided and not blank
-			if exp.Value != nil {
-				if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-					c.tsw.WriteLiterally("const ")
-					c.WriteIdent(ident, false)
-					c.tsw.WriteLiterally(" = _runes[i]") // TODO: should be indexVarName?
-					c.tsw.WriteLine("")
-				}
-			}
-			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-				return fmt.Errorf("failed to write range loop string body: %w", err)
-			}
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-
-			// outer }
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			return nil
+			return c.writeStringRange(exp)
 		} else if basic.Info()&types.IsInteger != 0 {
-			// The value variable is not allowed ranging over an integer.
-			if exp.Value != nil {
-				return errors.Errorf("ranging over an integer supports key variable only (not value variable): %v", exp)
-			}
-
-			// Handle ranging over an integer (Go 1.22+)
-			// Determine the index variable name for the generated loop
-			indexVarName := "_i" // Default name
-			if exp.Key != nil {
-				if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
-					indexVarName = keyIdent.Name
-				}
-			}
-
-			c.tsw.WriteLiterallyf("for (let %s = 0; %s < ", indexVarName, indexVarName)
-			if err := c.WriteValueExpr(exp.X); err != nil { // This is N
-				return fmt.Errorf("failed to write range loop integer expression: %w", err)
-			}
-			c.tsw.WriteLiterallyf("; %s++) {", indexVarName)
-
-			// write body
-			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-				return fmt.Errorf("failed to write range loop integer body: %w", err)
-			}
-
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			return nil
+			return c.writeIntegerRange(exp)
 		}
 	}
 
 	// Handle array and slice types
-	_, isSlice := underlying.(*types.Slice)
-	_, isArray := underlying.(*types.Array)
-	if isArray || isSlice {
-		// Determine the index variable name for the generated loop
-		indexVarName := "_i" // Default name
-		if exp.Key != nil {
-			if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
-				indexVarName = keyIdent.Name
-			}
-		}
-		// If both key and value are provided, use an index loop and assign both
-		if exp.Key != nil && exp.Value != nil {
-			c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-			if err := c.WriteValueExpr(exp.X); err != nil { // Write the expression for the iterable
-				return fmt.Errorf("failed to write range loop array/slice expression (key and value): %w", err)
-			}
-			c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
-			c.tsw.Indent(1)
-			c.tsw.WriteLine("")
-			// Declare value if not blank
-			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-				c.tsw.WriteLiterally("const ")
-				c.WriteIdent(ident, false)
-				c.tsw.WriteLiterally(" = ")
-				if err := c.WriteValueExpr(exp.X); err != nil {
-					return fmt.Errorf("failed to write range loop array/slice value expression: %w", err)
-				}
-				c.tsw.WriteLiterallyf("![%s]", indexVarName) // Use indexVarName with not-null assert
-				c.tsw.WriteLine("")
-			}
-			if err := c.WriteStmt(exp.Body); err != nil {
-				return fmt.Errorf("failed to write range loop array/slice body (key and value): %w", err)
-			}
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			return nil
-		} else if exp.Key != nil && exp.Value == nil { // Only key provided
-			c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-			// Write the expression for the iterable
-			if err := c.WriteValueExpr(exp.X); err != nil {
-				return fmt.Errorf("failed to write expression for the iterable: %w", err)
-			}
-			c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
-			c.tsw.Indent(1)
-			c.tsw.WriteLine("")
-			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-				return fmt.Errorf("failed to write range loop array/slice body (only key): %w", err)
-			}
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			return nil
-		} else if exp.Key == nil && exp.Value != nil { // Only value provided
-			// I think this is impossible. See for_range_value_only test.
-			return errors.Errorf("unexpected value without key in for range expression: %v", exp)
-		} else {
-			// Fallback: simple index loop without declaring range variables, use _i
-			indexVarName := "_i"
-			c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-			if err := c.WriteValueExpr(exp.X); err != nil {
-				return fmt.Errorf("failed to write range loop array/slice length expression (fallback): %w", err)
-			}
-			c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
-			c.tsw.Indent(1)
-			c.tsw.WriteLine("")
-			if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-				return fmt.Errorf("failed to write range loop array/slice body (fallback): %w", err)
-			}
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-			return nil
-		}
+	if c.isArrayOrSlice(underlying) {
+		return c.writeArraySliceRange(exp, false)
 	}
 
 	// Handle pointer to array/slice types
 	if ptrType, ok := underlying.(*types.Pointer); ok {
 		elem := ptrType.Elem().Underlying()
-		_, isSlice := elem.(*types.Slice)
-		_, isArray := elem.(*types.Array)
-		if isArray || isSlice {
-			// For pointer to array/slice, we need to dereference the pointer
-			// Check if the pointer variable itself is varrefed
-
-			// Determine the index variable name for the generated loop
-			indexVarName := "_i" // Default name
-			if exp.Key != nil {
-				if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
-					indexVarName = keyIdent.Name
-				}
-			}
-			// If both key and value are provided, use an index loop and assign both
-			if exp.Key != nil && exp.Value != nil {
-				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-
-				// Write the pointer expression - use WriteIdent to avoid automatic .value access
-				// since we'll add !.value for pointer dereference
-				if ident, ok := exp.X.(*ast.Ident); ok {
-					c.WriteIdent(ident, false) // Don't add .value here
-				} else {
-					if err := c.WriteValueExpr(exp.X); err != nil {
-						return fmt.Errorf("failed to write range loop pointer array/slice expression (key and value): %w", err)
-					}
-				}
-				// Add dereference for the pointer: since we're ranging over a pointer to array/slice,
-				// we need to dereference to get to the array/slice
-				c.tsw.WriteLiterally("!.value")
-				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
-				c.tsw.Indent(1)
-				c.tsw.WriteLine("")
-				// Declare value if not blank
-				if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-					c.tsw.WriteLiterally("const ")
-					c.WriteIdent(ident, false)
-					c.tsw.WriteLiterally(" = ")
-					// Write the pointer expression again for value access
-					if identX, ok := exp.X.(*ast.Ident); ok {
-						c.WriteIdent(identX, false) // Don't add .value here
-					} else {
-						if err := c.WriteValueExpr(exp.X); err != nil {
-							return fmt.Errorf("failed to write range loop pointer array/slice value expression: %w", err)
-						}
-					}
-					c.tsw.WriteLiterally("!.value![")
-					c.tsw.WriteLiterally(indexVarName)
-					c.tsw.WriteLiterally("]")
-					c.tsw.WriteLine("")
-				}
-				if err := c.WriteStmt(exp.Body); err != nil {
-					return fmt.Errorf("failed to write range loop pointer array/slice body (key and value): %w", err)
-				}
-				c.tsw.Indent(-1)
-				c.tsw.WriteLine("}")
-				return nil
-			} else if exp.Key != nil && exp.Value == nil { // Only key provided
-				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-				// Write the pointer expression - use WriteIdent to avoid automatic .value access
-				// since we'll add !.value for pointer dereference
-				if ident, ok := exp.X.(*ast.Ident); ok {
-					c.WriteIdent(ident, false) // Don't add .value here
-				} else {
-					if err := c.WriteValueExpr(exp.X); err != nil {
-						return fmt.Errorf("failed to write expression for the pointer iterable: %w", err)
-					}
-				}
-				c.tsw.WriteLiterally("!.value")
-				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
-				c.tsw.Indent(1)
-				c.tsw.WriteLine("")
-				if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-					return fmt.Errorf("failed to write range loop pointer array/slice body (only key): %w", err)
-				}
-				c.tsw.Indent(-1)
-				c.tsw.WriteLine("}")
-				return nil
-			} else if exp.Key == nil && exp.Value != nil { // Only value provided
-				// I think this is impossible. See for_range_value_only test.
-				return errors.Errorf("unexpected value without key in for range expression: %v", exp)
-			} else {
-				// Fallback: simple index loop without declaring range variables, use _i
-				indexVarName := "_i"
-				c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
-				// Write the pointer expression - use WriteIdent to avoid automatic .value access
-				// since we'll add !.value for pointer dereference
-				if ident, ok := exp.X.(*ast.Ident); ok {
-					c.WriteIdent(ident, false) // Don't add .value here
-				} else {
-					if err := c.WriteValueExpr(exp.X); err != nil {
-						return fmt.Errorf("failed to write range loop pointer array/slice length expression (fallback): %w", err)
-					}
-				}
-				c.tsw.WriteLiterally("!.value")
-				c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
-				c.tsw.Indent(1)
-				c.tsw.WriteLine("")
-				if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-					return fmt.Errorf("failed to write range loop pointer array/slice body (fallback): %w", err)
-				}
-				c.tsw.Indent(-1)
-				c.tsw.WriteLine("}")
-				return nil
-			}
+		if c.isArrayOrSlice(elem) {
+			return c.writeArraySliceRange(exp, true)
 		}
 	}
 
 	// Handle iterator function signatures
 	if sig, ok := underlying.(*types.Signature); ok {
-		// Check if this is an iterator function signature
-		// Iterator functions have the form: func(yield func(...) bool)
-		params := sig.Params()
-		if params.Len() == 1 {
-			yieldParam := params.At(0).Type()
-			if yieldSig, ok := yieldParam.Underlying().(*types.Signature); ok {
-				yieldParams := yieldSig.Params()
-				yieldResults := yieldSig.Results()
-
-				// Verify the yield function returns bool
-				if yieldResults.Len() == 1 {
-					if basic, ok := yieldResults.At(0).Type().Underlying().(*types.Basic); ok && basic.Kind() == types.Bool {
-						// This is an iterator function
-						// Generate TypeScript code that calls the iterator with a yield function
-
-						if yieldParams.Len() == 0 {
-							// func(func() bool) - iterator with no values
-							c.tsw.WriteLiterally(";(() => {")
-							c.tsw.Indent(1)
-							c.tsw.WriteLine("")
-							c.tsw.WriteLiterally("let shouldContinue = true")
-							c.tsw.WriteLine("")
-							if err := c.WriteValueExpr(exp.X); err != nil {
-								return fmt.Errorf("failed to write iterator expression: %w", err)
-							}
-							c.tsw.WriteLiterally("(() => {")
-							c.tsw.Indent(1)
-							c.tsw.WriteLine("")
-							if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-								return fmt.Errorf("failed to write iterator body: %w", err)
-							}
-							c.tsw.WriteLiterally("return shouldContinue")
-							c.tsw.WriteLine("")
-							c.tsw.Indent(-1)
-							c.tsw.WriteLiterally("})")
-							c.tsw.WriteLine("")
-							c.tsw.Indent(-1)
-							c.tsw.WriteLine("})()")
-							return nil
-						} else if yieldParams.Len() == 1 {
-							// func(func(V) bool) - iterator with one value
-							c.tsw.WriteLiterally(";(() => {")
-							c.tsw.Indent(1)
-							c.tsw.WriteLine("")
-							c.tsw.WriteLiterally("let shouldContinue = true")
-							c.tsw.WriteLine("")
-							if err := c.WriteValueExpr(exp.X); err != nil {
-								return fmt.Errorf("failed to write iterator expression: %w", err)
-							}
-							c.tsw.WriteLiterally("((")
-							if exp.Value != nil {
-								if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-									c.WriteIdent(ident, false)
-								} else {
-									c.tsw.WriteLiterally("v")
-								}
-							} else {
-								c.tsw.WriteLiterally("v")
-							}
-							c.tsw.WriteLiterally(") => {")
-							c.tsw.Indent(1)
-							c.tsw.WriteLine("")
-							if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-								return fmt.Errorf("failed to write iterator body: %w", err)
-							}
-							c.tsw.WriteLiterally("return shouldContinue")
-							c.tsw.WriteLine("")
-							c.tsw.Indent(-1)
-							c.tsw.WriteLiterally("})")
-							c.tsw.WriteLine("")
-							c.tsw.Indent(-1)
-							c.tsw.WriteLine("})()")
-							return nil
-						} else if yieldParams.Len() == 2 {
-							// func(func(K, V) bool) - iterator with key-value pairs
-							c.tsw.WriteLiterally(";(() => {")
-							c.tsw.Indent(1)
-							c.tsw.WriteLine("")
-							c.tsw.WriteLiterally("let shouldContinue = true")
-							c.tsw.WriteLine("")
-							if err := c.WriteValueExpr(exp.X); err != nil {
-								return fmt.Errorf("failed to write iterator expression: %w", err)
-							}
-							c.tsw.WriteLiterally("((")
-							if exp.Key != nil {
-								if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
-									c.WriteIdent(ident, false)
-								} else {
-									c.tsw.WriteLiterally("k")
-								}
-							} else {
-								c.tsw.WriteLiterally("k")
-							}
-							c.tsw.WriteLiterally(", ")
-							if exp.Value != nil {
-								if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-									c.WriteIdent(ident, false)
-								} else {
-									c.tsw.WriteLiterally("v")
-								}
-							} else {
-								c.tsw.WriteLiterally("v")
-							}
-							c.tsw.WriteLiterally(") => {")
-							c.tsw.Indent(1)
-							c.tsw.WriteLine("")
-							if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-								return fmt.Errorf("failed to write iterator body: %w", err)
-							}
-							c.tsw.WriteLiterally("return shouldContinue")
-							c.tsw.WriteLine("")
-							c.tsw.Indent(-1)
-							c.tsw.WriteLiterally("})")
-							c.tsw.WriteLine("")
-							c.tsw.Indent(-1)
-							c.tsw.WriteLine("})()")
-							return nil
-						}
-					}
-				}
-			}
+		if c.isIteratorSignature(sig) {
+			return c.writeIteratorRange(exp, sig)
 		}
 	}
 
 	// Handle interface types that may represent iterators
 	if _, ok := underlying.(*types.Interface); ok {
-		// For interface types, we need to treat them as potential iterators
-		// In Go 1.23+, interfaces can represent iterator functions
-		// We'll attempt to call them as iterator functions with a yield callback
-
-		// Try to determine the iterator pattern based on context or assume key-value pairs
-		// Since we can't easily determine the exact signature from just the interface,
-		// we'll generate a generic iterator call pattern
-
-		c.tsw.WriteLiterally(";(() => {")
-		c.tsw.Indent(1)
-		c.tsw.WriteLine("")
-		c.tsw.WriteLiterally("let shouldContinue = true")
-		c.tsw.WriteLine("")
-
-		// Call the interface as an iterator function
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write interface iterator expression: %w", err)
-		}
-
-		// Generate the appropriate yield function based on the range variables
-		if exp.Key != nil && exp.Value != nil {
-			// Key-value iterator
-			c.tsw.WriteLiterally("((")
-			if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
-				c.WriteIdent(ident, false)
-			} else {
-				c.tsw.WriteLiterally("k")
-			}
-			c.tsw.WriteLiterally(", ")
-			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-				c.WriteIdent(ident, false)
-			} else {
-				c.tsw.WriteLiterally("v")
-			}
-			c.tsw.WriteLiterally(") => {")
-		} else if exp.Value != nil {
-			// Value-only iterator
-			c.tsw.WriteLiterally("((")
-			if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
-				c.WriteIdent(ident, false)
-			} else {
-				c.tsw.WriteLiterally("v")
-			}
-			c.tsw.WriteLiterally(") => {")
-		} else if exp.Key != nil {
-			// Key-only iterator (treating it as value for single-param iterator)
-			c.tsw.WriteLiterally("((")
-			if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
-				c.WriteIdent(ident, false)
-			} else {
-				c.tsw.WriteLiterally("k")
-			}
-			c.tsw.WriteLiterally(") => {")
-		} else {
-			// No variables iterator
-			c.tsw.WriteLiterally("(() => {")
-		}
-
-		c.tsw.Indent(1)
-		c.tsw.WriteLine("")
-		if err := c.WriteStmtBlock(exp.Body, false); err != nil {
-			return fmt.Errorf("failed to write interface iterator body: %w", err)
-		}
-		c.tsw.WriteLiterally("return shouldContinue")
-		c.tsw.WriteLine("")
-		c.tsw.Indent(-1)
-		c.tsw.WriteLiterally("})")
-		c.tsw.WriteLine("")
-		c.tsw.Indent(-1)
-		c.tsw.WriteLine("})()")
-		return nil
+		return c.writeInterfaceIteratorRange(exp)
 	}
 
 	return errors.Errorf("unsupported range loop type: %T for expression %v", underlying, exp)
+}
+
+// Helper functions
+
+func (c *GoToTSCompiler) isMapType(iterType, underlying types.Type) bool {
+	if _, ok := underlying.(*types.Map); ok {
+		return true
+	}
+	if typeParam, isTypeParam := iterType.(*types.TypeParam); isTypeParam {
+		constraint := typeParam.Constraint()
+		if constraint != nil {
+			constraintUnderlying := constraint.Underlying()
+			if iface, isInterface := constraintUnderlying.(*types.Interface); isInterface {
+				return hasMapConstraint(iface)
+			}
+		}
+	}
+	return false
+}
+
+func (c *GoToTSCompiler) isArrayOrSlice(underlying types.Type) bool {
+	_, isSlice := underlying.(*types.Slice)
+	_, isArray := underlying.(*types.Array)
+	return isArray || isSlice
+}
+
+func (c *GoToTSCompiler) isIteratorSignature(sig *types.Signature) bool {
+	params := sig.Params()
+	if params.Len() != 1 {
+		return false
+	}
+	yieldParam := params.At(0).Type()
+	if yieldSig, ok := yieldParam.Underlying().(*types.Signature); ok {
+		yieldResults := yieldSig.Results()
+		if yieldResults.Len() == 1 {
+			if basic, ok := yieldResults.At(0).Type().Underlying().(*types.Basic); ok && basic.Kind() == types.Bool {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func (c *GoToTSCompiler) getIndexVarName(exp *ast.RangeStmt, defaultName string) string {
+	if exp.Key != nil {
+		if keyIdent, ok := exp.Key.(*ast.Ident); ok && keyIdent.Name != "_" {
+			return keyIdent.Name
+		}
+	}
+	return defaultName
+}
+
+func (c *GoToTSCompiler) writeMapRange(exp *ast.RangeStmt) error {
+	keyVarName := "_k"
+	valueVarName := "_v"
+
+	if exp.Key != nil {
+		if ident, ok := exp.Key.(*ast.Ident); ok && ident.Name != "_" {
+			keyVarName = ident.Name
+		}
+	}
+	if exp.Value != nil {
+		if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+			valueVarName = ident.Name
+		}
+	}
+
+	c.tsw.WriteLiterallyf("for (const [%s, %s] of ", keyVarName, valueVarName)
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write range loop map expression: %w", err)
+	}
+	c.tsw.WriteLiterally(".entries()) {")
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write range loop map body: %w", err)
+	}
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	return nil
+}
+
+func (c *GoToTSCompiler) writeStringRange(exp *ast.RangeStmt) error {
+	c.tsw.WriteLine("{")
+	c.tsw.Indent(1)
+
+	c.tsw.WriteLiterally("const _runes = $.stringToRunes(")
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write range loop string conversion expression: %w", err)
+	}
+	c.tsw.WriteLiterally(")")
+	c.tsw.WriteLine("")
+
+	indexVarName := c.getIndexVarName(exp, "i")
+	c.tsw.WriteLiterallyf("for (let %s = 0; %s < _runes.length; %s++) {", indexVarName, indexVarName, indexVarName)
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+
+	if exp.Value != nil {
+		if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+			c.tsw.WriteLiterally("const ")
+			c.WriteIdent(ident, false)
+			c.tsw.WriteLiterally(" = _runes[i]") // TODO: should be indexVarName?
+			c.tsw.WriteLine("")
+		}
+	}
+
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write range loop string body: %w", err)
+	}
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	return nil
+}
+
+func (c *GoToTSCompiler) writeIntegerRange(exp *ast.RangeStmt) error {
+	if exp.Value != nil {
+		return errors.Errorf("ranging over an integer supports key variable only (not value variable): %v", exp)
+	}
+
+	indexVarName := c.getIndexVarName(exp, "_i")
+	c.tsw.WriteLiterallyf("for (let %s = 0; %s < ", indexVarName, indexVarName)
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write range loop integer expression: %w", err)
+	}
+	c.tsw.WriteLiterallyf("; %s++) {", indexVarName)
+
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write range loop integer body: %w", err)
+	}
+
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	return nil
+}
+
+func (c *GoToTSCompiler) writeArraySliceRange(exp *ast.RangeStmt, isPointer bool) error {
+	indexVarName := c.getIndexVarName(exp, "_i")
+
+	// Handle the different cases
+	if exp.Key != nil && exp.Value != nil {
+		return c.writeArraySliceWithKeyValue(exp, indexVarName, isPointer)
+	} else if exp.Key != nil && exp.Value == nil {
+		return c.writeArraySliceKeyOnly(exp, indexVarName, isPointer)
+	} else if exp.Key == nil && exp.Value != nil {
+		return errors.Errorf("unexpected value without key in for range expression: %v", exp)
+	} else {
+		return c.writeArraySliceFallback(exp, isPointer)
+	}
+}
+
+func (c *GoToTSCompiler) writeArraySliceWithKeyValue(exp *ast.RangeStmt, indexVarName string, isPointer bool) error {
+	c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
+	if err := c.writeArraySliceExpression(exp.X, isPointer); err != nil {
+		return fmt.Errorf("failed to write range loop array/slice expression (key and value): %w", err)
+	}
+	c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+
+	if ident, ok := exp.Value.(*ast.Ident); ok && ident.Name != "_" {
+		c.tsw.WriteLiterally("const ")
+		c.WriteIdent(ident, false)
+		c.tsw.WriteLiterally(" = ")
+		if err := c.writeArraySliceExpression(exp.X, isPointer); err != nil {
+			return fmt.Errorf("failed to write range loop array/slice value expression: %w", err)
+		}
+		c.tsw.WriteLiterallyf("![%s]", indexVarName)
+		c.tsw.WriteLine("")
+	}
+
+	if err := c.WriteStmt(exp.Body); err != nil {
+		return fmt.Errorf("failed to write range loop array/slice body (key and value): %w", err)
+	}
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	return nil
+}
+
+func (c *GoToTSCompiler) writeArraySliceKeyOnly(exp *ast.RangeStmt, indexVarName string, isPointer bool) error {
+	c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
+	if err := c.writeArraySliceExpression(exp.X, isPointer); err != nil {
+		return fmt.Errorf("failed to write expression for the iterable: %w", err)
+	}
+	c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write range loop array/slice body (only key): %w", err)
+	}
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	return nil
+}
+
+func (c *GoToTSCompiler) writeArraySliceFallback(exp *ast.RangeStmt, isPointer bool) error {
+	indexVarName := "_i"
+	c.tsw.WriteLiterallyf("for (let %s = 0; %s < $.len(", indexVarName, indexVarName)
+	if err := c.writeArraySliceExpression(exp.X, isPointer); err != nil {
+		return fmt.Errorf("failed to write range loop array/slice length expression (fallback): %w", err)
+	}
+	c.tsw.WriteLiterallyf("); %s++) {", indexVarName)
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write range loop array/slice body (fallback): %w", err)
+	}
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+	return nil
+}
+
+func (c *GoToTSCompiler) writeArraySliceExpression(expr ast.Expr, isPointer bool) error {
+	if isPointer {
+		if ident, ok := expr.(*ast.Ident); ok {
+			c.WriteIdent(ident, false)
+		} else {
+			if err := c.WriteValueExpr(expr); err != nil {
+				return err
+			}
+		}
+		c.tsw.WriteLiterally("!.value")
+		return nil
+	} else {
+		return c.WriteValueExpr(expr)
+	}
+}
+
+func (c *GoToTSCompiler) writeIteratorRange(exp *ast.RangeStmt, sig *types.Signature) error {
+	params := sig.Params()
+	yieldParam := params.At(0).Type()
+	yieldSig := yieldParam.Underlying().(*types.Signature)
+	yieldParams := yieldSig.Params()
+
+	c.tsw.WriteLiterally(";(() => {")
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+	c.tsw.WriteLiterally("let shouldContinue = true")
+	c.tsw.WriteLine("")
+
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write iterator expression: %w", err)
+	}
+
+	switch yieldParams.Len() {
+	case 0:
+		c.tsw.WriteLiterally("!(() => {")
+	case 1:
+		c.tsw.WriteLiterally("!((")
+		c.writeIteratorParam(exp.Value, "v")
+		c.tsw.WriteLiterally(") => {")
+	case 2:
+		c.tsw.WriteLiterally("!((")
+		c.writeIteratorParam(exp.Key, "k")
+		c.tsw.WriteLiterally(", ")
+		c.writeIteratorParam(exp.Value, "v")
+		c.tsw.WriteLiterally(") => {")
+	}
+
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write iterator body: %w", err)
+	}
+	c.tsw.WriteLiterally("return shouldContinue")
+	c.tsw.WriteLine("")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLiterally("})")
+	c.tsw.WriteLine("")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("})()")
+	return nil
+}
+
+func (c *GoToTSCompiler) writeIteratorParam(param ast.Expr, defaultName string) {
+	if param != nil {
+		if ident, ok := param.(*ast.Ident); ok && ident.Name != "_" {
+			c.WriteIdent(ident, false)
+			return
+		}
+	}
+	c.tsw.WriteLiterally(defaultName)
+}
+
+func (c *GoToTSCompiler) writeInterfaceIteratorRange(exp *ast.RangeStmt) error {
+	c.tsw.WriteLiterally(";(() => {")
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+	c.tsw.WriteLiterally("let shouldContinue = true")
+	c.tsw.WriteLine("")
+
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write interface iterator expression: %w", err)
+	}
+
+	if exp.Key != nil && exp.Value != nil {
+		c.tsw.WriteLiterally("!((")
+		c.writeIteratorParam(exp.Key, "k")
+		c.tsw.WriteLiterally(", ")
+		c.writeIteratorParam(exp.Value, "v")
+		c.tsw.WriteLiterally(") => {")
+	} else if exp.Value != nil {
+		c.tsw.WriteLiterally("!((")
+		c.writeIteratorParam(exp.Value, "v")
+		c.tsw.WriteLiterally(") => {")
+	} else if exp.Key != nil {
+		c.tsw.WriteLiterally("!((")
+		c.writeIteratorParam(exp.Key, "k")
+		c.tsw.WriteLiterally(") => {")
+	} else {
+		c.tsw.WriteLiterally("!(() => {")
+	}
+
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+		return fmt.Errorf("failed to write interface iterator body: %w", err)
+	}
+	c.tsw.WriteLiterally("return shouldContinue")
+	c.tsw.WriteLine("")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLiterally("})")
+	c.tsw.WriteLine("")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("})()")
+	return nil
 }

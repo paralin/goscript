@@ -8,7 +8,6 @@ export async function main(): Promise<void> {
 		return "Hello, " + name
 	}
 
-
 	let message = greet!("world")
 	console.log(message)
 }

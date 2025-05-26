@@ -892,12 +892,22 @@ func (c *GoToTSCompiler) WriteDoc(doc *ast.CommentGroup) {
 }
 
 // sanitizeIdentifier checks if an identifier is a JavaScript/TypeScript reserved word
-// and prefixes it with an underscore if it is. This prevents compilation errors
-// when Go identifiers conflict with JS/TS keywords.
+// or conflicts with built-in types, and transforms it if needed. This prevents
+// compilation errors when Go identifiers conflict with JS/TS keywords or built-ins.
 func (c *GoToTSCompiler) sanitizeIdentifier(name string) string {
 	// Don't sanitize boolean literals - they are valid in both Go and JS/TS
 	if name == "true" || name == "false" {
 		return name
+	}
+
+	// Handle TypeScript built-in types that conflict with Go type parameter names
+	builtinTypes := map[string]string{
+		"Map": "MapType",
+		// Add other built-in types as needed
+	}
+
+	if replacement, exists := builtinTypes[name]; exists {
+		return replacement
 	}
 
 	// List of JavaScript/TypeScript reserved words that could conflict

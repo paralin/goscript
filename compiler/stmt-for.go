@@ -67,61 +67,8 @@ func (c *GoToTSCompiler) WriteStmtForInit(stmt ast.Stmt) error {
 		// For TypeScript for-loop init, we need to handle multi-variable declarations differently
 		if s.Tok == token.DEFINE && len(s.Lhs) > 1 && len(s.Rhs) == 1 {
 			// Handle the case where we have multiple LHS variables but only one RHS expression
-			// This could be a map access with comma-ok idiom: value, ok := m["key"]
+			// Use array destructuring for all cases including map comma-ok idiom
 			rhsExpr := s.Rhs[0]
-			if indexExpr, ok := rhsExpr.(*ast.IndexExpr); ok && len(s.Lhs) == 2 {
-				// Check if this is a map lookup (comma-ok idiom)
-				if c.pkg != nil && c.pkg.TypesInfo != nil {
-					tv, typeOk := c.pkg.TypesInfo.Types[indexExpr.X]
-					if typeOk {
-						// Check if it's a map type
-						if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
-							// Handle map comma-ok idiom in for loop initialization
-							c.tsw.WriteLiterally("let ")
-
-							// Write the value variable
-							if err := c.WriteValueExpr(s.Lhs[0]); err != nil {
-								return err
-							}
-							c.tsw.WriteLiterally(" = ")
-							c.tsw.WriteLiterally("$.mapGet(")
-							if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
-								return err
-							}
-							c.tsw.WriteLiterally(", ")
-							if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
-								return err
-							}
-							c.tsw.WriteLiterally(", ")
-							// Write the zero value for the map's value type
-							if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
-								c.WriteZeroValueForType(mapType.Elem())
-							} else {
-								c.tsw.WriteLiterally("null")
-							}
-							c.tsw.WriteLiterally("), ")
-
-							// Write the ok variable
-							if err := c.WriteValueExpr(s.Lhs[1]); err != nil {
-								return err
-							}
-							c.tsw.WriteLiterally(" = ")
-							c.tsw.WriteLiterally("$.mapHas(")
-							if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
-								return err
-							}
-							c.tsw.WriteLiterally(", ")
-							if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
-								return err
-							}
-							c.tsw.WriteLiterally(")")
-							return nil
-						}
-					}
-				}
-			}
-			// Handle general multi-assignment case with array destructuring
-			// e.g., for value, ok := getValues(); ... becomes for (let [value, ok] = getValues(); ...)
 			c.tsw.WriteLiterally("let [")
 			for i, lhs := range s.Lhs {
 				if i > 0 {
@@ -132,7 +79,7 @@ func (c *GoToTSCompiler) WriteStmtForInit(stmt ast.Stmt) error {
 				}
 			}
 			c.tsw.WriteLiterally("] = ")
-			if err := c.WriteValueExpr(rhsExpr); err != nil {
+			if err := c.writeDestructuringValue(rhsExpr); err != nil {
 				return err
 			}
 			return nil
@@ -191,6 +138,64 @@ func (c *GoToTSCompiler) WriteStmtForInit(stmt ast.Stmt) error {
 	default:
 		return errors.Errorf("unhandled for loop init statement: %T", stmt)
 	}
+}
+
+// writeDestructuringValue writes a value expression in a destructuring context.
+// For map index expressions, it generates the full tuple without [0] indexing.
+func (c *GoToTSCompiler) writeDestructuringValue(expr ast.Expr) error {
+	// Check if this is a map index expression that should return a tuple
+	if indexExpr, ok := expr.(*ast.IndexExpr); ok {
+		if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
+			underlyingType := tv.Type.Underlying()
+			// Check if it's a map type
+			if mapType, isMap := underlyingType.(*types.Map); isMap {
+				c.tsw.WriteLiterally("$.mapGet(")
+				if err := c.WriteValueExpr(indexExpr.X); err != nil {
+					return err
+				}
+				c.tsw.WriteLiterally(", ")
+				if err := c.WriteValueExpr(indexExpr.Index); err != nil {
+					return err
+				}
+				c.tsw.WriteLiterally(", ")
+				// Write the zero value as the default value for mapGet
+				c.WriteZeroValueForType(mapType.Elem())
+				c.tsw.WriteLiterally(")") // Don't add [0] for destructuring
+				return nil
+			}
+			// Check if it's a type parameter constrained to be a map type
+			if typeParam, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
+				constraint := typeParam.Constraint()
+				if constraint != nil {
+					underlying := constraint.Underlying()
+					if iface, isInterface := underlying.(*types.Interface); isInterface {
+						if hasMapConstraint(iface) {
+							c.tsw.WriteLiterally("$.mapGet(")
+							if err := c.WriteValueExpr(indexExpr.X); err != nil {
+								return err
+							}
+							c.tsw.WriteLiterally(", ")
+							if err := c.WriteValueExpr(indexExpr.Index); err != nil {
+								return err
+							}
+							c.tsw.WriteLiterally(", ")
+							// Generate the zero value as the default value for mapGet
+							mapValueType := getMapValueTypeFromConstraint(iface)
+							if mapValueType != nil {
+								c.WriteZeroValueForType(mapValueType)
+							} else {
+								c.tsw.WriteLiterally("null")
+							}
+							c.tsw.WriteLiterally(")") // Don't add [0] for destructuring
+							return nil
+						}
+					}
+				}
+			}
+		}
+	}
+	// For non-map expressions, use the regular WriteValueExpr
+	return c.WriteValueExpr(expr)
 }
 
 // WriteStmtForPost translates the post-iteration part of a Go `for` loop header

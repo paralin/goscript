@@ -8,9 +8,9 @@ export async function main(): Promise<void> {
 	// This verifies that our fix for selector expressions in make() calls works
 	// The original issue was "unhandled make call" when using selector expressions
 
-	let mfs = $.makeMap<string, Uint8Array>()
+	let mfs = $.makeMap<string, $.Bytes>()
 	$.mapSet(mfs, "test.txt", $.stringToBytes("hello world"))
 	console.log("Created map:", $.len(mfs))
-	console.log("Content:", $.bytesToString($.mapGet(mfs, "test.txt", new Uint8Array(0))))
+	console.log("Content:", $.bytesToString($.mapGet(mfs, "test.txt", new Uint8Array(0))[0]))
 }
 

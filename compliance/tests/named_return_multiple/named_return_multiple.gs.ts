@@ -65,8 +65,7 @@ export async function main(): Promise<void> {
 			// all are unassigned, should be zero values
 
 			return [resInt, resStr, resBool]
-		}
-	})(1)
+		}})(1)
 
 	console.log(n3) // Expected: 100
 	console.log(t3) // Expected: "" (empty string)
@@ -94,8 +93,7 @@ export async function main(): Promise<void> {
 			// all are unassigned
 
 			return [resInt, resStr, resBool]
-		}
-	})(2)
+		}})(2)
 
 	console.log(n4) // Expected: 200
 	console.log(t4) // Expected: "set string for val 2"
@@ -118,8 +116,7 @@ export async function main(): Promise<void> {
 			// all are unassigned here, so will take zero values
 
 			return [resInt, resStr, resBool]
-		}
-	})(3)
+		}})(3)
 
 	console.log(n5) // Expected: 0
 	console.log(t5) // Expected: ""

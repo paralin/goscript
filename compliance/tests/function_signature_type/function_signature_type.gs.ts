@@ -73,17 +73,14 @@ export async function main(): Promise<void> {
 		return [false, NewMyError("a was not positive")]
 	}
 
-
 	fn2 = (p0: number, p1: string): boolean => {
 		console.log("fn2 called with:", p0, p1)
 		return p0 == $.len(p1)
 	}
 
-
 	fn3 = (): void => {
 		console.log("fn3 called")
 	}
-
 
 	// Newline after all strings
 	fn4 = (a: number, ...b: string[]): void => {
@@ -96,7 +93,6 @@ export async function main(): Promise<void> {
 		}
 		console.log() // Newline after all strings
 	}
-
 
 	let [res1, err1] = fn1!(10, "hello")
 	console.log("fn1 result 1: ", res1, " ")

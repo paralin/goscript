@@ -17,30 +17,27 @@ export async function main(): Promise<void> {
 	console.log("Map size after adding 3 items: Expected: 3, Actual:", $.len(scores))
 
 	// Access values
-	console.log("Alice's score: Expected: 90, Actual:", $.mapGet(scores, "Alice", 0))
-	console.log("Bob's score: Expected: 85, Actual:", $.mapGet(scores, "Bob", 0))
+	console.log("Alice's score: Expected: 90, Actual:", $.mapGet(scores, "Alice", 0)[0])
+	console.log("Bob's score: Expected: 85, Actual:", $.mapGet(scores, "Bob", 0)[0])
 
 	// Modify a value
 	$.mapSet(scores, "Bob", 88)
-	console.log("Bob's updated score: Expected: 88, Actual:", $.mapGet(scores, "Bob", 0))
+	console.log("Bob's updated score: Expected: 88, Actual:", $.mapGet(scores, "Bob", 0)[0])
 
 	// Check if key exists (comma-ok idiom)
-	let value
-	let exists: boolean
-	exists = $.mapHas(scores, "David")
-	value = $.mapGet(scores, "David", 0)
+	let [value, exists] = $.mapGet(scores, "David", 0)
 	console.log("Does David exist in map? Expected: false, Actual:", exists)
 	console.log("Value for non-existent key: Expected: 0, Actual:", value)
 
 	// Delete a key
 	$.deleteMapEntry(scores, "Charlie")
-	exists = $.mapHas(scores, "Charlie")
+	;[, exists] = $.mapGet(scores, "Charlie", 0)
 	console.log("After delete, does Charlie exist? Expected: false, Actual:", exists)
 
 	// Create map with literal syntax
 	let colors = new Map([["red", "#ff0000"], ["green", "#00ff00"], ["blue", "#0000ff"]])
 	console.log("Map literal size: Expected: 3, Actual:", $.len(colors))
-	console.log("Color code for red: Expected: #ff0000, Actual:", $.mapGet(colors, "red", ""))
+	console.log("Color code for red: Expected: #ff0000, Actual:", $.mapGet(colors, "red", "")[0])
 
 	// Iterate over a map with range
 	console.log("Iterating over scores map:")
@@ -52,9 +49,7 @@ export async function main(): Promise<void> {
 	let scoreResults: $.Slice<string> = null
 
 	// Using string concatenation to build the output string
-	for (const [k, v] of stringMap.entries()) {
-		const name = k
-		const grade = v
+	for (const [name, grade] of stringMap.entries()) {
 		{
 			// Using string concatenation to build the output string
 			let result = "  - Name: " + name + " Grade: " + grade

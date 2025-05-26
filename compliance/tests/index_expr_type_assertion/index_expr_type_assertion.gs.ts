@@ -24,11 +24,11 @@ export async function main(): Promise<void> {
 	let ok2: boolean = false
 	let _gs_ta_val_545_: number
 	let _gs_ta_ok_545_: boolean
-	({ value: _gs_ta_val_545_, ok: _gs_ta_ok_545_ } = $.typeAssert<number>($.mapGet(m, "key2", null), {kind: $.TypeKind.Basic, name: 'number'}))
+	({ value: _gs_ta_val_545_, ok: _gs_ta_ok_545_ } = $.typeAssert<number>($.mapGet(m, "key2", null)[0], {kind: $.TypeKind.Basic, name: 'number'}))
 	$.mapSet(mapResults, "result", _gs_ta_val_545_)
 	ok2 = _gs_ta_ok_545_
 	if (ok2) {
-		console.log("m[key2] as int:", $.mustTypeAssert<number>($.mapGet(mapResults, "result", null), {kind: $.TypeKind.Basic, name: 'number'}))
+		console.log("m[key2] as int:", $.mustTypeAssert<number>($.mapGet(mapResults, "result", null)[0], {kind: $.TypeKind.Basic, name: 'number'}))
 	}
 }
 

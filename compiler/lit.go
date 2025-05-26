@@ -118,7 +118,7 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	}
 
 	// Write function body
-	if err := c.WriteStmtBlock(exp.Body, false); err != nil {
+	if err := c.WriteStmtBlock(exp.Body, true); err != nil {
 		return fmt.Errorf("failed to write block statement: %w", err)
 	}
 

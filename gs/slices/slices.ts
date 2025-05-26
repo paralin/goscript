@@ -20,3 +20,12 @@ export function All<T>(
     }
   }
 }
+
+/**
+ * Sort sorts a slice in ascending order.
+ * This is equivalent to Go's slices.Sort function.
+ * @param s The slice to sort in place
+ */
+export function Sort<T extends string | number>(s: $.Slice<T>): void {
+  $.sortSlice(s)
+}

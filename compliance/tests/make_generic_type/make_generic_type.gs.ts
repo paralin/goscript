@@ -12,15 +12,13 @@ export async function main(): Promise<void> {
 
 	// Test basic operations
 	$.mapSet(seen, 42, {})
-	let exists: boolean
-	exists = $.mapHas(seen, 42)
+	let [, exists] = $.mapGet(seen, 42, {})
 	console.log("Value exists:", exists)
 
 	// Test with string type parameter
 	let stringSet = $.makeMap<string, {  }>()
 	$.mapSet(stringSet, "hello", {})
-	let exists2: boolean
-	exists2 = $.mapHas(stringSet, "hello")
+	let [, exists2] = $.mapGet(stringSet, "hello", {})
 	console.log("String exists:", exists2)
 }
 

@@ -6,24 +6,19 @@ export const makeMap = <K, V>(): Map<K, V> => {
   return new Map<K, V>()
 }
 /**
- * Gets a value from a map, with a default value if the key doesn't exist.
+ * Gets a value from a map, returning a tuple [value, exists].
  * @param map The map to get from.
  * @param key The key to get.
  * @param defaultValue The default value to return if the key doesn't exist.
- * @returns The value for the key, or the default value if the key doesn't exist.
+ * @returns A tuple [value, exists] where value is the map value or defaultValue, and exists is whether the key was found.
  */
-export function mapGet<K, V>(map: Map<K, V>, key: K, defaultValue: V): V
-export function mapGet<K, V>(map: Map<K, V>, key: K, defaultValue: null): V | null
-export function mapGet<K, V>(map: Map<K, V>, key: K): V | undefined
-export function mapGet<K, V>(
-  map: Map<K, V>,
-  key: K,
-  defaultValue?: V | null,
-): V | null | undefined {
-  if (arguments.length === 2) {
-    return map.get(key)
+export function mapGet<K, V, D>(map: Map<K, V>, key: K, defaultValue: D): [V, true] | [D, false] {
+  const exists = map.has(key)
+  if (exists) {
+    return [map.get(key)!, true]
+  } else {
+    return [defaultValue, false]
   }
-  return map.has(key) ? map.get(key)! : defaultValue
 }
 
 /**

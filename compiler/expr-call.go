@@ -987,12 +987,16 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			}
 			c.tsw.WriteLiterally(")")
 		} else {
-			// Not an identifier (e.g., method call on a value)
+			// Not an identifier (e.g., method call on a value, function call result)
 			if err := c.WriteValueExpr(expFun); err != nil {
 				return fmt.Errorf("failed to write method expression in call: %w", err)
 			}
 
-			if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
+			// Check if this is a function call that returns a function (e.g., simpleIterator(m)())
+			// Add non-null assertion since the returned function could be null
+			if _, isCallExpr := expFun.(*ast.CallExpr); isCallExpr {
+				c.tsw.WriteLiterally("!")
+			} else if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
 				if _, ok := funType.Underlying().(*types.Signature); ok {
 					// Check if this is a function parameter identifier that needs not-null assertion
 					if ident, isIdent := expFun.(*ast.Ident); isIdent {
@@ -1005,6 +1009,13 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 							}
 						}
 					} else if _, isNamed := funType.(*types.Named); isNamed {
+						c.tsw.WriteLiterally("!")
+					}
+				} else {
+					// Check if the function type is nullable (e.g., func(...) | null)
+					// This handles cases where a function call returns a nullable function
+					funTypeStr := funType.String()
+					if strings.Contains(funTypeStr, "| null") || strings.Contains(funTypeStr, "null |") {
 						c.tsw.WriteLiterally("!")
 					}
 				}

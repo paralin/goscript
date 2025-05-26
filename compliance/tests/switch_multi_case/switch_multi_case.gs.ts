@@ -20,7 +20,6 @@ export async function main(): Promise<void> {
 		return [1, v + "_processed_flag_false", null]
 	}
 
-
 	let std = 2
 
 	switch (std) {

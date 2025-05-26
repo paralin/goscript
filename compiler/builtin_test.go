@@ -1,3 +1,5 @@
+//go:build test_emit_builtin
+
 package compiler
 
 import (

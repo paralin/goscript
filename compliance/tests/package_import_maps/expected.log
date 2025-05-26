@@ -1,0 +1,7 @@
+Result: atest+
+Result: atest+_local
+Result: btest,
+Result: btest,_local
+Result: ctest-
+Result: ctest-_local
+test finished

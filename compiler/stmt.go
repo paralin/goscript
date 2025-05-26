@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"go/types"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -537,6 +538,25 @@ func (c *GoToTSCompiler) WriteStmtReturn(exp *ast.ReturnStmt) error {
 		for i, res := range exp.Results {
 			if i != 0 {
 				c.tsw.WriteLiterally(", ")
+			}
+			// Special handling for nil in generic function returns
+			if ident, isIdent := res.(*ast.Ident); isIdent && ident.Name == "nil" {
+				// Check if we're in a generic function and get the return type
+				if nodeInfo := c.analysis.NodeData[exp]; nodeInfo != nil && nodeInfo.EnclosingFuncDecl != nil {
+					funcDecl := nodeInfo.EnclosingFuncDecl
+					if funcDecl.Type.Results != nil && i < len(funcDecl.Type.Results.List) {
+						// Get the return type for this result position
+						resultField := funcDecl.Type.Results.List[i]
+						if resultType := c.pkg.TypesInfo.TypeOf(resultField.Type); resultType != nil {
+							if _, isTypeParam := resultType.(*types.TypeParam); isTypeParam {
+								// This is a generic type parameter, use type assertion with unknown intermediate
+								c.tsw.WriteLiterally("null as unknown as ")
+								c.WriteGoType(resultType, GoTypeContextFunctionReturn)
+								continue
+							}
+						}
+					}
+				}
 			}
 			if err := c.WriteValueExpr(res); err != nil { // Return results are values
 				return err

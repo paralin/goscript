@@ -52,7 +52,7 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 
 			// Generate the zero value as the default value for mapGet
 			c.WriteZeroValueForType(mapType.Elem())
-			c.tsw.WriteLiterally(")")
+			c.tsw.WriteLiterally(")[0]") // Extract the value from the tuple
 			return nil
 		}
 
@@ -77,6 +77,31 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 			if constraint != nil {
 				underlying := constraint.Underlying()
 				if iface, isInterface := underlying.(*types.Interface); isInterface {
+					// Check if this is a map constraint (like ~map[K]V)
+					if hasMapConstraint(iface) {
+						// This is a map type parameter, use map access
+						c.tsw.WriteLiterally("$.mapGet(")
+						if err := c.WriteValueExpr(exp.X); err != nil {
+							return err
+						}
+						c.tsw.WriteLiterally(", ")
+						if err := c.WriteValueExpr(exp.Index); err != nil {
+							return err
+						}
+						c.tsw.WriteLiterally(", ")
+
+						// Generate the zero value as the default value for mapGet
+						// For type parameters, we need to get the value type from the constraint
+						mapValueType := getMapValueTypeFromConstraint(iface)
+						if mapValueType != nil {
+							c.WriteZeroValueForType(mapValueType)
+						} else {
+							c.tsw.WriteLiterally("null")
+						}
+						c.tsw.WriteLiterally(")[0]") // Extract the value from the tuple
+						return nil
+					}
+
 					// Check if this is a mixed string/byte constraint (like string | []byte)
 					if hasMixedStringByteConstraint(iface) {
 						// For mixed constraints, use specialized function that returns number (byte value)
@@ -691,6 +716,46 @@ func (c *GoToTSCompiler) WriteKeyValueExpr(exp *ast.KeyValueExpr) error {
 	c.tsw.WriteLiterally(": ")
 	if err := c.WriteValueExpr(exp.Value); err != nil {
 		return fmt.Errorf("failed to write key-value expression value: %w", err)
+	}
+	return nil
+}
+
+// hasMapConstraint checks if an interface constraint includes map types
+// For constraints like ~map[K]V, this returns true
+func hasMapConstraint(iface *types.Interface) bool {
+	// Check if the interface has type terms that include map types
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		embedded := iface.EmbeddedType(i)
+		if union, ok := embedded.(*types.Union); ok {
+			for j := 0; j < union.Len(); j++ {
+				term := union.Term(j)
+				if _, isMap := term.Type().Underlying().(*types.Map); isMap {
+					return true
+				}
+			}
+		} else if _, isMap := embedded.Underlying().(*types.Map); isMap {
+			return true
+		}
+	}
+	return false
+}
+
+// getMapValueTypeFromConstraint extracts the value type from a map constraint
+// For constraints like ~map[K]V, this returns V
+func getMapValueTypeFromConstraint(iface *types.Interface) types.Type {
+	// Check if the interface has type terms that include map types
+	for i := 0; i < iface.NumEmbeddeds(); i++ {
+		embedded := iface.EmbeddedType(i)
+		if union, ok := embedded.(*types.Union); ok {
+			for j := 0; j < union.Len(); j++ {
+				term := union.Term(j)
+				if mapType, isMap := term.Type().Underlying().(*types.Map); isMap {
+					return mapType.Elem()
+				}
+			}
+		} else if mapType, isMap := embedded.Underlying().(*types.Map); isMap {
+			return mapType.Elem()
+		}
 	}
 	return nil
 }

@@ -48,7 +48,7 @@ export class ValueContainer<T extends any> {
 
 	constructor(init?: Partial<{count?: number, value?: T}>) {
 		this._fields = {
-			value: $.varRef(init?.value ?? null!),
+			value: $.varRef(init?.value ?? null as any),
 			count: $.varRef(init?.count ?? 0)
 		}
 	}

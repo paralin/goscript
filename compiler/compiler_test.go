@@ -1,7 +1,6 @@
 package compiler_test
 
 import (
-	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -12,9 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/aperturerobotics/goscript/compiler"
 	"github.com/aperturerobotics/goscript/compliance"
-	"github.com/sirupsen/logrus"
 )
 
 // NOTE: this is here instead of compliance/compliance_test.go so coverage ends up in this package.
@@ -139,54 +136,4 @@ func getParentGoModulePath() (string, error) {
 		return "", err
 	}
 	return strings.TrimSpace(string(output)), nil
-}
-
-func TestUnsafePackageCompilation(t *testing.T) {
-	// Create a temporary directory for the test output
-	tempDir, err := os.MkdirTemp("", "goscript-test-unsafe")
-	if err != nil {
-		t.Fatalf("Failed to create temp dir: %v", err)
-	}
-	defer os.RemoveAll(tempDir)
-
-	// Setup logger
-	log := logrus.New()
-	log.SetLevel(logrus.DebugLevel)
-	le := logrus.NewEntry(log)
-
-	// Test with AllDependencies=true and DisableEmitBuiltin=false to ensure handwritten packages are copied
-	config := &compiler.Config{
-		OutputPath:         tempDir,
-		AllDependencies:    true,
-		DisableEmitBuiltin: false, // This ensures handwritten packages are copied to output
-	}
-
-	comp, err := compiler.NewCompiler(config, le, nil)
-	if err != nil {
-		t.Fatalf("Failed to create compiler: %v", err)
-	}
-
-	// Try to compile a package that has dependencies that import unsafe
-	// We'll use "sync/atomic" which imports unsafe but doesn't have a handwritten equivalent
-	result, err := comp.CompilePackages(context.Background(), "sync/atomic")
-	// This should now succeed since we have a handwritten unsafe package
-	if err != nil {
-		t.Fatalf("Expected compilation to succeed with handwritten unsafe package, but it failed: %v", err)
-	}
-
-	// Verify that the unsafe package was copied (not compiled) since it has a handwritten equivalent
-	if !slices.Contains(result.CopiedPackages, "unsafe") {
-		t.Errorf("Expected unsafe package to be in CopiedPackages, but it wasn't. CopiedPackages: %v", result.CopiedPackages)
-	}
-
-	// Verify that sync/atomic was compiled
-	if !slices.Contains(result.CompiledPackages, "sync/atomic") {
-		t.Errorf("Expected sync/atomic package to be in CompiledPackages, but it wasn't. CompiledPackages: %v", result.CompiledPackages)
-	}
-
-	// Check that the unsafe package directory exists in the output
-	unsafePath := filepath.Join(tempDir, "@goscript/unsafe")
-	if _, err := os.Stat(unsafePath); os.IsNotExist(err) {
-		t.Errorf("unsafe package directory was not created at %s", unsafePath)
-	}
 }

@@ -4,7 +4,7 @@
 import * as $ from "@goscript/builtin/builtin.js";
 
 export type MultiParamReturner = null | {
-	Process(data: Uint8Array, count: number, _p2: string): [boolean, $.GoError]
+	Process(data: $.Bytes, count: number, _p2: string): [boolean, $.GoError]
 }
 
 $.registerInterfaceType(
@@ -28,7 +28,7 @@ export class MyProcessor {
 		return cloned
 	}
 
-	public Process(data: Uint8Array, count: number, _: string): [boolean, $.GoError] {
+	public Process(data: $.Bytes, count: number, _: string): [boolean, $.GoError] {
 		const p = this
 		if (count > 0 && $.len(data) > 0) {
 			console.log("Processing successful")

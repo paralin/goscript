@@ -36,20 +36,17 @@ export async function main(): Promise<void> {
 	await once.Do((): void => {
 		counter++
 		console.log("Once function executed, counter:", counter)
-	}
-	)
+	})
 	await once.Do((): void => {
 		counter++
 		console.log("This should not execute")
-	}
-	)
+	})
 	console.log("Final counter:", counter)
 
 	// Test OnceFunc
 	let onceFunc = sync.OnceFunc((): void => {
 		console.log("OnceFunc executed")
-	}
-	)
+	})
 	onceFunc!()
 	onceFunc!() // Should not execute again
 
@@ -57,8 +54,7 @@ export async function main(): Promise<void> {
 	let onceValue = sync.OnceValue((): number => {
 		console.log("OnceValue function executed")
 		return 42
-	}
-	)
+	})
 	let val1 = onceValue!()
 	let val2 = onceValue!()
 	console.log("OnceValue results:", val1, val2)
@@ -85,8 +81,7 @@ export async function main(): Promise<void> {
 	await m.Range((key: null | any, value: null | any): boolean => {
 		console.log("Range:", key, "->", value)
 		return true
-	}
-	)
+	})
 
 	await m.Delete("key1")
 	{
@@ -100,8 +95,7 @@ export async function main(): Promise<void> {
 	let pool = new sync.Pool({New: (): null | any => {
 		console.log("Pool creating new object")
 		return "new object"
-	}
-	})
+	}})
 
 	let obj1 = pool!.Get()
 	console.log("Got from pool:", obj1)

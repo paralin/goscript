@@ -14,7 +14,7 @@ export function equal<T extends $.Comparable>(a: T, b: T): boolean {
 }
 
 // Generic function with union constraint
-export function getLength<S extends string | Uint8Array>(s: S): number {
+export function getLength<S extends string | $.Bytes>(s: S): number {
 	return $.len(s)
 }
 
@@ -40,8 +40,8 @@ export class Pair<T extends any> {
 
 	constructor(init?: Partial<{First?: T, Second?: T}>) {
 		this._fields = {
-			First: $.varRef(init?.First ?? null!),
-			Second: $.varRef(init?.Second ?? null!)
+			First: $.varRef(init?.First ?? null as any),
+			Second: $.varRef(init?.Second ?? null as any)
 		}
 	}
 

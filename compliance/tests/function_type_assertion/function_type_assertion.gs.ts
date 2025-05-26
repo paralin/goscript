@@ -122,7 +122,7 @@ export async function main(): Promise<void> {
 	$.mapSet(funcMap, "adder", Object.assign(add, { __goTypeName: 'Adder' }))
 
 	let mapFn: Greeter
-	({ value: mapFn, ok: ok } = $.typeAssert<Greeter>($.mapGet(funcMap, "greeter", null), {kind: $.TypeKind.Function, name: 'Greeter', params: [{ kind: $.TypeKind.Basic, name: "string" }], results: [{ kind: $.TypeKind.Basic, name: "string" }]}))
+	({ value: mapFn, ok: ok } = $.typeAssert<Greeter>($.mapGet(funcMap, "greeter", null)[0], {kind: $.TypeKind.Function, name: 'Greeter', params: [{ kind: $.TypeKind.Basic, name: "string" }], results: [{ kind: $.TypeKind.Basic, name: "string" }]}))
 	if (ok) {
 		console.log(mapFn!("Map"))
 	} else {
@@ -130,7 +130,7 @@ export async function main(): Promise<void> {
 	}
 
 	let mapAdderFn: Adder
-	({ value: mapAdderFn, ok: ok } = $.typeAssert<Adder>($.mapGet(funcMap, "adder", null), {kind: $.TypeKind.Function, name: 'Adder', params: [{ kind: $.TypeKind.Basic, name: "number" }, { kind: $.TypeKind.Basic, name: "number" }], results: [{ kind: $.TypeKind.Basic, name: "number" }]}))
+	({ value: mapAdderFn, ok: ok } = $.typeAssert<Adder>($.mapGet(funcMap, "adder", null)[0], {kind: $.TypeKind.Function, name: 'Adder', params: [{ kind: $.TypeKind.Basic, name: "number" }, { kind: $.TypeKind.Basic, name: "number" }], results: [{ kind: $.TypeKind.Basic, name: "number" }]}))
 	if (ok) {
 		console.log(mapAdderFn!(1, 2))
 	} else {

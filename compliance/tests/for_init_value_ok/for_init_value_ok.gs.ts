@@ -9,13 +9,13 @@ export async function main(): Promise<void> {
 	$.mapSet(m, "key2", 20)
 
 	// This should trigger the compiler error: for loop initialization with value, ok pattern
-	for (let value = $.mapGet(m, "key1", 0), ok = $.mapHas(m, "key1"); ok; ) {
+	for (let [value, ok] = $.mapGet(m, "key1", 0); ok; ) {
 		console.log("value:", value)
 		break
 	}
 
 	// Another case that might trigger the error
-	for (let v = $.mapGet(m, "key2", 0), exists = $.mapHas(m, "key2"); exists && v > 0; ) {
+	for (let [v, exists] = $.mapGet(m, "key2", 0); exists && v > 0; ) {
 		console.log("v:", v)
 		break
 	}

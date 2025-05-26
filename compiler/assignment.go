@@ -197,6 +197,7 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		currentIsMapIndex := false
 		if indexExpr, ok := l.(*ast.IndexExpr); ok {
 			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
+				// Check if it's a concrete map type
 				if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
 					currentIsMapIndex = true
 					if i == 0 {
@@ -213,6 +214,31 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 					}
 					c.tsw.WriteLiterally(", ")
 					// Value will be added after operator and RHS
+				} else if typeParam, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
+					// Check if the type parameter is constrained to be a map type
+					constraint := typeParam.Constraint()
+					if constraint != nil {
+						underlying := constraint.Underlying()
+						if iface, isInterface := underlying.(*types.Interface); isInterface {
+							if hasMapConstraint(iface) {
+								currentIsMapIndex = true
+								if i == 0 {
+									isMapIndexLHS = true
+								}
+								// Use mapSet helper for type parameter constrained to map
+								c.tsw.WriteLiterally("$.mapSet(")
+								if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
+									return err
+								}
+								c.tsw.WriteLiterally(", ")
+								if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
+									return err
+								}
+								c.tsw.WriteLiterally(", ")
+								// Value will be added after operator and RHS
+							}
+						}
+					}
 				}
 			}
 		}

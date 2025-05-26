@@ -27,7 +27,7 @@ export async function main(): Promise<void> {
 	console.log("Testing single value iterator:")
 	;(() => {
 		let shouldContinue = true
-		simpleIterator((v) => {
+		simpleIterator!((v) => {
 			{
 				console.log("value:", v)
 			}
@@ -38,7 +38,7 @@ export async function main(): Promise<void> {
 	console.log("Testing key-value iterator:")
 	;(() => {
 		let shouldContinue = true
-		keyValueIterator((k, v) => {
+		keyValueIterator!((k, v) => {
 			{
 				console.log("key:", k, "value:", v)
 			}

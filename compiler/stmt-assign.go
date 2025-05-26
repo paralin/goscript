@@ -276,121 +276,105 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 	}
 
 	// writeMapLookupWithExists handles the map comma-ok idiom: value, exists := myMap[key]
-	// Note: We don't use WriteIndexExpr here because we need to handle .has() and .get() separately
+	// Uses array destructuring with the tuple-returning $.mapGet function
 	writeMapLookupWithExists := func(lhs []ast.Expr, indexExpr *ast.IndexExpr, tok token.Token) error {
 		// First check that we have exactly two LHS expressions (value and exists)
 		if len(lhs) != 2 {
 			return fmt.Errorf("map comma-ok idiom requires exactly 2 variables on LHS, got %d", len(lhs))
 		}
 
-		// Check for blank identifiers and get variable names
+		// Check for blank identifiers
 		valueIsBlank := false
 		existsIsBlank := false
-		var valueName string
-		var existsName string
 
-		if valIdent, ok := lhs[0].(*ast.Ident); ok {
-			if valIdent.Name == "_" {
-				valueIsBlank = true
-			} else {
-				valueName = valIdent.Name
-			}
-		} else {
-			return fmt.Errorf("unhandled LHS expression type for value in map comma-ok: %T", lhs[0])
+		if valIdent, ok := lhs[0].(*ast.Ident); ok && valIdent.Name == "_" {
+			valueIsBlank = true
+		}
+		if existsIdent, ok := lhs[1].(*ast.Ident); ok && existsIdent.Name == "_" {
+			existsIsBlank = true
 		}
 
-		if existsIdent, ok := lhs[1].(*ast.Ident); ok {
-			if existsIdent.Name == "_" {
-				existsIsBlank = true
-			} else {
-				existsName = existsIdent.Name
-			}
-		} else {
-			return fmt.Errorf("unhandled LHS expression type for exists in map comma-ok: %T", lhs[1])
-		}
-
-		// Declare variables if using := and not blank
+		// Use array destructuring with mapGet tuple return
 		if tok == token.DEFINE {
-			if !valueIsBlank {
-				c.tsw.WriteLiterally("let ")
-				c.tsw.WriteLiterally(valueName)
-				// TODO: Add type annotation based on map value type
-				c.tsw.WriteLine("")
-			}
-			if !existsIsBlank {
-				c.tsw.WriteLiterally("let ")
-				c.tsw.WriteLiterally(existsName)
-				c.tsw.WriteLiterally(": boolean") // exists is always boolean
-				c.tsw.WriteLine("")
-			}
+			c.tsw.WriteLiterally("let ")
+		} else {
+			// Add semicolon before destructuring assignment to prevent TypeScript
+			// from interpreting it as array access on the previous line
+			c.tsw.WriteLiterally(";")
 		}
 
-		// Assign 'exists'
-		if !existsIsBlank {
-			c.tsw.WriteLiterally(existsName)
-			c.tsw.WriteLiterally(" = ")
-			c.tsw.WriteLiterally("$.mapHas(")
-			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
-				return err
-			}
-			c.tsw.WriteLiterally(", ")
-			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
-				return err
-			}
-			c.tsw.WriteLiterally(")")
-			c.tsw.WriteLine("")
-		}
+		c.tsw.WriteLiterally("[")
 
-		// Assign 'value'
+		// Write LHS variables, handling blanks
 		if !valueIsBlank {
-			c.tsw.WriteLiterally(valueName)
-			c.tsw.WriteLiterally(" = ")
-			c.tsw.WriteLiterally("$.mapGet(")
-			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
+			if err := c.WriteValueExpr(lhs[0]); err != nil {
 				return err
 			}
-			c.tsw.WriteLiterally(", ")
-			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
+		}
+		// Note: for blank identifiers, we just omit the variable name entirely
+
+		c.tsw.WriteLiterally(", ")
+
+		if !existsIsBlank {
+			if err := c.WriteValueExpr(lhs[1]); err != nil {
 				return err
 			}
-			c.tsw.WriteLiterally(", ")
-			// Write the zero value for the map's value type
-			if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
-				if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
-					c.WriteZeroValueForType(mapType.Elem())
+		}
+		// Note: for blank identifiers, we just omit the variable name entirely
+
+		c.tsw.WriteLiterally("] = $.mapGet(")
+
+		// Write map expression
+		if err := c.WriteValueExpr(indexExpr.X); err != nil {
+			return err
+		}
+
+		c.tsw.WriteLiterally(", ")
+
+		// Write key expression
+		if err := c.WriteValueExpr(indexExpr.Index); err != nil {
+			return err
+		}
+
+		c.tsw.WriteLiterally(", ")
+
+		// Write the zero value for the map's value type
+		if tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]; ok {
+			if mapType, isMap := tv.Type.Underlying().(*types.Map); isMap {
+				c.WriteZeroValueForType(mapType.Elem())
+			} else if typeParam, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
+				// Handle type parameter constrained to be a map type
+				constraint := typeParam.Constraint()
+				if constraint != nil {
+					underlying := constraint.Underlying()
+					if iface, isInterface := underlying.(*types.Interface); isInterface {
+						if hasMapConstraint(iface) {
+							// Get the value type from the constraint
+							mapValueType := getMapValueTypeFromConstraint(iface)
+							if mapValueType != nil {
+								c.WriteZeroValueForType(mapValueType)
+							} else {
+								c.tsw.WriteLiterally("null")
+							}
+						} else {
+							c.tsw.WriteLiterally("null")
+						}
+					} else {
+						c.tsw.WriteLiterally("null")
+					}
 				} else {
-					// Fallback zero value if type info is missing or not a map
 					c.tsw.WriteLiterally("null")
 				}
 			} else {
+				// Fallback zero value if type info is missing or not a map
 				c.tsw.WriteLiterally("null")
 			}
-			c.tsw.WriteLiterally(")")
-			c.tsw.WriteLine("")
-		} else if existsIsBlank {
-			// If both are blank, still evaluate for side effects (though .has/.get are usually pure)
-			// We add a ; otherwise TypeScript thinks we are invoking a function.
-			c.tsw.WriteLiterally(";(") // Wrap in parens to make it an expression statement
-			c.tsw.WriteLiterally("$.mapHas(")
-			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
-				return err
-			}
-			c.tsw.WriteLiterally(", ")
-			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
-				return err
-			}
-			c.tsw.WriteLiterally("), ") // Evaluate .has
-			c.tsw.WriteLiterally("$.mapGet(")
-			if err := c.WriteValueExpr(indexExpr.X); err != nil { // Map
-				return err
-			}
-			c.tsw.WriteLiterally(", ")
-			if err := c.WriteValueExpr(indexExpr.Index); err != nil { // Key
-				return err
-			}
-			c.tsw.WriteLiterally(", null))") // Evaluate .get with null as default
-			c.tsw.WriteLine("")
+		} else {
+			c.tsw.WriteLiterally("null")
 		}
+
+		c.tsw.WriteLiterally(")")
+		c.tsw.WriteLine("")
 
 		return nil
 	}
@@ -417,6 +401,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				}
 				return nil
 			}
+			// Handle general function calls that return multiple values
+			return writeMultiVarAssignFromCall(exp.Lhs, callExpr, exp.Tok)
 		}
 
 		if typeAssertExpr, ok := rhsExpr.(*ast.TypeAssertExpr); ok {
@@ -428,9 +414,21 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				if c.pkg != nil && c.pkg.TypesInfo != nil {
 					tv, ok := c.pkg.TypesInfo.Types[indexExpr.X]
 					if ok {
-						// Check if it's a map type
+						// Check if it's a concrete map type
 						if _, isMap := tv.Type.Underlying().(*types.Map); isMap {
 							return writeMapLookupWithExists(exp.Lhs, indexExpr, exp.Tok)
+						}
+						// Check if it's a type parameter constrained to be a map type
+						if typeParam, isTypeParam := tv.Type.(*types.TypeParam); isTypeParam {
+							constraint := typeParam.Constraint()
+							if constraint != nil {
+								underlying := constraint.Underlying()
+								if iface, isInterface := underlying.(*types.Interface); isInterface {
+									if hasMapConstraint(iface) {
+										return writeMapLookupWithExists(exp.Lhs, indexExpr, exp.Tok)
+									}
+								}
+							}
 						}
 					}
 				}
@@ -441,8 +439,6 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 				return c.writeChannelReceiveWithOk(exp.Lhs, unaryExpr, exp.Tok)
 			}
 			// If LHS count is not 2, fall through to error or other handling
-		} else if callExpr, ok := rhsExpr.(*ast.CallExpr); ok {
-			return writeMultiVarAssignFromCall(exp.Lhs, callExpr, exp.Tok)
 		}
 		// If none of the specific multi-assign patterns match, fall through to the error check below
 	}
@@ -463,7 +459,27 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 
 	// Ensure LHS and RHS have the same length for valid Go code in these cases
 	if len(exp.Lhs) != len(exp.Rhs) {
-		return fmt.Errorf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs))
+		// Special case: allow multiple LHS with single RHS if RHS can produce multiple values
+		// This handles cases like: x, y := getValue() where getValue() returns multiple values
+		// or other expressions that can produce multiple values
+		if len(exp.Rhs) == 1 {
+			// Allow single RHS expressions that can produce multiple values:
+			// - Function calls that return multiple values
+			// - Type assertions with comma-ok
+			// - Map lookups with comma-ok
+			// - Channel receives with comma-ok
+			// The Go type checker should have already verified this is valid
+			rhsExpr := exp.Rhs[0]
+			switch rhsExpr.(type) {
+			case *ast.CallExpr, *ast.TypeAssertExpr, *ast.IndexExpr, *ast.UnaryExpr:
+				// These expression types can potentially produce multiple values
+				// Let the general assignment logic handle them
+			default:
+				return fmt.Errorf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs))
+			}
+		} else {
+			return fmt.Errorf("invalid assignment statement: LHS count (%d) != RHS count (%d)", len(exp.Lhs), len(exp.Rhs))
+		}
 	}
 
 	// Handle multi-variable assignment (e.g., swaps) using writeAssignmentCore

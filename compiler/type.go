@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	"go/token"
 	"go/types"
 	"strings"
 )
@@ -67,7 +68,8 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 		c.WriteGoType(t.Underlying(), context)
 	case *types.TypeParam:
 		// For type parameters, write the type parameter name (e.g., "T", "K", etc.)
-		c.tsw.WriteLiterally(t.Obj().Name())
+		// Use sanitizeIdentifier to handle conflicts with TypeScript built-in types
+		c.tsw.WriteLiterally(c.sanitizeIdentifier(t.Obj().Name()))
 	case *types.Union:
 		// Handle union types (e.g., string | []byte)
 		for i := 0; i < t.Len(); i++ {
@@ -171,9 +173,9 @@ func (c *GoToTSCompiler) WriteZeroValueForType(typ any) {
 		// For anonymous struct types, initialize with {}
 		c.tsw.WriteLiterally("{}")
 	case *types.TypeParam:
-		// For type parameters, use null! (non-null assertion) to avoid TypeScript
-		// casting errors with union types like string | Uint8Array
-		c.tsw.WriteLiterally("null!")
+		// For type parameters, use null with type assertion to work around TypeScript's strict checking
+		// This allows null to be assigned to generic type parameters even when the constraint doesn't explicitly include null
+		c.tsw.WriteLiterally("null as any")
 	default:
 		c.tsw.WriteLiterally("null")
 	}
@@ -311,7 +313,7 @@ func (c *GoToTSCompiler) WritePointerType(t *types.Pointer, context GoTypeContex
 func (c *GoToTSCompiler) WriteSliceType(t *types.Slice) {
 	// Check if it's a []byte slice
 	if elem, ok := t.Elem().(*types.Basic); ok && elem.Kind() == types.Uint8 {
-		c.tsw.WriteLiterally("Uint8Array")
+		c.tsw.WriteLiterally("$.Bytes")
 		return
 	}
 	c.tsw.WriteLiterally("$.Slice<")
@@ -629,7 +631,8 @@ func (c *GoToTSCompiler) WriteTypeParameters(typeParams *ast.FieldList) {
 			if j > 0 {
 				c.tsw.WriteLiterally(", ")
 			}
-			c.tsw.WriteLiterally(name.Name)
+			// Use sanitizeIdentifier to handle conflicts with TypeScript built-in types
+			c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 
 			// Write constraint if present
 			if field.Type != nil {
@@ -661,7 +664,7 @@ func (c *GoToTSCompiler) WriteTypeConstraint(constraint ast.Expr) {
 		}
 	case *ast.BinaryExpr:
 		// Handle union types like []byte | string
-		if t.Op.String() == "|" {
+		if t.Op == token.OR {
 			c.WriteTypeConstraint(t.X)
 			c.tsw.WriteLiterally(" | ")
 			c.WriteTypeConstraint(t.Y)
@@ -675,7 +678,7 @@ func (c *GoToTSCompiler) WriteTypeConstraint(constraint ast.Expr) {
 	case *ast.ArrayType:
 		// Handle []byte specifically
 		if ident, ok := t.Elt.(*ast.Ident); ok && ident.Name == "byte" {
-			c.tsw.WriteLiterally("Uint8Array")
+			c.tsw.WriteLiterally("$.Bytes")
 		} else {
 			c.WriteTypeExpr(constraint)
 		}
