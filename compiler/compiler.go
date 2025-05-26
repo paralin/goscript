@@ -1015,7 +1015,7 @@ func (c *GoToTSCompiler) writeConstantValue(constObj *types.Const) {
 }
 
 // copyEmbeddedPackage recursively copies files from an embedded FS path to a filesystem directory.
-// It handles both regular files and directories.
+// It handles both regular files and directories, but only copies .gs.ts and .ts files.
 func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) error {
 	// Remove the output path if it exists
 	if err := os.RemoveAll(outputPath); err != nil {
@@ -1049,6 +1049,13 @@ func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) e
 				return err
 			}
 		} else {
+			// Only copy .gs.ts and .ts files, skip .go files and others
+			fileName := entry.Name()
+			if !strings.HasSuffix(fileName, ".gs.ts") && !strings.HasSuffix(fileName, ".ts") {
+				c.le.Debugf("Skipping non-TypeScript file: %s", fileName)
+				continue
+			}
+
 			// Read the file content from the embedded FS
 			content, err := gs.GsOverrides.ReadFile(entryPath)
 			if err != nil {
