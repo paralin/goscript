@@ -15,6 +15,8 @@ import (
 //     `exp.Value` string, which typically corresponds to valid TypeScript syntax
 //     (e.g., `123`, `3.14`, `"hello"`). Imaginary literals might need special
 //     handling if they are to be fully supported beyond direct string output.
+//   - Legacy octal literals (e.g., `0777`) are converted to modern TypeScript
+//     octal syntax (e.g., `0o777`) to avoid ES module compatibility issues.
 func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 	if exp.Kind == token.CHAR {
 		// Go char literal 'x' is a rune (int32). Translate to its numeric code point.
@@ -26,8 +28,42 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 		} else {
 			c.tsw.WriteLiterallyf("%d", val)
 		}
+	} else if exp.Kind == token.INT {
+		// Handle integer literals, including legacy octal conversion
+		value := exp.Value
+
+		// Check for legacy octal literals (starts with 0, followed by octal digits, but not 0x, 0b, or 0o)
+		if len(value) > 1 && value[0] == '0' && value != "0" {
+			// Check if it's already modern syntax (0x, 0b, 0o) or just legacy octal
+			if len(value) > 2 && (value[1] == 'x' || value[1] == 'X' ||
+				value[1] == 'b' || value[1] == 'B' ||
+				value[1] == 'o' || value[1] == 'O') {
+				// Already modern syntax (hex, binary, or modern octal), write as-is
+				c.tsw.WriteLiterally(value)
+			} else {
+				// Check if all remaining characters are valid octal digits (0-7)
+				isLegacyOctal := true
+				for i := 1; i < len(value); i++ {
+					if value[i] < '0' || value[i] > '7' {
+						isLegacyOctal = false
+						break
+					}
+				}
+
+				if isLegacyOctal {
+					// Convert legacy octal 0777 to modern octal 0o777
+					c.tsw.WriteLiterallyf("0o%s", value[1:])
+				} else {
+					// Not a valid octal, write as-is (might be decimal with leading zero)
+					c.tsw.WriteLiterally(value)
+				}
+			}
+		} else {
+			// Regular decimal integer or single zero, write as-is
+			c.tsw.WriteLiterally(value)
+		}
 	} else {
-		// Other literals (INT, FLOAT, STRING, IMAG)
+		// Other literals (FLOAT, STRING, IMAG)
 		c.tsw.WriteLiterally(exp.Value)
 	}
 }
