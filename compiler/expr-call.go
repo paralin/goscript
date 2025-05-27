@@ -1120,8 +1120,21 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				if i != 0 {
 					c.tsw.WriteLiterally(", ")
 				}
+				// Check if this is the last argument and we have ellipsis (variadic call)
+				if exp.Ellipsis != token.NoPos && i == len(exp.Args)-1 {
+					c.tsw.WriteLiterally("...")
+				}
 				if err := c.WriteValueExpr(arg); err != nil {
 					return fmt.Errorf("failed to write argument %d in call: %w", i, err)
+				}
+				// Add non-null assertion for spread arguments that might be null
+				if exp.Ellipsis != token.NoPos && i == len(exp.Args)-1 {
+					// Check if the argument type is potentially nullable (slice)
+					if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
+						if _, isSlice := argType.Underlying().(*types.Slice); isSlice {
+							c.tsw.WriteLiterally("!")
+						}
+					}
 				}
 			}
 			c.tsw.WriteLiterally(")")
@@ -1206,8 +1219,21 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
 		}
+		// Check if this is the last argument and we have ellipsis (variadic call)
+		if exp.Ellipsis != token.NoPos && i == len(exp.Args)-1 {
+			c.tsw.WriteLiterally("...")
+		}
 		if err := c.WriteValueExpr(arg); err != nil {
 			return fmt.Errorf("failed to write argument %d in call: %w", i, err)
+		}
+		// Add non-null assertion for spread arguments that might be null
+		if exp.Ellipsis != token.NoPos && i == len(exp.Args)-1 {
+			// Check if the argument type is potentially nullable (slice)
+			if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
+				if _, isSlice := argType.Underlying().(*types.Slice); isSlice {
+					c.tsw.WriteLiterally("!")
+				}
+			}
 		}
 	}
 	c.tsw.WriteLiterally(")")

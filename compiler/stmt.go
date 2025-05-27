@@ -855,17 +855,29 @@ func (c *GoToTSCompiler) WriteStmtDefer(exp *ast.DeferStmt) error {
 // WriteStmtLabeled handles labeled statements (ast.LabeledStmt), such as "label: statement".
 // In TypeScript, labels cannot be used with variable declarations, so we need to handle this case specially.
 func (c *GoToTSCompiler) WriteStmtLabeled(stmt *ast.LabeledStmt) error {
-	// Check if the labeled statement is a declaration statement
-	if declStmt, ok := stmt.Stmt.(*ast.DeclStmt); ok {
-		// For declaration statements, we need to put the label on a separate line
+	// Check if the labeled statement is a declaration statement or assignment with :=
+	needsBlock := false
+	if _, ok := stmt.Stmt.(*ast.DeclStmt); ok {
+		needsBlock = true
+	} else if assignStmt, ok := stmt.Stmt.(*ast.AssignStmt); ok && assignStmt.Tok == token.DEFINE {
+		// Assignment with := is also a declaration and needs special handling
+		needsBlock = true
+	}
+
+	if needsBlock {
+		// For declaration statements and := assignments, we need to put the label on a separate line
 		// because TypeScript doesn't allow labels with declarations
 		c.tsw.WriteLiterally(stmt.Label.Name)
-		c.tsw.WriteLine(": {}")
+		c.tsw.WriteLine(": {")
+		c.tsw.Indent(1)
 
-		// Write the declaration statement without the label
-		if err := c.WriteStmt(declStmt); err != nil {
-			return fmt.Errorf("failed to write labeled declaration statement: %w", err)
+		// Write the statement without the label
+		if err := c.WriteStmt(stmt.Stmt); err != nil {
+			return fmt.Errorf("failed to write labeled declaration/assignment statement: %w", err)
 		}
+
+		c.tsw.Indent(-1)
+		c.tsw.WriteLine("}")
 	} else {
 		// For non-declaration statements, write the label normally
 		c.tsw.WriteLiterally(stmt.Label.Name)
