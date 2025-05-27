@@ -1,0 +1,7 @@
+closed: true
+count: 42
+flag: 100
+s2 closed: false
+s2 count: 24
+s2 flag: 50
+atomic struct field test finished

@@ -95,7 +95,7 @@ func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldTy
 		if named, ok := fieldType.(*types.Named); ok {
 			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
 				isStructValueType = true
-				structTypeNameForClone = named.Obj().Name()
+				structTypeNameForClone = c.getTypeString(fieldType)
 			}
 		}
 
