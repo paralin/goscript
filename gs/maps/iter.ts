@@ -58,7 +58,7 @@ export function Insert<K extends $.Comparable, V>(
 
 // Collect collects key-value pairs from seq into a new map
 // and returns it.
-export function Collect<K extends $.Comparable, V extends any>(
+export function Collect<K extends $.Comparable, V>(
   seq: iter.Seq2<K, V>,
 ): Map<K, V> {
   let m = $.makeMap<K, V>()

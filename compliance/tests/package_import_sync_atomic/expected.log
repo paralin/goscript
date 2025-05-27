@@ -1,0 +1,18 @@
+Int32 stored 42, value: 42
+Int32 swapped to 100, old value: 42 new value: 100
+Int32 added 5, new value: 105
+Int32 CompareAndSwap 105->200 succeeded, value: 200
+Int64 stored 1000, value: 1000
+Int64 after subtracting 100: 900
+Uint32 stored 50, value: 50
+Uint32 after adding 25: 75
+Uint64 stored 2000, value: 2000
+Bool stored true, value: true
+Bool swapped to false, old value: true new value: false
+Pointer loaded: hello
+Pointer swapped, old: hello
+Pointer new value: world
+Value loaded: atomic value
+Value swapped, old: atomic value
+Value new: new atomic value
+atomic test finished

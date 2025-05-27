@@ -41,6 +41,10 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 	// Handle single variable declaration
 	if len(a.Names) == 1 {
 		name := a.Names[0]
+		// Skip underscore variables
+		if name.Name == "_" {
+			return nil
+		}
 		obj := c.pkg.TypesInfo.Defs[name]
 		if obj == nil {
 			return fmt.Errorf("could not resolve type: %v", name)

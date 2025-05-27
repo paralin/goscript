@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Ldexp, ldexp } from './ldexp.gs.js';
 import { Frexp } from './frexp.gs.js';
-import { Inf, NaN, IsNaN, IsInf } from './bits.gs.js';
+import { Inf, NaN as GoNaN, IsNaN } from './bits.gs.js';
 
 describe('Ldexp', () => {
   it('should compute frac × 2^exp correctly for basic cases', () => {
@@ -47,9 +47,9 @@ describe('Ldexp', () => {
   });
 
   it('should handle NaN cases', () => {
-    expect(IsNaN(Ldexp(NaN(), 5))).toBe(true);
-    expect(IsNaN(Ldexp(NaN(), -5))).toBe(true);
-    expect(IsNaN(Ldexp(NaN(), 0))).toBe(true);
+    expect(IsNaN(Ldexp(GoNaN(), 5))).toBe(true);
+    expect(IsNaN(Ldexp(GoNaN(), -5))).toBe(true);
+    expect(IsNaN(Ldexp(GoNaN(), 0))).toBe(true);
   });
 
   it('should be the inverse of Frexp', () => {
@@ -123,6 +123,6 @@ describe('ldexp (lowercase)', () => {
     // Test special cases
     expect(ldexp(Inf(1), 5)).toBe(Ldexp(Inf(1), 5));
     expect(ldexp(Inf(-1), 5)).toBe(Ldexp(Inf(-1), 5));
-    expect(IsNaN(ldexp(NaN(), 5))).toBe(IsNaN(Ldexp(NaN(), 5)));
+    expect(IsNaN(ldexp(GoNaN(), 5))).toBe(IsNaN(Ldexp(GoNaN(), 5)));
   });
 }); 

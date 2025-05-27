@@ -46,8 +46,8 @@ describe('Erfinv', () => {
   })
 
   it('should handle very small values', () => {
-    expect(Erfinv(1e-10)).toBeCloseTo(8.862269254527579e-11, 14)
-    expect(Erfinv(-1e-10)).toBeCloseTo(-8.862269254527579e-11, 14)
+    expect(Erfinv(1e-10)).toBeCloseTo(8.862269254527579e-11, 14) //eslint-disable-line no-loss-of-precision
+    expect(Erfinv(-1e-10)).toBeCloseTo(-8.862269254527579e-11, 14) //eslint-disable-line no-loss-of-precision
   })
 
   it('should handle values close to boundaries', () => {

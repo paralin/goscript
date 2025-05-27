@@ -94,8 +94,8 @@ describe('Lgamma', () => {
   it('should satisfy reflection formula for negative values', () => {
     // For non-integer x: Lgamma(x) + Lgamma(1-x) = log(π/sin(πx))
     const x = 0.3
-    const [lgamma_x, sign_x] = Lgamma(x)
-    const [lgamma_1_minus_x, sign_1_minus_x] = Lgamma(1 - x)
+    const [lgamma_x, _sign_x] = Lgamma(x)
+    const [lgamma_1_minus_x, _sign_1_minus_x] = Lgamma(1 - x)
     const expected = Math.log(Math.PI / Math.sin(Math.PI * x))
     expect(lgamma_x + lgamma_1_minus_x).toBeCloseTo(expected, 5)
   })

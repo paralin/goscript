@@ -399,9 +399,8 @@ func copyDependenciesToDepsFromResult(t *testing.T, parentModulePath, testDir st
 
 	// For each dependency package, copy it to compliance/deps/
 	for _, depPkg := range dependencyPackages {
-		// Use the last component of the package path as the directory name
-		packageName := filepath.Base(depPkg)
-		destDir := filepath.Join(depsDir, packageName)
+		// Preserve the full package path structure in deps/
+		destDir := filepath.Join(depsDir, depPkg)
 
 		// Find the source directory in the output
 		// We need to construct the path based on the compiler's output structure

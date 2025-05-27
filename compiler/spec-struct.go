@@ -56,6 +56,10 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		}
 		for _, name := range field.Names {
 			fieldName := name.Name
+			// Skip underscore fields
+			if fieldName == "_" {
+				continue
+			}
 			fieldType := c.pkg.TypesInfo.TypeOf(field.Type)
 			if fieldType == nil {
 				fieldType = types.Typ[types.Invalid]
@@ -86,6 +90,10 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		} else {
 			fieldKeyName = field.Name()
 		}
+		// Skip underscore fields
+		if fieldKeyName == "_" {
+			continue
+		}
 		fieldTsType := c.getTypeString(field.Type())
 		c.tsw.WriteLinef("%s: $.VarRef<%s>;", fieldKeyName, fieldTsType)
 	}
@@ -105,6 +113,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		c.tsw.WriteLine("")
 		c.tsw.Indent(1)
 
+		firstFieldWritten := false
 		for i := range numFields {
 			field := underlyingStruct.Field(i)
 			fieldType := field.Type()
@@ -115,13 +124,20 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				fieldKeyName = field.Name()
 			}
 
-			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
-
-			if i < numFields-1 {
-				c.tsw.WriteLine(",")
-			} else {
-				c.tsw.WriteLine("")
+			// Skip underscore fields
+			if fieldKeyName == "_" {
+				continue
 			}
+
+			if firstFieldWritten {
+				c.tsw.WriteLine(",")
+			}
+
+			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+			firstFieldWritten = true
+		}
+		if firstFieldWritten {
+			c.tsw.WriteLine("")
 		}
 		c.tsw.Indent(-1)
 	}
@@ -154,6 +170,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLine("cloned._fields = {")
 	c.tsw.Indent(1)
 
+	firstFieldWritten := false
 	for i := range numFields {
 		field := underlyingStruct.Field(i)
 		fieldType := field.Type()
@@ -164,13 +181,20 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			fieldKeyName = field.Name()
 		}
 
-		c.writeClonedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
-
-		if i < numFields-1 {
-			c.tsw.WriteLine(",")
-		} else {
-			c.tsw.WriteLine("")
+		// Skip underscore fields
+		if fieldKeyName == "_" {
+			continue
 		}
+
+		if firstFieldWritten {
+			c.tsw.WriteLine(",")
+		}
+
+		c.writeClonedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+		firstFieldWritten = true
+	}
+	if firstFieldWritten {
+		c.tsw.WriteLine("")
 	}
 
 	c.tsw.Indent(-1)
@@ -402,6 +426,10 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		} else {
 			fieldKeyName = field.Name()
 		}
+		// Skip underscore fields
+		if fieldKeyName == "_" {
+			continue
+		}
 		// fieldTsType := c.getTypeString(field.Type())
 		if !firstField {
 			c.tsw.WriteLiterally(", ")
@@ -450,6 +478,11 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 	for i := 0; i < underlying.NumFields(); i++ {
 		field := underlying.Field(i)
 		fieldName := field.Name()
+
+		// Skip underscore fields
+		if fieldName == "_" {
+			continue
+		}
 
 		if !field.Exported() && field.Pkg() != c.pkg.Types {
 			continue

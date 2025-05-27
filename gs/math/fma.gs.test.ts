@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { FMA } from './fma.gs.js';
-import { Inf, NaN, IsNaN, IsInf } from './bits.gs.js';
+import { Inf, NaN as GoNaN, IsNaN } from './bits.gs.js';
 
 describe('FMA', () => {
   it('should compute fused multiply-add correctly for basic cases', () => {
@@ -35,10 +35,10 @@ describe('FMA', () => {
   });
 
   it('should handle NaN cases', () => {
-    expect(IsNaN(FMA(NaN(), 2, 3))).toBe(true);
-    expect(IsNaN(FMA(2, NaN(), 3))).toBe(true);
-    expect(IsNaN(FMA(2, 3, NaN()))).toBe(true);
-    expect(IsNaN(FMA(NaN(), NaN(), NaN()))).toBe(true);
+    expect(IsNaN(FMA(GoNaN(), 2, 3))).toBe(true);
+    expect(IsNaN(FMA(2, GoNaN(), 3))).toBe(true);
+    expect(IsNaN(FMA(2, 3, GoNaN()))).toBe(true);
+    expect(IsNaN(FMA(GoNaN(), GoNaN(), GoNaN()))).toBe(true);
   });
 
   it('should handle special infinity and zero combinations', () => {

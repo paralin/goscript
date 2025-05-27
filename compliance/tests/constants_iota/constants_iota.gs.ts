@@ -6,7 +6,6 @@ import * as $ from "@goscript/builtin/builtin.js";
 export type ByteSize = number;
 
 // ignore first value by assigning to blank identifier
-let _: number = 0
 
 export let KB: ByteSize = (1 << (10 * 0))
 

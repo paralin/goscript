@@ -75,3 +75,9 @@ export function StringData(_str: string): Pointer {
     'unsafe.StringData is not supported in JavaScript/TypeScript: direct memory access is not available in JavaScript',
   )
 }
+
+// Pointer converts a value to an unsafe.Pointer for atomic operations
+// In JavaScript/TypeScript, this is just a pass-through function
+export function Pointer(value: any): Pointer {
+  return value;
+}
