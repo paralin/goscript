@@ -560,22 +560,16 @@ func (c *GoToTSCompiler) WriteUnaryExpr(exp *ast.UnaryExpr) error {
 
 // WriteSliceExpr translates a Go slice expression (e.g., `s[low:high:max]`) to its TypeScript equivalent.
 // If `s` is a string and it's not a 3-index slice, it uses `s.substring(low, high)`.
-// If `s` is `[]byte` (Uint8Array) and it's not a 3-index slice, it uses `s.subarray(low, high)`.
+// If `s` is `[]byte` (Uint8Array) and it's not a 3-index slice, it uses $.goSlice.
 // Otherwise, it falls back to the `$.goSlice(s, low, high, max)` runtime helper.
 func (c *GoToTSCompiler) WriteSliceExpr(exp *ast.SliceExpr) error {
 	// Check if the expression being sliced is a string
 	tv := c.pkg.TypesInfo.TypeOf(exp.X)
 	isString := false
-	isByteSlice := false
 	isTypeParam := false
 	if tv != nil {
 		if basicType, isBasic := tv.Underlying().(*types.Basic); isBasic && (basicType.Info()&types.IsString) != 0 {
 			isString = true
-		}
-		if sliceType, isSlice := tv.Underlying().(*types.Slice); isSlice {
-			if basicElem, isBasic := sliceType.Elem().(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
-				isByteSlice = true
-			}
 		}
 		if _, isTP := tv.(*types.TypeParam); isTP {
 			isTypeParam = true
@@ -644,29 +638,6 @@ func (c *GoToTSCompiler) WriteSliceExpr(exp *ast.SliceExpr) error {
 			// Go's default high for string[low:] means to the end.
 			// $.sliceString can handle undefined for high as end of string.
 			c.tsw.WriteLiterally("undefined")
-		}
-		c.tsw.WriteLiterally(")")
-	} else if isByteSlice && !exp.Slice3 {
-		// Use s.subarray(low, high) for []byte slices
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return err
-		}
-		c.tsw.WriteLiterally(".subarray(")
-		if exp.Low != nil {
-			if err := c.WriteValueExpr(exp.Low); err != nil {
-				return err
-			}
-		} else {
-			c.tsw.WriteLiterally("0") // Default low for subarray is 0
-		}
-		if exp.High != nil {
-			c.tsw.WriteLiterally(", ")
-			if err := c.WriteValueExpr(exp.High); err != nil {
-				return err
-			}
-		} else {
-			// If high is omitted, subarray goes to the end of the array.
-			// No need to write undefined or length, just close the parenthesis if low was the last arg.
 		}
 		c.tsw.WriteLiterally(")")
 	} else {

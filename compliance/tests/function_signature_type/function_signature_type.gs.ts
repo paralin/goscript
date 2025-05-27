@@ -47,7 +47,7 @@ export class MyError {
 
 	public Error(): string {
 		const e = this
-		return e!.s
+		return e.s
 	}
 
 	// Register this type with the runtime type system

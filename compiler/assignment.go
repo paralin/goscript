@@ -282,14 +282,21 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 		// Continue, we've already written part of the mapSet() function call
 	} else {
 		c.tsw.WriteLiterally(" ")
-		tokStr, ok := TokenToTs(tok) // Use explicit gstypes alias
-		if !ok {
-			c.tsw.WriteLiterally("?= ")
-			c.tsw.WriteCommentLine("Unknown token " + tok.String())
+
+		// Special handling for &^= (bitwise AND NOT assignment)
+		if tok == token.AND_NOT_ASSIGN {
+			// Transform x &^= y to x &= ~(y)
+			c.tsw.WriteLiterally("&= ~(")
 		} else {
-			c.tsw.WriteLiterally(tokStr)
+			tokStr, ok := TokenToTs(tok) // Use explicit gstypes alias
+			if !ok {
+				c.tsw.WriteLiterally("?= ")
+				c.tsw.WriteCommentLine("Unknown token " + tok.String())
+			} else {
+				c.tsw.WriteLiterally(tokStr)
+			}
+			c.tsw.WriteLiterally(" ")
 		}
-		c.tsw.WriteLiterally(" ")
 	}
 
 	// Write RHS
@@ -351,6 +358,11 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 				return err
 			}
 		}
+	}
+
+	// Close the parenthesis for &^= transformation
+	if tok == token.AND_NOT_ASSIGN && !(isMapIndexLHS && len(lhs) == 1) {
+		c.tsw.WriteLiterally(")")
 	}
 
 	// If the LHS was a single map index, close the mapSet call

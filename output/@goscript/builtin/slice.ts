@@ -77,9 +77,81 @@ export const makeSlice = <T>(
   typeHint?: string,
 ): Slice<T> => {
   if (typeHint === 'byte') {
-    // Uint8Array is initialized to zeros by default.
-    // Capacity for Uint8Array is its length.
-    return new Uint8Array(length) as Slice<T>
+    const actualCapacity = capacity === undefined ? length : capacity
+    if (length < 0 || actualCapacity < 0 || length > actualCapacity) {
+      throw new Error(
+        `Invalid slice length (${length}) or capacity (${actualCapacity})`,
+      )
+    }
+
+    // If capacity equals length, use Uint8Array directly for efficiency
+    if (actualCapacity === length) {
+      return new Uint8Array(length) as Slice<T>
+    }
+
+    // If capacity > length, create a SliceProxy backed by a Uint8Array
+    const backingUint8 = new Uint8Array(actualCapacity)
+    const backingNumbers = Array.from(backingUint8) as T[] // Convert to number[] for backing
+
+    const proxyTargetArray = new Array<T>(length)
+    for (let i = 0; i < length; i++) {
+      proxyTargetArray[i] = 0 as T // Initialize with zeros
+    }
+
+    const proxy = proxyTargetArray as SliceProxy<T>
+    proxy.__meta__ = {
+      backing: backingNumbers,
+      offset: 0,
+      length: length,
+      capacity: actualCapacity,
+    }
+
+    // Create a proper Proxy with the handler for SliceProxy behavior
+    const handler = {
+      get(target: any, prop: string | symbol): any {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = Number(prop)
+          if (index >= 0 && index < target.__meta__.length) {
+            return target.__meta__.backing[target.__meta__.offset + index]
+          }
+          throw new Error(
+            `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+          )
+        }
+
+        if (prop === 'length') {
+          return target.__meta__.length
+        }
+
+        if (prop === '__meta__') {
+          return target.__meta__
+        }
+
+        return Reflect.get(target, prop)
+      },
+
+      set(target: any, prop: string | symbol, value: any): boolean {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = Number(prop)
+          if (index >= 0 && index < target.__meta__.length) {
+            target.__meta__.backing[target.__meta__.offset + index] = value
+            target[index] = value // Also update the proxy target for consistency
+            return true
+          }
+          throw new Error(
+            `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+          )
+        }
+
+        if (prop === 'length' || prop === '__meta__') {
+          return false
+        }
+
+        return Reflect.set(target, prop, value)
+      },
+    }
+
+    return new Proxy(proxy, handler) as Slice<T>
   }
 
   const actualCapacity = capacity === undefined ? length : capacity

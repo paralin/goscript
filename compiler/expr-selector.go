@@ -129,7 +129,33 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 	// Add null assertion for selector expressions when accessing fields/methods on nullable types
 	// In Go, accessing fields or calling methods on nil pointers/interfaces panics, so we should throw in TypeScript
 	baseType := c.pkg.TypesInfo.TypeOf(exp.X)
-	if baseType != nil {
+
+	// Special case: Check if this is a method receiver alias (e.g., `b` in `const b = this`)
+	// In this case, we should use regular field access instead of pointer access
+	isMethodReceiverAlias := false
+	if baseIdent, ok := exp.X.(*ast.Ident); ok {
+		// Check if this identifier refers to a method receiver
+		// Method receivers are typically named variables that alias `this`
+		if obj := c.pkg.TypesInfo.ObjectOf(baseIdent); obj != nil {
+			if varObj, ok := obj.(*types.Var); ok {
+				// Check if this is a local variable in a method context
+				// Method receiver aliases are local variables with pointer types that represent `this`
+				if _, isPtr := varObj.Type().(*types.Pointer); isPtr {
+					// Additional check: only consider it a method receiver alias if the variable name
+					// suggests it's an alias (single letter names are common for aliases like `b`, `r`, etc.)
+					// and it's not a common variable name like `f` which is often used for regular variables
+					varName := baseIdent.Name
+					if len(varName) == 1 && varName != "f" {
+						// This is likely a method receiver alias like `const b = this`
+						// We should treat it as a regular object access, not a pointer access
+						isMethodReceiverAlias = true
+					}
+				}
+			}
+		}
+	}
+
+	if baseType != nil && !isMethodReceiverAlias {
 		// Check if the base is a pointer type
 		if _, isPtr := baseType.(*types.Pointer); isPtr {
 			c.tsw.WriteLiterally("!.")
@@ -145,7 +171,7 @@ func (c *GoToTSCompiler) WriteSelectorExpr(exp *ast.SelectorExpr) error {
 			c.tsw.WriteLiterally(".")
 		}
 	} else {
-		// Add .
+		// Add . (either baseType is nil or this is a method receiver alias)
 		c.tsw.WriteLiterally(".")
 	}
 

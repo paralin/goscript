@@ -111,34 +111,6 @@ export class stringFinder {
     }
     return -1
   }
-
-  // Register this type with the runtime type system
-  static __typeInfo = $.registerStructType(
-    'stringFinder',
-    new stringFinder(),
-    [
-      {
-        name: 'next',
-        args: [
-          { name: 'text', type: { kind: $.TypeKind.Basic, name: 'string' } },
-        ],
-        returns: [{ type: { kind: $.TypeKind.Basic, name: 'number' } }],
-      },
-    ],
-    stringFinder,
-    {
-      pattern: { kind: $.TypeKind.Basic, name: 'string' },
-      badCharSkip: {
-        kind: $.TypeKind.Array,
-        length: 256,
-        elemType: { kind: $.TypeKind.Basic, name: 'number' },
-      },
-      goodSuffixSkip: {
-        kind: $.TypeKind.Slice,
-        elemType: { kind: $.TypeKind.Basic, name: 'number' },
-      },
-    },
-  )
 }
 
 export function makeStringFinder(pattern: string): stringFinder | null {

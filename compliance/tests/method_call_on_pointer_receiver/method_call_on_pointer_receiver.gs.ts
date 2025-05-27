@@ -42,7 +42,7 @@ export class MyStruct {
 	// GetMyString returns the MyString field.
 	public GetMyString(): string {
 		const m = this
-		return m!.MyString
+		return m.MyString
 	}
 
 	// Register this type with the runtime type system

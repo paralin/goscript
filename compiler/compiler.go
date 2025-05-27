@@ -919,7 +919,10 @@ func (c *GoToTSCompiler) writeConstantValue(constObj *types.Const) {
 		c.tsw.WriteLiterally(val.String())
 	case constant.String:
 		// For string constants, write as a quoted string literal
-		c.tsw.WriteLiterally(val.String()) // val.String() already includes quotes
+		// Use constant.StringVal to get the full string value without truncation,
+		// then manually add quotes since StringVal returns the unquoted string
+		stringValue := constant.StringVal(val)
+		c.tsw.WriteLiterallyf("%q", stringValue) // %q adds proper quotes and escaping
 	case constant.Bool:
 		// For boolean constants, write true/false
 		if constant.BoolVal(val) {

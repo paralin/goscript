@@ -435,40 +435,7 @@ class trieNode {
     }
   }
 
-  // Register this type with the runtime type system
-  static __typeInfo = $.registerStructType(
-    'trieNode',
-    new trieNode(),
-    [
-      {
-        name: 'add',
-        args: [
-          { name: 'key', type: { kind: $.TypeKind.Basic, name: 'string' } },
-          { name: 'val', type: { kind: $.TypeKind.Basic, name: 'string' } },
-          {
-            name: 'priority',
-            type: { kind: $.TypeKind.Basic, name: 'number' },
-          },
-          {
-            name: 'r',
-            type: { kind: $.TypeKind.Pointer, elemType: 'genericReplacer' },
-          },
-        ],
-        returns: [],
-      },
-    ],
-    trieNode,
-    {
-      value: { kind: $.TypeKind.Basic, name: 'string' },
-      priority: { kind: $.TypeKind.Basic, name: 'number' },
-      prefix: { kind: $.TypeKind.Basic, name: 'string' },
-      next: { kind: $.TypeKind.Pointer, elemType: 'trieNode' },
-      table: {
-        kind: $.TypeKind.Slice,
-        elemType: { kind: $.TypeKind.Pointer, elemType: 'trieNode' },
-      },
-    },
-  )
+
 }
 
 class genericReplacer {
@@ -656,72 +623,9 @@ class genericReplacer {
     }
     return [n, err]
   }
-
-  // Register this type with the runtime type system
-  static __typeInfo = $.registerStructType(
-    'genericReplacer',
-    new genericReplacer(),
-    [
-      {
-        name: 'lookup',
-        args: [
-          { name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } },
-          {
-            name: 'ignoreRoot',
-            type: { kind: $.TypeKind.Basic, name: 'boolean' },
-          },
-        ],
-        returns: [
-          { type: { kind: $.TypeKind.Basic, name: 'string' } },
-          { type: { kind: $.TypeKind.Basic, name: 'number' } },
-          { type: { kind: $.TypeKind.Basic, name: 'boolean' } },
-        ],
-      },
-      {
-        name: 'Replace',
-        args: [{ name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } }],
-        returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }],
-      },
-      {
-        name: 'WriteString',
-        args: [
-          { name: 'w', type: 'Writer' },
-          { name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } },
-        ],
-        returns: [
-          { type: { kind: $.TypeKind.Basic, name: 'number' } },
-          {
-            type: {
-              kind: $.TypeKind.Interface,
-              name: 'GoError',
-              methods: [
-                {
-                  name: 'Error',
-                  args: [],
-                  returns: [
-                    { type: { kind: $.TypeKind.Basic, name: 'string' } },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-    ],
-    genericReplacer,
-    {
-      root: 'trieNode',
-      tableSize: { kind: $.TypeKind.Basic, name: 'number' },
-      mapping: {
-        kind: $.TypeKind.Array,
-        length: 256,
-        elemType: { kind: $.TypeKind.Basic, name: 'number' },
-      },
-    },
-  )
 }
 
-export function makeGenericReplacer(
+function makeGenericReplacer(
   oldnew: $.Slice<string>,
 ): genericReplacer | null {
   let r = new genericReplacer()
@@ -773,65 +677,25 @@ class stringWriter {
     w: $.VarRef<io.Writer>
   }
 
-  constructor(init?: Partial<{ w?: io.Writer }>) {
+  constructor(w: io.Writer) {
     this._fields = {
-      w: $.varRef(init!.w!),
+      w: $.varRef(w),
     }
-  }
-
-  public clone(): stringWriter {
-    const cloned = new stringWriter()
-    cloned._fields = {
-      w: $.varRef(this._fields.w.value),
-    }
-    return cloned
   }
 
   public WriteString(s: string): [number, $.GoError] {
     const w = this
     return w.w!.Write($.stringToBytes(s))
   }
-
-  // Register this type with the runtime type system
-  static __typeInfo = $.registerStructType(
-    'stringWriter',
-    new stringWriter(),
-    [
-      {
-        name: 'WriteString',
-        args: [{ name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } }],
-        returns: [
-          { type: { kind: $.TypeKind.Basic, name: 'number' } },
-          {
-            type: {
-              kind: $.TypeKind.Interface,
-              name: 'GoError',
-              methods: [
-                {
-                  name: 'Error',
-                  args: [],
-                  returns: [
-                    { type: { kind: $.TypeKind.Basic, name: 'string' } },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-    ],
-    stringWriter,
-    { w: 'Writer' },
-  )
 }
 
-export function getStringWriter(w: io.Writer): io.StringWriter {
+function getStringWriter(w: io.Writer): io.StringWriter {
   let { value: sw, ok: ok } = $.typeAssert<io.StringWriter>(
     w,
     'io.StringWriter',
   )
   if (!ok) {
-    sw = new stringWriter({ w: w })
+    sw = new stringWriter(w)
   }
   return sw
 }
@@ -926,51 +790,10 @@ class singleStringReplacer {
     return [n, err]
   }
 
-  // Register this type with the runtime type system
-  static __typeInfo = $.registerStructType(
-    'singleStringReplacer',
-    new singleStringReplacer(),
-    [
-      {
-        name: 'Replace',
-        args: [{ name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } }],
-        returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }],
-      },
-      {
-        name: 'WriteString',
-        args: [
-          { name: 'w', type: 'Writer' },
-          { name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } },
-        ],
-        returns: [
-          { type: { kind: $.TypeKind.Basic, name: 'number' } },
-          {
-            type: {
-              kind: $.TypeKind.Interface,
-              name: 'GoError',
-              methods: [
-                {
-                  name: 'Error',
-                  args: [],
-                  returns: [
-                    { type: { kind: $.TypeKind.Basic, name: 'string' } },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-    ],
-    singleStringReplacer,
-    {
-      finder: { kind: $.TypeKind.Pointer, elemType: 'stringFinder' },
-      value: { kind: $.TypeKind.Basic, name: 'string' },
-    },
-  )
+
 }
 
-export function makeSingleStringReplacer(
+function makeSingleStringReplacer(
   pattern: string,
   value: string,
 ): singleStringReplacer | null {
@@ -1243,58 +1066,7 @@ class byteStringReplacer {
     return [n, err]
   }
 
-  // Register this type with the runtime type system
-  static __typeInfo = $.registerStructType(
-    'byteStringReplacer',
-    new byteStringReplacer(),
-    [
-      {
-        name: 'Replace',
-        args: [{ name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } }],
-        returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }],
-      },
-      {
-        name: 'WriteString',
-        args: [
-          { name: 'w', type: 'Writer' },
-          { name: 's', type: { kind: $.TypeKind.Basic, name: 'string' } },
-        ],
-        returns: [
-          { type: { kind: $.TypeKind.Basic, name: 'number' } },
-          {
-            type: {
-              kind: $.TypeKind.Interface,
-              name: 'GoError',
-              methods: [
-                {
-                  name: 'Error',
-                  args: [],
-                  returns: [
-                    { type: { kind: $.TypeKind.Basic, name: 'string' } },
-                  ],
-                },
-              ],
-            },
-          },
-        ],
-      },
-    ],
-    byteStringReplacer,
-    {
-      replacements: {
-        kind: $.TypeKind.Array,
-        length: 256,
-        elemType: {
-          kind: $.TypeKind.Slice,
-          elemType: { kind: $.TypeKind.Basic, name: 'number' },
-        },
-      },
-      toReplace: {
-        kind: $.TypeKind.Slice,
-        elemType: { kind: $.TypeKind.Basic, name: 'string' },
-      },
-    },
-  )
+
 }
 
 // Helper function to copy bytes

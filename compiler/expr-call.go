@@ -206,17 +206,31 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 					// Check if it's make([]byte, ...)
 					if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
-						c.tsw.WriteLiterally("new Uint8Array(")
-						if len(exp.Args) >= 2 {
+						// Check if capacity is different from length
+						if len(exp.Args) == 3 {
+							// make([]byte, len, cap) - need to handle capacity
+							c.tsw.WriteLiterally("$.makeSlice<number>(")
 							if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 								return err
 							}
-							// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+							c.tsw.WriteLiterally(", ")
+							if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+								return err
+							}
+							c.tsw.WriteLiterally(", 'byte')")
 						} else {
-							// If no length is provided, default to 0
-							c.tsw.WriteLiterally("0")
+							// make([]byte, len) - capacity equals length, use Uint8Array
+							c.tsw.WriteLiterally("new Uint8Array(")
+							if len(exp.Args) >= 2 {
+								if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+									return err
+								}
+							} else {
+								// If no length is provided, default to 0
+								c.tsw.WriteLiterally("0")
+							}
+							c.tsw.WriteLiterally(")")
 						}
-						c.tsw.WriteLiterally(")")
 						return nil // Handled make for []byte
 					}
 
@@ -251,11 +265,13 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
 					c.tsw.WriteLiterally(">(")
 
+					hasCapacity := len(exp.Args) == 3
+
 					if len(exp.Args) >= 2 {
 						if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 							return err
 						}
-						if len(exp.Args) == 3 {
+						if hasCapacity {
 							c.tsw.WriteLiterally(", ")
 							if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
 								return err
@@ -267,6 +283,19 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 						// If no length is provided, default to 0
 						c.tsw.WriteLiterally("0")
 					}
+
+					// Add type hint for proper zero value initialization
+					typeHint := c.getTypeHintForSliceElement(goElemType)
+					if typeHint != "" {
+						if !hasCapacity {
+							// If no capacity was provided, add undefined for capacity parameter
+							c.tsw.WriteLiterally(", undefined")
+						}
+						c.tsw.WriteLiterally(", '")
+						c.tsw.WriteLiterally(typeHint)
+						c.tsw.WriteLiterally("'")
+					}
+
 					c.tsw.WriteLiterally(")")
 					return nil // Handled make for slice
 				}
@@ -291,17 +320,31 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 											if elemType != nil {
 												// Check if it's make(S, ...) where S constrains to []byte
 												if basicElem, isBasic := elemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
-													c.tsw.WriteLiterally("new Uint8Array(")
-													if len(exp.Args) >= 2 {
+													// Check if capacity is different from length
+													if len(exp.Args) == 3 {
+														// make([]byte, len, cap) - need to handle capacity
+														c.tsw.WriteLiterally("$.makeSlice<number>(")
 														if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 															return err
 														}
-														// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+														c.tsw.WriteLiterally(", ")
+														if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+															return err
+														}
+														c.tsw.WriteLiterally(", 'byte')")
 													} else {
-														// If no length is provided, default to 0
-														c.tsw.WriteLiterally("0")
+														// make([]byte, len) - capacity equals length, use Uint8Array
+														c.tsw.WriteLiterally("new Uint8Array(")
+														if len(exp.Args) >= 2 {
+															if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+																return err
+															}
+														} else {
+															// If no length is provided, default to 0
+															c.tsw.WriteLiterally("0")
+														}
+														c.tsw.WriteLiterally(")")
 													}
-													c.tsw.WriteLiterally(")")
 													return nil // Handled make for generic []byte
 												}
 
@@ -309,11 +352,13 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 												c.WriteGoType(elemType, GoTypeContextGeneral) // Write the element type
 												c.tsw.WriteLiterally(">(")
 
+												hasCapacity := len(exp.Args) == 3
+
 												if len(exp.Args) >= 2 {
 													if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 														return err
 													}
-													if len(exp.Args) == 3 {
+													if hasCapacity {
 														c.tsw.WriteLiterally(", ")
 														if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
 															return err
@@ -325,6 +370,19 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 													// If no length is provided, default to 0
 													c.tsw.WriteLiterally("0")
 												}
+
+												// Add type hint for proper zero value initialization
+												typeHint := c.getTypeHintForSliceElement(elemType)
+												if typeHint != "" {
+													if !hasCapacity {
+														// If no capacity was provided, add undefined for capacity parameter
+														c.tsw.WriteLiterally(", undefined")
+													}
+													c.tsw.WriteLiterally(", '")
+													c.tsw.WriteLiterally(typeHint)
+													c.tsw.WriteLiterally("'")
+												}
+
 												c.tsw.WriteLiterally(")")
 												return nil // Handled make for generic slice
 											}
@@ -340,17 +398,31 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 									// Check if it's a named type with []byte underlying type
 									if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
-										c.tsw.WriteLiterally("new Uint8Array(")
-										if len(exp.Args) >= 2 {
+										// Check if capacity is different from length
+										if len(exp.Args) == 3 {
+											// make([]byte, len, cap) - need to handle capacity
+											c.tsw.WriteLiterally("$.makeSlice<number>(")
 											if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 												return err
 											}
-											// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+											c.tsw.WriteLiterally(", ")
+											if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+												return err
+											}
+											c.tsw.WriteLiterally(", 'byte')")
 										} else {
-											// If no length is provided, default to 0
-											c.tsw.WriteLiterally("0")
+											// make([]byte, len) - capacity equals length, use Uint8Array
+											c.tsw.WriteLiterally("new Uint8Array(")
+											if len(exp.Args) >= 2 {
+												if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+													return err
+												}
+											} else {
+												// If no length is provided, default to 0
+												c.tsw.WriteLiterally("0")
+											}
+											c.tsw.WriteLiterally(")")
 										}
-										c.tsw.WriteLiterally(")")
 										return nil // Handled make for named []byte type
 									}
 
@@ -359,11 +431,13 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 									c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
 									c.tsw.WriteLiterally(">(")
 
+									hasCapacity := len(exp.Args) == 3
+
 									if len(exp.Args) >= 2 {
 										if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 											return err
 										}
-										if len(exp.Args) == 3 {
+										if hasCapacity {
 											c.tsw.WriteLiterally(", ")
 											if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
 												return err
@@ -375,6 +449,19 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 										// If no length is provided, default to 0
 										c.tsw.WriteLiterally("0")
 									}
+
+									// Add type hint for proper zero value initialization
+									typeHint := c.getTypeHintForSliceElement(goElemType)
+									if typeHint != "" {
+										if !hasCapacity {
+											// If no capacity was provided, add undefined for capacity parameter
+											c.tsw.WriteLiterally(", undefined")
+										}
+										c.tsw.WriteLiterally(", '")
+										c.tsw.WriteLiterally(typeHint)
+										c.tsw.WriteLiterally("'")
+									}
+
 									c.tsw.WriteLiterally(")")
 									return nil // Handled make for named slice type
 								}
@@ -461,17 +548,31 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 						// Check if it's an instantiated generic type with []byte underlying type
 						if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
-							c.tsw.WriteLiterally("new Uint8Array(")
-							if len(exp.Args) >= 2 {
+							// Check if capacity is different from length
+							if len(exp.Args) == 3 {
+								// make([]byte, len, cap) - need to handle capacity
+								c.tsw.WriteLiterally("$.makeSlice<number>(")
 								if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 									return err
 								}
-								// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+								c.tsw.WriteLiterally(", ")
+								if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+									return err
+								}
+								c.tsw.WriteLiterally(", 'byte')")
 							} else {
-								// If no length is provided, default to 0
-								c.tsw.WriteLiterally("0")
+								// make([]byte, len) - capacity equals length, use Uint8Array
+								c.tsw.WriteLiterally("new Uint8Array(")
+								if len(exp.Args) >= 2 {
+									if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+										return err
+									}
+								} else {
+									// If no length is provided, default to 0
+									c.tsw.WriteLiterally("0")
+								}
+								c.tsw.WriteLiterally(")")
 							}
-							c.tsw.WriteLiterally(")")
 							return nil // Handled make for instantiated generic []byte type
 						}
 
@@ -480,11 +581,13 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 						c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
 						c.tsw.WriteLiterally(">(")
 
+						hasCapacity := len(exp.Args) == 3
+
 						if len(exp.Args) >= 2 {
 							if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 								return err
 							}
-							if len(exp.Args) == 3 {
+							if hasCapacity {
 								c.tsw.WriteLiterally(", ")
 								if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
 									return err
@@ -496,6 +599,19 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 							// If no length is provided, default to 0
 							c.tsw.WriteLiterally("0")
 						}
+
+						// Add type hint for proper zero value initialization
+						typeHint := c.getTypeHintForSliceElement(goElemType)
+						if typeHint != "" {
+							if !hasCapacity {
+								// If no capacity was provided, add undefined for capacity parameter
+								c.tsw.WriteLiterally(", undefined")
+							}
+							c.tsw.WriteLiterally(", '")
+							c.tsw.WriteLiterally(typeHint)
+							c.tsw.WriteLiterally("'")
+						}
+
 						c.tsw.WriteLiterally(")")
 						return nil // Handled make for instantiated generic slice type
 					}
@@ -569,17 +685,31 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 						// Check if it's a selector expression with []byte underlying type
 						if basicElem, isBasic := goElemType.(*types.Basic); isBasic && basicElem.Kind() == types.Uint8 {
-							c.tsw.WriteLiterally("new Uint8Array(")
-							if len(exp.Args) >= 2 {
+							// Check if capacity is different from length
+							if len(exp.Args) == 3 {
+								// make([]byte, len, cap) - need to handle capacity
+								c.tsw.WriteLiterally("$.makeSlice<number>(")
 								if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 									return err
 								}
-								// Capacity argument for make([]byte, len, cap) is ignored for new Uint8Array(len)
+								c.tsw.WriteLiterally(", ")
+								if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
+									return err
+								}
+								c.tsw.WriteLiterally(", 'byte')")
 							} else {
-								// If no length is provided, default to 0
-								c.tsw.WriteLiterally("0")
+								// make([]byte, len) - capacity equals length, use Uint8Array
+								c.tsw.WriteLiterally("new Uint8Array(")
+								if len(exp.Args) >= 2 {
+									if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
+										return err
+									}
+								} else {
+									// If no length is provided, default to 0
+									c.tsw.WriteLiterally("0")
+								}
+								c.tsw.WriteLiterally(")")
 							}
-							c.tsw.WriteLiterally(")")
 							return nil // Handled make for selector expression []byte type
 						}
 
@@ -588,11 +718,13 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 						c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
 						c.tsw.WriteLiterally(">(")
 
+						hasCapacity := len(exp.Args) == 3
+
 						if len(exp.Args) >= 2 {
 							if err := c.WriteValueExpr(exp.Args[1]); err != nil { // Length
 								return err
 							}
-							if len(exp.Args) == 3 {
+							if hasCapacity {
 								c.tsw.WriteLiterally(", ")
 								if err := c.WriteValueExpr(exp.Args[2]); err != nil { // Capacity
 									return err
@@ -604,6 +736,19 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 							// If no length is provided, default to 0
 							c.tsw.WriteLiterally("0")
 						}
+
+						// Add type hint for proper zero value initialization
+						typeHint := c.getTypeHintForSliceElement(goElemType)
+						if typeHint != "" {
+							if !hasCapacity {
+								// If no capacity was provided, add undefined for capacity parameter
+								c.tsw.WriteLiterally(", undefined")
+							}
+							c.tsw.WriteLiterally(", '")
+							c.tsw.WriteLiterally(typeHint)
+							c.tsw.WriteLiterally("'")
+						}
+
 						c.tsw.WriteLiterally(")")
 						return nil // Handled make for selector expression slice type
 					}
@@ -774,6 +919,40 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					if i > 0 || len(exp.Args) > 1 { // Add comma before elements if there are any
 						c.tsw.WriteLiterally(", ")
 					}
+
+					// Special case: append([]byte, string...) should convert string to bytes
+					if exp.Ellipsis != token.NoPos && i == 0 { // This is the first element after slice and has ellipsis
+						// Check if the slice is []byte and the argument is a string
+						sliceType := c.pkg.TypesInfo.TypeOf(exp.Args[0])
+						argType := c.pkg.TypesInfo.TypeOf(arg)
+
+						if sliceType != nil && argType != nil {
+							// Check if slice is []byte (Uint8Array)
+							isSliceOfBytes := false
+							if sliceUnder, ok := sliceType.Underlying().(*types.Slice); ok {
+								if basicElem, ok := sliceUnder.Elem().(*types.Basic); ok && basicElem.Kind() == types.Uint8 {
+									isSliceOfBytes = true
+								}
+							}
+
+							// Check if argument is string (including untyped string)
+							isArgString := false
+							if basicArg, ok := argType.Underlying().(*types.Basic); ok && (basicArg.Kind() == types.String || basicArg.Kind() == types.UntypedString) {
+								isArgString = true
+							}
+
+							if isSliceOfBytes && isArgString {
+								// Convert string to bytes: append([]byte, string...) -> $.append(slice, ...$.stringToBytes(string))
+								c.tsw.WriteLiterally("...$.stringToBytes(")
+								if err := c.WriteValueExpr(arg); err != nil {
+									return fmt.Errorf("failed to write string argument in append call: %w", err)
+								}
+								c.tsw.WriteLiterally(")")
+								continue
+							}
+						}
+					}
+
 					if err := c.WriteValueExpr(arg); err != nil {
 						return fmt.Errorf("failed to write argument %d in append call: %w", i+1, err)
 					}
@@ -1122,4 +1301,23 @@ func hasMixedStringByteConstraint(iface *types.Interface) bool {
 
 	// Return true only if we have both string and []byte in the constraint
 	return hasString && hasByteSlice
+}
+
+// getTypeHintForSliceElement returns the appropriate type hint for makeSlice based on the Go element type
+func (c *GoToTSCompiler) getTypeHintForSliceElement(elemType types.Type) string {
+	if basicType, isBasic := elemType.(*types.Basic); isBasic {
+		switch basicType.Kind() {
+		case types.Int, types.Int8, types.Int16, types.Int32, types.Int64,
+			types.Uint, types.Uint8, types.Uint16, types.Uint32, types.Uint64,
+			types.Float32, types.Float64, types.Complex64, types.Complex128:
+			return "number"
+		case types.Bool:
+			return "boolean"
+		case types.String:
+			return "string"
+		}
+	}
+	// For other types (structs, interfaces, pointers, etc.), don't provide a hint
+	// This will use the default null initialization which is appropriate for object types
+	return ""
 }

@@ -31,7 +31,7 @@ export class MockInode {
 
 	public getValue(): number {
 		const m = this
-		return m!.Value
+		return m.Value
 	}
 
 	// Register this type with the runtime type system

@@ -4,7 +4,9 @@ import (
 	"fmt"
 	"go/ast"
 	"go/token"
+	"regexp"
 	"strconv"
+	"strings"
 )
 
 // WriteBasicLit translates a Go basic literal (`ast.BasicLit`) into its
@@ -62,8 +64,26 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 			// Regular decimal integer or single zero, write as-is
 			c.tsw.WriteLiterally(value)
 		}
+	} else if exp.Kind == token.STRING {
+		// Handle string literals, with special processing for raw strings
+		value := exp.Value
+
+		// Check if this is a raw string literal (starts and ends with backticks)
+		if len(value) >= 2 && value[0] == '`' && value[len(value)-1] == '`' {
+			// This is a Go raw string - need to escape invalid \x sequences for JavaScript
+			content := value[1 : len(value)-1] // Remove surrounding backticks
+
+			// Escape invalid \x, \u, and \U sequences that would cause TS1125 errors
+			content = c.escapeInvalidEscapeSequences(content)
+
+			// Write as template literal with corrected content
+			c.tsw.WriteLiterallyf("`%s`", content)
+		} else {
+			// Regular string literal (double quotes) - write as-is
+			c.tsw.WriteLiterally(value)
+		}
 	} else {
-		// Other literals (FLOAT, STRING, IMAG)
+		// Other literals (FLOAT, IMAG)
 		c.tsw.WriteLiterally(exp.Value)
 	}
 }
@@ -164,4 +184,57 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 	}
 
 	return nil
+}
+
+// escapeInvalidEscapeSequences escapes \x, \u, and \U sequences in raw strings that would be invalid in JavaScript template literals.
+// JavaScript template literals expect:
+// - \x to be followed by exactly 2 hexadecimal digits
+// - \u to be followed by exactly 4 hexadecimal digits
+// - \U to be followed by exactly 8 hexadecimal digits
+// This function escapes sequences that don't meet these requirements.
+func (c *GoToTSCompiler) escapeInvalidEscapeSequences(content string) string {
+	// Use regex to find all \x, \u, and \U sequences
+	re := regexp.MustCompile(`\\([xuU])([0-9a-fA-F]*)`)
+
+	return re.ReplaceAllStringFunc(content, func(match string) string {
+		if len(match) < 2 {
+			return match
+		}
+
+		escapeType := match[1] // x, u, or U
+		suffix := match[2:]    // The hex digits that follow
+
+		var expectedLength int
+		switch escapeType {
+		case 'x':
+			expectedLength = 2
+		case 'u':
+			expectedLength = 4
+		case 'U':
+			expectedLength = 8
+		default:
+			return match
+		}
+
+		// Check if it has exactly the expected number of hex digits
+		if len(suffix) == expectedLength {
+			// Check if all characters are hex digits
+			isValidHex := true
+			for _, char := range suffix {
+				if !((char >= '0' && char <= '9') ||
+					(char >= 'a' && char <= 'f') ||
+					(char >= 'A' && char <= 'F')) {
+					isValidHex = false
+					break
+				}
+			}
+			if isValidHex {
+				// Valid escape sequence, keep as-is
+				return match
+			}
+		}
+
+		// Invalid escape sequence, escape the backslash
+		return strings.Replace(match, `\`, `\\`, 1)
+	})
 }

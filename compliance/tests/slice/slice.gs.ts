@@ -7,12 +7,12 @@ export async function main(): Promise<void> {
 	// --- Original Tests ---
 	console.log("--- Original Tests ---")
 	// Create a slice of integers with length 5 and capacity 10
-	let s = $.makeSlice<number>(5, 10)
+	let s = $.makeSlice<number>(5, 10, 'number')
 	console.log($.len(s)) // 5
 	console.log($.cap(s)) // 10
 
 	// Create a slice of strings with length 3
-	let s2 = $.makeSlice<string>(3)
+	let s2 = $.makeSlice<string>(3, undefined, 'string')
 	console.log($.len(s2)) // 3
 	console.log($.cap(s2)) // 3
 
@@ -53,7 +53,7 @@ export async function main(): Promise<void> {
 
 	// Create slice with 0 len/cap and append
 	console.log("--- Zero len/cap append ---")
-	let zeroSlice = $.makeSlice<number>(0, 0)
+	let zeroSlice = $.makeSlice<number>(0, 0, 'number')
 	console.log($.len(zeroSlice)) // 0
 	console.log($.cap(zeroSlice)) // 0
 	zeroSlice = $.append(zeroSlice, 100)
@@ -211,7 +211,7 @@ export async function main(): Promise<void> {
 	// Create a slice of slices where inner slice has capacity for append
 
 	// {0, 0}, len 2, cap 5
-	let sliceOfSlicesWithCap = $.arrayToSlice<$.Slice<number>>([[ 1, 2, 3 ], $.makeSlice<number>(2, 5), [ 6, 7, 8, 9 ]], 2)
+	let sliceOfSlicesWithCap = $.arrayToSlice<$.Slice<number>>([[ 1, 2, 3 ], $.makeSlice<number>(2, 5, 'number'), [ 6, 7, 8, 9 ]], 2)
 	sliceOfSlicesWithCap![1]![0] = 40
 	sliceOfSlicesWithCap![1]![1] = 50
 
@@ -295,7 +295,7 @@ export async function main(): Promise<void> {
 
 	// Initialize inner slices
 	makeSliceOfSlices![0] = $.arrayToSlice<number>([1000, 2000])
-	makeSliceOfSlices![1] = $.makeSlice<number>(1, 3)
+	makeSliceOfSlices![1] = $.makeSlice<number>(1, 3, 'number')
 	makeSliceOfSlices![1]![0] = 3000
 
 	console.log("makeSliceOfSlices[0][1]:", makeSliceOfSlices![0]![1]) // 2000

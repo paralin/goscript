@@ -48,11 +48,11 @@ export async function main(): Promise<void> {
 	// because s1 is a struct and *p is being assigned.
 	p!.value = s1.clone()
 
-	console.log(p!.Value) // Expected: 10
+	console.log(p.Value) // Expected: 10
 
 	// Modify s1 to ensure p is a clone and not a reference
 	s1.Value = 30
-	console.log(p!.Value) // Expected: 10 (still, due to clone)
+	console.log(p.Value) // Expected: 10 (still, due to clone)
 
 	// Test assignment from a pointer to a struct (should not clone)
 	let s2 = new MyStruct({Value: 40})

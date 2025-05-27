@@ -32,7 +32,7 @@ export class MyStruct {
 	// SetValue sets the MyInt field (pointer receiver).
 	public SetValue(v: number): void {
 		const m = this
-		m!.MyInt = v
+		m.MyInt = v
 	}
 
 	// GetValue returns the MyInt field (value receiver for verification).

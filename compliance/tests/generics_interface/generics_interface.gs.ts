@@ -64,18 +64,18 @@ export class ValueContainer<T extends any> {
 
 	public Get(): T {
 		const b = this
-		return b!.value
+		return b.value
 	}
 
 	public Set(v: T): void {
 		const b = this
-		b!.value = v
-		b!.count++
+		b.value = v
+		b.count++
 	}
 
 	public Size(): number {
 		const b = this
-		return b!.count
+		return b.count
 	}
 
 	// Register this type with the runtime type system
@@ -116,9 +116,9 @@ export class StringValueContainer {
 
 	public Compare(other: string): number {
 		const s = this
-		if (s!.value < other) {
+		if (s.value < other) {
 			return -1
-		} else if (s!.value > other) {
+		} else if (s.value > other) {
 			return 1
 		}
 		return 0
@@ -126,7 +126,7 @@ export class StringValueContainer {
 
 	public Equal(other: string): boolean {
 		const s = this
-		return s!.value == other
+		return s.value == other
 	}
 
 	// Register this type with the runtime type system

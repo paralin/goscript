@@ -100,12 +100,12 @@ var tokenMap = map[token.Token]string{
 	token.QUO_ASSIGN: "/=",
 	token.REM_ASSIGN: "%=",
 
-	token.AND_ASSIGN:     "&=",
-	token.OR_ASSIGN:      "|=",
-	token.XOR_ASSIGN:     "^=", // TODO: check if this works
-	token.SHL_ASSIGN:     "<<=",
-	token.SHR_ASSIGN:     ">>=",
-	token.AND_NOT_ASSIGN: "&^=",
+	token.AND_ASSIGN: "&=",
+	token.OR_ASSIGN:  "|=",
+	token.XOR_ASSIGN: "^=", // TODO: check if this works
+	token.SHL_ASSIGN: "<<=",
+	token.SHR_ASSIGN: ">>=",
+	// token.AND_NOT_ASSIGN: "&^=", // Handled specially in assignment logic
 
 	token.LAND: "&&",
 	token.LOR:  "||",

@@ -1,0 +1,13 @@
+New error: basic error
+Errorf error: formatted error: 42
+WithStack error: base error
+Wrap error: wrapped message: base error
+Wrapf error: wrapped with format: test: base error
+WithMessage error: additional message: base error
+WithMessagef error: additional formatted message: 123: base error
+Cause error: base error
+WithStack with nil returns nil
+Wrap with nil returns nil
+Unwrap error: wrapped message: base error
+Is check passed
+test finished

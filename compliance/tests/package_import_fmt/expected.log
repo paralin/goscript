@@ -1,0 +1,26 @@
+Hello World
+This is a line
+String: test
+Integer: 42
+Float: 3.14
+Boolean: true
+Character: A
+Sprintf result: Formatted string: value 123
+Multiple: text 100 2.500000 false
+Width: '   hi'
+Precision: '1.235'
+Both: '  123.46'
+Left aligned: 'left    '
+Zero padded: '00000042'
+Hex: ff
+Hex upper: FF
+Octal: 100
+Address-like: 0x1400000e120
+Quoted: "hello\nworld"
+Type: int
+Type: string
+Default: 42
+Default: string
+Default: true
+Struct: {Name:Alice Age:30}
+Go syntax: main.Person{Name:"Alice", Age:30}test finished

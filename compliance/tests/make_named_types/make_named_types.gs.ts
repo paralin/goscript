@@ -9,7 +9,7 @@ export async function main(): Promise<void> {
 	// rather than direct type expressions like []int or map[string]int
 
 	type MySlice = $.Slice<number>;
-	let s: MySlice = $.makeSlice<number>(5)
+	let s: MySlice = $.makeSlice<number>(5, undefined, 'number')
 	console.log("Length:", $.len(s))
 
 	// Test make() with named map type

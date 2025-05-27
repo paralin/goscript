@@ -61,11 +61,6 @@ func isProtobufGoLitePackage(pkgPath string) bool {
 	if strings.HasPrefix(pkgPath, "github.com/aperturerobotics/json-iterator-lite") {
 		return true
 	}
-	// Skip other packages commonly used only by .pb.go files
-	switch pkgPath {
-	case "encoding/json", "encoding/base64", "strconv", "fmt":
-		return true
-	}
 	return false
 }
 

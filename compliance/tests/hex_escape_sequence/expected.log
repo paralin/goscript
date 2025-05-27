@@ -1,0 +1,4 @@
+Appended raw string with \x: \x
+Raw string with \x: \x
+Raw string with \xG: \xG
+Interpreted string: A

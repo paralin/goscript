@@ -1,0 +1,43 @@
+--- Testing make() with slices ---
+--- Basic make with length only ---
+len(s1): 5
+cap(s1): 5
+--- Make with length and capacity ---
+len(s2): 3
+cap(s2): 10
+--- Make bytes with zero length, large capacity ---
+len(b1): 0
+cap(b1): 100000
+--- Make bytes with length and capacity ---
+len(b2): 10
+cap(b2): 50
+--- Make with zero capacity ---
+len(s3): 0
+cap(s3): 0
+--- Make with equal length and capacity ---
+len(s4): 7
+cap(s4): 7
+--- Append to slice with extra capacity ---
+Before append - len: 2 cap: 5
+After append - len: 3 cap: 5
+s5[2]: 30
+--- Append to bytes with extra capacity ---
+Before append - len: 1 cap: 10
+After append - len: 2 cap: 10
+b3[0]: 65
+b3[1]: 66
+--- Large capacity slice ---
+len(large): 5
+cap(large): 1000000
+--- Zero length, various capacities ---
+z1 - len: 0 cap: 1
+z2 - len: 0 cap: 100
+z3 - len: 0 cap: 10000
+--- Slice operations on made slices ---
+sub - len: 3 cap: 18
+sub[0]: 20
+sub[2]: 40
+--- String slices with capacity ---
+str - len: 3 cap: 8
+str[1]: world
+--- All tests completed ---

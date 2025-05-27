@@ -31,12 +31,12 @@ export class Counter {
 
 	public Increment(): void {
 		const c = this
-		c!.value++
+		c.value++
 	}
 
 	public GetValue(): number {
 		const c = this
-		return c!.value
+		return c.value
 	}
 
 	public IncrementValue(): void {

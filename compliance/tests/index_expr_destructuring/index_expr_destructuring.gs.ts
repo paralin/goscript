@@ -14,7 +14,7 @@ export function returnIntAndString(): [number, string] {
 export async function main(): Promise<void> {
 	// Create arrays/slices to test index expressions in destructuring
 	let intArray: number[] = [0, 0]
-	let stringSlice: $.Slice<string> = $.makeSlice<string>(2)
+	let stringSlice: $.Slice<string> = $.makeSlice<string>(2, undefined, 'string')
 
 	// This should trigger the "unhandled LHS expression in destructuring: *ast.IndexExpr" error
 	{

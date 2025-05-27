@@ -85,9 +85,81 @@ export const makeSlice = <T>(
   typeHint?: string,
 ): Slice<T> => {
   if (typeHint === 'byte') {
-    // Uint8Array is initialized to zeros by default.
-    // Capacity for Uint8Array is its length.
-    return new Uint8Array(length) as Slice<T>
+    const actualCapacity = capacity === undefined ? length : capacity
+    if (length < 0 || actualCapacity < 0 || length > actualCapacity) {
+      throw new Error(
+        `Invalid slice length (${length}) or capacity (${actualCapacity})`,
+      )
+    }
+
+    // If capacity equals length, use Uint8Array directly for efficiency
+    if (actualCapacity === length) {
+      return new Uint8Array(length) as Slice<T>
+    }
+
+    // If capacity > length, create a SliceProxy backed by a Uint8Array
+    const backingUint8 = new Uint8Array(actualCapacity)
+    const backingNumbers = Array.from(backingUint8) as T[] // Convert to number[] for backing
+
+    const proxyTargetArray = new Array<T>(length)
+    for (let i = 0; i < length; i++) {
+      proxyTargetArray[i] = 0 as T // Initialize with zeros
+    }
+
+    const proxy = proxyTargetArray as SliceProxy<T>
+    proxy.__meta__ = {
+      backing: backingNumbers,
+      offset: 0,
+      length: length,
+      capacity: actualCapacity,
+    }
+
+    // Create a proper Proxy with the handler for SliceProxy behavior
+    const handler = {
+      get(target: any, prop: string | symbol): any {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = Number(prop)
+          if (index >= 0 && index < target.__meta__.length) {
+            return target.__meta__.backing[target.__meta__.offset + index]
+          }
+          throw new Error(
+            `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+          )
+        }
+
+        if (prop === 'length') {
+          return target.__meta__.length
+        }
+
+        if (prop === '__meta__') {
+          return target.__meta__
+        }
+
+        return Reflect.get(target, prop)
+      },
+
+      set(target: any, prop: string | symbol, value: any): boolean {
+        if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+          const index = Number(prop)
+          if (index >= 0 && index < target.__meta__.length) {
+            target.__meta__.backing[target.__meta__.offset + index] = value
+            target[index] = value // Also update the proxy target for consistency
+            return true
+          }
+          throw new Error(
+            `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+          )
+        }
+
+        if (prop === 'length' || prop === '__meta__') {
+          return false
+        }
+
+        return Reflect.set(target, prop, value)
+      },
+    }
+
+    return new Proxy(proxy, handler) as Slice<T>
   }
 
   const actualCapacity = capacity === undefined ? length : capacity
@@ -135,7 +207,52 @@ export const makeSlice = <T>(
     capacity: actualCapacity,
   }
 
-  return proxy
+  // Create a proper Proxy with the handler for SliceProxy behavior
+  const handler = {
+    get(target: any, prop: string | symbol): any {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const index = Number(prop)
+        if (index >= 0 && index < target.__meta__.length) {
+          return target.__meta__.backing[target.__meta__.offset + index]
+        }
+        throw new Error(
+          `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+        )
+      }
+
+      if (prop === 'length') {
+        return target.__meta__.length
+      }
+
+      if (prop === '__meta__') {
+        return target.__meta__
+      }
+
+      return Reflect.get(target, prop)
+    },
+
+    set(target: any, prop: string | symbol, value: any): boolean {
+      if (typeof prop === 'string' && /^\d+$/.test(prop)) {
+        const index = Number(prop)
+        if (index >= 0 && index < target.__meta__.length) {
+          target.__meta__.backing[target.__meta__.offset + index] = value
+          target[index] = value // Also update the proxy target for consistency
+          return true
+        }
+        throw new Error(
+          `Slice index out of range: ${index} >= ${target.__meta__.length}`,
+        )
+      }
+
+      if (prop === 'length' || prop === '__meta__') {
+        return false
+      }
+
+      return Reflect.set(target, prop, value)
+    },
+  }
+
+  return new Proxy(proxy, handler) as Slice<T>
 }
 
 /**
@@ -337,18 +454,22 @@ export const goSlice = <T>( // T can be number for Uint8Array case
   const newLength = high - low
   const newOffset = oldOffset + low
 
-  const target = {
-    __meta__: {
-      backing: backing,
-      offset: newOffset,
-      length: newLength,
-      capacity: newCap,
-    },
+  // Create an array-like target with the correct length
+  const proxyTargetArray = new Array<T>(newLength)
+  // Note: We don't need to initialize the values here since the proxy handler
+  // will fetch them from the backing array when accessed
+
+  const proxy = proxyTargetArray as SliceProxy<T>
+  proxy.__meta__ = {
+    backing: backing,
+    offset: newOffset,
+    length: newLength,
+    capacity: newCap,
   }
 
   // const handler = { ... } // Handler is now defined at the top
 
-  return new Proxy(target, handler) as unknown as SliceProxy<T>
+  return new Proxy(proxy, handler) as unknown as SliceProxy<T>
 }
 
 /**
@@ -530,10 +651,12 @@ export const cap = <T>(obj: Slice<T> | Uint8Array): number => {
  * @param elements The elements to append.
  * @returns The modified or new slice.
  */
-export const append = <T>(
+export function append(slice: Uint8Array, ...elements: any[]): Uint8Array
+export function append<T>(slice: Slice<T>, ...elements: any[]): Slice<T>
+export function append<T>(
   slice: Slice<T> | Uint8Array,
   ...elements: any[]
-): Slice<T> => {
+): Slice<T> {
   // 1. Flatten all elements from the varargs `...elements` into `varargsElements`.
   // Determine if the result should be a Uint8Array.
   const inputIsUint8Array = slice instanceof Uint8Array
@@ -589,7 +712,7 @@ export const append = <T>(
     }
     const newArr = new Uint8Array(combinedBytes.length)
     newArr.set(combinedBytes)
-    return newArr as Slice<T>
+    return newArr as any
   }
 
   // Handle generic Slice<T> (non-Uint8Array result).
@@ -598,7 +721,7 @@ export const append = <T>(
   const numAdded = elements.length
 
   if (numAdded === 0) {
-    return slice
+    return slice as any
   }
 
   let originalElements: T[] = []
@@ -639,7 +762,7 @@ export const append = <T>(
       length: newLength,
       capacity: oldCapacity,
     }
-    return resultProxy
+    return resultProxy as any
   }
 
   // Case 2: Reallocation is needed.
@@ -671,7 +794,7 @@ export const append = <T>(
     length: newLength,
     capacity: newCapacity,
   }
-  return resultProxy
+  return resultProxy as any
 }
 
 /**
@@ -918,8 +1041,7 @@ export const sliceString = (
     // Attempt to decode with strict UTF-8 validation
     const result = new TextDecoder('utf-8', { fatal: true }).decode(slicedBytes)
     return result
-  } catch (_e) {
-    //eslint-disable-line @typescript-eslint/no-unused-vars
+  } catch (_e) { //eslint-disable-line @typescript-eslint/no-unused-vars
     // If we get here, the slice would create invalid UTF-8
     // This is a fundamental limitation of JavaScript string handling
     throw new Error(

@@ -1,0 +1,11 @@
+Itoa result: 123
+FormatInt result: 789
+ParseFloat result: 3.14
+FormatFloat result: 2.718
+ParseBool result: true
+FormatBool result: false
+Quote result: "hello world"
+Unquote result: hello world
+Atoi error handled
+ParseFloat error handled
+test finished
