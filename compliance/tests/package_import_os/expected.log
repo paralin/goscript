@@ -1,0 +1,5 @@
+Current working directory: /
+Set environment variable TEST_VAR
+Got environment variable TEST_VAR: test_value
+Environment variable TEST_VAR unset successfully
+Hostname: goscript

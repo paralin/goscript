@@ -170,10 +170,16 @@ func (c *GoToTSCompiler) WriteStmtBranch(stmt *ast.BranchStmt) error {
 		c.tsw.WriteLine("break") // No semicolon needed
 	case token.CONTINUE:
 		c.tsw.WriteLine("continue") // No semicolon needed
+	case token.GOTO:
+		// TypeScript doesn't support goto, but we can handle it by skipping it
+		// since the labeled statement restructuring should handle the control flow
+		c.tsw.WriteCommentLinef("goto %s // goto statement skipped", stmt.Label.Name)
+	case token.FALLTHROUGH:
+		// Fallthrough is handled in switch statements, should not appear elsewhere
+		c.tsw.WriteCommentLinef("fallthrough // fallthrough statement skipped")
 	default:
 		// This case should ideally not be reached if the Go parser is correct,
 		// as ast.BranchStmt only covers break, continue, goto, fallthrough.
-		// 'goto' and 'fallthrough' are handled elsewhere or not supported.
 		c.tsw.WriteCommentLinef("unhandled branch statement token: %s", stmt.Tok.String())
 	}
 	return nil
