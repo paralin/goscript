@@ -63,6 +63,7 @@
     "lint": "npm run lint:go && npm run lint:js",
     "lint:go": "make lint",
     "lint:js": "eslint -c eslint.config.mjs ./",
+    "lint:js:fix": "eslint -c eslint.config.mjs ./ --fix",
     "prepare": "husky",
     "precommit": "lint-staged"
   },

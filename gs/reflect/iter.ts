@@ -1,5 +1,4 @@
-import * as $ from '@goscript/builtin/builtin.js'
-import { Type, Value, canRangeFunc, canRangeFunc2 } from './type.js'
+import { Type, Value } from './type.js'
 import { uintptr } from './types.js'
 import { ValueOf } from './value.js'
 

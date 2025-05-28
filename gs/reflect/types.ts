@@ -20,7 +20,7 @@ export type ReflectValue =
   | bigint
   | string
   | symbol
-  | Function
+  | Function //eslint-disable-line @typescript-eslint/no-unsafe-function-type
   | object
   | unknown[]
   | Map<unknown, unknown>
@@ -118,7 +118,7 @@ export class StructTag {
 export interface Method {
   Name: string
   Type: Type
-  Func: Function
+  Func: Function //eslint-disable-line @typescript-eslint/no-unsafe-function-type
   Index: number
 }
 

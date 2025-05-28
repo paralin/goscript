@@ -24,7 +24,7 @@ export function Swapper(slice: ReflectValue): (i: number, j: number) => void {
   // Fast path for slices of size 0 and 1. Nothing to swap.
   switch (actualArray.length) {
     case 0:
-      return (i: number, j: number): void => {
+      return (_i: number, _j: number): void => {
         throw new Error('reflect: slice index out of range')
       }
     case 1:

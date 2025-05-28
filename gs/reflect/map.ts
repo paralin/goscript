@@ -1,4 +1,3 @@
-import * as $ from '@goscript/builtin/builtin.js'
 import { Type, Kind, Value } from './type.js'
 
 // Simple MapOf implementation using JavaScript Map
@@ -76,7 +75,7 @@ export function MakeMap(typ: Type): Value {
   return new Value(map, typ)
 }
 
-export function MakeMapWithSize(typ: Type, n: number): Value {
+export function MakeMapWithSize(typ: Type, _n: number): Value {
   // JavaScript Map doesn't have initial size, so we ignore n
   return MakeMap(typ)
 }

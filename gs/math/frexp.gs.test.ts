@@ -8,15 +8,12 @@ describe('Frexp', () => {
     let [frac, exp] = Frexp(8)
     expect(frac).toBeCloseTo(0.5, 10)
     expect(exp).toBe(4) // 8 = 0.5 * 2^4
-
     ;[frac, exp] = Frexp(1)
     expect(frac).toBeCloseTo(0.5, 10)
     expect(exp).toBe(1) // 1 = 0.5 * 2^1
-
     ;[frac, exp] = Frexp(2)
     expect(frac).toBeCloseTo(0.5, 10)
     expect(exp).toBe(2) // 2 = 0.5 * 2^2
-
     ;[frac, exp] = Frexp(4)
     expect(frac).toBeCloseTo(0.5, 10)
     expect(exp).toBe(3) // 4 = 0.5 * 2^3
@@ -26,11 +23,9 @@ describe('Frexp', () => {
     let [frac, exp] = Frexp(0.5)
     expect(frac).toBeCloseTo(0.5, 10)
     expect(exp).toBe(0) // 0.5 = 0.5 * 2^0
-
     ;[frac, exp] = Frexp(0.25)
     expect(frac).toBeCloseTo(0.5, 10)
     expect(exp).toBe(-1) // 0.25 = 0.5 * 2^-1
-
     ;[frac, exp] = Frexp(0.125)
     expect(frac).toBeCloseTo(0.5, 10)
     expect(exp).toBe(-2) // 0.125 = 0.5 * 2^-2
@@ -40,11 +35,9 @@ describe('Frexp', () => {
     let [frac, exp] = Frexp(-8)
     expect(frac).toBeCloseTo(-0.5, 10)
     expect(exp).toBe(4) // -8 = -0.5 * 2^4
-
     ;[frac, exp] = Frexp(-1)
     expect(frac).toBeCloseTo(-0.5, 10)
     expect(exp).toBe(1) // -1 = -0.5 * 2^1
-
     ;[frac, exp] = Frexp(-0.5)
     expect(frac).toBeCloseTo(-0.5, 10)
     expect(exp).toBe(0) // -0.5 = -0.5 * 2^0
@@ -54,7 +47,6 @@ describe('Frexp', () => {
     let [frac, exp] = Frexp(0)
     expect(frac).toBe(0)
     expect(exp).toBe(0)
-
     ;[frac, exp] = Frexp(-0)
     expect(frac).toBe(-0)
     expect(exp).toBe(0)
@@ -65,7 +57,6 @@ describe('Frexp', () => {
     let [frac, exp] = Frexp(Inf(1))
     expect(frac).toBe(Inf(1))
     expect(exp).toBe(0)
-
     ;[frac, exp] = Frexp(Inf(-1))
     expect(frac).toBe(Inf(-1))
     expect(exp).toBe(0)

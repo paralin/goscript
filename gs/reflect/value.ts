@@ -8,7 +8,6 @@ import {
   Int32,
   Int64,
   Int8,
-  Kind,
   Map,
   PointerTo,
   Ptr,
@@ -26,32 +25,11 @@ import {
   BasicType,
   Invalid,
 } from './type.js'
-import {
-  ReflectValue,
-  SelectCase,
-  SelectSend,
-  SelectRecv,
-  SelectDefault,
-} from './types.js'
+import { ReflectValue, SelectCase, SelectRecv, SelectDefault } from './types.js'
 import * as $ from '@goscript/builtin/builtin.js'
 
 // Re-export ValueOf from type.ts for compatibility
 export { ValueOf } from './type'
-
-// valueInterface is used by deepequal - just return the underlying value
-export function valueInterface(v: Value, safe?: boolean): any {
-  return (v as any).value
-}
-
-// methodReceiver is used by makefunc - placeholder implementation
-export function methodReceiver(
-  op: string,
-  v: Value,
-  methodIndex: number,
-): Value {
-  // Placeholder implementation
-  return v
-}
 
 // Zero returns a Value representing the zero value for the specified type.
 export function Zero(typ: Type): Value {
@@ -150,7 +128,6 @@ export function Indirect(v: Value): Value {
 
 // New returns a Value representing a pointer to a new zero value for the specified type.
 export function New(typ: Type): Value {
-  const zero = Zero(typ)
   const ptrType = PointerTo(typ)
   // For the pointer value, we'll use the zero value but with pointer type
   // In a real implementation, this would be a pointer to the zero value
@@ -158,7 +135,7 @@ export function New(typ: Type): Value {
 }
 
 // MakeSlice returns a Value representing a new slice with the specified type, length, and capacity.
-export function MakeSlice(typ: Type, len: number, cap: number): Value {
+export function MakeSlice(typ: Type, len: number, _cap: number): Value {
   if (typ.Kind().valueOf() !== Slice.valueOf()) {
     throw new Error('reflect.MakeSlice of non-slice type')
   }

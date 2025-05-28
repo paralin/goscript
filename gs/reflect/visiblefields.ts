@@ -130,7 +130,6 @@ class visibleFieldsWalker {
       let f = t!.Field!(i).clone()
       f.Index = $.append(null, w.index) as number[]
       if (f.Anonymous) {
-        let t = f.Type
         if (f.Type!.Kind().valueOf() == 22) {
           const elemType = f.Type!.Elem!()
           if (elemType) {

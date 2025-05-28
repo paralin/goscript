@@ -1,5 +1,3 @@
-import * as $ from '@goscript/builtin/builtin.js'
-
 // DeepEqual reports whether x and y are "deeply equal," defined as follows.
 // Two values of identical type are deeply equal if one of the following cases applies.
 // Values of distinct types are never deeply equal.

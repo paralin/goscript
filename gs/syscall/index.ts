@@ -135,19 +135,19 @@ export interface RawConn {
 
 // Stub implementation of RawConn that always returns ErrUnimplemented
 export class StubRawConn implements RawConn {
-  Control(f: (fd: uintptr) => void): $.GoError {
+  Control(_f: (fd: uintptr) => void): $.GoError {
     return {
       Error: () => 'operation not implemented in JavaScript environment',
     }
   }
 
-  Read(f: (fd: uintptr) => boolean): $.GoError {
+  Read(_f: (fd: uintptr) => boolean): $.GoError {
     return {
       Error: () => 'operation not implemented in JavaScript environment',
     }
   }
 
-  Write(f: (fd: uintptr) => boolean): $.GoError {
+  Write(_f: (fd: uintptr) => boolean): $.GoError {
     return {
       Error: () => 'operation not implemented in JavaScript environment',
     }
@@ -193,14 +193,14 @@ export const ESRCH: Errno = {
 
 // Additional missing syscall functions
 export function Open(
-  path: string,
-  flag: number,
-  perm: number,
+  _path: string,
+  _flag: number,
+  _perm: number,
 ): [number, $.GoError] {
   return [-1, ENOSYS]
 }
 
-export function Sysctl(name: string): [string, $.GoError] {
+export function Sysctl(_name: string): [string, $.GoError] {
   return ['', ENOSYS]
 }
 

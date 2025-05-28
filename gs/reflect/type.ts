@@ -1,4 +1,3 @@
-import * as $ from '@goscript/builtin/builtin.js'
 import { ReflectValue, ChanDir } from './types.js'
 
 // rtype is the common implementation of most values
@@ -346,7 +345,7 @@ export class Value {
     return this._type.NumField()
   }
 
-  public Field(i: number): Value {
+  public Field(_i: number): Value {
     // Simplified implementation for struct field access
     return new Value(null, this._type)
   }
@@ -389,7 +388,7 @@ export class Value {
     return null
   }
 
-  public MapIndex(key: Value): Value {
+  public MapIndex(_key: Value): Value {
     // Placeholder for map access
     return new Value(null, new BasicType(Invalid, 'invalid'))
   }
@@ -460,7 +459,7 @@ export class BasicType implements Type {
     return ''
   }
 
-  public Field?(i: number): any {
+  public Field?(_i: number): any {
     return null
   }
 
@@ -533,7 +532,7 @@ class ArrayType implements Type {
     return ''
   }
 
-  public Field?(i: number): any {
+  public Field?(_i: number): any {
     return null
   }
 
@@ -570,7 +569,7 @@ class PointerType implements Type {
     return ''
   }
 
-  public Field?(i: number): any {
+  public Field?(_i: number): any {
     return null
   }
 
@@ -607,7 +606,7 @@ class FunctionType implements Type {
     return ''
   }
 
-  public Field?(i: number): any {
+  public Field?(_i: number): any {
     return null
   }
 
@@ -651,7 +650,7 @@ class MapType implements Type {
     return ''
   }
 
-  public Field?(i: number): any {
+  public Field?(_i: number): any {
     return null
   }
 
@@ -692,7 +691,7 @@ class StructType implements Type {
     return ''
   }
 
-  public Field?(i: number): any {
+  public Field?(_i: number): any {
     // Stub implementation
     return null
   }
@@ -743,7 +742,7 @@ class ChannelType implements Type {
     return ''
   }
 
-  public Field?(i: number): any {
+  public Field?(_: number): any {
     return null
   }
 
@@ -1004,7 +1003,7 @@ export function canRangeFunc2(t: Type): boolean {
   return kind === 21 // map
 }
 
-export function funcLayout(t: Type, rcvr: Type | null): any {
+export function funcLayout(_t: Type, _rcvr: Type | null): any {
   return {
     Type: null,
     InCount: 0,

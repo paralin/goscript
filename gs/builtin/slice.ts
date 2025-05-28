@@ -1041,8 +1041,8 @@ export const sliceString = (
     // Attempt to decode with strict UTF-8 validation
     const result = new TextDecoder('utf-8', { fatal: true }).decode(slicedBytes)
     return result
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
   } catch (_e) {
-    //eslint-disable-line @typescript-eslint/no-unused-vars
     // If we get here, the slice would create invalid UTF-8
     // This is a fundamental limitation of JavaScript string handling
     throw new Error(
