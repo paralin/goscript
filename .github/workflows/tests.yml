@@ -42,13 +42,14 @@ jobs:
       - name: Test Go
         run: go test -timeout=10m -v ./...
 
-      # WIP not passing yet
-      - name: Test Js
-        run: yarn test:js || true
+      - name: Typecheck Js
+        run: yarn typecheck
 
-      # WIP not passing yet
+      - name: Test Js
+        run: yarn test:js
+
       - name: Lint Js
-        run: yarn lint:js || true
+        run: yarn lint:js
         
       - name: Check for git-dirty files in compliance directory
         run: |
