@@ -1,5 +1,5 @@
 import * as $ from '@goscript/builtin/builtin.js'
-import { Type } from './type.js'
+import { Type, Ptr, Struct } from './type.js'
 import { StructField } from './types.js'
 
 // VisibleFields returns all the visible fields in t, which must be a
@@ -127,20 +127,24 @@ class visibleFieldsWalker {
     }
     $.mapSet(w.visiting, t, true)
     for (let i = 0; i < t!.NumField!(); i++) {
-      let f = t!.Field!(i).clone()
-      f.Index = $.append(null, w.index) as number[]
-      if (f.Anonymous) {
-        if (f.Type!.Kind().valueOf() == 22) {
-          const elemType = f.Type!.Elem!()
-          if (elemType) {
-            f.Type = elemType
+      if (!t!.Field) continue;
+      const field = t!.Field(i)
+      if (field) {
+        const f = field.clone()
+        f.Index = $.append(null, w.index) as number[]
+        if (f.Anonymous) {
+          if (f.Type && f.Type.Kind().valueOf() === Ptr.valueOf()) {
+            const elemType = f.Type.Elem!()
+            if (elemType) {
+              f.Type = elemType
+            }
           }
+          if (f.Type && f.Type.Kind().valueOf() === Struct.valueOf()) {
+            w.walk(f.Type)
+          }
+        } else {
+          w.fields = $.append(w.fields, f)
         }
-        if (f.Type!.Kind().valueOf() == 25) {
-          w.walk(f.Type)
-        }
-      } else {
-        w.fields = $.append(w.fields, f)
       }
     }
     $.deleteMapEntry(w.visiting, t)

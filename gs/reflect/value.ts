@@ -28,6 +28,11 @@ import {
 import { ReflectValue, SelectCase, SelectRecv, SelectDefault } from './types.js'
 import * as $ from '@goscript/builtin/builtin.js'
 
+interface ChannelObject {
+  _sendQueue?: unknown[];
+  send?: (value: unknown) => void;
+}
+
 // Re-export ValueOf from type.ts for compatibility
 export { ValueOf } from './type'
 
@@ -218,7 +223,7 @@ export function Select(cases: $.Slice<SelectCase>): [number, Value, boolean] {
     const selectCase = selectCases[i]
     if (selectCase.Dir.valueOf() === SelectRecv.valueOf() && selectCase.Chan) {
       const channelValue = selectCase.Chan
-      const channelObj = (channelValue as unknown as { value: any }).value
+      const channelObj = (channelValue as unknown as { value: unknown }).value as ChannelObject
 
       // Check if there are queued values to receive
       if (
@@ -226,7 +231,7 @@ export function Select(cases: $.Slice<SelectCase>): [number, Value, boolean] {
         channelObj._sendQueue &&
         channelObj._sendQueue.length > 0
       ) {
-        const receivedValue = channelObj._sendQueue.shift() // Remove from queue
+        const receivedValue = channelObj._sendQueue.shift() as ReflectValue // Remove from queue
         const elemType = channelValue.Type().Elem()
         if (elemType) {
           const recvVal = new Value(receivedValue, elemType)

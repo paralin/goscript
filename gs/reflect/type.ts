@@ -1,4 +1,5 @@
-import { ReflectValue, ChanDir } from './types.js'
+import { ReflectValue, ChanDir, StructField } from './types.js'
+import { MapIter } from './map.js'
 
 // rtype is the common implementation of most values
 export class rtype {
@@ -181,7 +182,7 @@ export interface Type {
   PkgPath?(): string
 
   // Field returns a struct type's i'th field.
-  Field?(i: number): any
+  Field?(i: number): StructField | null
 
   // common returns the common type implementation.
   common?(): rtype
@@ -351,15 +352,15 @@ export class Value {
   }
 
   // Additional methods needed by various parts of the codebase
-  public UnsafePointer(): any {
+  public UnsafePointer(): unknown {
     return this._value
   }
 
-  public pointer(): any {
+  public pointer(): unknown {
     return this._value
   }
 
-  public get ptr(): any {
+  public get ptr(): unknown {
     return this._value
   }
 
@@ -383,7 +384,7 @@ export class Value {
     return 0
   }
 
-  public MapRange(): any {
+  public MapRange(): MapIter<unknown, unknown> | null {
     // Placeholder for map iteration
     return null
   }
@@ -393,9 +394,9 @@ export class Value {
     return new Value(null, new BasicType(Invalid, 'invalid'))
   }
 
-  public Complex(): any {
+  public Complex(): number | { real: number; imag: number } | null {
     // Placeholder for complex number support
-    return this._value
+    return this._value as number | { real: number; imag: number } | null
   }
 
   // Send sends a value to a channel
@@ -459,7 +460,7 @@ export class BasicType implements Type {
     return ''
   }
 
-  public Field?(_i: number): any {
+  public Field?(_i: number): StructField | null {
     return null
   }
 
@@ -532,7 +533,7 @@ class ArrayType implements Type {
     return ''
   }
 
-  public Field?(_i: number): any {
+  public Field?(_i: number): StructField | null {
     return null
   }
 
@@ -569,7 +570,7 @@ class PointerType implements Type {
     return ''
   }
 
-  public Field?(_i: number): any {
+  public Field?(_i: number): StructField | null {
     return null
   }
 
@@ -606,7 +607,7 @@ class FunctionType implements Type {
     return ''
   }
 
-  public Field?(_i: number): any {
+  public Field?(_i: number): StructField | null {
     return null
   }
 
@@ -650,7 +651,7 @@ class MapType implements Type {
     return ''
   }
 
-  public Field?(_i: number): any {
+  public Field?(_i: number): StructField | null {
     return null
   }
 
@@ -780,7 +781,7 @@ function getTypeOf(value: ReflectValue): Type {
       if (funcWithMeta.__typeInfo) {
         const typeInfo = funcWithMeta.__typeInfo
         if (
-          typeInfo.kind === 'function' &&
+          (typeInfo.kind === 'function' || typeInfo.kind === 'Function') &&
           typeInfo.params &&
           typeInfo.results
         ) {
@@ -1003,7 +1004,7 @@ export function canRangeFunc2(t: Type): boolean {
   return kind === 21 // map
 }
 
-export function funcLayout(_t: Type, _rcvr: Type | null): any {
+export function funcLayout(_t: Type, _rcvr: Type | null): { Type: Type | null; InCount: number; OutCount: number } {
   return {
     Type: null,
     InCount: 0,
