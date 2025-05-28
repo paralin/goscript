@@ -1,8 +1,7 @@
 import * as $ from "@goscript/builtin/builtin.js";
-import { Type, Value, uintptr } from "./reflect.gs.js";
-import { MakeFunc } from "./makefunc.gs.js";
-import { canRangeFunc, canRangeFunc2 } from "./type.gs.js";
-import { ValueOf } from "./value.gs.js";
+import { Type, Value, canRangeFunc, canRangeFunc2 } from "./type.js";
+import { uintptr } from "./types.js";
+import { ValueOf } from "./value.js";
 
 import * as iter from "@goscript/iter/index.js"
 

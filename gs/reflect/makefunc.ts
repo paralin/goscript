@@ -1,10 +1,10 @@
+import { Type, Value, uintptr, bitVector, funcType, rtype, flag } from "./reflect.js";
+import { methodReceiver } from "./value.js";
+
 import * as $ from "@goscript/builtin/builtin.js";
-import { Type, Value, uintptr, bitVector, funcType, rtype, flag } from "./reflect.gs.js";
-import { methodReceiver } from "./value.gs.js";
+import { funcLayout } from "./type.js";
 import * as abi from "@goscript/internal/abi/index.js";
 import * as unsafe from "@goscript/unsafe/index.js"
-
-import { funcLayout } from "./type.gs.js";
 
 class makeFuncImpl {
 	public get ftyp(): { Type?: any; InCount?: number; OutCount?: number } | null {

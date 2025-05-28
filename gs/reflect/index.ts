@@ -1,10 +1,9 @@
 // Export the main reflect functions organized like Go stdlib
-export { TypeOf, ValueOf, Value, Kind, ArrayOf, SliceOf, PointerTo, PtrTo } from "./type";
+export { TypeOf, ValueOf, Value, Kind, ArrayOf, SliceOf, PointerTo, PtrTo, MapOf } from "./type";
 export type { Type } from "./type";
 export { DeepEqual } from "./deepequal";
 export { Zero, Copy, Indirect, New, MakeSlice, MakeMap, Append } from "./value";
 export { Swapper } from "./swapper";
-export { MapOf } from "./map_swiss.gs";
 
 // Export new types and constants
 export { 

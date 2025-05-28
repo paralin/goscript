@@ -1,5 +1,19 @@
-import { Type, Value, Kind, Bool, Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr, Float32, Float64, String, Slice, Array, PointerTo, Ptr, MapOf, SliceOf, Map } from "./type";
-import { ReflectValue } from "./types";
+import { Array, Bool, Float32, Float64, Int, Int16, Int32, Int64, Int8, Kind, Map, PointerTo, Ptr, Slice, String, Type, Uint, Uint16, Uint32, Uint64, Uint8, Uintptr, Value } from "./type.js";
+import { ReflectValue } from "./types.js";
+
+// Re-export ValueOf from type.ts for compatibility
+export { ValueOf } from "./type";
+
+// valueInterface is used by deepequal - just return the underlying value
+export function valueInterface(v: Value, safe?: boolean): any {
+    return (v as any).value;
+}
+
+// methodReceiver is used by makefunc - placeholder implementation
+export function methodReceiver(op: string, v: Value, methodIndex: number): Value {
+    // Placeholder implementation
+    return v;
+}
 
 // Zero returns a Value representing the zero value for the specified type.
 export function Zero(typ: Type): Value {
@@ -59,7 +73,7 @@ export function Copy(dst: Value, src: Value): number {
 
 // Helper function to extract the underlying array from a Value
 function getArrayFromValue(value: Value): unknown[] | null {
-    const val = (value as unknown as { _value: ReflectValue })._value;
+    const val = (value as unknown as { value: ReflectValue }).value;
     
     // Check for GoScript slice objects created by $.arrayToSlice
     if (val && typeof val === 'object' && '__meta__' in val) {
@@ -85,7 +99,7 @@ export function Indirect(v: Value): Value {
         const elemType = type.Elem();
         if (elemType) {
             // Return a new Value with the same underlying value but the element type
-            return new Value((v as unknown as { _value: ReflectValue })._value, elemType);
+            return new Value((v as unknown as { value: ReflectValue }).value, elemType);
         }
     }
     // For non-pointer types, just return the value as-is
@@ -114,7 +128,7 @@ export function MakeSlice(typ: Type, len: number, cap: number): Value {
     }
     
     const zeroValue = Zero(elemType);
-    const zeroVal = (zeroValue as unknown as { _value: ReflectValue })._value;
+    const zeroVal = (zeroValue as unknown as { value: ReflectValue }).value;
     const array = new globalThis.Array(len).fill(zeroVal);
     
     return new Value(array, typ);
@@ -141,21 +155,8 @@ export function Append(s: Value, x: Value): Value {
         throw new Error("cannot get array from slice value");
     }
     
-    const newValue = (x as unknown as { _value: ReflectValue })._value;
+    const newValue = (x as unknown as { value: ReflectValue }).value;
     const newArray = [...array, newValue];
     
     return new Value(newArray, s.Type());
-}
-
-// ValueError is returned by Value methods when they are called on a Value
-// that cannot perform the operation.
-export class ValueError extends Error {
-    public Kind: Kind;
-    public Method: string;
-
-    constructor(init: { Kind: Kind; Method: string }) {
-        super(`reflect: call of reflect.Value.${init.Method} on ${init.Kind.String()} Value`);
-        this.Kind = init.Kind;
-        this.Method = init.Method;
-    }
 } 

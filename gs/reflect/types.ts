@@ -60,13 +60,30 @@ export const BothDir = new ChanDir(3);
 import { Type, Kind, Value } from "./type.js";
 
 // Struct field representation
-export interface StructField {
-    Name: string;
-    Type: Type;
-    Tag?: StructTag;
-    Offset?: uintptr;
-    Index?: number[];
-    Anonymous?: boolean;
+export class StructField {
+    public Name: string = "";
+    public Type!: Type;
+    public Tag?: StructTag;
+    public Offset?: uintptr;
+    public Index?: number[];
+    public Anonymous?: boolean;
+
+    constructor(init?: Partial<StructField>) {
+        if (init) {
+            Object.assign(this, init);
+        }
+    }
+
+    public clone(): StructField {
+        return new StructField({
+            Name: this.Name,
+            Type: this.Type,
+            Tag: this.Tag,
+            Offset: this.Offset,
+            Index: this.Index ? [...this.Index] : undefined,
+            Anonymous: this.Anonymous
+        });
+    }
 }
 
 // Struct tag type

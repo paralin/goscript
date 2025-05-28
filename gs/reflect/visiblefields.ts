@@ -1,5 +1,6 @@
 import * as $ from "@goscript/builtin/builtin.js";
-import { Type, StructField } from "./reflect.gs.js";
+import { Type } from "./type.js";
+import { StructField } from "./types.js";
 
 // VisibleFields returns all the visible fields in t, which must be a
 // struct type. A field is defined as visible if it's accessible

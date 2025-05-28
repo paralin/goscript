@@ -1,12 +1,3 @@
-import * as $ from "@goscript/builtin/builtin.js";
-
-// import * as abi from "@goscript/internal/abi/index.js"
-
-import * as unsafe from "@goscript/unsafe/index.js"
-
-import * as _ from "@goscript/unsafe/index.js"
-
-// Import types from the main reflect module
 import { Type, Kind } from "./type.js";
 
 // Define missing types that are referenced but not yet implemented

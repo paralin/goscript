@@ -27,11 +27,11 @@ export class IntArgRegBitmap {
 }
 
 // FuncPCABI0 returns the entry PC of the function f for ABI0
-export function FuncPCABI0(f: any): number {
+export function FuncPCABI0(_f: any): number {
     return 0; // Placeholder
 }
 
 // FuncPCABIInternal returns the entry PC of the function f for the internal ABI
-export function FuncPCABIInternal(f: any): number {
+export function FuncPCABIInternal(_f: any): number {
     return 0; // Placeholder
 } 

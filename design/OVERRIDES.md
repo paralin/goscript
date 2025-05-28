@@ -314,10 +314,3 @@ go test -timeout 30s -run ^TestCompliance/package_import_{package}$ ./compiler
 3. **Async Support**: Proper async/await integration for blocking operations
 4. **Maintainability**: Cleaner, more readable generated code
 5. **Extensibility**: Easy to add new packages without modifying core compiler
-
-## Limitations
-
-1. **API Compatibility**: Must maintain exact Go API compatibility
-2. **Behavior Matching**: Must match Go's behavior precisely for tests to pass
-3. **Metadata Maintenance**: Requires keeping metadata in sync with implementation
-4. **Testing Overhead**: Each override package needs comprehensive testing 

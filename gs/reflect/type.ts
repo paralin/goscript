@@ -1,6 +1,75 @@
 import * as $ from "@goscript/builtin/builtin.js";
 import { ReflectValue } from "./types.js";
 
+// rtype is the common implementation of most values
+export class rtype {
+    constructor(public kind: Kind) {}
+    
+    Kind(): Kind {
+        return this.kind;
+    }
+    
+    String(): string {
+        return this.kind.String();
+    }
+
+    Pointers(): boolean {
+        // Return true for pointer-like types
+        const k = this.kind.valueOf();
+        return k === Ptr.valueOf() || k === Map.valueOf() || k === Slice.valueOf() || k === Interface.valueOf();
+    }
+}
+
+// funcType represents a function type
+export class funcType extends rtype {
+    constructor(kind: Kind, public inCount: number = 0, public outCount: number = 0) {
+        super(kind);
+    }
+}
+
+// flag type for internal use
+export class flag {
+    constructor(private _value: number | Kind) {
+        if (typeof _value === 'number') {
+            this._value = _value;
+        } else {
+            this._value = _value.valueOf();
+        }
+    }
+    
+    valueOf(): number {
+        return typeof this._value === 'number' ? this._value : this._value.valueOf();
+    }
+
+    // Support arithmetic operations
+    static from(value: number | Kind): flag {
+        return new flag(value);
+    }
+}
+
+// bitVector class for tracking pointers
+export class bitVector {
+    private bits: number[] = [];
+    
+    Set(index: number): void {
+        const wordIndex = Math.floor(index / 32);
+        const bitIndex = index % 32;
+        while (this.bits.length <= wordIndex) {
+            this.bits.push(0);
+        }
+        this.bits[wordIndex] |= (1 << bitIndex);
+    }
+    
+    Get(index: number): boolean {
+        const wordIndex = Math.floor(index / 32);
+        const bitIndex = index % 32;
+        if (wordIndex >= this.bits.length) {
+            return false;
+        }
+        return (this.bits[wordIndex] & (1 << bitIndex)) !== 0;
+    }
+}
+
 // Kind represents the specific kind of type that a Type represents.
 export class Kind {
     constructor(private _value: number) {}
@@ -76,9 +145,18 @@ export interface Type {
     
     // NumField returns a struct type's field count.
     NumField(): number;
+    
+    // PkgPath returns the package path for named types, empty for unnamed types.
+    PkgPath?(): string;
+    
+    // Field returns a struct type's i'th field.
+    Field?(i: number): any;
+    
+    // common returns the common type implementation.
+    common?(): rtype;
 }
 
-// Value is the reflection interface to a Go value.
+// Value is the reflection interface to a Go value - consolidated from all implementations
 export class Value {
     constructor(private _value: ReflectValue, private _type: Type) {}
 
@@ -86,11 +164,33 @@ export class Value {
         return new Value(this._value, this._type);
     }
 
+    // Methods required by godoc.txt and used throughout the codebase
     public Int(): number {
         if (typeof this._value === 'number' && Number.isInteger(this._value)) {
             return this._value;
         }
         throw new Error("reflect: call of reflect.Value.Int on " + this._type.Kind().String() + " Value");
+    }
+
+    public Uint(): number {
+        if (typeof this._value === 'number' && this._value >= 0) {
+            return this._value;
+        }
+        throw new Error("reflect: call of reflect.Value.Uint on " + this._type.Kind().String() + " Value");
+    }
+
+    public Float(): number {
+        if (typeof this._value === 'number') {
+            return this._value;
+        }
+        throw new Error("reflect: call of reflect.Value.Float on " + this._type.Kind().String() + " Value");
+    }
+
+    public Bool(): boolean {
+        if (typeof this._value === 'boolean') {
+            return this._value;
+        }
+        throw new Error("reflect: call of reflect.Value.Bool on " + this._type.Kind().String() + " Value");
     }
 
     public String(): string {
@@ -113,7 +213,7 @@ export class Value {
             }
         }
         
-        // Check for Uint8Array and other typed arrays
+        // Check for typed arrays
         if (this._value instanceof Uint8Array || 
             this._value instanceof Int8Array ||
             this._value instanceof Uint16Array ||
@@ -145,10 +245,94 @@ export class Value {
     public Type(): Type {
         return this._type;
     }
+
+    public IsValid(): boolean {
+        return this._value !== null && this._value !== undefined;
+    }
+
+    public IsNil(): boolean {
+        return this._value === null || this._value === undefined;
+    }
+
+    public Index(i: number): Value {
+        if (globalThis.Array.isArray(this._value)) {
+            return new Value(this._value[i], getTypeOf(this._value[i]));
+        }
+        throw new Error("reflect: call of reflect.Value.Index on " + this._type.Kind().String() + " Value");
+    }
+
+    public Bytes(): Uint8Array {
+        if (this._value instanceof Uint8Array) {
+            return this._value;
+        }
+        throw new Error("reflect: call of reflect.Value.Bytes on " + this._type.Kind().String() + " Value");
+    }
+
+    public Elem(): Value {
+        // For pointers and interfaces, return the element
+        return new Value(this._value, this._type);
+    }
+
+    public NumField(): number {
+        return this._type.NumField();
+    }
+
+    public Field(i: number): Value {
+        // Simplified implementation for struct field access
+        return new Value(null, this._type);
+    }
+
+    // Additional methods needed by various parts of the codebase
+    public UnsafePointer(): any {
+        return this._value;
+    }
+
+    public pointer(): any {
+        return this._value;
+    }
+
+    public get ptr(): any {
+        return this._value;
+    }
+
+    // Internal method to access the underlying value
+    public get value(): ReflectValue {
+        return this._value;
+    }
+
+    // Convert method needed by iter.ts
+    public Convert(t: Type): Value {
+        // Simple conversion - in a real implementation this would do type conversion
+        return new Value(this._value, t);
+    }
+
+    // Additional methods from deleted reflect.gs.ts
+    public typ(): rtype | null {
+        return new rtype(this._type.Kind());
+    }
+
+    public get flag(): number {
+        return 0;
+    }
+
+    public MapRange(): any {
+        // Placeholder for map iteration
+        return null;
+    }
+
+    public MapIndex(key: Value): Value {
+        // Placeholder for map access
+        return new Value(null, new BasicType(Invalid, "invalid"));
+    }
+
+    public Complex(): any {
+        // Placeholder for complex number support
+        return this._value;
+    }
 }
 
-// Basic type implementation
-class BasicType implements Type {
+// Basic type implementation - exported for compatibility
+export class BasicType implements Type {
     constructor(private _kind: Kind, private _name: string, private _size: number = 8) {}
 
     public String(): string {
@@ -169,6 +353,18 @@ class BasicType implements Type {
 
     public NumField(): number {
         return 0;
+    }
+
+    public PkgPath?(): string {
+        return "";
+    }
+
+    public Field?(i: number): any {
+        return null;
+    }
+
+    public common?(): rtype {
+        return new rtype(this._kind);
     }
 }
 
@@ -194,6 +390,10 @@ class SliceType implements Type {
 
     public NumField(): number {
         return 0;
+    }
+
+    public PkgPath?(): string {
+        return "";
     }
 }
 
@@ -224,6 +424,18 @@ class ArrayType implements Type {
     public Len(): number {
         return this._len;
     }
+
+    public PkgPath?(): string {
+        return "";
+    }
+
+    public Field?(i: number): any {
+        return null;
+    }
+
+    public common?(): rtype {
+        return new rtype(this.Kind());
+    }
 }
 
 // Pointer type implementation
@@ -249,6 +461,18 @@ class PointerType implements Type {
     public NumField(): number {
         return 0;
     }
+
+    public PkgPath?(): string {
+        return "";
+    }
+
+    public Field?(i: number): any {
+        return null;
+    }
+
+    public common?(): rtype {
+        return new rtype(this.Kind());
+    }
 }
 
 // Function type implementation
@@ -273,6 +497,18 @@ class FunctionType implements Type {
 
     public NumField(): number {
         return 0;
+    }
+
+    public PkgPath?(): string {
+        return "";
+    }
+
+    public Field?(i: number): any {
+        return null;
+    }
+
+    public common?(): rtype {
+        return new rtype(this.Kind());
     }
 }
 
@@ -303,6 +539,18 @@ class MapType implements Type {
     public Key(): Type {
         return this._keyType;
     }
+
+    public PkgPath?(): string {
+        return "";
+    }
+
+    public Field?(i: number): any {
+        return null;
+    }
+
+    public common?(): rtype {
+        return new rtype(this.Kind());
+    }
 }
 
 // Struct type implementation
@@ -328,6 +576,18 @@ class StructType implements Type {
 
     public NumField(): number {
         return this._fields.length;
+    }
+
+    public PkgPath?(): string {
+        return "";
+    }
+
+    public Field?(i: number): any {
+        return this._fields[i] || null;
+    }
+
+    public common?(): rtype {
+        return new rtype(this.Kind());
     }
 }
 
@@ -494,6 +754,7 @@ function getTypeOf(value: ReflectValue): Type {
     }
 }
 
+// Exported functions as required by godoc.txt
 export function TypeOf(i: ReflectValue): Type {
     return getTypeOf(i);
 }
@@ -520,4 +781,23 @@ export function PtrTo(t: Type): Type {
 
 export function MapOf(key: Type, elem: Type): Type {
     return new MapType(key, elem);
+}
+
+// Additional functions from merged files
+export function canRangeFunc(t: Type): boolean {
+    const kind = t.Kind().valueOf();
+    return kind === 23 || kind === 17 || kind === 24; // slice, array, string
+}
+
+export function canRangeFunc2(t: Type): boolean {
+    const kind = t.Kind().valueOf();
+    return kind === 21; // map
+}
+
+export function funcLayout(t: Type, rcvr: Type | null): any {
+    return {
+        Type: null,
+        InCount: 0,
+        OutCount: 0
+    };
 } 
