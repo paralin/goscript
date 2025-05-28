@@ -1,9 +1,35 @@
 import { describe, it, expect } from 'vitest'
 import {
-  E, Pi, Phi, Sqrt2, SqrtE, SqrtPi, SqrtPhi, Ln2, Log2E, Ln10, Log10E,
-  MaxFloat32, SmallestNonzeroFloat32, MaxFloat64, SmallestNonzeroFloat64,
-  MaxInt, MinInt, MaxInt8, MinInt8, MaxInt16, MinInt16, MaxInt32, MinInt32,
-  MaxInt64, MinInt64, MaxUint, MaxUint8, MaxUint16, MaxUint32, MaxUint64
+  E,
+  Pi,
+  Phi,
+  Sqrt2,
+  SqrtE,
+  SqrtPi,
+  SqrtPhi,
+  Ln2,
+  Log2E,
+  Ln10,
+  Log10E,
+  MaxFloat32,
+  SmallestNonzeroFloat32,
+  MaxFloat64,
+  SmallestNonzeroFloat64,
+  MaxInt,
+  MinInt,
+  MaxInt8,
+  MinInt8,
+  MaxInt16,
+  MinInt16,
+  MaxInt32,
+  MinInt32,
+  MaxInt64,
+  MinInt64,
+  MaxUint,
+  MaxUint8,
+  MaxUint16,
+  MaxUint32,
+  MaxUint64,
 } from './const.gs.js'
 
 describe('Mathematical Constants', () => {
@@ -25,7 +51,7 @@ describe('Mathematical Constants', () => {
   })
 
   it('should have correct float limits', () => {
-    expect(MaxFloat32).toBe(3.4028234663852886e+38)
+    expect(MaxFloat32).toBe(3.4028234663852886e38)
     expect(SmallestNonzeroFloat32).toBe(1.401298464324817e-45)
     expect(MaxFloat64).toBe(Number.MAX_VALUE)
     expect(SmallestNonzeroFloat64).toBe(Number.MIN_VALUE)
@@ -48,7 +74,7 @@ describe('Mathematical Constants', () => {
     expect(MinInt).toBe(-9223372036854775808n)
     expect(MaxInt64).toBe(9223372036854775807n)
     expect(MinInt64).toBe(-9223372036854775808n)
-    expect(MaxUint).toBe(0xFFFFFFFFFFFFFFFFn)
-    expect(MaxUint64).toBe(0xFFFFFFFFFFFFFFFFn)
+    expect(MaxUint).toBe(0xffffffffffffffffn)
+    expect(MaxUint64).toBe(0xffffffffffffffffn)
   })
-}) 
+})

@@ -30,7 +30,9 @@ describe('Erfinv', () => {
   })
 
   it('should be the inverse of Erf', () => {
-    const testValues = [0, 0.1, 0.3, 0.5, 0.7, 0.9, -0.1, -0.3, -0.5, -0.7, -0.9]
+    const testValues = [
+      0, 0.1, 0.3, 0.5, 0.7, 0.9, -0.1, -0.3, -0.5, -0.7, -0.9,
+    ]
     for (const x of testValues) {
       const y = Erfinv(x)
       // Relax precision tolerance for JavaScript floating-point differences
@@ -101,4 +103,4 @@ describe('Erfcinv', () => {
     expect(Erfcinv(0.0001)).toBeGreaterThan(2.5)
     expect(Erfcinv(1.9999)).toBeLessThan(-2.5)
   })
-}) 
+})

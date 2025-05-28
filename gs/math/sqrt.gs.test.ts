@@ -46,4 +46,4 @@ describe('sqrt', () => {
     expect(sqrt(9)).toBe(Sqrt(9))
     expect(Number.isNaN(sqrt(-1))).toBe(Number.isNaN(Sqrt(-1)))
   })
-}) 
+})

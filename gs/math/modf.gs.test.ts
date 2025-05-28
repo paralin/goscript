@@ -18,7 +18,7 @@ describe('Modf', () => {
     const [int, frac] = Modf(0)
     expect(int).toBe(0)
     expect(frac).toBe(0)
-    
+
     const [intNeg, fracNeg] = Modf(-0)
     expect(Object.is(intNeg, -0)).toBe(true)
     expect(fracNeg === 0 || Object.is(fracNeg, -0)).toBe(true)
@@ -28,7 +28,7 @@ describe('Modf', () => {
     const [int, frac] = Modf(5)
     expect(int).toBe(5)
     expect(frac).toBe(0)
-    
+
     const [intNeg, fracNeg] = Modf(-5)
     expect(intNeg).toBe(-5)
     expect(fracNeg === 0 || Object.is(fracNeg, -0)).toBe(true)
@@ -38,11 +38,11 @@ describe('Modf', () => {
     const [intPosInf, fracPosInf] = Modf(Number.POSITIVE_INFINITY)
     expect(intPosInf).toBe(Number.POSITIVE_INFINITY)
     expect(Number.isNaN(fracPosInf)).toBe(true)
-    
+
     const [intNegInf, fracNegInf] = Modf(Number.NEGATIVE_INFINITY)
     expect(intNegInf).toBe(Number.NEGATIVE_INFINITY)
     expect(Number.isNaN(fracNegInf)).toBe(true)
-    
+
     const [intNaN, fracNaN] = Modf(Number.NaN)
     expect(Number.isNaN(intNaN)).toBe(true)
     expect(Number.isNaN(fracNaN)).toBe(true)
@@ -52,7 +52,7 @@ describe('Modf', () => {
     const [int1, frac1] = Modf(2.5)
     expect(Math.sign(int1)).toBe(1)
     expect(Math.sign(frac1)).toBe(1)
-    
+
     const [int2, frac2] = Modf(-2.5)
     expect(Math.sign(int2)).toBe(-1)
     expect(Math.sign(frac2)).toBe(-1)
@@ -71,10 +71,10 @@ describe('modf', () => {
     const [int2, frac2] = Modf(3.14)
     expect(int1).toBe(int2)
     expect(frac1).toBe(frac2)
-    
+
     const [int3, frac3] = modf(-3.14)
     const [int4, frac4] = Modf(-3.14)
     expect(int3).toBe(int4)
     expect(frac3).toBe(frac4)
   })
-}) 
+})

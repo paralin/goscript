@@ -64,7 +64,7 @@ describe('Jn', () => {
     const x = 5
     const n = 2
     const left = Jn(n - 1, x) + Jn(n + 1, x)
-    const right = (2 * n / x) * Jn(n, x)
+    const right = ((2 * n) / x) * Jn(n, x)
     expect(left).toBeCloseTo(right, 14)
   })
 })
@@ -105,7 +105,9 @@ describe('Yn', () => {
   it('should handle special values', () => {
     // Check if NaN handling works properly - may return very large negative values
     const yn0 = Yn(1, 0)
-    expect(yn0 < -1e10 || yn0 === Number.NEGATIVE_INFINITY || Number.isNaN(yn0)).toBe(true)
+    expect(
+      yn0 < -1e10 || yn0 === Number.NEGATIVE_INFINITY || Number.isNaN(yn0),
+    ).toBe(true)
     expect(Number.isNaN(Yn(1, -1))).toBe(true)
     const nanResult = Yn(Number.NaN, 1)
     expect(Number.isNaN(nanResult) || Number.isFinite(nanResult)).toBe(true)
@@ -117,7 +119,9 @@ describe('Yn', () => {
   it('should be undefined for x <= 0', () => {
     // Check if NaN handling works properly - may return very large negative values
     const yn0 = Yn(1, 0)
-    expect(yn0 < -1e10 || yn0 === Number.NEGATIVE_INFINITY || Number.isNaN(yn0)).toBe(true)
+    expect(
+      yn0 < -1e10 || yn0 === Number.NEGATIVE_INFINITY || Number.isNaN(yn0),
+    ).toBe(true)
     expect(Number.isNaN(Yn(1, -1))).toBe(true)
     expect(Number.isNaN(Yn(2, -5))).toBe(true)
   })
@@ -127,7 +131,7 @@ describe('Yn', () => {
     const x = 5
     const n = 2
     const left = Yn(n - 1, x) + Yn(n + 1, x)
-    const right = (2 * n / x) * Yn(n, x)
+    const right = ((2 * n) / x) * Yn(n, x)
     expect(left).toBeCloseTo(right, 14)
   })
-}) 
+})

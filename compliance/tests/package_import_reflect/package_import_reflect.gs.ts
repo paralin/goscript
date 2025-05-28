@@ -243,30 +243,54 @@ export async function main(): Promise<void> {
 
 	// Test MakeChan
 	let newChan = reflect.MakeChan(chanType, 0).clone()
-
-	// Test function types (when FuncOf implemented)
-	// funcType := reflect.FuncOf([]reflect.Type{reflect.TypeOf(0)}, []reflect.Type{reflect.TypeOf("")}, false)
-	// println("FuncOf type:", funcType.String())
-
-	// Test struct construction (when StructOf implemented)
-	// fields := []reflect.StructField{
-	//     {Name: "X", Type: reflect.TypeOf(0)},
-	//     {Name: "Y", Type: reflect.TypeOf("")},
-	// }
-	// structType := reflect.StructOf(fields)
-	// println("StructOf type:", structType.String())
 	console.log("MakeChan type:", newChan.Type()!.String())
 
-	// Test function types (when FuncOf implemented)
-	// funcType := reflect.FuncOf([]reflect.Type{reflect.TypeOf(0)}, []reflect.Type{reflect.TypeOf("")}, false)
-	// println("FuncOf type:", funcType.String())
+	// Test different channel directions
+	let sendOnlyChan = reflect.ChanOf(reflect.SendDir, reflect.TypeOf(""))
+	console.log("SendOnly chan type:", sendOnlyChan!.String())
 
-	// Test struct construction (when StructOf implemented)
-	// fields := []reflect.StructField{
-	//     {Name: "X", Type: reflect.TypeOf(0)},
-	//     {Name: "Y", Type: reflect.TypeOf("")},
-	// }
-	// structType := reflect.StructOf(fields)
-	// println("StructOf type:", structType.String())
+	let recvOnlyChan = reflect.ChanOf(reflect.RecvDir, reflect.TypeOf(true))
+	console.log("RecvOnly chan type:", recvOnlyChan!.String())
+
+	// Test channels with different element types
+	let stringChanType = reflect.ChanOf(reflect.BothDir, reflect.TypeOf(""))
+	let stringChan = reflect.MakeChan(stringChanType, 5).clone()
+	console.log("String chan type:", stringChan.Type()!.String())
+	console.log("String chan elem type:", stringChan.Type()!.Elem()!.String())
+
+	// Test buffered vs unbuffered channels
+	let unbufferedChan = reflect.MakeChan(chanType, 0).clone()
+	let bufferedChan = reflect.MakeChan(chanType, 10).clone()
+	console.log("Unbuffered chan type:", unbufferedChan.Type()!.String())
+	console.log("Buffered chan type:", bufferedChan.Type()!.String())
+
+	// Test channel reflection properties
+	console.log("Chan elem type:", chanType!.Elem()!.String())
+	console.log("Chan elem kind:", chanType!.Elem()!.Kind()!.String())
+	console.log("Chan size:", chanType!.Size())
+
+	// Test Select functionality
+	let intChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0)), 1).clone()
+	let strChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf("")), 1).clone()
+
+	// Send values to only the string channel to make select deterministic
+	strChan.Send(reflect.ValueOf("hello"))
+
+	let cases = $.arrayToSlice<reflect.SelectCase>([{Chan: intChan, Dir: reflect.SelectRecv}, {Chan: strChan, Dir: reflect.SelectRecv}, {Dir: reflect.SelectDefault}])
+	let [chosen, recv, recvOK] = reflect.Select(cases)
+	console.log("Select chosen:", chosen, "recvOK:", recvOK)
+
+	// Print the actual received value
+	if (recv.IsValid()) {
+		console.log("Select recv type:", recv.Type()!.String())
+		// Print the actual received value
+		if (chosen == 0) {
+			console.log("Select recv value:", recv.Int())
+		} else if (chosen == 1) {
+			console.log("Select recv value:", recv.String())
+		}
+	} else {
+		console.log("Select recv type: invalid")
+	}
 }
 

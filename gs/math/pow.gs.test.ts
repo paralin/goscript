@@ -37,7 +37,7 @@ describe('Pow', () => {
     expect(Pow(2, Number.NEGATIVE_INFINITY)).toBe(0)
     expect(Pow(0.5, Number.POSITIVE_INFINITY)).toBe(0)
     expect(Pow(0.5, Number.NEGATIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY)
-    
+
     expect(Pow(Number.POSITIVE_INFINITY, 1)).toBe(Number.POSITIVE_INFINITY)
     expect(Pow(Number.POSITIVE_INFINITY, -1)).toBe(0)
     expect(Pow(Number.NEGATIVE_INFINITY, 2)).toBe(Number.POSITIVE_INFINITY)
@@ -59,7 +59,7 @@ describe('Pow', () => {
 
   it('should handle fractional exponents', () => {
     expect(Pow(4, 0.5)).toBe(2)
-    expect(Pow(8, 1/3)).toBeCloseTo(2, 15)
+    expect(Pow(8, 1 / 3)).toBeCloseTo(2, 15)
     expect(Pow(16, 0.25)).toBe(2)
   })
 })
@@ -69,7 +69,9 @@ describe('pow', () => {
     expect(pow(2, 3)).toBe(Pow(2, 3))
     expect(pow(0, 1)).toBe(Pow(0, 1))
     expect(pow(-2, 2)).toBe(Pow(-2, 2))
-    expect(pow(Number.POSITIVE_INFINITY, 1)).toBe(Pow(Number.POSITIVE_INFINITY, 1))
+    expect(pow(Number.POSITIVE_INFINITY, 1)).toBe(
+      Pow(Number.POSITIVE_INFINITY, 1),
+    )
   })
 })
 
@@ -100,4 +102,4 @@ describe('isOddInt', () => {
     expect(isOddInt(1 << 53)).toBe(false) // too large
     expect(isOddInt((1 << 53) - 1)).toBe(true) // largest odd integer
   })
-}) 
+})

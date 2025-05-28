@@ -85,4 +85,4 @@ describe('normalize', () => {
     expect(y).toBe(0)
     expect(exp).toBe(-52)
   })
-}) 
+})

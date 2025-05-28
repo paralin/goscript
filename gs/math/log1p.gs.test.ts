@@ -37,7 +37,7 @@ describe('Log1p', () => {
     const x = 1e-15
     const log1pResult = Log1p(x)
     const logResult = Math.log(1 + x)
-    
+
     // For very small x, log1p should be more accurate
     expect(Math.abs(log1pResult - x)).toBeLessThan(Math.abs(logResult - x))
   })
@@ -52,4 +52,4 @@ describe('log1p', () => {
     expect(Number.isNaN(log1p(Number.NaN))).toBe(true)
     expect(Number.isNaN(log1p(-2))).toBe(true)
   })
-}) 
+})

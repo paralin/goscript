@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from '@goscript/builtin/builtin.js'
 
 // DeepEqual reports whether x and y are "deeply equal," defined as follows.
 // Two values of identical type are deeply equal if one of the following cases applies.
@@ -52,95 +52,105 @@ import * as $ from "@goscript/builtin/builtin.js";
 // equal rather than examining the values to which they point.
 // This ensures that DeepEqual terminates.
 export function DeepEqual(x: null | any, y: null | any): boolean {
-	// Handle null/undefined cases
-	if (x === y) {
-		return true;
-	}
+  // Handle null/undefined cases
+  if (x === y) {
+    return true
+  }
 
-	if (x === null || y === null || x === undefined || y === undefined) {
-		return x === y;
-	}
+  if (x === null || y === null || x === undefined || y === undefined) {
+    return x === y
+  }
 
-	// Check for identical references first
-	if (x === y) {
-		return true;
-	}
+  // Check for identical references first
+  if (x === y) {
+    return true
+  }
 
-	// Different types are never equal
-	if (typeof x !== typeof y) {
-		return false;
-	}
+  // Different types are never equal
+  if (typeof x !== typeof y) {
+    return false
+  }
 
-	// Handle arrays (including GoScript slices)
-	if (globalThis.Array.isArray(x) && globalThis.Array.isArray(y)) {
-		if (x.length !== y.length) {
-			return false;
-		}
-		for (let i = 0; i < x.length; i++) {
-			if (!DeepEqual(x[i], y[i])) {
-				return false;
-			}
-		}
-		return true;
-	}
+  // Handle arrays (including GoScript slices)
+  if (globalThis.Array.isArray(x) && globalThis.Array.isArray(y)) {
+    if (x.length !== y.length) {
+      return false
+    }
+    for (let i = 0; i < x.length; i++) {
+      if (!DeepEqual(x[i], y[i])) {
+        return false
+      }
+    }
+    return true
+  }
 
-	// Handle GoScript slice objects with __meta__ structure
-	if (x && y && typeof x === 'object' && typeof y === 'object') {
-		// Check if both are GoScript slices
-		if ('__meta__' in x && '__meta__' in y) {
-			const xMeta = (x as { __meta__?: { backing?: unknown[], length?: number } }).__meta__;
-			const yMeta = (y as { __meta__?: { backing?: unknown[], length?: number } }).__meta__;
-			
-			if (xMeta && yMeta && 'backing' in xMeta && 'backing' in yMeta && 
-				'length' in xMeta && 'length' in yMeta &&
-				globalThis.Array.isArray(xMeta.backing) && globalThis.Array.isArray(yMeta.backing) &&
-				typeof xMeta.length === 'number' && typeof yMeta.length === 'number') {
-				
-				// Compare lengths
-				if (xMeta.length !== yMeta.length) {
-					return false;
-				}
-				
-				// Compare elements
-				for (let i = 0; i < xMeta.length; i++) {
-					if (!DeepEqual(xMeta.backing[i], yMeta.backing[i])) {
-						return false;
-					}
-				}
-				return true;
-			}
-		}
-	}
+  // Handle GoScript slice objects with __meta__ structure
+  if (x && y && typeof x === 'object' && typeof y === 'object') {
+    // Check if both are GoScript slices
+    if ('__meta__' in x && '__meta__' in y) {
+      const xMeta = (
+        x as { __meta__?: { backing?: unknown[]; length?: number } }
+      ).__meta__
+      const yMeta = (
+        y as { __meta__?: { backing?: unknown[]; length?: number } }
+      ).__meta__
 
-	// Handle Maps
-	if (x instanceof globalThis.Map && y instanceof globalThis.Map) {
-		if (x.size !== y.size) {
-			return false;
-		}
-		for (const [key, value] of x) {
-			if (!y.has(key) || !DeepEqual(value, y.get(key))) {
-				return false;
-			}
-		}
-		return true;
-	}
+      if (
+        xMeta &&
+        yMeta &&
+        'backing' in xMeta &&
+        'backing' in yMeta &&
+        'length' in xMeta &&
+        'length' in yMeta &&
+        globalThis.Array.isArray(xMeta.backing) &&
+        globalThis.Array.isArray(yMeta.backing) &&
+        typeof xMeta.length === 'number' &&
+        typeof yMeta.length === 'number'
+      ) {
+        // Compare lengths
+        if (xMeta.length !== yMeta.length) {
+          return false
+        }
 
-	// Handle objects (structs)
-	if (typeof x === 'object' && typeof y === 'object') {
-		const keysX = Object.keys(x);
-		const keysY = Object.keys(y);
-		if (keysX.length !== keysY.length) {
-			return false;
-		}
-		for (const key of keysX) {
-			if (!keysY.includes(key) || !DeepEqual(x[key], y[key])) {
-				return false;
-			}
-		}
-		return true;
-	}
+        // Compare elements
+        for (let i = 0; i < xMeta.length; i++) {
+          if (!DeepEqual(xMeta.backing[i], yMeta.backing[i])) {
+            return false
+          }
+        }
+        return true
+      }
+    }
+  }
 
-	// For primitive values, use direct comparison
-	return x === y;
+  // Handle Maps
+  if (x instanceof globalThis.Map && y instanceof globalThis.Map) {
+    if (x.size !== y.size) {
+      return false
+    }
+    for (const [key, value] of x) {
+      if (!y.has(key) || !DeepEqual(value, y.get(key))) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // Handle objects (structs)
+  if (typeof x === 'object' && typeof y === 'object') {
+    const keysX = Object.keys(x)
+    const keysY = Object.keys(y)
+    if (keysX.length !== keysY.length) {
+      return false
+    }
+    for (const key of keysX) {
+      if (!keysY.includes(key) || !DeepEqual(x[key], y[key])) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // For primitive values, use direct comparison
+  return x === y
 }
-

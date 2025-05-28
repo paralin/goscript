@@ -34,6 +34,8 @@ describe('acosh', () => {
     expect(acosh(1)).toBe(Acosh(1))
     expect(acosh(2)).toBe(Acosh(2))
     expect(acosh(10)).toBe(Acosh(10))
-    expect(acosh(Number.POSITIVE_INFINITY)).toBe(Acosh(Number.POSITIVE_INFINITY))
+    expect(acosh(Number.POSITIVE_INFINITY)).toBe(
+      Acosh(Number.POSITIVE_INFINITY),
+    )
   })
-}) 
+})

@@ -1,80 +1,82 @@
-import * as $ from "@goscript/builtin/builtin.js";
-import { Type, Kind, Value } from "./type.js";
+import * as $ from '@goscript/builtin/builtin.js'
+import { Type, Kind, Value } from './type.js'
 
 // Simple MapOf implementation using JavaScript Map
 export function MapOf(key: Type, elem: Type): Type {
-	return new MapType(key, elem);
+  return new MapType(key, elem)
 }
 
 // Simple map type implementation
 class MapType implements Type {
-	constructor(private _keyType: Type, private _elemType: Type) {}
+  constructor(
+    private _keyType: Type,
+    private _elemType: Type,
+  ) {}
 
-	public String(): string {
-		return `map[${this._keyType.String()}]${this._elemType.String()}`;
-	}
+  public String(): string {
+    return `map[${this._keyType.String()}]${this._elemType.String()}`
+  }
 
-	public Kind(): Kind {
-		return new Kind(21); // Map kind
-	}
+  public Kind(): Kind {
+    return new Kind(21) // Map kind
+  }
 
-	public Size(): number {
-		return 8; // pointer size
-	}
+  public Size(): number {
+    return 8 // pointer size
+  }
 
-	public Elem(): Type | null {
-		return this._elemType;
-	}
+  public Elem(): Type | null {
+    return this._elemType
+  }
 
-	public Key(): Type | null {
-		return this._keyType;
-	}
+  public Key(): Type | null {
+    return this._keyType
+  }
 
-	public NumField(): number {
-		return 0;
-	}
+  public NumField(): number {
+    return 0
+  }
 }
 
 // Simple map iterator using JavaScript Map
 export class MapIter {
-	private iterator: Iterator<[any, any]>;
-	private currentEntry: IteratorResult<[any, any]> | null = null;
-	
-	constructor(private map: Map<any, any>) {
-		this.iterator = map.entries();
-		this.Next();
-	}
+  private iterator: Iterator<[any, any]>
+  private currentEntry: IteratorResult<[any, any]> | null = null
 
-	public Next(): boolean {
-		this.currentEntry = this.iterator.next();
-		return !this.currentEntry.done;
-	}
+  constructor(private map: Map<any, any>) {
+    this.iterator = map.entries()
+    this.Next()
+  }
 
-	public Key(): any {
-		return this.currentEntry?.value?.[0];
-	}
+  public Next(): boolean {
+    this.currentEntry = this.iterator.next()
+    return !this.currentEntry.done
+  }
 
-	public Value(): any {
-		return this.currentEntry?.value?.[1];
-	}
+  public Key(): any {
+    return this.currentEntry?.value?.[0]
+  }
 
-	public Reset(m: any): void {
-		if (m instanceof Map) {
-			this.map = m;
-			this.iterator = m.entries();
-			this.Next();
-		}
-	}
+  public Value(): any {
+    return this.currentEntry?.value?.[1]
+  }
+
+  public Reset(m: any): void {
+    if (m instanceof Map) {
+      this.map = m
+      this.iterator = m.entries()
+      this.Next()
+    }
+  }
 }
 
 // Helper functions for map operations
 export function MakeMap(typ: Type): Value {
-	const map = new Map();
-	return new Value(map, typ);
+  const map = new Map()
+  return new Value(map, typ)
 }
 
 export function MakeMapWithSize(typ: Type, n: number): Value {
-	// JavaScript Map doesn't have initial size, so we ignore n
-	return MakeMap(typ);
+  // JavaScript Map doesn't have initial size, so we ignore n
+  return MakeMap(typ)
 }
-

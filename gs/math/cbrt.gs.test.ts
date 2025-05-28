@@ -54,4 +54,4 @@ describe('cbrt', () => {
     expect(cbrt(Number.POSITIVE_INFINITY)).toBe(Cbrt(Number.POSITIVE_INFINITY))
     expect(cbrt(0.125)).toBe(Cbrt(0.125))
   })
-}) 
+})

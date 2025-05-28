@@ -63,4 +63,4 @@ describe('Gamma', () => {
     const expected = Math.PI / Math.sin(Math.PI * x)
     expect(gamma_x * gamma_1_minus_x).toBeCloseTo(expected, 10)
   })
-}) 
+})

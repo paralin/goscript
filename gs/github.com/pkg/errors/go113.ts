@@ -1,6 +1,6 @@
-import * as $ from "../../../builtin/builtin.js";
+import * as $ from '../../../builtin/builtin.js'
 
-import * as stderrors from "../../../errors/index.js"
+import * as stderrors from '../../../errors/index.js'
 
 // Is reports whether any error in err's chain matches target.
 //
@@ -10,7 +10,7 @@ import * as stderrors from "../../../errors/index.js"
 // An error is considered to match a target if it is equal to that target or if
 // it implements a method Is(error) bool such that Is(target) returns true.
 export function Is(err: $.GoError, target: $.GoError): boolean {
-	return stderrors.Is(err, target)
+  return stderrors.Is(err, target)
 }
 
 // As finds the first error in err's chain that matches target, and if so, sets
@@ -27,13 +27,12 @@ export function Is(err: $.GoError, target: $.GoError): boolean {
 // As will panic if target is not a non-nil pointer to either a type that implements
 // error, or to any interface type. As returns false if err is nil.
 export function As(err: $.GoError, target: null | any): boolean {
-	return stderrors.As(err, target)
+  return stderrors.As(err, target)
 }
 
 // Unwrap returns the result of calling the Unwrap method on err, if err's
 // type contains an Unwrap method returning error.
 // Otherwise, Unwrap returns nil.
 export function Unwrap(err: $.GoError): $.GoError {
-	return stderrors.Unwrap(err)
+  return stderrors.Unwrap(err)
 }
-

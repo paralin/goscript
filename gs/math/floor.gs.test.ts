@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { Floor, floor, Ceil, ceil, Trunc, trunc, Round, RoundToEven } from './floor.gs.js'
+import {
+  Floor,
+  floor,
+  Ceil,
+  ceil,
+  Trunc,
+  trunc,
+  Round,
+  RoundToEven,
+} from './floor.gs.js'
 
 describe('Floor', () => {
   it('should return correct floor values', () => {
@@ -28,7 +37,9 @@ describe('floor', () => {
   it('should work the same as Floor', () => {
     expect(floor(4.8)).toBe(Floor(4.8))
     expect(floor(-4.2)).toBe(Floor(-4.2))
-    expect(floor(Number.POSITIVE_INFINITY)).toBe(Floor(Number.POSITIVE_INFINITY))
+    expect(floor(Number.POSITIVE_INFINITY)).toBe(
+      Floor(Number.POSITIVE_INFINITY),
+    )
   })
 })
 
@@ -90,7 +101,9 @@ describe('trunc', () => {
   it('should work the same as Trunc', () => {
     expect(trunc(4.8)).toBe(Trunc(4.8))
     expect(trunc(-4.2)).toBe(Trunc(-4.2))
-    expect(trunc(Number.POSITIVE_INFINITY)).toBe(Trunc(Number.POSITIVE_INFINITY))
+    expect(trunc(Number.POSITIVE_INFINITY)).toBe(
+      Trunc(Number.POSITIVE_INFINITY),
+    )
   })
 })
 
@@ -143,4 +156,4 @@ describe('RoundToEven', () => {
     expect(RoundToEven(0)).toBe(0)
     expect(RoundToEven(-0)).toBe(-0)
   })
-}) 
+})

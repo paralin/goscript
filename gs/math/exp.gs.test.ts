@@ -79,4 +79,4 @@ describe('expmulti', () => {
     expect(expmulti(0, 0, 1)).toBe(2)
     expect(expmulti(1, 0, 1)).toBeCloseTo(Math.E * 2, 14)
   })
-}) 
+})

@@ -6,15 +6,15 @@ describe('Lgamma', () => {
     const [lgamma1, sign1] = Lgamma(1)
     expect(lgamma1).toBe(0)
     expect(sign1).toBe(1)
-    
+
     const [lgamma2, sign2] = Lgamma(2)
     expect(lgamma2).toBe(0)
     expect(sign2).toBe(1)
-    
+
     const [lgamma3, sign3] = Lgamma(3)
     expect(lgamma3).toBeCloseTo(Math.log(2), 14)
     expect(sign3).toBe(1)
-    
+
     const [lgamma4, sign4] = Lgamma(4)
     expect(lgamma4).toBeCloseTo(Math.log(6), 14)
     expect(sign4).toBe(1)
@@ -25,7 +25,7 @@ describe('Lgamma', () => {
     // Relax tolerance for half-integers due to JavaScript precision limits
     expect(lgamma05).toBeCloseTo(Math.log(Math.sqrt(Math.PI)), 6)
     expect(sign05).toBe(1)
-    
+
     const [lgamma15, sign15] = Lgamma(1.5)
     expect(lgamma15).toBeCloseTo(-0.1207822376352452, 6)
     expect(sign15).toBe(1)
@@ -36,9 +36,9 @@ describe('Lgamma', () => {
     // Relax tolerance for negative values due to JavaScript precision limits
     expect(lgamma_05).toBeCloseTo(1.265512123484645, 5)
     expect(sign_05).toBe(-1)
-    
+
     const [lgamma_15, sign_15] = Lgamma(-1.5)
-    expect(lgamma_15).toBeCloseTo(Math.log(4 * Math.sqrt(Math.PI) / 3), 5)
+    expect(lgamma_15).toBeCloseTo(Math.log((4 * Math.sqrt(Math.PI)) / 3), 5)
     expect(sign_15).toBe(1)
   })
 
@@ -46,11 +46,11 @@ describe('Lgamma', () => {
     const [lgammaInf, signInf] = Lgamma(Number.POSITIVE_INFINITY)
     expect(lgammaInf).toBe(Number.POSITIVE_INFINITY)
     expect(signInf).toBe(1)
-    
+
     const [lgammaNegInf, signNegInf] = Lgamma(Number.NEGATIVE_INFINITY)
     expect(lgammaNegInf).toBe(Number.NEGATIVE_INFINITY)
     expect(signNegInf).toBe(1)
-    
+
     const [lgammaNaN, signNaN] = Lgamma(Number.NaN)
     expect(Number.isNaN(lgammaNaN)).toBe(true)
     // Allow either NaN or finite value for sign as implementations may vary
@@ -62,7 +62,7 @@ describe('Lgamma', () => {
     // Allow either NaN or very large values as implementations may vary
     expect(Number.isNaN(lgamma_1) || Math.abs(lgamma_1) > 1e10).toBe(true)
     expect(Number.isNaN(sign_1) || Number.isFinite(sign_1)).toBe(true)
-    
+
     const [lgamma_2, sign_2] = Lgamma(-2)
     expect(Number.isNaN(lgamma_2) || Math.abs(lgamma_2) > 1e10).toBe(true)
     expect(Number.isNaN(sign_2) || Number.isFinite(sign_2)).toBe(true)
@@ -99,4 +99,4 @@ describe('Lgamma', () => {
     const expected = Math.log(Math.PI / Math.sin(Math.PI * x))
     expect(lgamma_x + lgamma_1_minus_x).toBeCloseTo(expected, 5)
   })
-}) 
+})

@@ -26,4 +26,4 @@ describe('Abs', () => {
     expect(Abs(Number.MIN_VALUE)).toBe(Number.MIN_VALUE)
     expect(Abs(-Number.MIN_VALUE)).toBe(Number.MIN_VALUE)
   })
-}) 
+})

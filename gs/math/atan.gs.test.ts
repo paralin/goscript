@@ -46,4 +46,4 @@ describe('satan', () => {
     expect(satan(1)).toBeCloseTo(Math.atan(1), 15)
     expect(satan(2)).toBeCloseTo(Math.atan(2), 15)
   })
-}) 
+})

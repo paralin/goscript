@@ -44,4 +44,4 @@ describe('atanh', () => {
     expect(atanh(1)).toBe(Atanh(1))
     expect(atanh(-1)).toBe(Atanh(-1))
   })
-}) 
+})

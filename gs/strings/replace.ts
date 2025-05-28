@@ -434,8 +434,6 @@ class trieNode {
       t!.next!.add('', val, priority, r)
     }
   }
-
-
 }
 
 class genericReplacer {
@@ -625,9 +623,7 @@ class genericReplacer {
   }
 }
 
-function makeGenericReplacer(
-  oldnew: $.Slice<string>,
-): genericReplacer | null {
+function makeGenericReplacer(oldnew: $.Slice<string>): genericReplacer | null {
   let r = new genericReplacer()
   // Find each byte used, then assign them each an index.
   for (let i = 0; i < $.len(oldnew); i += 2) {
@@ -789,8 +785,6 @@ class singleStringReplacer {
     n += wn
     return [n, err]
   }
-
-
 }
 
 function makeSingleStringReplacer(
@@ -1065,8 +1059,6 @@ class byteStringReplacer {
     }
     return [n, err]
   }
-
-
 }
 
 // Helper function to copy bytes

@@ -52,7 +52,11 @@ describe('Y0', () => {
     expect(Y0(Number.POSITIVE_INFINITY)).toBe(0)
     // Check if Y0(0) returns a very large negative number or -Infinity
     const y0_zero = Y0(0)
-    expect(y0_zero < -1e10 || y0_zero === Number.NEGATIVE_INFINITY || Number.isNaN(y0_zero)).toBe(true)
+    expect(
+      y0_zero < -1e10 ||
+        y0_zero === Number.NEGATIVE_INFINITY ||
+        Number.isNaN(y0_zero),
+    ).toBe(true)
     expect(Number.isNaN(Y0(-1))).toBe(true)
     expect(Number.isNaN(Y0(Number.NEGATIVE_INFINITY))).toBe(true)
     expect(Number.isNaN(Y0(Number.NaN))).toBe(true)
@@ -71,4 +75,4 @@ describe('Y0', () => {
     expect(Number.isNaN(Y0(-5))).toBe(true)
     expect(Number.isNaN(Y0(-10))).toBe(true)
   })
-}) 
+})

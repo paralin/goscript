@@ -30,4 +30,4 @@ describe('Signbit', () => {
     expect(Signbit(Number.NaN)).toBe(false)
     expect(Signbit(-Number.NaN)).toBe(false) // NaN doesn't have a sign
   })
-}) 
+})

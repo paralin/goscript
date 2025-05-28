@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from '@goscript/builtin/builtin.js'
 
 // Stub implementations for internal/byteorder package
 export function LittleEndian(): boolean {
@@ -19,10 +19,10 @@ export function BEUint64(b: $.Bytes): number {
   // For our stub purposes, this should be sufficient
   let high = BEUint32(b)
   let low = BEUint32($.goSlice(b, 4, undefined))
-  return (high * 0x100000000) + low
+  return high * 0x100000000 + low
 }
 
-// Little Endian byte order functions  
+// Little Endian byte order functions
 export function LEUint16(b: $.Bytes): number {
   return b![0] | (b![1] << 8)
 }
@@ -36,5 +36,5 @@ export function LEUint64(b: $.Bytes): number {
   // For our stub purposes, this should be sufficient
   let low = LEUint32(b)
   let high = LEUint32($.goSlice(b, 4, undefined))
-  return low + (high * 0x100000000)
-} 
+  return low + high * 0x100000000
+}

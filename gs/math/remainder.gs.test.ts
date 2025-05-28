@@ -67,4 +67,4 @@ describe('remainder', () => {
     expect(Number.isNaN(remainder(Number.NaN, 3))).toBe(true)
     expect(Number.isNaN(remainder(5, 0))).toBe(true)
   })
-}) 
+})

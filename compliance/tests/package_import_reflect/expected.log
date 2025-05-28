@@ -54,3 +54,15 @@ Append result len: 3
 ChanOf type: chan int
 ChanOf kind: chan
 MakeChan type: chan int
+SendOnly chan type: chan<- string
+RecvOnly chan type: <-chan bool
+String chan type: chan string
+String chan elem type: string
+Unbuffered chan type: chan int
+Buffered chan type: chan int
+Chan elem type: int
+Chan elem kind: int
+Chan size: 8
+Select chosen: 1 recvOK: true
+Select recv type: string
+Select recv value: hello

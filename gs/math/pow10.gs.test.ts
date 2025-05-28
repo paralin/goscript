@@ -55,4 +55,4 @@ describe('Pow10', () => {
       expect(Pow10(n)).toBeCloseTo(Math.pow(10, n), 15)
     }
   })
-}) 
+})

@@ -63,4 +63,4 @@ describe('acos', () => {
     expect(acos(-1)).toBe(Acos(-1))
     expect(acos(0.5)).toBe(Acos(0.5))
   })
-}) 
+})

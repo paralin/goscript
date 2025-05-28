@@ -77,4 +77,4 @@ describe('log2', () => {
     expect(log2(4)).toBe(Log2(4))
     expect(Number.isNaN(log2(-1))).toBe(Number.isNaN(Log2(-1)))
   })
-}) 
+})

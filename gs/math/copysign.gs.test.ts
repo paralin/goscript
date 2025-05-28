@@ -18,9 +18,13 @@ describe('Copysign', () => {
 
   it('should handle infinity values', () => {
     expect(Copysign(Number.POSITIVE_INFINITY, 1)).toBe(Number.POSITIVE_INFINITY)
-    expect(Copysign(Number.POSITIVE_INFINITY, -1)).toBe(Number.NEGATIVE_INFINITY)
+    expect(Copysign(Number.POSITIVE_INFINITY, -1)).toBe(
+      Number.NEGATIVE_INFINITY,
+    )
     expect(Copysign(Number.NEGATIVE_INFINITY, 1)).toBe(Number.POSITIVE_INFINITY)
-    expect(Copysign(Number.NEGATIVE_INFINITY, -1)).toBe(Number.NEGATIVE_INFINITY)
+    expect(Copysign(Number.NEGATIVE_INFINITY, -1)).toBe(
+      Number.NEGATIVE_INFINITY,
+    )
   })
 
   it('should handle NaN values', () => {
@@ -41,4 +45,4 @@ describe('Copysign', () => {
     expect(Object.is(Copysign(-5, -0), -5)).toBe(true)
     expect(Object.is(Copysign(0, -0), -0)).toBe(true)
   })
-}) 
+})

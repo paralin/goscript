@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from '@goscript/builtin/builtin.js'
 
 // Essential type aliases
 export type uintptr = number
@@ -27,7 +27,7 @@ export const Stderr = 2
 export const SIGINT = 2
 export const SIGTERM = 15
 
-// File mode constants  
+// File mode constants
 export const S_IFMT = 0o170000
 export const S_IFREG = 0o100000
 export const S_IFDIR = 0o040000
@@ -44,9 +44,9 @@ export const S_ISVTX = 0o001000
 export function Getenv(key: string): [string, boolean] {
   if (typeof process !== 'undefined' && process.env) {
     const value = process.env[key]
-    return value !== undefined ? [value, true] : ["", false]
+    return value !== undefined ? [value, true] : ['', false]
   }
-  return ["", false]
+  return ['', false]
 }
 
 export function Setenv(key: string, value: string): $.GoError {
@@ -54,7 +54,7 @@ export function Setenv(key: string, value: string): $.GoError {
     process.env[key] = value
     return null
   }
-  return { Error: () => "setenv not supported" }
+  return { Error: () => 'setenv not supported' }
 }
 
 export function Unsetenv(key: string): $.GoError {
@@ -62,7 +62,7 @@ export function Unsetenv(key: string): $.GoError {
     delete process.env[key]
     return null
   }
-  return { Error: () => "unsetenv not supported" }
+  return { Error: () => 'unsetenv not supported' }
 }
 
 export function Clearenv(): void {
@@ -96,10 +96,10 @@ export class Dirent {
   }
 }
 
-// Stat_t structure stub  
+// Stat_t structure stub
 export class Stat_t {
   public Dev: number = 0
-  public Ino: number = 0  
+  public Ino: number = 0
   public Mode: number = 0
   public Nlink: number = 0
   public Uid: number = 0
@@ -114,13 +114,13 @@ export class Stat_t {
   public AtimeNsec: number = 0
   public MtimeNsec: number = 0
   public CtimeNsec: number = 0
-  
+
   constructor(init?: any) {
     if (init) {
       Object.assign(this, init)
     }
   }
-  
+
   public clone(): Stat_t {
     return new Stat_t(this)
   }
@@ -129,76 +129,84 @@ export class Stat_t {
 // RawConn interface - stub implementation for JavaScript environment
 export interface RawConn {
   Control(f: (fd: uintptr) => void): $.GoError
-  Read(f: (fd: uintptr) => boolean): $.GoError  
+  Read(f: (fd: uintptr) => boolean): $.GoError
   Write(f: (fd: uintptr) => boolean): $.GoError
 }
 
 // Stub implementation of RawConn that always returns ErrUnimplemented
 export class StubRawConn implements RawConn {
   Control(f: (fd: uintptr) => void): $.GoError {
-    return { Error: () => "operation not implemented in JavaScript environment" }
+    return {
+      Error: () => 'operation not implemented in JavaScript environment',
+    }
   }
-  
+
   Read(f: (fd: uintptr) => boolean): $.GoError {
-    return { Error: () => "operation not implemented in JavaScript environment" }
+    return {
+      Error: () => 'operation not implemented in JavaScript environment',
+    }
   }
-  
+
   Write(f: (fd: uintptr) => boolean): $.GoError {
-    return { Error: () => "operation not implemented in JavaScript environment" }
+    return {
+      Error: () => 'operation not implemented in JavaScript environment',
+    }
   }
 }
 
 // Additional error constants - implement as Errno type
 export const ENOSYS: Errno = {
-  Error: () => "function not implemented",
+  Error: () => 'function not implemented',
   Is: (target: $.GoError) => target === ENOSYS,
-  Errno: () => 38
+  Errno: () => 38,
 }
 
 export const EISDIR: Errno = {
-  Error: () => "is a directory", 
+  Error: () => 'is a directory',
   Is: (target: $.GoError) => target === EISDIR,
-  Errno: () => 21
+  Errno: () => 21,
 }
 
 export const ENOTDIR: Errno = {
-  Error: () => "not a directory",
+  Error: () => 'not a directory',
   Is: (target: $.GoError) => target === ENOTDIR,
-  Errno: () => 20
+  Errno: () => 20,
 }
 
 export const ERANGE: Errno = {
-  Error: () => "result too large",
+  Error: () => 'result too large',
   Is: (target: $.GoError) => target === ERANGE,
-  Errno: () => 34
+  Errno: () => 34,
 }
 
 export const ENOMEM: Errno = {
-  Error: () => "out of memory",
+  Error: () => 'out of memory',
   Is: (target: $.GoError) => target === ENOMEM,
-  Errno: () => 12
+  Errno: () => 12,
 }
 
 export const ESRCH: Errno = {
-  Error: () => "no such process",
+  Error: () => 'no such process',
   Is: (target: $.GoError) => target === ESRCH,
-  Errno: () => 3
+  Errno: () => 3,
 }
 
 // Additional missing syscall functions
-export function Open(path: string, flag: number, perm: number): [number, $.GoError] {
+export function Open(
+  path: string,
+  flag: number,
+  perm: number,
+): [number, $.GoError] {
   return [-1, ENOSYS]
 }
 
 export function Sysctl(name: string): [string, $.GoError] {
-  return ["", ENOSYS]
+  return ['', ENOSYS]
 }
-
-
 
 // Getpagesize returns the underlying system's memory page size.
 export function Getpagesize(): number {
   // Return a standard page size for JavaScript environment
   // Most systems use 4096 bytes as the default page size
   return 4096
-} 
+}

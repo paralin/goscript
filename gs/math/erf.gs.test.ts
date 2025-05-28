@@ -89,4 +89,4 @@ describe('erfc', () => {
     expect(erfc(-1)).toBe(Erfc(-1))
     expect(Number.isNaN(erfc(Number.NaN))).toBe(true)
   })
-}) 
+})

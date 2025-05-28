@@ -22,7 +22,9 @@ describe('Asinh', () => {
     const resultPos = Asinh(Number.MAX_VALUE)
     expect(resultPos > 700 || resultPos === Number.POSITIVE_INFINITY).toBe(true)
     const resultNeg = Asinh(-Number.MAX_VALUE)
-    expect(resultNeg < -700 || resultNeg === Number.NEGATIVE_INFINITY).toBe(true)
+    expect(resultNeg < -700 || resultNeg === Number.NEGATIVE_INFINITY).toBe(
+      true,
+    )
     expect(Asinh(Number.MIN_VALUE)).toBeCloseTo(Number.MIN_VALUE, 14)
   })
 })
@@ -32,6 +34,8 @@ describe('asinh', () => {
     expect(asinh(0)).toBe(Asinh(0))
     expect(asinh(1)).toBe(Asinh(1))
     expect(asinh(-1)).toBe(Asinh(-1))
-    expect(asinh(Number.POSITIVE_INFINITY)).toBe(Asinh(Number.POSITIVE_INFINITY))
+    expect(asinh(Number.POSITIVE_INFINITY)).toBe(
+      Asinh(Number.POSITIVE_INFINITY),
+    )
   })
-}) 
+})

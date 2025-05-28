@@ -35,7 +35,7 @@ describe('Mod', () => {
     expect(Number.isNaN(Mod(Number.NaN, 3))).toBe(true)
     expect(Number.isNaN(Mod(5, 0))).toBe(true)
     expect(Number.isNaN(Mod(5, Number.NaN))).toBe(true)
-    
+
     expect(Mod(5, Number.POSITIVE_INFINITY)).toBe(5)
     expect(Mod(5, Number.NEGATIVE_INFINITY)).toBe(5)
     expect(Mod(-5, Number.POSITIVE_INFINITY)).toBe(-5)
@@ -61,4 +61,4 @@ describe('mod', () => {
     expect(mod(5.5, 2)).toBe(Mod(5.5, 2))
     expect(Number.isNaN(mod(5, 0))).toBe(Number.isNaN(Mod(5, 0)))
   })
-}) 
+})

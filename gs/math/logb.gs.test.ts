@@ -84,4 +84,4 @@ describe('ilogb', () => {
     expect(ilogb(3)).toBe(1)
     expect(ilogb(-2)).toBe(1)
   })
-}) 
+})

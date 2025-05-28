@@ -4,9 +4,9 @@ import { Atan2, atan2 } from './atan2.gs.js'
 describe('Atan2', () => {
   it('should return correct arctangent values for basic cases', () => {
     expect(Atan2(1, 1)).toBeCloseTo(Math.PI / 4, 15)
-    expect(Atan2(1, -1)).toBeCloseTo(3 * Math.PI / 4, 15)
+    expect(Atan2(1, -1)).toBeCloseTo((3 * Math.PI) / 4, 15)
     expect(Atan2(-1, 1)).toBeCloseTo(-Math.PI / 4, 15)
-    expect(Atan2(-1, -1)).toBeCloseTo(-3 * Math.PI / 4, 15)
+    expect(Atan2(-1, -1)).toBeCloseTo((-3 * Math.PI) / 4, 15)
   })
 
   it('should handle zero cases correctly', () => {
@@ -17,15 +17,23 @@ describe('Atan2', () => {
   })
 
   it('should handle infinity cases', () => {
-    expect(Atan2(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY)).toBeCloseTo(Math.PI / 4, 15)
-    expect(Atan2(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY)).toBeCloseTo(-Math.PI / 4, 15)
-    expect(Atan2(Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY)).toBeCloseTo(3 * Math.PI / 4, 15)
-    expect(Atan2(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY)).toBeCloseTo(-3 * Math.PI / 4, 15)
-    
+    expect(
+      Atan2(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY),
+    ).toBeCloseTo(Math.PI / 4, 15)
+    expect(
+      Atan2(Number.NEGATIVE_INFINITY, Number.POSITIVE_INFINITY),
+    ).toBeCloseTo(-Math.PI / 4, 15)
+    expect(
+      Atan2(Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY),
+    ).toBeCloseTo((3 * Math.PI) / 4, 15)
+    expect(
+      Atan2(Number.NEGATIVE_INFINITY, Number.NEGATIVE_INFINITY),
+    ).toBeCloseTo((-3 * Math.PI) / 4, 15)
+
     expect(Atan2(1, Number.POSITIVE_INFINITY)).toBe(0)
     expect(Atan2(1, Number.NEGATIVE_INFINITY)).toBeCloseTo(Math.PI, 15)
     expect(Atan2(-1, Number.NEGATIVE_INFINITY)).toBeCloseTo(-Math.PI, 15)
-    
+
     expect(Atan2(Number.POSITIVE_INFINITY, 1)).toBeCloseTo(Math.PI / 2, 15)
     expect(Atan2(Number.NEGATIVE_INFINITY, 1)).toBeCloseTo(-Math.PI / 2, 15)
   })
@@ -52,4 +60,4 @@ describe('atan2', () => {
     expect(atan2(-1, -1)).toBe(Atan2(-1, -1))
     expect(atan2(0, 1)).toBe(Atan2(0, 1))
   })
-}) 
+})

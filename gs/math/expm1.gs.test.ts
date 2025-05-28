@@ -11,7 +11,7 @@ describe('Expm1', () => {
 
   it('should return correct values for normal inputs', () => {
     expect(Expm1(1)).toBeCloseTo(Math.E - 1, 15)
-    expect(Expm1(-1)).toBeCloseTo(1/Math.E - 1, 15)
+    expect(Expm1(-1)).toBeCloseTo(1 / Math.E - 1, 15)
     expect(Expm1(2)).toBeCloseTo(Math.E * Math.E - 1, 14)
     expect(Expm1(0.5)).toBeCloseTo(Math.sqrt(Math.E) - 1, 15)
   })
@@ -31,9 +31,11 @@ describe('Expm1', () => {
     const x = 1e-15
     const expm1Result = Expm1(x)
     const expMinus1Result = Math.exp(x) - 1
-    
+
     // For very small x, expm1 should be more accurate
-    expect(Math.abs(expm1Result - x)).toBeLessThan(Math.abs(expMinus1Result - x))
+    expect(Math.abs(expm1Result - x)).toBeLessThan(
+      Math.abs(expMinus1Result - x),
+    )
   })
 })
 
@@ -45,4 +47,4 @@ describe('expm1', () => {
     expect(expm1(0.5)).toBe(Expm1(0.5))
     expect(Number.isNaN(expm1(Number.NaN))).toBe(true)
   })
-}) 
+})

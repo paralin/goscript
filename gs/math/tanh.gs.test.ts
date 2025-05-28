@@ -49,4 +49,4 @@ describe('tanh', () => {
     expect(tanh(-1)).toBe(Tanh(-1))
     expect(tanh(Number.POSITIVE_INFINITY)).toBe(Tanh(Number.POSITIVE_INFINITY))
   })
-}) 
+})

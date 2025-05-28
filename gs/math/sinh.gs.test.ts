@@ -63,4 +63,4 @@ describe('cosh', () => {
     expect(cosh(-1)).toBe(Cosh(-1))
     expect(cosh(Number.POSITIVE_INFINITY)).toBe(Cosh(Number.POSITIVE_INFINITY))
   })
-}) 
+})

@@ -6,7 +6,9 @@ describe('Nextafter', () => {
     expect(Nextafter(1.0, 1.0)).toBe(1.0)
     expect(Nextafter(0.0, 0.0)).toBe(0.0)
     expect(Nextafter(-1.0, -1.0)).toBe(-1.0)
-    expect(Nextafter(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY)
+    expect(Nextafter(Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY)).toBe(
+      Number.POSITIVE_INFINITY,
+    )
   })
 
   it('should return NaN when either input is NaN', () => {
@@ -18,7 +20,7 @@ describe('Nextafter', () => {
   it('should handle zero correctly', () => {
     const nextPos = Nextafter(0, 1)
     const nextNeg = Nextafter(0, -1)
-    
+
     expect(nextPos).toBeGreaterThan(0)
     expect(nextNeg).toBeLessThan(0)
     expect(Math.abs(nextPos)).toBe(Number.MIN_VALUE)
@@ -70,7 +72,7 @@ describe('Nextafter32', () => {
   it('should handle zero correctly', () => {
     const nextPos = Nextafter32(0, 1)
     const nextNeg = Nextafter32(0, -1)
-    
+
     expect(nextPos).toBeGreaterThan(0)
     expect(nextNeg).toBeLessThan(0)
     // For float32, the smallest positive value is different
@@ -82,7 +84,7 @@ describe('Nextafter32', () => {
     const x = 1.0
     const nextUp = Nextafter32(x, 2.0)
     const nextDown = Nextafter32(x, 0.0)
-    
+
     expect(nextUp).toBeGreaterThan(x)
     expect(nextDown).toBeLessThan(x)
   })
@@ -91,7 +93,7 @@ describe('Nextafter32', () => {
     const x = 1.0
     const nextUp = Nextafter32(x, Number.POSITIVE_INFINITY)
     const nextDown = Nextafter32(x, 0.0)
-    
+
     expect(nextUp).toBeGreaterThan(x)
     expect(nextDown).toBeLessThan(x)
   })
@@ -100,8 +102,8 @@ describe('Nextafter32', () => {
     const x = -1.0
     const nextUp = Nextafter32(x, 0.0)
     const nextDown = Nextafter32(x, -2.0)
-    
+
     expect(nextUp).toBeGreaterThan(x)
     expect(nextDown).toBeLessThan(x)
   })
-}) 
+})

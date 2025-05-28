@@ -22,8 +22,8 @@ describe('Tan', () => {
   it('should approach infinity near asymptotes', () => {
     const nearPiOver2 = Math.PI / 2 - 1e-10
     expect(Math.abs(Tan(nearPiOver2))).toBeGreaterThan(1e9)
-    
-    const near3PiOver2 = 3 * Math.PI / 2 - 1e-10
+
+    const near3PiOver2 = (3 * Math.PI) / 2 - 1e-10
     expect(Math.abs(Tan(near3PiOver2))).toBeGreaterThan(1e9)
   })
 
@@ -47,4 +47,4 @@ describe('tan', () => {
     expect(tan(Math.PI)).toBe(Tan(Math.PI))
     expect(Number.isNaN(tan(Number.NaN))).toBe(Number.isNaN(Tan(Number.NaN)))
   })
-}) 
+})

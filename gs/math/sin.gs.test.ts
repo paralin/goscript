@@ -80,4 +80,4 @@ describe('cos', () => {
     expect(cos(-Math.PI / 2)).toBe(Cos(-Math.PI / 2))
     expect(cos(Math.PI)).toBe(Cos(Math.PI))
   })
-}) 
+})
