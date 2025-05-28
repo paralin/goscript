@@ -51,7 +51,7 @@
 // This ensures that DeepEqual terminates.
 import { ReflectValue } from './types.js'
 
-export function DeepEqual(x: ReflectValue, y: ReflectValue): boolean {
+export function DeepEqual(x: ReflectValue | null | undefined, y: ReflectValue | null | undefined): boolean {
   // Handle null/undefined cases
   if (x === y) {
     return true
