@@ -1,5 +1,4 @@
 import { describe, it, expect } from 'vitest'
-import { MapOf } from './type.js'
 import { MapIter } from './map.js'
 
 describe('MapIter', () => {
