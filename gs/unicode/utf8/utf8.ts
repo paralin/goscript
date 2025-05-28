@@ -63,18 +63,21 @@ export function DecodeLastRuneInString(s: string): [number, number] {
 }
 
 // DecodeRune unpacks the first UTF-8 encoding in p and returns the rune and its width in bytes.
-export function DecodeRune(p: Uint8Array): [number, number] {
-  if (p.length === 0) {
+export function DecodeRune(p: $.Bytes): [number, number] {
+  if (!p?.length) {
     return [RuneError, 0]
   }
 
-  if (p[0] < RuneSelf) {
-    return [p[0], 1]
+  if (p![0] < RuneSelf) {
+    return [p![0], 1]
   }
+
+  // Convert p to Uint8Array to satisfy AllowsSharedBufferSource requirement
+  const bytes = $.normalizeBytes(p)
 
   // Convert bytes to string and decode
   const decoder = new TextDecoder('utf-8', { fatal: false })
-  const str = decoder.decode(p.slice(0, Math.min(4, p.length)))
+  const str = decoder.decode(bytes.slice(0, Math.min(4, bytes.length)))
   if (str.length === 0 || str === '\uFFFD') {
     return [RuneError, 1]
   }

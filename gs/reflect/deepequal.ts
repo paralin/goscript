@@ -51,7 +51,10 @@
 // This ensures that DeepEqual terminates.
 import { ReflectValue } from './types.js'
 
-export function DeepEqual(x: ReflectValue | null | undefined, y: ReflectValue | null | undefined): boolean {
+export function DeepEqual(
+  x: ReflectValue | null | undefined,
+  y: ReflectValue | null | undefined,
+): boolean {
   // Handle null/undefined cases
   if (x === y) {
     return true
@@ -114,7 +117,12 @@ export function DeepEqual(x: ReflectValue | null | undefined, y: ReflectValue | 
 
         // Compare elements
         for (let i = 0; i < xMeta.length; i++) {
-          if (!DeepEqual(xMeta.backing[i] as ReflectValue, yMeta.backing[i] as ReflectValue)) {
+          if (
+            !DeepEqual(
+              xMeta.backing[i] as ReflectValue,
+              yMeta.backing[i] as ReflectValue,
+            )
+          ) {
             return false
           }
         }
@@ -129,7 +137,10 @@ export function DeepEqual(x: ReflectValue | null | undefined, y: ReflectValue | 
       return false
     }
     for (const [key, value] of x) {
-      if (!y.has(key) || !DeepEqual(value as ReflectValue, y.get(key) as ReflectValue)) {
+      if (
+        !y.has(key) ||
+        !DeepEqual(value as ReflectValue, y.get(key) as ReflectValue)
+      ) {
         return false
       }
     }
@@ -144,8 +155,8 @@ export function DeepEqual(x: ReflectValue | null | undefined, y: ReflectValue | 
       return false
     }
     for (const key of keysX) {
-      const xObj = x as Record<string, ReflectValue>;
-      const yObj = y as Record<string, ReflectValue>;
+      const xObj = x as Record<string, ReflectValue>
+      const yObj = y as Record<string, ReflectValue>
       if (!keysY.includes(key) || !DeepEqual(xObj[key], yObj[key])) {
         return false
       }

@@ -132,6 +132,18 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				return errors.Errorf("unhandled delete call with incorrect number of arguments: %d != 2", len(exp.Args))
 			}
 			c.tsw.WriteLiterally("$.deleteMapEntry")
+		case "copy":
+			// Translate copy(dst, src) to $.copy(dst, src)
+			if len(exp.Args) != 2 {
+				return errors.Errorf("unhandled copy call with incorrect number of arguments: %d != 2", len(exp.Args))
+			}
+			c.tsw.WriteLiterally("$.copy")
+		case "recover":
+			// Translate recover() to $.recover()
+			if len(exp.Args) != 0 {
+				return errors.Errorf("unhandled recover call with incorrect number of arguments: %d != 0", len(exp.Args))
+			}
+			c.tsw.WriteLiterally("$.recover")
 		case "make":
 			// First check if we have a channel type
 			if typ := c.pkg.TypesInfo.TypeOf(exp.Args[0]); typ != nil {

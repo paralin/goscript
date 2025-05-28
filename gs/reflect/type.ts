@@ -1004,7 +1004,10 @@ export function canRangeFunc2(t: Type): boolean {
   return kind === 21 // map
 }
 
-export function funcLayout(_t: Type, _rcvr: Type | null): { Type: Type | null; InCount: number; OutCount: number } {
+export function funcLayout(
+  _t: Type,
+  _rcvr: Type | null,
+): { Type: Type | null; InCount: number; OutCount: number } {
   return {
     Type: null,
     InCount: 0,

@@ -70,14 +70,25 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 
 		// Check if this is a raw string literal (starts and ends with backticks)
 		if len(value) >= 2 && value[0] == '`' && value[len(value)-1] == '`' {
-			// This is a Go raw string - need to escape invalid \x sequences for JavaScript
+			// This is a Go raw string
 			content := value[1 : len(value)-1] // Remove surrounding backticks
 
-			// Escape invalid \x, \u, and \U sequences that would cause TS1125 errors
-			content = c.escapeInvalidEscapeSequences(content)
-
-			// Write as template literal with corrected content
-			c.tsw.WriteLiterallyf("`%s`", content)
+			// Check if the raw string contains backslashes that would be problematic in template literals
+			if strings.Contains(content, `\`) {
+				// Convert to a regular string literal with proper escaping
+				// Replace backslashes with double backslashes for TypeScript
+				content = strings.ReplaceAll(content, `\`, `\\`)
+				// Replace double quotes with escaped double quotes
+				content = strings.ReplaceAll(content, `"`, `\"`)
+				// Write as a regular string literal
+				c.tsw.WriteLiterallyf(`"%s"`, content)
+			} else {
+				// No backslashes, safe to use template literal
+				// Escape invalid \x, \u, and \U sequences that would cause TS1125 errors
+				content = c.escapeInvalidEscapeSequences(content)
+				// Write as template literal with corrected content
+				c.tsw.WriteLiterallyf("`%s`", content)
+			}
 		} else {
 			// Regular string literal (double quotes) - write as-is
 			c.tsw.WriteLiterally(value)

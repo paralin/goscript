@@ -1,0 +1,21 @@
+Equal works correctly
+Compare works: hello < world
+Contains works correctly
+Index works correctly, found at position: 2
+Joined: hello world
+Split result length: 2
+Split works correctly
+HasPrefix works correctly
+HasSuffix works correctly
+Trimmed: hello
+Upper: HELLO
+Lower: hello
+Repeated: xxx
+Count of 'a' in 'banana': 3
+Replace result: hi hello
+ReplaceAll result: hi hi
+Buffer content: Hello World
+Buffer length: 11
+Read 5 bytes: Hello
+Buffer after reset, length: 0
+test finished

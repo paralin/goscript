@@ -1,0 +1,9 @@
+Read from hello.txt: Hello, World!
+ReadFile dir/subfile.txt: This is a subfile
+hello.txt size: 13
+hello.txt name: hello.txt
+Directory entries:
+  Entry: binary.bin IsDir: false
+  Entry: dir IsDir: false
+  Entry: hello.txt IsDir: false
+Error reading dir: readdir dir: not implemented

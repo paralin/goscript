@@ -127,7 +127,7 @@ class visibleFieldsWalker {
     }
     $.mapSet(w.visiting, t, true)
     for (let i = 0; i < t!.NumField!(); i++) {
-      if (!t!.Field) continue;
+      if (!t!.Field) continue
       const field = t!.Field(i)
       if (field) {
         const f = field.clone()
