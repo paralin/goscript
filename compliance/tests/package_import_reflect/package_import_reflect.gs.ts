@@ -231,13 +231,18 @@ export async function main(): Promise<void> {
 	let newMap = reflect.MakeMap(mapTypeStr).clone()
 	console.log("MakeMap type:", newMap.Type()!.String())
 
-	// Test Append (when implemented)
+	// Test Append
 	let originalSlice = reflect.ValueOf($.arrayToSlice<number>([1, 2])).clone()
 	let appendedSlice = reflect.Append(originalSlice, reflect.ValueOf(3)).clone()
+	console.log("Append result len:", appendedSlice.Len())
 
-	// Test channel types (when ChanOf implemented)
-	// chanType := reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
-	// println("ChanOf type:", chanType.String())
+	// Test channel types
+	let chanType = reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
+	console.log("ChanOf type:", chanType!.String())
+	console.log("ChanOf kind:", chanType!.Kind()!.String())
+
+	// Test MakeChan
+	let newChan = reflect.MakeChan(chanType, 0).clone()
 
 	// Test function types (when FuncOf implemented)
 	// funcType := reflect.FuncOf([]reflect.Type{reflect.TypeOf(0)}, []reflect.Type{reflect.TypeOf("")}, false)
@@ -250,11 +255,7 @@ export async function main(): Promise<void> {
 	// }
 	// structType := reflect.StructOf(fields)
 	// println("StructOf type:", structType.String())
-	console.log("Append result len:", appendedSlice.Len())
-
-	// Test channel types (when ChanOf implemented)
-	// chanType := reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
-	// println("ChanOf type:", chanType.String())
+	console.log("MakeChan type:", newChan.Type()!.String())
 
 	// Test function types (when FuncOf implemented)
 	// funcType := reflect.FuncOf([]reflect.Type{reflect.TypeOf(0)}, []reflect.Type{reflect.TypeOf("")}, false)

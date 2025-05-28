@@ -173,14 +173,19 @@ func main() {
 	newMap := reflect.MakeMap(mapTypeStr)
 	println("MakeMap type:", newMap.Type().String())
 
-	// Test Append (when implemented)
+	// Test Append
 	originalSlice := reflect.ValueOf([]int{1, 2})
 	appendedSlice := reflect.Append(originalSlice, reflect.ValueOf(3))
 	println("Append result len:", appendedSlice.Len())
 
-	// Test channel types (when ChanOf implemented)
-	// chanType := reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
-	// println("ChanOf type:", chanType.String())
+	// Test channel types
+	chanType := reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
+	println("ChanOf type:", chanType.String())
+	println("ChanOf kind:", chanType.Kind().String())
+
+	// Test MakeChan
+	newChan := reflect.MakeChan(chanType, 0)
+	println("MakeChan type:", newChan.Type().String())
 
 	// Test function types (when FuncOf implemented)
 	// funcType := reflect.FuncOf([]reflect.Type{reflect.TypeOf(0)}, []reflect.Type{reflect.TypeOf("")}, false)

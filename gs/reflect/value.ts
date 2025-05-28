@@ -1,5 +1,6 @@
-import { Array, Bool, Float32, Float64, Int, Int16, Int32, Int64, Int8, Kind, Map, PointerTo, Ptr, Slice, String, Type, Uint, Uint16, Uint32, Uint64, Uint8, Uintptr, Value } from "./type.js";
+import { Array, Bool, Float32, Float64, Int, Int16, Int32, Int64, Int8, Kind, Map, PointerTo, Ptr, Slice, String, Type, Uint, Uint16, Uint32, Uint64, Uint8, Uintptr, Value, Chan } from "./type.js";
 import { ReflectValue } from "./types.js";
+import * as $ from "@goscript/builtin/builtin.js";
 
 // Re-export ValueOf from type.ts for compatibility
 export { ValueOf } from "./type";
@@ -159,4 +160,24 @@ export function Append(s: Value, x: Value): Value {
     const newArray = [...array, newValue];
     
     return new Value(newArray, s.Type());
+}
+
+// MakeChan returns a Value representing a new channel with the specified type.
+export function MakeChan(typ: Type, buffer: number): Value {
+    if (typ.Kind().valueOf() !== Chan.valueOf()) {
+        throw new Error("reflect.MakeChan of non-chan type");
+    }
+    
+    const elemType = typ.Elem();
+    if (!elemType) {
+        throw new Error("channel type missing element type");
+    }
+    
+    // Get the zero value for the channel element type
+    const zeroValue = Zero(elemType);
+    const zeroVal = (zeroValue as unknown as { value: ReflectValue }).value;
+    
+    // Create a channel using the builtin makeChannel function
+    const channel = $.makeChannel(buffer, zeroVal);
+    return new Value(channel, typ);
 } 

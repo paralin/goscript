@@ -51,3 +51,6 @@ MakeSlice len: 3
 MakeSlice type: []int
 MakeMap type: map[string]int
 Append result len: 3
+ChanOf type: chan int
+ChanOf kind: chan
+MakeChan type: chan int

@@ -1,5 +1,5 @@
 import * as $ from "@goscript/builtin/builtin.js";
-import { ReflectValue } from "./types.js";
+import { ReflectValue, ChanDir } from "./types.js";
 
 // rtype is the common implementation of most values
 export class rtype {
@@ -566,8 +566,8 @@ class StructType implements Type {
     }
 
     public Size(): number {
-        // Simple calculation - in reality this would need alignment
-        return this._fields.reduce((total, field) => total + field.type.Size(), 0);
+        // Struct size is implementation-defined, we'll use a reasonable default
+        return this._fields.reduce((sum, field) => sum + field.type.Size(), 0);
     }
 
     public Elem(): Type | null {
@@ -583,11 +583,63 @@ class StructType implements Type {
     }
 
     public Field?(i: number): any {
-        return this._fields[i] || null;
+        // Stub implementation
+        return null;
     }
 
     public common?(): rtype {
         return new rtype(this.Kind());
+    }
+}
+
+class ChannelType implements Type {
+    constructor(private _elemType: Type, private _dir: ChanDir) {}
+
+    public String(): string {
+        // Format: chan T, <-chan T, or chan<- T
+        const elem = this._elemType.String();
+        switch (this._dir.valueOf()) {
+            case 1: // RecvDir
+                return `<-chan ${elem}`;
+            case 2: // SendDir  
+                return `chan<- ${elem}`;
+            case 3: // BothDir
+            default:
+                return `chan ${elem}`;
+        }
+    }
+
+    public Kind(): Kind {
+        return Chan;
+    }
+
+    public Size(): number {
+        // Channels are represented as pointers, so pointer size
+        return 8;
+    }
+
+    public Elem(): Type | null {
+        return this._elemType;
+    }
+
+    public NumField(): number {
+        return 0;
+    }
+
+    public PkgPath?(): string {
+        return "";
+    }
+
+    public Field?(i: number): any {
+        return null;
+    }
+
+    public common?(): rtype {
+        return new rtype(this.Kind());
+    }
+
+    public ChanDir(): ChanDir {
+        return this._dir;
     }
 }
 
@@ -781,6 +833,10 @@ export function PtrTo(t: Type): Type {
 
 export function MapOf(key: Type, elem: Type): Type {
     return new MapType(key, elem);
+}
+
+export function ChanOf(dir: ChanDir, t: Type): Type {
+    return new ChannelType(t, dir);
 }
 
 // Additional functions from merged files
