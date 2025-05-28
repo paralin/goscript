@@ -6,3 +6,5 @@ vendor
 dist
 buildtarget
 .idea
+output
+out
