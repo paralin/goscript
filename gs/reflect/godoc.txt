@@ -1,0 +1,67 @@
+package reflect // import "reflect"
+
+Package reflect implements run-time reflection, allowing a program to manipulate
+objects with arbitrary types. The typical use is to take a value with static
+type interface{} and extract its dynamic type information by calling TypeOf,
+which returns a Type.
+
+A call to ValueOf returns a Value representing the run-time data. Zero takes a
+Type and returns a Value representing a zero value for that type.
+
+See "The Laws of Reflection" for an introduction to reflection in Go:
+https://golang.org/doc/articles/laws_of_reflection.html
+
+const Ptr = Pointer
+func Copy(dst, src Value) int
+func DeepEqual(x, y any) bool
+func Select(cases []SelectCase) (chosen int, recv Value, recvOK bool)
+func Swapper(slice any) func(i, j int)
+type ChanDir int
+    const RecvDir ChanDir = 1 << iota ...
+type Kind uint
+    const Invalid Kind = iota ...
+type MapIter struct{ ... }
+type Method struct{ ... }
+type SelectCase struct{ ... }
+type SelectDir int
+    const SelectSend SelectDir ...
+type SliceHeader struct{ ... }
+type StringHeader struct{ ... }
+type StructField struct{ ... }
+    func VisibleFields(t Type) []StructField
+type StructTag string
+type Type interface{ ... }
+    func ArrayOf(length int, elem Type) Type
+    func ChanOf(dir ChanDir, t Type) Type
+    func FuncOf(in, out []Type, variadic bool) Type
+    func MapOf(key, elem Type) Type
+    func PointerTo(t Type) Type
+    func PtrTo(t Type) Type
+    func SliceOf(t Type) Type
+    func StructOf(fields []StructField) Type
+    func TypeFor[T any]() Type
+    func TypeOf(i any) Type
+type Value struct{ ... }
+    func Append(s Value, x ...Value) Value
+    func AppendSlice(s, t Value) Value
+    func Indirect(v Value) Value
+    func MakeChan(typ Type, buffer int) Value
+    func MakeFunc(typ Type, fn func(args []Value) (results []Value)) Value
+    func MakeMap(typ Type) Value
+    func MakeMapWithSize(typ Type, n int) Value
+    func MakeSlice(typ Type, len, cap int) Value
+    func New(typ Type) Value
+    func NewAt(typ Type, p unsafe.Pointer) Value
+    func SliceAt(typ Type, p unsafe.Pointer, n int) Value
+    func ValueOf(i any) Value
+    func Zero(typ Type) Value
+type ValueError struct{ ... }
+
+BUG: FieldByName and related functions consider struct field names to be equal
+if the names are equal, even if they are unexported names originating
+in different packages. The practical effect of this is that the result of
+t.FieldByName("x") is not well defined if the struct type t contains
+multiple fields named x (embedded from different packages).
+FieldByName may return one of the fields named x or may report that there are none.
+See https://golang.org/issue/4876 for more details.
+

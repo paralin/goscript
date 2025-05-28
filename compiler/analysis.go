@@ -43,10 +43,23 @@ type VariableUsageInfo struct {
 	Destinations []AssignmentInfo
 }
 
+// FunctionTypeInfo represents Go function type information for reflection
+type FunctionTypeInfo struct {
+	Params   []types.Type // Parameter types
+	Results  []types.Type // Return types
+	Variadic bool         // Whether the function is variadic
+}
+
 // FunctionInfo consolidates function-related tracking data.
 type FunctionInfo struct {
 	IsAsync      bool
 	NamedReturns []string
+}
+
+// ReflectedFunctionInfo tracks functions that need reflection support
+type ReflectedFunctionInfo struct {
+	FuncType     *types.Signature // The function's type signature
+	NeedsReflect bool             // Whether this function is used with reflection
 }
 
 // NodeInfo consolidates node-related tracking data.
@@ -84,6 +97,12 @@ type Analysis struct {
 	// FuncLitData tracks function literal specific data since they don't have types.Object
 	FuncLitData map[*ast.FuncLit]*FunctionInfo
 
+	// ReflectedFunctions tracks functions that need reflection type metadata
+	ReflectedFunctions map[ast.Node]*ReflectedFunctionInfo
+
+	// FunctionAssignments tracks which function literals are assigned to which variables
+	FunctionAssignments map[types.Object]ast.Node
+
 	// PackageMetadata holds package-level metadata
 	PackageMetadata map[string]interface{}
 }
@@ -102,12 +121,14 @@ type PackageAnalysis struct {
 // NewAnalysis creates a new Analysis instance.
 func NewAnalysis() *Analysis {
 	return &Analysis{
-		VariableUsage:   make(map[types.Object]*VariableUsageInfo),
-		Imports:         make(map[string]*fileImport),
-		FunctionData:    make(map[types.Object]*FunctionInfo),
-		NodeData:        make(map[ast.Node]*NodeInfo),
-		FuncLitData:     make(map[*ast.FuncLit]*FunctionInfo),
-		PackageMetadata: make(map[string]interface{}),
+		VariableUsage:       make(map[types.Object]*VariableUsageInfo),
+		Imports:             make(map[string]*fileImport),
+		FunctionData:        make(map[types.Object]*FunctionInfo),
+		NodeData:            make(map[ast.Node]*NodeInfo),
+		FuncLitData:         make(map[*ast.FuncLit]*FunctionInfo),
+		ReflectedFunctions:  make(map[ast.Node]*ReflectedFunctionInfo),
+		FunctionAssignments: make(map[types.Object]ast.Node),
+		PackageMetadata:     make(map[string]interface{}),
 	}
 }
 
@@ -341,6 +362,10 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 								// Case: var lhs = rhs_ident
 								assignmentType = DirectAssignment
 								sourceObj = v.pkg.TypesInfo.ObjectOf(rhsIdent)
+							} else if funcLit, ok := rhsExpr.(*ast.FuncLit); ok {
+								// Case: var lhs = func(...) { ... }
+								// Track function literal assignment
+								v.analysis.FunctionAssignments[lhsObj] = funcLit
 							}
 
 							// --- Record Usage ---
@@ -578,6 +603,9 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		}
 
+		// Check for reflect function calls that operate on functions
+		v.checkReflectUsage(n)
+
 		// Store async state for this call expression
 		if v.analysis.NodeData[n] == nil {
 			v.analysis.NodeData[n] = &NodeInfo{}
@@ -637,6 +665,11 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 					continue // Skip blank identifier assignments
 				}
 				lhsTrackedObj = v.pkg.TypesInfo.ObjectOf(lhsIdent)
+
+				// Check if RHS is a function literal and track the assignment
+				if funcLit, ok := currentRHSExpr.(*ast.FuncLit); ok {
+					v.analysis.FunctionAssignments[lhsTrackedObj] = funcLit
+				}
 			} else if selExpr, ok := currentLHSExpr.(*ast.SelectorExpr); ok {
 				// LHS is struct.field or package.Var
 				if selection := v.pkg.TypesInfo.Selections[selExpr]; selection != nil {
@@ -1094,4 +1127,92 @@ func (a *Analysis) IsMethodAsync(pkgName, typeName, methodName string) bool {
 	}
 
 	return false
+}
+
+// NeedsReflectionMetadata returns whether the given function node needs reflection type metadata
+func (a *Analysis) NeedsReflectionMetadata(node ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	reflectInfo := a.ReflectedFunctions[node]
+	return reflectInfo != nil && reflectInfo.NeedsReflect
+}
+
+// GetFunctionTypeInfo returns the function type information for reflection
+func (a *Analysis) GetFunctionTypeInfo(node ast.Node) *ReflectedFunctionInfo {
+	if node == nil {
+		return nil
+	}
+	return a.ReflectedFunctions[node]
+}
+
+// MarkFunctionForReflection marks a function node as needing reflection support
+func (a *Analysis) MarkFunctionForReflection(node ast.Node, funcType *types.Signature) {
+	if node == nil || funcType == nil {
+		return
+	}
+	a.ReflectedFunctions[node] = &ReflectedFunctionInfo{
+		FuncType:     funcType,
+		NeedsReflect: true,
+	}
+}
+
+// checkReflectUsage checks for reflect function calls that operate on functions
+func (v *analysisVisitor) checkReflectUsage(callExpr *ast.CallExpr) {
+	// Check if this is a reflect package function call
+	if selExpr, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
+		// Check if the selector is from reflect package
+		if ident, ok := selExpr.X.(*ast.Ident); ok {
+			// Check if this is a reflect package call (reflect.TypeOf, reflect.ValueOf, etc.)
+			if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil {
+				if pkgName, ok := obj.(*types.PkgName); ok && pkgName.Imported().Path() == "reflect" {
+					methodName := selExpr.Sel.Name
+
+					// Check for reflect.TypeOf and reflect.ValueOf calls
+					if methodName == "TypeOf" || methodName == "ValueOf" {
+						// Check if any argument is a function
+						for _, arg := range callExpr.Args {
+							v.checkReflectArgument(arg)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// checkReflectArgument checks if an argument to a reflect function is a function that needs metadata
+func (v *analysisVisitor) checkReflectArgument(arg ast.Expr) {
+	// Check if the argument is an identifier (variable)
+	if ident, ok := arg.(*ast.Ident); ok {
+		// Get the object this identifier refers to
+		if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil {
+			// Check if this object has a function type
+			if funcType, ok := obj.Type().(*types.Signature); ok {
+				// This is a function variable being passed to reflect
+				// We need to find the original function definition/assignment
+				v.markFunctionVariable(ident, funcType)
+			}
+		}
+	} else if funcLit, ok := arg.(*ast.FuncLit); ok {
+		// This is a function literal being passed directly to reflect
+		if funcType := v.pkg.TypesInfo.Types[funcLit].Type.(*types.Signature); funcType != nil {
+			v.analysis.MarkFunctionForReflection(funcLit, funcType)
+		}
+	}
+}
+
+// markFunctionVariable finds the function definition/assignment for a variable and marks it for reflection
+func (v *analysisVisitor) markFunctionVariable(ident *ast.Ident, funcType *types.Signature) {
+	// Get the object for this identifier
+	obj := v.pkg.TypesInfo.Uses[ident]
+	if obj == nil {
+		return
+	}
+
+	// Check if we have a tracked function assignment for this variable
+	if funcNode := v.analysis.FunctionAssignments[obj]; funcNode != nil {
+		// Mark the function node for reflection
+		v.analysis.MarkFunctionForReflection(funcNode, funcType)
+	}
 }

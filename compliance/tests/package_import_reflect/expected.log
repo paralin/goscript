@@ -1,0 +1,53 @@
+Type: int
+Value: 42
+Kind: int
+String type: string
+String value: hello
+String kind: string
+Slice type: []int
+Slice len: 3
+Slice kind: slice
+DeepEqual a==b: true
+DeepEqual a==c: false
+Zero int: 0
+SliceOf int: []int
+SliceOf kind: slice
+ArrayOf 5 int: [5]int
+ArrayOf kind: array
+PointerTo int: *int
+PointerTo kind: ptr
+PtrTo int: *int
+New int type: *int
+Indirect type: int
+Zero string: 
+Zero bool: <bool Value>
+Before swap: 1 5
+After swap: 5 1
+Copied elements: 2
+Dst after copy: 10 20
+Struct type: main.Person
+Struct kind: struct
+Struct value type: main.Person
+Float kind: float64
+Bool kind: bool
+Same int types: true
+Different types: false
+MapOf string->int: map[string]int
+MapOf kind: map
+Chan kinds available
+Interface value type: string
+Interface kind: string
+Function type: func(int) string
+Function kind: func
+Complex slice type: [][]int
+Complex slice kind: slice
+Complex slice len: 2
+Type size methods:
+Int size: 8
+String size: 16
+Slice size: 24
+Enhanced API tests:
+MakeSlice len: 3
+MakeSlice type: []int
+MakeMap type: map[string]int
+Append result len: 3

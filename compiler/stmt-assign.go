@@ -469,7 +469,7 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		if callExpr, ok := exp.Rhs[0].(*ast.CallExpr); ok {
 			// Handle protobuf UnmarshalVT: err = out.UnmarshalVT(data)
 			if c.isProtobufMethodCall(callExpr, "UnmarshalVT") {
-				return c.writeProtobufUnmarshalAssignment(exp.Lhs, callExpr, exp.Tok)
+				return c.writeProtobufUnmarshalAssignment(exp.Lhs, callExpr)
 			}
 			// Handle protobuf UnmarshalJSON: err = out.UnmarshalJSON(data)
 			if c.isProtobufMethodCall(callExpr, "UnmarshalJSON") {

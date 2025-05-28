@@ -864,7 +864,7 @@ func RunGoScriptTestDir(t *testing.T, workspaceDir, testDir string) {
 			if actual != exp {
 				actualLogPath := filepath.Join(testDir, "actual.log")
 				os.WriteFile(actualLogPath, []byte(actual+"\n"), 0o644)
-				t.Errorf("output mismatch (TS vs Go)\nExpected (from Go):\n%s\nActual (from TS):\n%s", exp, actual)
+				t.Errorf("=== output mismatch! (TS vs Go) ===\n\n=== expected (from Go) ===\n%s\n\n=== actual (from TS) ===\n%s", exp, actual)
 			} else {
 				os.Remove(filepath.Join(testDir, "actual.log")) //nolint:errcheck
 			}

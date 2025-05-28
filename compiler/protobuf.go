@@ -230,7 +230,7 @@ func (c *GoToTSCompiler) writeProtobufMarshalAssignment(lhs []ast.Expr, callExpr
 
 // writeProtobufUnmarshalAssignment handles: err = out.UnmarshalVT(data)
 // Generates: out = ExampleMsg.fromBinary(data); err = null;
-func (c *GoToTSCompiler) writeProtobufUnmarshalAssignment(lhs []ast.Expr, callExpr *ast.CallExpr, tok token.Token) error {
+func (c *GoToTSCompiler) writeProtobufUnmarshalAssignment(lhs []ast.Expr, callExpr *ast.CallExpr) error {
 	if len(lhs) != 1 {
 		return fmt.Errorf("protobuf unmarshal assignment requires exactly 1 LHS variable, got %d", len(lhs))
 	}

@@ -1,0 +1,161 @@
+import { Type, Value, Kind, Bool, Int, Int8, Int16, Int32, Int64, Uint, Uint8, Uint16, Uint32, Uint64, Uintptr, Float32, Float64, String, Slice, Array, PointerTo, Ptr, MapOf, SliceOf, Map } from "./type";
+import { ReflectValue } from "./types";
+
+// Zero returns a Value representing the zero value for the specified type.
+export function Zero(typ: Type): Value {
+    let zeroValue: ReflectValue;
+    
+    switch (typ.Kind().valueOf()) {
+        case Bool.valueOf():
+            zeroValue = false;
+            break;
+        case Int.valueOf():
+        case Int8.valueOf():
+        case Int16.valueOf():
+        case Int32.valueOf():
+        case Int64.valueOf():
+        case Uint.valueOf():
+        case Uint8.valueOf():
+        case Uint16.valueOf():
+        case Uint32.valueOf():
+        case Uint64.valueOf():
+        case Uintptr.valueOf():
+        case Float32.valueOf():
+        case Float64.valueOf():
+            zeroValue = 0;
+            break;
+        case String.valueOf():
+            zeroValue = "";
+            break;
+        case Slice.valueOf():
+        case Array.valueOf():
+            zeroValue = [];
+            break;
+        default:
+            zeroValue = null;
+            break;
+    }
+
+    return new Value(zeroValue, typ);
+}
+
+// Copy copies the contents of src to dst until either dst has been filled
+// or src has been exhausted. It returns the number of elements copied.
+export function Copy(dst: Value, src: Value): number {
+    // Extract the underlying arrays from the Value objects
+    const dstArray = getArrayFromValue(dst);
+    const srcArray = getArrayFromValue(src);
+    
+    if (!dstArray || !srcArray) {
+        return 0;
+    }
+    
+    const count = Math.min(dstArray.length, srcArray.length);
+    for (let i = 0; i < count; i++) {
+        dstArray[i] = srcArray[i];
+    }
+    return count;
+}
+
+// Helper function to extract the underlying array from a Value
+function getArrayFromValue(value: Value): unknown[] | null {
+    const val = (value as unknown as { _value: ReflectValue })._value;
+    
+    // Check for GoScript slice objects created by $.arrayToSlice
+    if (val && typeof val === 'object' && '__meta__' in val) {
+        const meta = (val as { __meta__?: { backing?: unknown[] } }).__meta__;
+        if (meta && meta.backing && globalThis.Array.isArray(meta.backing)) {
+            return meta.backing;
+        }
+    }
+    
+    // Check for regular JavaScript arrays
+    if (globalThis.Array.isArray(val)) {
+        return val;
+    }
+    
+    return null;
+}
+
+// Indirect returns the value that v points to.
+export function Indirect(v: Value): Value {
+    // Check if this is a pointer type
+    const type = v.Type();
+    if (type.Kind().valueOf() === Ptr.valueOf()) { // Ptr kind
+        const elemType = type.Elem();
+        if (elemType) {
+            // Return a new Value with the same underlying value but the element type
+            return new Value((v as unknown as { _value: ReflectValue })._value, elemType);
+        }
+    }
+    // For non-pointer types, just return the value as-is
+    return v;
+}
+
+// New returns a Value representing a pointer to a new zero value for the specified type.
+export function New(typ: Type): Value {
+    const zero = Zero(typ);
+    const ptrType = PointerTo(typ);
+    // For the pointer value, we'll use the zero value but with pointer type
+    // In a real implementation, this would be a pointer to the zero value
+    return new Value(null, ptrType); // null represents the pointer value
+}
+
+// MakeSlice returns a Value representing a new slice with the specified type, length, and capacity.
+export function MakeSlice(typ: Type, len: number, cap: number): Value {
+    if (typ.Kind().valueOf() !== Slice.valueOf()) {
+        throw new Error("reflect.MakeSlice of non-slice type");
+    }
+    
+    // Create a slice with the specified length, filled with zero values
+    const elemType = typ.Elem();
+    if (!elemType) {
+        throw new Error("slice type missing element type");
+    }
+    
+    const zeroValue = Zero(elemType);
+    const zeroVal = (zeroValue as unknown as { _value: ReflectValue })._value;
+    const array = new globalThis.Array(len).fill(zeroVal);
+    
+    return new Value(array, typ);
+}
+
+// MakeMap returns a Value representing a new map with the specified type.
+export function MakeMap(typ: Type): Value {
+    if (typ.Kind().valueOf() !== Map.valueOf()) {
+        throw new Error("reflect.MakeMap of non-map type");
+    }
+    
+    const map = new globalThis.Map();
+    return new Value(map, typ);
+}
+
+// Append appends the values x to a slice and returns the resulting slice.
+export function Append(s: Value, x: Value): Value {
+    if (s.Kind().valueOf() !== Slice.valueOf()) {
+        throw new Error("reflect.Append of non-slice");
+    }
+    
+    const array = getArrayFromValue(s);
+    if (!array) {
+        throw new Error("cannot get array from slice value");
+    }
+    
+    const newValue = (x as unknown as { _value: ReflectValue })._value;
+    const newArray = [...array, newValue];
+    
+    return new Value(newArray, s.Type());
+}
+
+// ValueError is returned by Value methods when they are called on a Value
+// that cannot perform the operation.
+export class ValueError extends Error {
+    public Kind: Kind;
+    public Method: string;
+
+    constructor(init: { Kind: Kind; Method: string }) {
+        super(`reflect: call of reflect.Value.${init.Method} on ${init.Kind.String()} Value`);
+        this.Kind = init.Kind;
+        this.Method = init.Method;
+    }
+} 

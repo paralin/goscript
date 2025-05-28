@@ -101,6 +101,17 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 //   - Wrapped in `Promise<>` if `async`.
 //   - The function body (`exp.Body`) is translated using `WriteStmt`.
 func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
+	// Check if this function needs reflection metadata
+	needsReflection := c.analysis.NeedsReflectionMetadata(exp)
+
+	if needsReflection {
+		// Start IIFE to attach metadata
+		c.tsw.WriteLiterally("(() => {")
+		c.tsw.Indent(1)
+		c.tsw.WriteLine("")
+		c.tsw.WriteLiterally("const fn = ")
+	}
+
 	// Determine if the function literal should be async
 	isAsync := c.analysis.IsFuncLitAsync(exp)
 
@@ -182,6 +193,78 @@ func (c *GoToTSCompiler) WriteFuncLitValue(exp *ast.FuncLit) error {
 		c.tsw.Indent(-1)
 		c.tsw.WriteLiterally("}")
 	}
+
+	// Add reflection metadata if needed
+	if needsReflection {
+		c.tsw.WriteLine("")
+
+		// Attach type metadata to the function
+		if err := c.writeReflectionMetadata(exp); err != nil {
+			return fmt.Errorf("failed to write reflection metadata: %w", err)
+		}
+
+		c.tsw.WriteLine("return fn")
+		c.tsw.Indent(-1)
+		c.tsw.WriteLiterally("})()")
+	}
+
+	return nil
+}
+
+// writeReflectionMetadata attaches function type information to a function for reflection support
+func (c *GoToTSCompiler) writeReflectionMetadata(exp *ast.FuncLit) error {
+	// Get the reflection info for this function
+	reflectInfo := c.analysis.GetFunctionTypeInfo(exp)
+	if reflectInfo == nil || reflectInfo.FuncType == nil {
+		return nil // No reflection info available
+	}
+
+	funcType := reflectInfo.FuncType
+
+	// Build FunctionTypeInfo metadata
+	c.tsw.WriteLiterally("fn.__typeInfo = {")
+	c.tsw.Indent(1)
+	c.tsw.WriteLine("")
+	c.tsw.WriteLiterally("kind: $.TypeKind.Function,")
+	c.tsw.WriteLine("")
+
+	// Add parameters
+	if funcType.Params() != nil && funcType.Params().Len() > 0 {
+		c.tsw.WriteLiterally("params: [")
+		for i := 0; i < funcType.Params().Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			param := funcType.Params().At(i)
+			c.tsw.WriteLiterallyf("'%s'", param.Type().String())
+		}
+		c.tsw.WriteLiterally("],")
+		c.tsw.WriteLine("")
+	}
+
+	// Add results
+	if funcType.Results() != nil && funcType.Results().Len() > 0 {
+		c.tsw.WriteLiterally("results: [")
+		for i := 0; i < funcType.Results().Len(); i++ {
+			if i > 0 {
+				c.tsw.WriteLiterally(", ")
+			}
+			result := funcType.Results().At(i)
+			c.tsw.WriteLiterallyf("'%s'", result.Type().String())
+		}
+		c.tsw.WriteLiterally("],")
+		c.tsw.WriteLine("")
+	}
+
+	// Add variadic flag
+	if funcType.Variadic() {
+		c.tsw.WriteLiterally("isVariadic: true,")
+		c.tsw.WriteLine("")
+	}
+
+	c.tsw.Indent(-1)
+	c.tsw.WriteLiterally("}")
+	c.tsw.WriteLine("")
 
 	return nil
 }
