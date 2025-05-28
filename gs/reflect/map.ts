@@ -38,34 +38,33 @@ class MapType implements Type {
 }
 
 // Simple map iterator using JavaScript Map
-export class MapIter {
-  private iterator: Iterator<[any, any]>
-  private currentEntry: IteratorResult<[any, any]> | null = null
+export class MapIter<K = unknown, V = unknown> {
+  public iterator: Iterator<[K, V]>
+  public current: IteratorResult<[K, V]> | null = null
 
-  constructor(private map: Map<any, any>) {
+  constructor(public map: Map<K, V>) {
     this.iterator = map.entries()
     this.Next()
   }
 
   public Next(): boolean {
-    this.currentEntry = this.iterator.next()
-    return !this.currentEntry.done
+    this.current = this.iterator.next()
+    return !this.current.done
   }
 
-  public Key(): any {
-    return this.currentEntry?.value?.[0]
+  public Key(): K | null {
+    return this.current?.value?.[0] ?? null
   }
 
-  public Value(): any {
-    return this.currentEntry?.value?.[1]
+  public Value(): V | null {
+    return this.current?.value?.[1] ?? null
   }
 
-  public Reset(m: any): void {
-    if (m instanceof Map) {
-      this.map = m
-      this.iterator = m.entries()
-      this.Next()
-    }
+  public Reset(m: Map<K, V>): void {
+    this.map = m
+    this.iterator = m.entries()
+    this.current = null
+    this.Next()
   }
 }
 
