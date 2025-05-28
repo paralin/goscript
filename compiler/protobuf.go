@@ -118,7 +118,7 @@ func (c *PackageCompiler) copyProtobufTSFile(sourcePath, fileName string) error 
 }
 
 // writeProtobufExports writes exports for a protobuf file to the index.ts file
-func (c *PackageCompiler) writeProtobufExports(indexFile *os.File, fileName, pbTsFileName string) error {
+func (c *PackageCompiler) writeProtobufExports(indexFile *os.File, fileName string) error {
 	// For protobuf files, we know they typically export message types
 	// For now, we'll use a simple heuristic: export all types that end with "Msg"
 	// In a full implementation, we would parse the .pb.ts file to extract actual exports

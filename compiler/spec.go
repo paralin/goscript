@@ -45,7 +45,10 @@ func (c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string {
 		return named.Obj().Name()
 	} else {
 		// Fallback for unnamed embedded types, though less common for structs
-		fieldKeyName := strings.Title(trueType.String()) // Simple heuristic
+		fieldKeyName := trueType.String()
+		if len(fieldKeyName) > 0 {
+			fieldKeyName = strings.ToUpper(fieldKeyName[:1]) + fieldKeyName[1:]
+		}
 		if dotIndex := strings.LastIndex(fieldKeyName, "."); dotIndex != -1 {
 			fieldKeyName = fieldKeyName[dotIndex+1:]
 		}
@@ -261,7 +264,7 @@ func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
 
 			if recvTypeName == className {
 				c.tsw.WriteLine("")
-				if err := c.writeNamedTypeMethod(funcDecl, className); err != nil {
+				if err := c.writeNamedTypeMethod(funcDecl); err != nil {
 					return err
 				}
 			}
@@ -275,7 +278,7 @@ func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
 }
 
 // writeNamedTypeMethod writes a method for a named type, handling receiver binding properly
-func (c *GoToTSCompiler) writeNamedTypeMethod(decl *ast.FuncDecl, className string) error {
+func (c *GoToTSCompiler) writeNamedTypeMethod(decl *ast.FuncDecl) error {
 	if decl.Doc != nil {
 		c.WriteDoc(decl.Doc)
 	}

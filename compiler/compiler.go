@@ -453,7 +453,10 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 		if strings.HasSuffix(fileName, ".pb") {
 			// For protobuf files, add a simple re-export
 			pbTsFileName := fileName + ".ts"
-			if err := c.writeProtobufExports(indexFile, fileName, pbTsFileName); err != nil {
+			if err := func() error {
+				var _ string = pbTsFileName
+				return c.writeProtobufExports(indexFile, fileName)
+			}(); err != nil {
 				return err
 			}
 			continue

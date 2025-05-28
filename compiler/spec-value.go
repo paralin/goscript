@@ -233,14 +233,14 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 						if c.hasReceiverMethods(typeName) {
 							// Check if the initializer is a basic literal or simple value that needs wrapping
 							needsConstructor := false
-							switch initializerExpr.(type) {
+							switch expr := initializerExpr.(type) {
 							case *ast.BasicLit:
 								needsConstructor = true
 							case *ast.Ident:
 								// Check if it's a simple identifier (not a function call or complex expression)
-								if ident := initializerExpr.(*ast.Ident); ident.Name != "nil" {
+								if expr.Name != "nil" {
 									// Check if this identifier refers to a value of the underlying type
-									if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil {
+									if obj := c.pkg.TypesInfo.Uses[expr]; obj != nil {
 										if objType := obj.Type(); objType != nil {
 											// If the identifier's type matches the underlying type, wrap it
 											if types.Identical(objType, namedType.Underlying()) {

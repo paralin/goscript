@@ -503,14 +503,12 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 		case *types.Pointer:
 			// Handle pointer to composite literal
 			ptrType := underlying.(*types.Pointer)
-			elemType := ptrType.Elem().Underlying()
-			switch elemType.(type) {
+			switch elemType := ptrType.Elem().Underlying().(type) {
 			case *types.Struct:
 				// This is an anonymous struct literal with inferred pointer type
 				// Just create the struct object directly - no var-refing needed
 				// Anonymous literals are not variables, so they don't get var-refed
-				structType := elemType.(*types.Struct)
-				return c.writeUntypedStructLiteral(exp, structType) // true = anonymous
+				return c.writeUntypedStructLiteral(exp, elemType) // true = anonymous
 			default:
 				return fmt.Errorf("unhandled pointer composite literal element type: %T", elemType)
 			}

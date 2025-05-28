@@ -642,11 +642,11 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 				if selection := v.pkg.TypesInfo.Selections[selExpr]; selection != nil {
 					lhsTrackedObj = selection.Obj() // This is the field or selected var object
 				}
-			} else if _, ok := currentLHSExpr.(*ast.StarExpr); ok {
+			} /* else if _, ok := currentLHSExpr.(*ast.StarExpr); ok {
 				// LHS is *pointer.
 				// We don't try to get a types.Object for the dereferenced entity itself to store in VariableUsage.
 				// lhsTrackedObj remains nil. The effect on rhsSourceObj (if its address is taken) is handled below.
-			}
+			} */
 			// For other complex LHS (e.g., map_expr[key_expr]), lhsTrackedObj remains nil.
 
 			// --- Record Usage Information ---
