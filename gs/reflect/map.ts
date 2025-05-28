@@ -37,7 +37,12 @@ class MapType implements Type {
   }
 }
 
-// Simple map iterator using JavaScript Map
+/**
+ * MapIter provides an iterator interface for Go maps.
+ * It wraps a JavaScript Map iterator and provides methods to iterate over key-value pairs.
+ * @template K - The type of keys in the map
+ * @template V - The type of values in the map
+ */
 export class MapIter<K = unknown, V = unknown> {
   public iterator: Iterator<[K, V]>
   public current: IteratorResult<[K, V]> | null = null

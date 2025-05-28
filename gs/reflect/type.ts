@@ -781,7 +781,7 @@ function getTypeOf(value: ReflectValue): Type {
       if (funcWithMeta.__typeInfo) {
         const typeInfo = funcWithMeta.__typeInfo
         if (
-          typeInfo.kind === 'function' &&
+          (typeInfo.kind === 'function' || typeInfo.kind === 'Function') &&
           typeInfo.params &&
           typeInfo.results
         ) {
