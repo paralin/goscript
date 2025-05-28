@@ -1,30 +1,18 @@
+//go:build linkname
+
 package main
 
 import (
-	"os"
+	"time"
 	_ "unsafe"
 )
 
-//go:linkname osOpen os.Open
-func osOpen(name string) (*os.File, error)
+//go:linkname timeNow time.Now
+func timeNow() time.Time {
+	return time.Date(2000, 1, 1, 0, 0, 0, 0, time.UTC)
+}
 
 func main() {
-	// Test basic os package functionality
-	file, err := os.Open("/dev/null")
-	if err != nil {
-		println("error opening file:", err.Error())
-		return
-	}
-	defer file.Close()
-
-	// Test the linkname function - this should be equivalent to os.Open
-	file2, err2 := osOpen("/dev/null")
-	if err2 != nil {
-		println("error opening file with linkname:", err2.Error())
-		return
-	}
-	defer file2.Close()
-
-	println("linkname directive compiled successfully")
-	println("test finished")
+	now := time.Now()
+	println("overridden time now", now.String())
 }
