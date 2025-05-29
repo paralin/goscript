@@ -1167,10 +1167,8 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 							// Check if the type is from an imported package
 							if typePkg := namedType.Obj().Pkg(); typePkg != nil && typePkg != c.pkg.Types {
-								pkgPath := typePkg.Path()
-								// Extract package name from path (e.g., "sync" from "github.com/.../gs/sync")
-								parts := strings.Split(pkgPath, "/")
-								pkgName := parts[len(parts)-1]
+								// Use the actual package name from the type information
+								pkgName := typePkg.Name()
 
 								// Check if this method is async based on metadata
 								if c.analysis.IsMethodAsync(pkgName, typeName, methodName) {

@@ -499,7 +499,7 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 // It extracts the Go import path (e.g., `"path/to/pkg"`) and determines the
 // import alias/name for TypeScript. If the Go import has an explicit name
 // (e.g., `alias "path/to/pkg"`), that alias is used. Otherwise, the package
-// name is derived from the Go path.
+// name is derived from the actual Go package name, not the import path.
 //
 // The Go path is then translated to a TypeScript module path using
 // `translateGoPathToTypescriptPath`.
@@ -516,9 +516,22 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 	}
 
 	goPath := a.Path.Value[1 : len(a.Path.Value)-1]
-	impName := packageNameFromGoPath(goPath)
+
+	// Determine the import name to use in TypeScript
+	var impName string
 	if a.Name != nil && a.Name.Name != "" {
+		// Explicit alias provided: import alias "path/to/pkg"
 		impName = a.Name.Name
+	} else {
+		// No explicit alias, use the actual package name from type information
+		// This handles cases where package name differs from the last path segment
+		if actualName, err := getActualPackageName(goPath, c.pkg.Imports); err == nil {
+			impName = actualName
+		} else {
+			// Fallback to last segment of path if package not found in type information
+			pts := strings.Split(goPath, "/")
+			impName = pts[len(pts)-1]
+		}
 	}
 
 	// All Go package imports are mapped to the @goscript/ scope.

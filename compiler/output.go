@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
+
+	"golang.org/x/tools/go/packages"
 )
 
 // ComputeModulePath computes the root of the output typescript module.
@@ -21,10 +23,14 @@ func translateGoPathToTypescriptPath(goImportPath string) string {
 	return fmt.Sprintf("@goscript/%s", goImportPath)
 }
 
-// packageNameFromGoPath attempts to determine the package name from the last segment of the go path.
-func packageNameFromGoPath(goPkgPath string) string {
-	pts := strings.Split(goPkgPath, "/")
-	return pts[len(pts)-1]
+// getActualPackageName returns the actual Go package name from package information.
+// If the package is not found in the imports map, returns an error instead of falling back.
+// This handles cases where the package name differs from the last segment of the import path.
+func getActualPackageName(importPath string, importsMap map[string]*packages.Package) (string, error) {
+	if pkg, exists := importsMap[importPath]; exists && pkg.Name != "" {
+		return pkg.Name, nil
+	}
+	return "", fmt.Errorf("package %s not found in imports map", importPath)
 }
 
 // TranslateGoFilePathToTypescriptFilePath converts the go package path and typescript filename to output path within the typescript output dir

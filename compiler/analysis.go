@@ -831,10 +831,8 @@ func (v *analysisVisitor) containsAsyncOperations(node ast.Node) bool {
 
 								// Check if the type is from an imported package
 								if typePkg := namedType.Obj().Pkg(); typePkg != nil && typePkg != v.pkg.Types {
-									pkgPath := typePkg.Path()
-									// Extract package name from path (e.g., "sync" from "github.com/.../gs/sync")
-									parts := strings.Split(pkgPath, "/")
-									pkgName := parts[len(parts)-1]
+									// Use the actual package name from the type information
+									pkgName := typePkg.Name()
 
 									// Check if this method is async based on metadata
 									if v.analysis.IsMethodAsync(pkgName, typeName, methodName) {
@@ -905,10 +903,21 @@ func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap
 				importVars: make(map[string]struct{}),
 			}
 
-			// Use the import name or package name as the key
-			key := packageNameFromGoPath(path)
+			// Use the import name or the actual package name as the key
+			var key string
 			if name != "" {
+				// Explicit alias provided
 				key = name
+			} else {
+				// No explicit alias, use the actual package name from type information
+				// This handles cases where package name differs from the last path segment
+				if actualName, err := getActualPackageName(path, pkg.Imports); err == nil {
+					key = actualName
+				} else {
+					// Fallback to last segment of path if package not found in type information
+					pts := strings.Split(path, "/")
+					key = pts[len(pts)-1]
+				}
 			}
 
 			analysis.Imports[key] = fileImp

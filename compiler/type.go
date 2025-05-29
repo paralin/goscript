@@ -237,12 +237,34 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 	if typePkg != nil && typePkg != c.pkg.Types {
 		// This type is from an imported package, find the import alias
 		typePkgPath := typePkg.Path()
+		typePkgName := typePkg.Name() // Get the actual package name
 
-		// Try to find the import alias by matching the package path
+		// Try to find the import alias by matching the package name or path
 		for importAlias := range c.analysis.Imports {
-			// The importAlias could be either the explicit alias or the default package name
-			// If it's the default package name, it should match the last segment of the path
-			defaultPkgName := packageNameFromGoPath(typePkgPath)
+			// First, try to match by the actual package name
+			if importAlias == typePkgName {
+				// Write the qualified name: importAlias.TypeName
+				c.tsw.WriteLiterally(importAlias)
+				c.tsw.WriteLiterally(".")
+				c.tsw.WriteLiterally(t.Obj().Name())
+
+				// For generic types, include type arguments
+				if t.TypeArgs() != nil && t.TypeArgs().Len() > 0 {
+					c.tsw.WriteLiterally("<")
+					for i := 0; i < t.TypeArgs().Len(); i++ {
+						if i > 0 {
+							c.tsw.WriteLiterally(", ")
+						}
+						c.WriteGoType(t.TypeArgs().At(i), GoTypeContextGeneral)
+					}
+					c.tsw.WriteLiterally(">")
+				}
+				return
+			}
+
+			// Fallback: try to match by path-based package name (for backwards compatibility)
+			pts := strings.Split(typePkgPath, "/")
+			defaultPkgName := pts[len(pts)-1]
 			if importAlias == defaultPkgName || importAlias == typePkgPath {
 				// Write the qualified name: importAlias.TypeName
 				c.tsw.WriteLiterally(importAlias)
