@@ -334,9 +334,75 @@ export function Scanln(..._a: any[]): [number, Error | null] {
   return [0, new Error('Scanln not implemented')]
 }
 
-export function Sscan(_str: string, ..._a: any[]): [number, Error | null] {
-  // TODO: Implement scanning from string
-  return [0, new Error('Sscan not implemented')]
+export function Sscan(str: string, ...a: any[]): [number, Error | null] {
+  const tokens = str.trim().split(/\s+/).filter(token => token.length > 0)
+  let scanned = 0
+  
+  const values = a.map(arg => {
+    if (arg && typeof arg === 'object' && typeof arg.__get === 'function') {
+      return arg.__get()
+    }
+    if (arg && typeof arg === 'object' && 'value' in arg) {
+      return arg.value
+    }
+    return arg
+  })
+  
+  for (let i = 0; i < a.length && i < tokens.length; i++) {
+    const token = tokens[i]
+    const currentType = typeof values[i]
+    
+    try {
+      switch (currentType) {
+        case 'number':
+          const num = Number(token)
+          if (isNaN(num)) {
+            return [scanned, new Error(`cannot parse "${token}" as number`)]
+          }
+          values[i] = num
+          break
+        case 'string':
+          values[i] = token
+          break
+        case 'boolean':
+          if (token === 'true') {
+            values[i] = true
+          } else if (token === 'false') {
+            values[i] = false
+          } else {
+            return [scanned, new Error(`cannot parse "${token}" as boolean`)]
+          }
+          break
+        default:
+          const parsed = Number(token)
+          if (!isNaN(parsed)) {
+            values[i] = parsed
+          } else {
+            values[i] = token
+          }
+      }
+      scanned++
+    } catch (e) {
+      return [scanned, new Error(`scan error: ${e}`)]
+    }
+  }
+  
+  for (let i = 0; i < a.length && i < values.length; i++) {
+    const target = a[i]
+    const newValue = values[i]
+    
+    if (target && typeof target === 'object' && typeof target.__set === 'function') {
+      target.__set(newValue)
+    }
+    else if (target && typeof target === 'object' && 'value' in target) {
+      target.value = newValue
+    }
+    else {
+      a[i] = newValue
+    }
+  }
+  
+  return [scanned, null]
 }
 
 export function Sscanf(_str: string, _format: string, ..._a: any[]): [number, Error | null] {
@@ -376,4 +442,4 @@ export interface ScanState {
   Token(skipSpace: boolean, f: (r: number) => boolean): [Uint8Array, Error | null]
   Width(): [number, boolean]
   Read(buf: Uint8Array): [number, Error | null]
-} 
+}          

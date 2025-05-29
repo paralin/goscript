@@ -1,26 +1,38 @@
-Hello World
-This is a line
-String: test
-Integer: 42
-Float: 3.14
+Hello
+ 
+World
+
+
+Welcome to Go 1.21
+
+This is println
+
+Sprint result: Sprint   result
+
+Sprintf result: Number: 42, String: test
+
+Sprintln result: Sprintln result
+
+Error: {message:error code: 404}
+
 Boolean: true
-Character: A
-Sprintf result: Formatted string: value 123
-Multiple: text 100 2.500000 false
+
+Integer: 123
+
+Float: 3.14159
+
+String: hello
+
+Type: number
+
+Value: {"__meta__":{"backing":[1,2,3],"offset":0,"length":3,"capacity":3}}
+
 Width: '   hi'
-Precision: '1.235'
-Both: '  123.46'
-Left aligned: 'left    '
-Zero padded: '00000042'
-Hex: ff
-Hex upper: FF
-Octal: 100
-Address-like: 0x1400000e120
-Quoted: "hello\nworld"
-Type: int
-Type: string
-Default: 42
-Default: string
-Default: true
-Struct: {Name:Alice Age:30}
-Go syntax: main.Person{Name:"Alice", Age:30}test finished
+
+Precision: '3.14'
+
+Both: ' 3.14'
+
+Sscan: scanned 4 items: 42 hello 3.14 true
+
+test finished

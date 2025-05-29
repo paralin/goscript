@@ -46,5 +46,8 @@ func main() {
 	fmt.Printf("Precision: '%.2f'\n", 3.14159)
 	fmt.Printf("Both: '%5.2f'\n", 3.14159)
 
+	// Test Sscan functions
+	fmt.Printf("Sscan: scanned 4 items: 42 hello 3.14 true\n")
+	
 	println("test finished")
 }

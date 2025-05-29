@@ -7,6 +7,7 @@ export {
   FormatString,
   Scan, Scanf, Scanln,
   Sscan, Sscanf, Sscanln,
-  Fscan, Fscanf, Fscanln,
-  Formatter, GoStringer, Stringer, State, Scanner, ScanState
+  Fscan, Fscanf, Fscanln
 } from "./fmt.js"
+
+export type { Formatter, GoStringer, Stringer, State, Scanner, ScanState } from "./fmt.js"
