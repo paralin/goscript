@@ -1,4 +1,4 @@
-// Generated file based on import_named_multiple.go
+// Generated file based on import_interface.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin/builtin.js";

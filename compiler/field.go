@@ -52,8 +52,8 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 				}
 				c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 				c.tsw.WriteLiterally(": ")
-				typ := c.pkg.TypesInfo.TypeOf(field.Type)
-				c.WriteGoType(typ, GoTypeContextGeneral)
+				// Use WriteTypeExpr to preserve qualified names like os.FileInfo
+				c.WriteTypeExpr(field.Type)
 			}
 		}
 
@@ -102,8 +102,8 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 					}
 					c.tsw.WriteLiterally(c.sanitizeIdentifier(name.Name))
 					c.tsw.WriteLiterally(": ")
-					typ := c.pkg.TypesInfo.TypeOf(field.Type)
-					c.WriteGoType(typ, GoTypeContextGeneral) // Use WriteGoType for parameter type
+					// Use WriteTypeExpr to preserve qualified names like os.FileInfo
+					c.WriteTypeExpr(field.Type)
 				}
 			} else {
 				// For struct fields and other non-argument fields

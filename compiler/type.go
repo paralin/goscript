@@ -400,8 +400,8 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 		}
 		if len(exp.Results.List) == 1 {
 			// Single return type (named or unnamed)
-			typ := c.pkg.TypesInfo.TypeOf(exp.Results.List[0].Type)
-			c.WriteGoType(typ, GoTypeContextFunctionReturn)
+			// Use WriteTypeExpr to preserve qualified names like os.FileInfo
+			c.WriteTypeExpr(exp.Results.List[0].Type)
 		} else {
 			// Multiple return types -> tuple
 			c.tsw.WriteLiterally("[")
@@ -409,8 +409,8 @@ func (c *GoToTSCompiler) WriteFuncType(exp *ast.FuncType, isAsync bool) {
 				if i > 0 {
 					c.tsw.WriteLiterally(", ")
 				}
-				typ := c.pkg.TypesInfo.TypeOf(field.Type)
-				c.WriteGoType(typ, GoTypeContextFunctionReturn)
+				// Use WriteTypeExpr to preserve qualified names like os.FileInfo
+				c.WriteTypeExpr(field.Type)
 			}
 			c.tsw.WriteLiterally("]")
 		}

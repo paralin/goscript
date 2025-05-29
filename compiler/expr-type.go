@@ -20,6 +20,22 @@ import (
 // - Interface types -> TypeScript interface types or "any"
 // - Function types -> TypeScript function signatures
 func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
+	// Handle selector expressions (e.g., os.FileInfo) specially to preserve qualified names
+	if selectorExpr, ok := a.(*ast.SelectorExpr); ok {
+		if pkgIdent, ok := selectorExpr.X.(*ast.Ident); ok {
+			// Check if this is a package selector (e.g., os.FileInfo)
+			if obj := c.pkg.TypesInfo.Uses[pkgIdent]; obj != nil {
+				if _, isPkg := obj.(*types.PkgName); isPkg {
+					// This is a package.Type reference - write the qualified name
+					c.tsw.WriteLiterally(pkgIdent.Name)
+					c.tsw.WriteLiterally(".")
+					c.tsw.WriteLiterally(selectorExpr.Sel.Name)
+					return
+				}
+			}
+		}
+	}
+
 	// Get type information for the expression and use WriteGoType
 	typ := c.pkg.TypesInfo.TypeOf(a)
 	c.WriteGoType(typ, GoTypeContextGeneral)
