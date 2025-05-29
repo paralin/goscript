@@ -1,6 +1,9 @@
 package compiler
 
-import "go/ast"
+import (
+	"go/ast"
+	"go/types"
+)
 
 // WriteFieldList translates a Go field list (`ast.FieldList`), which can represent
 // function parameters, function results, or struct fields, into its TypeScript equivalent.
@@ -70,8 +73,19 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 
 		c.tsw.WriteLiterally(": ")
 		if ellipsis, ok := lastParam.Type.(*ast.Ellipsis); ok {
-			c.WriteTypeExpr(ellipsis.Elt)
-			c.tsw.WriteLiterally("[]")
+			// Get the actual variadic parameter type from the type checker
+			// This gives us the slice type (e.g., []interface{})
+			variadicType := c.pkg.TypesInfo.TypeOf(lastParam.Type)
+			if sliceType, isSlice := variadicType.(*types.Slice); isSlice {
+				// For variadic parameters, write the element type followed by []
+				// This handles interface{} properly by generating "any[]" instead of "null | any[]"
+				c.WriteGoType(sliceType.Elem(), GoTypeContextGeneral)
+				c.tsw.WriteLiterally("[]")
+			} else {
+				// Fallback to the original AST-based approach for edge cases
+				c.WriteTypeExpr(ellipsis.Elt)
+				c.tsw.WriteLiterally("[]")
+			}
 		}
 	} else {
 		// Handle regular parameter list for function declarations

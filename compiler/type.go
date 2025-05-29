@@ -9,16 +9,18 @@ import (
 )
 
 // GoTypeContext specifies the context in which a Go type is being translated to TypeScript.
-// This affects how certain types (especially pointers) are handled.
+// This affects how certain types are handled, particularly interfaces and pointers.
 type GoTypeContext int
 
 const (
 	// GoTypeContextGeneral is used for general type translation
 	GoTypeContextGeneral GoTypeContext = iota
 	// GoTypeContextFunctionReturn is used when translating types for function return values.
-	// In this context, pointer-to-struct types become `ClassName | null` instead of
-	// `$.VarRef<ClassName> | null` because function return values cannot be addressed.
+	// This affects how pointer types are handled (no VarRef wrapper for structs).
 	GoTypeContextFunctionReturn
+	// GoTypeContextVariadicParam is used when translating types for variadic parameter elements.
+	// This affects how interface{} types are handled (no null prefix).
+	GoTypeContextVariadicParam
 )
 
 // WriteGoType is the main dispatcher for translating Go types to their TypeScript
@@ -29,6 +31,7 @@ const (
 //   - GoTypeContextGeneral: Standard type translation
 //   - GoTypeContextFunctionReturn: Special handling for function return types where
 //     pointer-to-struct types become `ClassName | null` instead of `$.VarRef<ClassName> | null`
+//   - GoTypeContextVariadicParam: Special handling for variadic parameter elements
 //
 // It handles nil types as 'any' with a comment, and dispatches to appropriate
 // type-specific writers for all other recognized Go types.
@@ -59,7 +62,11 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 	case *types.Chan:
 		c.WriteChannelType(t)
 	case *types.Interface:
-		c.WriteInterfaceType(t, nil) // No ast.InterfaceType available here
+		if context == GoTypeContextVariadicParam {
+			c.writeInterfaceStructure(t, nil) // Skip the "null |" prefix for variadic params
+		} else {
+			c.WriteInterfaceType(t, nil) // No ast.InterfaceType available here
+		}
 	case *types.Signature:
 		c.WriteSignatureType(t)
 	case *types.Struct:

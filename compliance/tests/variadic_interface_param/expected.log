@@ -1,0 +1,16 @@
+Name: test1
+Values count: 3
+Value 0 is not nil
+Value 1 is not nil
+Value 2 is not nil
+Name: test2
+Values count: 2
+Value 0 is nil
+Value 1 is not nil
+Name: test3
+Values count: 0
+Name: test4
+Values count: 3
+Value 0 is not nil
+Value 1 is not nil
+Value 2 is not nil 
