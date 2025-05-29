@@ -72,9 +72,9 @@ export class CustomString {
 				const r = _runes[i]
 				{
 					if (r >= 97 && r <= 122) {
-						result += String.fromCharCode(r - 32)
+						result += $.runeOrStringToString(r - 32)
 					} else {
-						result += String.fromCharCode(r)
+						result += $.runeOrStringToString(r)
 					}
 				}
 			}

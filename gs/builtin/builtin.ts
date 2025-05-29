@@ -422,6 +422,23 @@ export function max(a: number, b: number): number {
   return Math.max(a, b)
 }
 
+/**
+ * Converts a rune (number) or string to a string.
+ * This is used to replace String.fromCharCode() in Go string(rune) conversions.
+ * Since sometimes single-char rune literals are compiled to strings, this function
+ * needs to handle both numbers (runes) and strings.
+ * 
+ * @param runeOrString A rune (Unicode code point as number) or a string
+ * @returns The resulting string
+ */
+export function runeOrStringToString(runeOrString: number | string): string {
+  if (typeof runeOrString === 'string') {
+    return runeOrString
+  }
+  // For numbers, use String.fromCharCode to convert the rune to a string
+  return String.fromCharCode(runeOrString)
+}
+
 // Panic recovery function (simplified implementation)
 export function recover(): any {
   // In a real implementation, this would interact with Go's panic/recover mechanism

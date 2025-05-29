@@ -37,23 +37,23 @@ export async function main(): Promise<void> {
 	console.log("\nTesting case conversion:")
 
 	// Test ToUpper
-	console.log("ToUpper('a'):", String.fromCharCode(unicode.ToUpper(97)))
-	console.log("ToUpper('Z'):", String.fromCharCode(unicode.ToUpper(90)))
+	console.log("ToUpper('a'):", $.runeOrStringToString(unicode.ToUpper(97)))
+	console.log("ToUpper('Z'):", $.runeOrStringToString(unicode.ToUpper(90)))
 
 	// Test ToLower
-	console.log("ToLower('A'):", String.fromCharCode(unicode.ToLower(65)))
-	console.log("ToLower('z'):", String.fromCharCode(unicode.ToLower(122)))
+	console.log("ToLower('A'):", $.runeOrStringToString(unicode.ToLower(65)))
+	console.log("ToLower('z'):", $.runeOrStringToString(unicode.ToLower(122)))
 
 	// Test ToTitle
-	console.log("ToTitle('a'):", String.fromCharCode(unicode.ToTitle(97)))
+	console.log("ToTitle('a'):", $.runeOrStringToString(unicode.ToTitle(97)))
 
 	// Test To function with constants
-	console.log("To(UpperCase, 'b'):", String.fromCharCode(unicode.To(unicode.UpperCase, 98)))
-	console.log("To(LowerCase, 'C'):", String.fromCharCode(unicode.To(unicode.LowerCase, 67)))
+	console.log("To(UpperCase, 'b'):", $.runeOrStringToString(unicode.To(unicode.UpperCase, 98)))
+	console.log("To(LowerCase, 'C'):", $.runeOrStringToString(unicode.To(unicode.LowerCase, 67)))
 
 	// Test SimpleFold
-	console.log("SimpleFold('A'):", String.fromCharCode(unicode.SimpleFold(65)))
-	console.log("SimpleFold('a'):", String.fromCharCode(unicode.SimpleFold(97)))
+	console.log("SimpleFold('A'):", $.runeOrStringToString(unicode.SimpleFold(65)))
+	console.log("SimpleFold('a'):", $.runeOrStringToString(unicode.SimpleFold(97)))
 
 	// Test constants
 	console.log("\nTesting constants:")

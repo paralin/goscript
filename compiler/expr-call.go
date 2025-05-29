@@ -22,7 +22,7 @@ import (
 // - `make(map[K]V)` becomes `$.makeMap<K_ts, V_ts>()`.
 // - `make([]T, len, cap)` becomes `$.makeSlice<T_ts>(len, cap)`.
 // - `make([]byte, len, cap)` becomes `new Uint8Array(len)`.
-// - `string(runeVal)` becomes `String.fromCharCode(runeVal)`.
+// - `string(runeVal)` becomes `$.runeOrStringToString(runeVal)`.
 // - `string([]runeVal)` becomes `$.runesToString(sliceVal)`.
 // - `string([]byteVal)` becomes `$.bytesToString(sliceVal)`.
 // - `[]rune(stringVal)` becomes `$.stringToRunes(stringVal)“.
@@ -830,9 +830,9 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				if isCallExpr {
 					// Check if it's a call to rune()
 					if innerFunIdent, innerFunIsIdent := innerCall.Fun.(*ast.Ident); innerFunIsIdent && innerFunIdent.String() == "rune" {
-						// Translate string(rune(val)) to String.fromCharCode(val)
+						// Translate string(rune(val)) to $.runeOrStringToString(val)
 						if len(innerCall.Args) == 1 {
-							c.tsw.WriteLiterally("String.fromCharCode(")
+							c.tsw.WriteLiterally("$.runeOrStringToString(")
 							if err := c.WriteValueExpr(innerCall.Args[0]); err != nil {
 								return fmt.Errorf("failed to write argument for string(rune) conversion: %w", err)
 							}
@@ -855,8 +855,8 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					}
 
 					if basic, isBasic := tv.Type.Underlying().(*types.Basic); isBasic && (basic.Kind() == types.Int32 || basic.Kind() == types.UntypedRune) {
-						// Translate string(rune_val) to String.fromCharCode(rune_val)
-						c.tsw.WriteLiterally("String.fromCharCode(")
+						// Translate string(rune_val) to $.runeOrStringToString(rune_val)
+						c.tsw.WriteLiterally("$.runeOrStringToString(")
 						if err := c.WriteValueExpr(arg); err != nil {
 							return fmt.Errorf("failed to write argument for string(int32) conversion: %w", err)
 						}

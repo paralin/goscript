@@ -56,10 +56,10 @@ let totalMessages: number = 8
 // A worker function that will be called as a goroutine
 export async function worker(id: number): Promise<void> {
 	// Send worker starting message
-	await $.chanSend(messages, new Message({priority: 10 + id, text: "Worker " + String.fromCharCode(48 + id) + " starting"}))
+	await $.chanSend(messages, new Message({priority: 10 + id, text: "Worker " + $.runeOrStringToString(48 + id) + " starting"}))
 
 	// Send worker done message
-	await $.chanSend(messages, new Message({priority: 20 + id, text: "Worker " + String.fromCharCode(48 + id) + " done"}))
+	await $.chanSend(messages, new Message({priority: 20 + id, text: "Worker " + $.runeOrStringToString(48 + id) + " done"}))
 }
 
 // Another worker function to test multiple different goroutines

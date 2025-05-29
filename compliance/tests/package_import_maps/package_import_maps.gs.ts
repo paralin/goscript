@@ -40,7 +40,7 @@ export async function main(): Promise<void> {
 			{
 				// Simple assignment that should trigger the error
 				let [x, y] = getValue()
-				let result = k + x + String.fromCharCode(v + y)
+				let result = k + x + $.runeOrStringToString(v + y)
 				results = $.append(results, result)
 			}
 			return shouldContinue
@@ -53,7 +53,7 @@ export async function main(): Promise<void> {
 		simpleIterator(m)!((k, v) => {
 			{
 				let [x, y] = getValue()
-				let result = k + x + String.fromCharCode(v + y) + "_local"
+				let result = k + x + $.runeOrStringToString(v + y) + "_local"
 				results = $.append(results, result)
 			}
 			return shouldContinue
