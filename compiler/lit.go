@@ -76,12 +76,7 @@ func (c *GoToTSCompiler) WriteBasicLit(exp *ast.BasicLit) {
 			// Check if the raw string contains backslashes that would be problematic in template literals
 			if strings.Contains(content, `\`) {
 				// Convert to a regular string literal with proper escaping
-				// Replace backslashes with double backslashes for TypeScript
-				content = strings.ReplaceAll(content, `\`, `\\`)
-				// Replace double quotes with escaped double quotes
-				content = strings.ReplaceAll(content, `"`, `\"`)
-				// Write as a regular string literal
-				c.tsw.WriteLiterallyf(`"%s"`, content)
+				c.tsw.WriteLiterallyf("%q", content)
 			} else {
 				// No backslashes, safe to use template literal
 				// Escape invalid \x, \u, and \U sequences that would cause TS1125 errors
