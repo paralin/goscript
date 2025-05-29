@@ -210,11 +210,19 @@ export function MakeChan(typ: Type, buffer: number): Value {
 export function Select(cases: $.Slice<SelectCase>): [number, Value, boolean] {
   // Extract the backing array from the GoScript slice
   let selectCases: SelectCase[] = []
-  if (cases && typeof cases === 'object' && '__meta__' in cases) {
-    // This is a GoScript slice, extract the backing array
-    const meta = (cases as { __meta__?: { backing?: SelectCase[] } }).__meta__
-    if (meta && meta.backing) {
-      selectCases = meta.backing
+  
+  if (cases && typeof cases === 'object') {
+    if ('__meta__' in cases) {
+      // This is a GoScript SliceProxy, extract the backing array
+      const meta = (cases as { __meta__?: { backing?: SelectCase[], offset?: number, length?: number } }).__meta__
+      if (meta && meta.backing) {
+        const offset = meta.offset ?? 0
+        const length = meta.length ?? meta.backing.length
+        selectCases = meta.backing.slice(offset, offset + length)
+      }
+    } else if (globalThis.Array.isArray(cases)) {
+      // This is a plain array (optimized case where offset=0 and length=capacity)
+      selectCases = cases as SelectCase[]
     }
   }
 
