@@ -1,0 +1,22 @@
+Base: file.txt
+Dir: dir/subdir
+Ext: .txt
+Clean: dir/subdir/file.txt
+Join: dir/subdir/file.txt
+Split dir: dir/subdir/
+Split file: file.txt
+IsAbs /absolute/path: true
+IsAbs relative/path: false
+ToSlash: dir\subdir\file.txt
+FromSlash: dir/subdir/file.txt
+VolumeName: 
+Match *.txt file.txt: true
+Match dir/* dir/file.txt: true
+HasPrefix /usr/local/bin /usr/local: true
+IsLocal file.txt: true
+IsLocal ../file.txt: false
+SplitList length: 3
+SplitList 0 : /usr/bin
+SplitList 1 : /usr/local/bin
+SplitList 2 : /bin
+test finished

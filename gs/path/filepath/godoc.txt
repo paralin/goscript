@@ -1,0 +1,35 @@
+package filepath // import "path/filepath"
+
+Package filepath implements utility routines for manipulating filename paths in
+a way compatible with the target operating system-defined file paths.
+
+The filepath package uses either forward slashes or backslashes, depending on
+the operating system. To process paths such as URLs that always use forward
+slashes regardless of the operating system, see the path package.
+
+const Separator = os.PathSeparator ...
+var ErrBadPattern = errors.New("syntax error in pattern")
+var SkipAll error = fs.SkipAll
+var SkipDir error = fs.SkipDir
+func Abs(path string) (string, error)
+func Base(path string) string
+func Clean(path string) string
+func Dir(path string) string
+func EvalSymlinks(path string) (string, error)
+func Ext(path string) string
+func FromSlash(path string) string
+func Glob(pattern string) (matches []string, err error)
+func HasPrefix(p, prefix string) bool
+func IsAbs(path string) bool
+func IsLocal(path string) bool
+func Join(elem ...string) string
+func Localize(path string) (string, error)
+func Match(pattern, name string) (matched bool, err error)
+func Rel(basepath, targpath string) (string, error)
+func Split(path string) (dir, file string)
+func SplitList(path string) []string
+func ToSlash(path string) string
+func VolumeName(path string) string
+func Walk(root string, fn WalkFunc) error
+func WalkDir(root string, fn fs.WalkDirFunc) error
+type WalkFunc func(path string, info fs.FileInfo, err error) error

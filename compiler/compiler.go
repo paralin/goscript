@@ -934,13 +934,9 @@ func (c *GoToTSCompiler) writeConstantValue(constObj *types.Const) {
 
 // copyEmbeddedPackage recursively copies files from an embedded FS path to a filesystem directory.
 // It handles both regular files and directories, but only copies .gs.ts and .ts files.
+// It preserves existing subdirectories that aren't being overwritten.
 func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) error {
-	// Remove the output path if it exists
-	if err := os.RemoveAll(outputPath); err != nil {
-		return fmt.Errorf("failed to remove output directory %s: %w", outputPath, err)
-	}
-
-	// Create the output path
+	// Create the output path if it doesn't exist
 	if err := os.MkdirAll(outputPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create output directory %s: %w", outputPath, err)
 	}
@@ -972,6 +968,13 @@ func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) e
 			if !strings.HasSuffix(fileName, ".gs.ts") && !strings.HasSuffix(fileName, ".ts") {
 				// c.le.Debugf("Skipping non-TypeScript file: %s", fileName)
 				continue
+			}
+
+			// Remove existing file if it exists (but preserve directories)
+			if stat, err := os.Stat(outputEntryPath); err == nil && !stat.IsDir() {
+				if err := os.Remove(outputEntryPath); err != nil {
+					return fmt.Errorf("failed to remove existing file %s: %w", outputEntryPath, err)
+				}
 			}
 
 			// Read the file content from the embedded FS
@@ -1133,11 +1136,6 @@ func (c *Compiler) copyGsPackageWithDependencies(packagePath string, processedPa
 
 	// Compute output path for this package
 	outputPath := ComputeModulePath(c.config.OutputPath, packagePath)
-
-	// Remove existing directory if it exists
-	if err := os.RemoveAll(outputPath); err != nil {
-		return fmt.Errorf("failed to remove existing output directory for %s: %w", packagePath, err)
-	}
 
 	// Create the output directory
 	if err := os.MkdirAll(outputPath, 0o755); err != nil {
