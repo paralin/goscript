@@ -1,49 +1,23 @@
 package main
 
-import (
-	"os"
-	"path/filepath"
-)
-
-type FileInfo interface {
-	Name() string
+func firstFunc() (string, int) {
+	return "", 42
 }
 
-type mockFileInfo struct {
-	name string
-}
-
-func (m mockFileInfo) Name() string {
-	return m.name
-}
-
-type mockFS struct{}
-
-func (fs mockFS) Lstat(filename string) (FileInfo, error) {
-	if filename == "error.txt" {
-		return nil, os.ErrNotExist
+func secondFunc(x int) int {
+	if x != 0 {
+		println("Got value:", x)
+		return 0
 	}
-	return mockFileInfo{name: filename}, nil
-}
-
-func walkFn(filename string, info FileInfo, err error) error {
-	if err != nil {
-		println("Error walking:", filename, "error:", err.Error())
-		return nil
-	}
-	println("File:", filename)
-	return nil
+	return 99
 }
 
 func main() {
-	fs := mockFS{}
-	filename := "error.txt"
-
-	fileInfo, err := fs.Lstat(filename)
-	if err := walkFn(filename, fileInfo, err); err != nil && err != filepath.SkipDir {
-		println("Walk function returned error")
+	_, x := firstFunc()
+	// This is the problematic pattern: x is shadowed but also used in the call
+	if x := secondFunc(x); x != 0 {
+		println("Function returned value")
 		return
 	}
-
-	println("Walk completed successfully")
+	println("Completed successfully")
 }
