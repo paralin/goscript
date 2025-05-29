@@ -194,7 +194,7 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 
 	// If DisableEmitBuiltin is false, we need to copy the builtin package to the output directory
 	if !c.config.DisableEmitBuiltin {
-		c.le.Infof("Copying builtin package to output directory")
+		c.le.Debugf("Copying builtin package to output directory")
 		builtinPath := "gs/builtin"
 		outputPath := ComputeModulePath(c.config.OutputPath, "builtin")
 		if err := c.copyEmbeddedPackage(builtinPath, outputPath); err != nil {
@@ -218,7 +218,7 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			}
 			if gsErr == nil {
 				if c.config.DisableEmitBuiltin {
-					c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
+					// c.le.Infof("Skipping compilation for overridden package %s", pkg.PkgPath)
 					result.CopiedPackages = append(result.CopiedPackages, pkg.PkgPath)
 					continue
 				} else {
@@ -245,6 +245,8 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 		if err := pkgCompiler.Compile(ctx); err != nil {
 			return nil, fmt.Errorf("failed to compile package %s: %w", pkg.PkgPath, err)
 		}
+
+		c.le.Info(pkg.PkgPath)
 
 		result.CompiledPackages = append(result.CompiledPackages, pkg.PkgPath)
 	}
@@ -338,7 +340,7 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 			}
 		}
 
-		c.le.WithField("file", relWdFileName).Debug("compiling file")
+		c.le.Debugf("GS: %s", relWdFileName)
 		if err := c.CompileFile(ctx, fileName, f, packageAnalysis); err != nil {
 			return err
 		}
@@ -1112,9 +1114,11 @@ func (c *Compiler) copyGsPackageWithDependencies(packagePath string, processedPa
 	}
 
 	// Log dependencies if any are found
-	if len(metadata.Dependencies) > 0 {
-		c.le.Infof("Package %s has dependencies: %v", packagePath, metadata.Dependencies)
-	}
+	/*
+		if len(metadata.Dependencies) > 0 {
+			c.le.Debugf("Package %s has dependencies: %v", packagePath, metadata.Dependencies)
+		}
+	*/
 
 	// First, recursively process all dependencies
 	for _, depPath := range metadata.Dependencies {
@@ -1124,7 +1128,7 @@ func (c *Compiler) copyGsPackageWithDependencies(packagePath string, processedPa
 	}
 
 	// Now copy the package itself
-	c.le.Infof("Copying handwritten package %s to output directory", packagePath)
+	// c.le.Debugf("Copying handwritten package %s to output directory", packagePath)
 
 	// Compute output path for this package
 	outputPath := ComputeModulePath(c.config.OutputPath, packagePath)
