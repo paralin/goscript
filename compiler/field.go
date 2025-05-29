@@ -79,7 +79,7 @@ func (c *GoToTSCompiler) WriteFieldList(a *ast.FieldList, isArguments bool) {
 			if sliceType, isSlice := variadicType.(*types.Slice); isSlice {
 				// For variadic parameters, write the element type followed by []
 				// This handles interface{} properly by generating "any[]" instead of "null | any[]"
-				c.WriteGoType(sliceType.Elem(), GoTypeContextGeneral)
+				c.WriteGoType(sliceType.Elem(), GoTypeContextVariadicParam)
 				c.tsw.WriteLiterally("[]")
 			} else {
 				// Fallback to the original AST-based approach for edge cases

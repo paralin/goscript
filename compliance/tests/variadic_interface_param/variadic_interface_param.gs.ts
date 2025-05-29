@@ -5,7 +5,7 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 // testVariadicInterface tests the TypeScript generation for functions
 // with variadic ...interface{} parameters
-export function testVariadicInterface(name: string, ...values: null | any[]): void {
+export function testVariadicInterface(name: string, ...values: any[]): void {
 	console.log("Name:", name)
 	console.log("Values count:", $.len(values))
 
