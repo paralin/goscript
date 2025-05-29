@@ -488,8 +488,36 @@ export function HasSuffix(s: $.Bytes, suffix: $.Bytes): boolean {
 // dropped from the byte slice with no replacement. The characters in s and the
 // output are interpreted as UTF-8-encoded code points.
 export function Map(mapping: ((r: number) => number) | null, s: $.Bytes): $.Bytes {
-	// TODO: Implement Map function with proper UTF-8 handling
-	throw new Error("Map: not implemented")
+	if (s === null || $.len(s) === 0 || mapping === null) {
+		return s === null ? null : new Uint8Array(0)
+	}
+	
+	const result: number[] = []
+	
+	for (let i = 0; i < $.len(s); ) {
+		const [r, size] = utf8.DecodeRune($.goSlice(s, i, undefined))
+		if (size <= 0) {
+			// Invalid UTF-8, copy the byte as-is
+			result.push(s![i])
+			i++
+		} else {
+			const mappedR = mapping(r)
+			if (mappedR >= 0) {
+				// Encode the mapped rune back to bytes
+				const runeBytes = new Uint8Array(utf8.UTFMax)
+				const n = utf8.EncodeRune(runeBytes, mappedR)
+				
+				// Add the encoded bytes to result
+				for (let j = 0; j < n; j++) {
+					result.push(runeBytes[j])
+				}
+			}
+			
+			i += size
+		}
+	}
+	
+	return new Uint8Array(result)
 }
 
 // Repeat returns a new byte slice consisting of count copies of b.
@@ -607,29 +635,51 @@ export function ToTitle(s: $.Bytes): $.Bytes {
 // ToUpperSpecial treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their
 // upper case, giving priority to the special casing rules.
 export function ToUpperSpecial(c: unicode.SpecialCase, s: $.Bytes): $.Bytes {
-	// TODO: Fix SpecialCase method calls
-	throw new Error("ToUpperSpecial: not implemented")
+	// For now, ignore special case and fall back to regular ToUpper
+	return ToUpper(s)
 }
 
 // ToLowerSpecial treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their
 // lower case, giving priority to the special casing rules.
 export function ToLowerSpecial(c: unicode.SpecialCase, s: $.Bytes): $.Bytes {
-	// TODO: Fix SpecialCase method calls
-	throw new Error("ToLowerSpecial: not implemented")
+	// For now, ignore special case and fall back to regular ToLower
+	return ToLower(s)
 }
 
 // ToTitleSpecial treats s as UTF-8-encoded bytes and returns a copy with all the Unicode letters mapped to their
 // title case, giving priority to the special casing rules.
 export function ToTitleSpecial(c: unicode.SpecialCase, s: $.Bytes): $.Bytes {
-	// TODO: Fix SpecialCase method calls
-	throw new Error("ToTitleSpecial: not implemented")
+	// For now, ignore special case and fall back to regular ToTitle
+	return ToTitle(s)
 }
 
 // ToValidUTF8 treats s as UTF-8-encoded bytes and returns a copy with each run of bytes
 // representing invalid UTF-8 replaced with the bytes in replacement, which may be empty.
 export function ToValidUTF8(s: $.Bytes, replacement: $.Bytes): $.Bytes {
-	// TODO: Implement ToValidUTF8 with proper UTF-8 validation
-	throw new Error("ToValidUTF8: not implemented")
+	if (s === null || $.len(s) === 0) {
+		return s === null ? null : new Uint8Array(0)
+	}
+	
+	const result: number[] = []
+	const replacementArr = replacement ? $.bytesToArray(replacement) : []
+	
+	for (let i = 0; i < $.len(s); ) {
+		const [r, size] = utf8.DecodeRune($.goSlice(s, i, undefined))
+		if (size <= 0 || r === utf8.RuneError) {
+			// Invalid UTF-8, replace with replacement bytes
+			for (const b of replacementArr) {
+				result.push(b)
+			}
+			i++
+		} else {
+			for (let j = 0; j < size; j++) {
+				result.push(s![i + j])
+			}
+			i += size
+		}
+	}
+	
+	return new Uint8Array(result)
 }
 
 // isSeparator reports whether the rune could mark a word boundary.
@@ -659,8 +709,41 @@ export function isSeparator(r: number): boolean {
 // Deprecated: The rule Title uses for word boundaries does not handle Unicode
 // punctuation properly. Use golang.org/x/text/cases instead.
 export function Title(s: $.Bytes): $.Bytes {
-	// TODO: Implement Title function properly
-	throw new Error("Title: not implemented")
+	if (s === null || $.len(s) === 0) {
+		return s === null ? null : new Uint8Array(0)
+	}
+	
+	const result: number[] = []
+	let prevIsSep = true  // Start of string counts as separator
+	
+	for (let i = 0; i < $.len(s); ) {
+		const [r, size] = utf8.DecodeRune($.goSlice(s, i, undefined))
+		if (size <= 0) {
+			// Invalid UTF-8, copy the byte as-is
+			result.push(s![i])
+			i++
+			prevIsSep = true
+		} else {
+			let transformedR = r
+			if (prevIsSep && unicode.IsLetter(r)) {
+				transformedR = unicode.ToTitle(r)
+			}
+			
+			// Encode the (possibly transformed) rune back to bytes
+			const runeBytes = new Uint8Array(utf8.UTFMax)
+			const n = utf8.EncodeRune(runeBytes, transformedR)
+			
+			// Add the encoded bytes to result
+			for (let j = 0; j < n; j++) {
+				result.push(runeBytes[j])
+			}
+			
+			prevIsSep = isSeparator(r)
+			i += size
+		}
+	}
+	
+	return new Uint8Array(result)
 }
 
 // TrimLeftFunc treats s as UTF-8-encoded bytes and returns a subslice of s by slicing off
@@ -1119,8 +1202,33 @@ export function ReplaceAll(s: $.Bytes, old: $.Bytes, _new: $.Bytes): $.Bytes {
 // are equal under simple Unicode case-folding, which is a more general
 // form of case-insensitivity.
 export function EqualFold(s: $.Bytes, t: $.Bytes): boolean {
-	// TODO: Implement EqualFold function properly (complex Unicode folding logic)
-	throw new Error("EqualFold: not implemented")
+	if (s === null && t === null) return true
+	if (s === null || t === null) return false
+	
+	let si = 0, ti = 0
+	
+	while (si < $.len(s) && ti < $.len(t)) {
+		const [sr, ssize] = utf8.DecodeRune($.goSlice(s, si, undefined))
+		const [tr, tsize] = utf8.DecodeRune($.goSlice(t, ti, undefined))
+		
+		if (ssize <= 0 || tsize <= 0) {
+			// Invalid UTF-8, fall back to byte comparison
+			if (s![si] !== t![ti]) return false
+			si++
+			ti++
+		} else {
+			// Convert both to lowercase for comparison
+			const sLower = unicode.ToLower(sr)
+			const tLower = unicode.ToLower(tr)
+			
+			if (sLower !== tLower) return false
+			
+			si += ssize
+			ti += tsize
+		}
+	}
+	
+	return si === $.len(s) && ti === $.len(t)
 }
 
 // Index returns the index of the first instance of sep in s, or -1 if sep is not present in s.
