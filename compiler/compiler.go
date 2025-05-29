@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"go/ast"
 	"go/constant"
+	"go/parser"
 	"go/token"
 	"go/types"
 	"os"
@@ -202,6 +203,9 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 		result.CopiedPackages = append(result.CopiedPackages, "builtin")
 	}
 
+	// Track which gs packages have been processed to avoid duplicates
+	processedGsPackages := make(map[string]bool)
+
 	// Compile all packages
 	for _, pkg := range pkgs {
 		// Check if the package has a handwritten equivalent
@@ -218,28 +222,10 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 					result.CopiedPackages = append(result.CopiedPackages, pkg.PkgPath)
 					continue
 				} else {
-					// If DisableEmitBuiltin is false, we need to copy the handwritten package to the output directory
-					c.le.Infof("Copying handwritten package %s to output directory", pkg.PkgPath)
-
-					// Compute output path for this package
-					outputPath := ComputeModulePath(c.config.OutputPath, pkg.PkgPath)
-
-					// Remove existing directory if it exists
-					if err := os.RemoveAll(outputPath); err != nil {
-						return nil, fmt.Errorf("failed to remove existing output directory for %s: %w", pkg.PkgPath, err)
+					// If DisableEmitBuiltin is false, we need to copy the handwritten package and its dependencies
+					if err := c.copyGsPackageWithDependencies(pkg.PkgPath, processedGsPackages, result); err != nil {
+						return nil, fmt.Errorf("failed to copy handwritten package %s with dependencies: %w", pkg.PkgPath, err)
 					}
-
-					// Create the output directory
-					if err := os.MkdirAll(outputPath, 0o755); err != nil {
-						return nil, fmt.Errorf("failed to create output directory for %s: %w", pkg.PkgPath, err)
-					}
-
-					// Copy files from embedded FS to output directory
-					if err := c.copyEmbeddedPackage(gsSourcePath, outputPath); err != nil {
-						return nil, fmt.Errorf("failed to copy embedded package %s: %w", pkg.PkgPath, err)
-					}
-
-					result.CopiedPackages = append(result.CopiedPackages, pkg.PkgPath)
 					continue
 				}
 			}
@@ -998,5 +984,166 @@ func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) e
 		}
 	}
 
+	return nil
+}
+
+// GsPackageMetadata holds metadata about a gs/ package
+type GsPackageMetadata struct {
+	// Dependencies lists the import paths that this gs/ package requires
+	Dependencies []string
+}
+
+// ReadGsPackageMetadata reads dependency metadata from .go files in a gs/ package
+// It looks for a var variable named "GsDependencies" which should be a slice of strings
+// containing the import paths that this package depends on.
+func (c *Compiler) ReadGsPackageMetadata(gsSourcePath string) (*GsPackageMetadata, error) {
+	metadata := &GsPackageMetadata{
+		Dependencies: []string{},
+	}
+
+	// Check if there are any .go files in the gs package directory
+	entries, err := gs.GsOverrides.ReadDir(gsSourcePath)
+	if err != nil {
+		return metadata, nil // No metadata files, return empty metadata
+	}
+
+	// Look for .go files containing metadata
+	for _, entry := range entries {
+		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") {
+			metadataFilePath := filepath.Join(gsSourcePath, entry.Name())
+
+			// Read the .go file content
+			content, err := gs.GsOverrides.ReadFile(metadataFilePath)
+			if err != nil {
+				continue // Skip files we can't read
+			}
+
+			// Parse the file to extract metadata
+			if deps, err := c.extractDependenciesFromGoFile(content); err == nil {
+				metadata.Dependencies = append(metadata.Dependencies, deps...)
+			}
+		}
+	}
+
+	return metadata, nil
+}
+
+// extractDependenciesFromGoFile parses a .go file and extracts the GsDependencies var
+func (c *Compiler) extractDependenciesFromGoFile(content []byte) ([]string, error) {
+	// Parse the Go file
+	fset := token.NewFileSet()
+	file, err := parser.ParseFile(fset, "metadata.go", content, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	var dependencies []string
+
+	// Look for var declarations
+	for _, decl := range file.Decls {
+		if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.VAR {
+			for _, spec := range genDecl.Specs {
+				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
+					for i, name := range valueSpec.Names {
+						if name.Name == "GsDependencies" {
+							// Found the GsDependencies var, extract its value
+							if i < len(valueSpec.Values) {
+								if deps := c.extractStringSliceFromExpr(valueSpec.Values[i]); deps != nil {
+									dependencies = append(dependencies, deps...)
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return dependencies, nil
+}
+
+// extractStringSliceFromExpr extracts string values from a composite literal expression
+func (c *Compiler) extractStringSliceFromExpr(expr ast.Expr) []string {
+	var result []string
+
+	if compLit, ok := expr.(*ast.CompositeLit); ok {
+		for _, elt := range compLit.Elts {
+			if basicLit, ok := elt.(*ast.BasicLit); ok && basicLit.Kind == token.STRING {
+				// Remove quotes from string literal
+				value := basicLit.Value
+				if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
+					result = append(result, value[1:len(value)-1])
+				}
+			}
+		}
+	}
+
+	return result
+}
+
+// copyGsPackageWithDependencies copies a gs/ package and all its dependencies recursively
+// It tracks already processed packages to avoid infinite loops and duplicate work
+func (c *Compiler) copyGsPackageWithDependencies(packagePath string, processedPackages map[string]bool, result *CompilationResult) error {
+	// Check if we've already processed this package
+	if processedPackages[packagePath] {
+		return nil
+	}
+
+	// Mark this package as being processed
+	processedPackages[packagePath] = true
+
+	gsSourcePath := "gs/" + packagePath
+
+	// Check if the gs package actually exists
+	_, gsErr := gs.GsOverrides.ReadDir(gsSourcePath)
+	if gsErr != nil {
+		if os.IsNotExist(gsErr) {
+			c.le.Debugf("gs package %s does not exist, skipping", packagePath)
+			return nil
+		}
+		return gsErr
+	}
+
+	// Read metadata to get dependencies
+	metadata, err := c.ReadGsPackageMetadata(gsSourcePath)
+	if err != nil {
+		c.le.WithError(err).Warnf("Failed to read metadata for gs package %s, continuing without dependencies", packagePath)
+		metadata = &GsPackageMetadata{Dependencies: []string{}}
+	}
+
+	// Log dependencies if any are found
+	if len(metadata.Dependencies) > 0 {
+		c.le.Infof("Package %s has dependencies: %v", packagePath, metadata.Dependencies)
+	}
+
+	// First, recursively process all dependencies
+	for _, depPath := range metadata.Dependencies {
+		if err := c.copyGsPackageWithDependencies(depPath, processedPackages, result); err != nil {
+			return fmt.Errorf("failed to copy dependency %s of package %s: %w", depPath, packagePath, err)
+		}
+	}
+
+	// Now copy the package itself
+	c.le.Infof("Copying handwritten package %s to output directory", packagePath)
+
+	// Compute output path for this package
+	outputPath := ComputeModulePath(c.config.OutputPath, packagePath)
+
+	// Remove existing directory if it exists
+	if err := os.RemoveAll(outputPath); err != nil {
+		return fmt.Errorf("failed to remove existing output directory for %s: %w", packagePath, err)
+	}
+
+	// Create the output directory
+	if err := os.MkdirAll(outputPath, 0o755); err != nil {
+		return fmt.Errorf("failed to create output directory for %s: %w", packagePath, err)
+	}
+
+	// Copy files from embedded FS to output directory
+	if err := c.copyEmbeddedPackage(gsSourcePath, outputPath); err != nil {
+		return fmt.Errorf("failed to copy embedded package %s: %w", packagePath, err)
+	}
+
+	result.CopiedPackages = append(result.CopiedPackages, packagePath)
 	return nil
 }
