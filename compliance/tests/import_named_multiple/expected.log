@@ -6,9 +6,7 @@ baz.Split[ 0 ]: a
 baz.Split[ 1 ]: b
 baz.Split[ 2 ]: c
 strings.Count: 2
-strings.Split: {
-  __meta__: { backing: [ 'a', 'b', 'c' ], offset: 0, length: 3, capacity: 3 }
-}
+strings.Split: [ 'a', 'b', 'c' ]
 strings.Join: a,b,c
 strings.Replace: a,d,c
 strings.ReplaceAll: a,d,c
@@ -23,11 +21,7 @@ strings.TrimRight: he
 strings.Contains: true
 strings.ContainsAny: true
 strings.EqualFold: true
-strings.Fields: {
-  __meta__: { backing: [ 'hello', 'world' ], offset: 0, length: 2, capacity: 2 }
-}
-strings.FieldsFunc: {
-  __meta__: { backing: [ 'hello', 'world' ], offset: 0, length: 2, capacity: 2 }
-}
+strings.Fields: [ 'hello', 'world' ]
+strings.FieldsFunc: [ 'hello', 'world' ]
 strings.HasPrefix: true
 strings.HasSuffix: true

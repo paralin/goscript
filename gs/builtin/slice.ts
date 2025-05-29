@@ -192,6 +192,11 @@ export const makeSlice = <T>(
   // The rest of backingArr (from length to actualCapacity-1) remains uninitialized (undefined),
   // representing available capacity.
 
+  // OPTIMIZATION: If length equals capacity, return backing array directly
+  if (length === actualCapacity) {
+    return backingArr as Slice<T>
+  }
+
   // The proxyTargetArray serves as the shell for the proxy.
   // Its elements up to 'length' should reflect the initialized part of the slice.
   const proxyTargetArray = new Array<T>(length)
@@ -252,7 +257,7 @@ export const makeSlice = <T>(
     },
   }
 
-  return new Proxy(proxy, handler) as Slice<T>
+  return new Proxy(proxy, handler) as unknown as SliceProxy<T>
 }
 
 /**
@@ -454,6 +459,11 @@ export const goSlice = <T>( // T can be number for Uint8Array case
   const newLength = high - low
   const newOffset = oldOffset + low
 
+  // OPTIMIZATION: If the result would have offset=0 and length=capacity, return backing directly
+  if (newOffset === 0 && newLength === newCap) {
+    return backing as Slice<T>
+  }
+
   // Create an array-like target with the correct length
   const proxyTargetArray = new Array<T>(newLength)
   // Note: We don't need to initialize the values here since the proxy handler
@@ -486,6 +496,12 @@ export const arrayToSlice = <T>(
   if (arr == null) return [] as T[]
 
   if (arr.length === 0) return arr
+
+  // OPTIMIZATION: For arrays where offset=0 and length=capacity, return the array directly
+  // if we're not doing deep conversion
+  if (depth === 1) {
+    return arr as Slice<T>
+  }
 
   const target = {
     __meta__: {
