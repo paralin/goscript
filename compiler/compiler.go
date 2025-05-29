@@ -141,7 +141,7 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			// Check if this package has a handwritten equivalent
 			if hasHandwrittenEquivalent(pkg.PkgPath) {
 				// Add this package but don't visit its dependencies
-				c.le.Debugf("Skipping dependencies of handwritten package: %s", pkg.PkgPath)
+				// c.le.Debugf("Skipping dependencies of handwritten package: %s", pkg.PkgPath)
 				return
 			}
 
@@ -149,13 +149,13 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			for _, imp := range pkg.Imports {
 				// Skip protobuf-go-lite packages and their dependencies
 				if isProtobufGoLitePackage(imp.PkgPath) {
-					c.le.Debugf("Skipping protobuf-go-lite package: %s", imp.PkgPath)
+					// c.le.Debugf("Skipping protobuf-go-lite package: %s", imp.PkgPath)
 					continue
 				}
 
 				// Skip packages that are only used by .pb.go files
 				if isPackageOnlyUsedByProtobufFiles(pkg, imp.PkgPath) {
-					c.le.Debugf("Skipping package only used by .pb.go files: %s", imp.PkgPath)
+					// c.le.Debugf("Skipping package only used by .pb.go files: %s", imp.PkgPath)
 					continue
 				}
 
@@ -340,7 +340,8 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 			}
 		}
 
-		c.le.Debugf("GS: %s", relWdFileName)
+		// log just the filename
+		c.le.Debugf("GS: %s", filepath.Base(fileName))
 		if err := c.CompileFile(ctx, fileName, f, packageAnalysis); err != nil {
 			return err
 		}
@@ -969,7 +970,7 @@ func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) e
 			// Only copy .gs.ts and .ts files, skip .go files and others
 			fileName := entry.Name()
 			if !strings.HasSuffix(fileName, ".gs.ts") && !strings.HasSuffix(fileName, ".ts") {
-				c.le.Debugf("Skipping non-TypeScript file: %s", fileName)
+				// c.le.Debugf("Skipping non-TypeScript file: %s", fileName)
 				continue
 			}
 
