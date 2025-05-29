@@ -271,4 +271,4 @@ describe('path/filepath - Pattern matching functions', () => {
       expect(match2).toBe(true)
     })
   })
-}) 
+})

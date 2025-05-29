@@ -1,8 +1,23 @@
 import { describe, it, expect } from 'vitest'
 import {
-  Base, Dir, Ext, Clean, Join, Split, IsAbs, ToSlash, FromSlash,
-  VolumeName, IsLocal, SplitList, HasPrefix, Abs, Rel, EvalSymlinks,
-  Separator, ListSeparator
+  Base,
+  Dir,
+  Ext,
+  Clean,
+  Join,
+  Split,
+  IsAbs,
+  ToSlash,
+  FromSlash,
+  VolumeName,
+  IsLocal,
+  SplitList,
+  HasPrefix,
+  Abs,
+  Rel,
+  EvalSymlinks,
+  Separator,
+  ListSeparator,
 } from './path.js'
 
 describe('path/filepath - Path manipulation functions', () => {
@@ -44,7 +59,9 @@ describe('path/filepath - Path manipulation functions', () => {
 
   describe('Clean', () => {
     it('should clean up path by resolving . and .. elements', () => {
-      expect(Clean('dir//subdir/../subdir/./file.txt')).toBe('dir/subdir/file.txt')
+      expect(Clean('dir//subdir/../subdir/./file.txt')).toBe(
+        'dir/subdir/file.txt',
+      )
       expect(Clean('/dir/../file')).toBe('/file')
       expect(Clean('./file')).toBe('file')
       expect(Clean('../file')).toBe('../file')
@@ -127,7 +144,9 @@ describe('path/filepath - Path manipulation functions', () => {
   describe('SplitList', () => {
     it('should split PATH-style lists', () => {
       expect(SplitList('/usr/bin:/usr/local/bin:/bin')).toEqual([
-        '/usr/bin', '/usr/local/bin', '/bin'
+        '/usr/bin',
+        '/usr/local/bin',
+        '/bin',
       ])
       expect(SplitList('')).toEqual([])
       expect(SplitList('/single/path')).toEqual(['/single/path'])
@@ -196,11 +215,11 @@ describe('Complex path operations', () => {
     expect(Clean('/a/b/../c/./d/')).toBe('/a/c/d')
     expect(Clean('a/b/../../c')).toBe('c')
     expect(Clean('../../a/b')).toBe('../../a/b')
-    
+
     // Test Join with various inputs
     expect(Join('/a', '../b', 'c')).toBe('/b/c')
     expect(Join('a', '/b', 'c')).toBe('/b/c')
-    
+
     // Test Split edge cases
     expect(Split('/a/')).toEqual(['/a/', ''])
     expect(Split('//a')).toEqual(['//', 'a'])
@@ -212,16 +231,16 @@ describe('Complex path operations', () => {
       '/absolute/path',
       'path/with/../dots',
       './relative/path',
-      '../../parent/path'
+      '../../parent/path',
     ]
 
     for (const path of testPaths) {
       const cleaned = Clean(path)
       const [dir, file] = Split(cleaned)
       const rejoined = dir + file
-      
+
       // Split and rejoin should preserve the cleaned path
       expect(rejoined).toBe(cleaned)
     }
   })
-}) 
+})

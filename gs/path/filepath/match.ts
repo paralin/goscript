@@ -36,10 +36,10 @@ export function Match(pattern: string, name: string): [boolean, Error | null] {
 
 function validatePattern(pattern: string): void {
   let i = 0
-  
+
   while (i < pattern.length) {
     const char = pattern[i]
-    
+
     switch (char) {
       case '\\':
         // Must be followed by another character
@@ -49,27 +49,27 @@ function validatePattern(pattern: string): void {
         }
         i++
         break
-        
+
       case '[': {
         // Must have a properly closed character class
         i++
         let foundContent = false
         let foundClose = false
-        
+
         // Skip negation
         if (i < pattern.length && pattern[i] === '^') {
           i++
         }
-        
+
         while (i < pattern.length) {
           if (pattern[i] === ']') {
             foundClose = true
             i++
             break
           }
-          
+
           foundContent = true
-          
+
           if (pattern[i] === '\\') {
             i++ // Skip escape character
             if (i >= pattern.length) {
@@ -78,13 +78,13 @@ function validatePattern(pattern: string): void {
           }
           i++
         }
-        
+
         if (!foundClose || !foundContent) {
           throw new Error('bad pattern')
         }
         break
       }
-        
+
       default:
         i++
         break
@@ -95,10 +95,10 @@ function validatePattern(pattern: string): void {
 function matchPattern(pattern: string, name: string): boolean {
   let patternIndex = 0
   let nameIndex = 0
-  
+
   while (patternIndex < pattern.length && nameIndex < name.length) {
     const p = pattern[patternIndex]
-    
+
     switch (p) {
       case '*':
         // Handle star - match any sequence of characters
@@ -107,15 +107,17 @@ function matchPattern(pattern: string, name: string): boolean {
           // Pattern ends with *, matches rest of name
           return true
         }
-        
+
         // Try to match the rest of the pattern with remaining name
         for (let i = nameIndex; i <= name.length; i++) {
-          if (matchPattern(pattern.substring(patternIndex), name.substring(i))) {
+          if (
+            matchPattern(pattern.substring(patternIndex), name.substring(i))
+          ) {
             return true
           }
         }
         return false
-        
+
       case '?':
         // Match any single character except separator
         if (name[nameIndex] === '/') {
@@ -124,10 +126,14 @@ function matchPattern(pattern: string, name: string): boolean {
         patternIndex++
         nameIndex++
         break
-        
+
       case '[': {
         // Character class
-        const [matched, newPatternIndex] = matchCharClass(pattern, patternIndex, name[nameIndex])
+        const [matched, newPatternIndex] = matchCharClass(
+          pattern,
+          patternIndex,
+          name[nameIndex],
+        )
         if (!matched) {
           return false
         }
@@ -145,7 +151,7 @@ function matchPattern(pattern: string, name: string): boolean {
         patternIndex++
         nameIndex++
         break
-        
+
       default:
         // Literal character
         if (p !== name[nameIndex]) {
@@ -156,34 +162,38 @@ function matchPattern(pattern: string, name: string): boolean {
         break
     }
   }
-  
+
   // Handle any remaining stars in pattern
   while (patternIndex < pattern.length && pattern[patternIndex] === '*') {
     patternIndex++
   }
-  
+
   // Both pattern and name should be fully consumed
   return patternIndex >= pattern.length && nameIndex >= name.length
 }
 
-function matchCharClass(pattern: string, start: number, char: string): [boolean, number] {
+function matchCharClass(
+  pattern: string,
+  start: number,
+  char: string,
+): [boolean, number] {
   let index = start + 1
   let negated = false
-  
+
   // Check for negation
   if (index < pattern.length && pattern[index] === '^') {
     negated = true
     index++
   }
-  
+
   let matched = false
-  
+
   while (index < pattern.length) {
     if (pattern[index] === ']') {
       index++
       break
     }
-    
+
     if (pattern[index] === '\\') {
       // Escaped character
       index++
@@ -191,7 +201,11 @@ function matchCharClass(pattern: string, start: number, char: string): [boolean,
         matched = true
       }
       index++
-    } else if (index + 2 < pattern.length && pattern[index + 1] === '-' && pattern[index + 2] !== ']') {
+    } else if (
+      index + 2 < pattern.length &&
+      pattern[index + 1] === '-' &&
+      pattern[index + 2] !== ']'
+    ) {
       // Character range
       const lo = pattern[index]
       const hi = pattern[index + 2]
@@ -207,11 +221,11 @@ function matchCharClass(pattern: string, start: number, char: string): [boolean,
       index++
     }
   }
-  
+
   if (negated) {
     matched = !matched
   }
-  
+
   return [matched, index]
 }
 
@@ -232,4 +246,4 @@ export function Glob(pattern: string): [string[], Error | null] {
   } catch (err) {
     return [[], ErrBadPattern]
   }
-} 
+}

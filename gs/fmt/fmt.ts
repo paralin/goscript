@@ -1,8 +1,8 @@
 // Handwritten TypeScript implementation of Go's fmt package
 // Optimized for JavaScript runtime and simplified for common use cases
 
-import * as $ from "@goscript/builtin/index.js"
-import * as errors from "@goscript/errors/index.js"
+import * as $ from '@goscript/builtin/index.js'
+import * as errors from '@goscript/errors/index.js'
 
 // Basic interfaces
 export interface Stringer {
@@ -75,7 +75,8 @@ function defaultFormat(value: any): string {
   if (typeof value === 'boolean') return value ? 'true' : 'false'
   if (typeof value === 'number') return value.toString()
   if (typeof value === 'string') return value
-  if (Array.isArray(value)) return '[' + value.map(defaultFormat).join(' ') + ']'
+  if (Array.isArray(value))
+    return '[' + value.map(defaultFormat).join(' ') + ']'
   if (typeof value === 'object') {
     // Check for Stringer interface
     if (value.String && typeof value.String === 'function') {
@@ -83,7 +84,9 @@ function defaultFormat(value: any): string {
     }
     // Default object representation
     if (value.constructor?.name && value.constructor.name !== 'Object') {
-      return `{${Object.entries(value).map(([k, v]) => `${k}:${defaultFormat(v)}`).join(' ')}}`
+      return `{${Object.entries(value)
+        .map(([k, v]) => `${k}:${defaultFormat(v)}`)
+        .join(' ')}}`
     }
     return JSON.stringify(value)
   }
@@ -93,7 +96,7 @@ function defaultFormat(value: any): string {
 function parseFormat(format: string, args: any[]): string {
   let result = ''
   let argIndex = 0
-  
+
   for (let i = 0; i < format.length; i++) {
     if (format[i] === '%') {
       if (i + 1 < format.length) {
@@ -103,25 +106,25 @@ function parseFormat(format: string, args: any[]): string {
           i++ // skip the next %
           continue
         }
-        
+
         // Parse format specifier
         let j = i + 1
         let width = ''
         let precision = ''
         let flags = ''
-        
+
         // Parse flags (-, +, #, 0, space)
         while (j < format.length && '+-# 0'.includes(format[j])) {
           flags += format[j]
           j++
         }
-        
+
         // Parse width
         while (j < format.length && format[j] >= '0' && format[j] <= '9') {
           width += format[j]
           j++
         }
-        
+
         // Parse precision
         if (j < format.length && format[j] === '.') {
           j++
@@ -130,23 +133,29 @@ function parseFormat(format: string, args: any[]): string {
             j++
           }
         }
-        
+
         // Get the verb
         if (j < format.length) {
           const verb = format[j]
-          
+
           if (argIndex < args.length) {
             let formatted = formatValue(args[argIndex], verb)
-            
+
             // Apply width and precision formatting
             if (width && !precision) {
               const w = parseInt(width)
               if (flags.includes('-')) {
                 formatted = formatted.padEnd(w)
               } else {
-                formatted = formatted.padStart(w, flags.includes('0') ? '0' : ' ')
+                formatted = formatted.padStart(
+                  w,
+                  flags.includes('0') ? '0' : ' ',
+                )
               }
-            } else if (precision && (verb === 'f' || verb === 'e' || verb === 'g')) {
+            } else if (
+              precision &&
+              (verb === 'f' || verb === 'e' || verb === 'g')
+            ) {
               const p = parseInt(precision)
               const num = Number(args[argIndex])
               if (verb === 'f') {
@@ -156,7 +165,7 @@ function parseFormat(format: string, args: any[]): string {
               } else if (verb === 'g') {
                 formatted = num.toPrecision(p)
               }
-              
+
               if (width) {
                 const w = parseInt(width)
                 if (flags.includes('-')) {
@@ -166,13 +175,13 @@ function parseFormat(format: string, args: any[]): string {
                 }
               }
             }
-            
+
             result += formatted
             argIndex++
           } else {
             result += `%!${verb}(MISSING)`
           }
-          
+
           i = j
         } else {
           result += format[i]
@@ -184,7 +193,7 @@ function parseFormat(format: string, args: any[]): string {
       result += format[i]
     }
   }
-  
+
   return result
 }
 
@@ -195,7 +204,7 @@ let stdout = {
     // In the real implementation, this would interact with the Go runtime
     // The test will still pass because it only checks compilation
     $.println(data)
-  }
+  },
 }
 
 // Print functions
@@ -239,7 +248,11 @@ export function Fprint(w: any, ...a: any[]): [number, Error | null] {
   return [0, new Error('Writer does not implement Write method')]
 }
 
-export function Fprintf(w: any, format: string, ...a: any[]): [number, Error | null] {
+export function Fprintf(
+  w: any,
+  format: string,
+  ...a: any[]
+): [number, Error | null] {
   const result = parseFormat(format, a)
   if (w && w.Write) {
     return w.Write(new TextEncoder().encode(result))
@@ -265,7 +278,11 @@ export function Append(b: Uint8Array, ...a: any[]): Uint8Array {
   return newArray
 }
 
-export function Appendf(b: Uint8Array, format: string, ...a: any[]): Uint8Array {
+export function Appendf(
+  b: Uint8Array,
+  format: string,
+  ...a: any[]
+): Uint8Array {
   const result = parseFormat(format, a)
   const encoded = new TextEncoder().encode(result)
   const newArray = new Uint8Array(b.length + encoded.length)
@@ -292,29 +309,29 @@ export function Errorf(format: string, ...a: any[]): any {
 // FormatString - simplified implementation
 export function FormatString(state: State, verb: number): string {
   let result = '%'
-  
+
   // Add flags
-  if (state.Flag(32)) result += ' '  // space
-  if (state.Flag(43)) result += '+'  // plus
-  if (state.Flag(45)) result += '-'  // minus
-  if (state.Flag(35)) result += '#'  // hash
-  if (state.Flag(48)) result += '0'  // zero
-  
+  if (state.Flag(32)) result += ' ' // space
+  if (state.Flag(43)) result += '+' // plus
+  if (state.Flag(45)) result += '-' // minus
+  if (state.Flag(35)) result += '#' // hash
+  if (state.Flag(48)) result += '0' // zero
+
   // Add width
   const [width, hasWidth] = state.Width()
   if (hasWidth) {
     result += width.toString()
   }
-  
+
   // Add precision
   const [precision, hasPrecision] = state.Precision()
   if (hasPrecision) {
     result += '.' + precision.toString()
   }
-  
+
   // Add verb
   result += String.fromCharCode(verb)
-  
+
   return result
 }
 
@@ -339,7 +356,11 @@ export function Sscan(_str: string, ..._a: any[]): [number, Error | null] {
   return [0, new Error('Sscan not implemented')]
 }
 
-export function Sscanf(_str: string, _format: string, ..._a: any[]): [number, Error | null] {
+export function Sscanf(
+  _str: string,
+  _format: string,
+  ..._a: any[]
+): [number, Error | null] {
   // TODO: Implement formatted scanning from string
   return [0, new Error('Sscanf not implemented')]
 }
@@ -354,7 +375,11 @@ export function Fscan(_r: any, ..._a: any[]): [number, Error | null] {
   return [0, new Error('Fscan not implemented')]
 }
 
-export function Fscanf(_r: any, _format: string, ..._a: any[]): [number, Error | null] {
+export function Fscanf(
+  _r: any,
+  _format: string,
+  ..._a: any[]
+): [number, Error | null] {
   // TODO: Implement formatted scanning from Reader
   return [0, new Error('Fscanf not implemented')]
 }
@@ -373,7 +398,10 @@ export interface ScanState {
   ReadRune(): [number, number, Error | null]
   UnreadRune(): Error | null
   SkipSpace(): void
-  Token(skipSpace: boolean, f: (r: number) => boolean): [Uint8Array, Error | null]
+  Token(
+    skipSpace: boolean,
+    f: (r: number) => boolean,
+  ): [Uint8Array, Error | null]
   Width(): [number, boolean]
   Read(buf: Uint8Array): [number, Error | null]
-} 
+}

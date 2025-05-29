@@ -17,20 +17,20 @@ export function Base(path: string): string {
   if (path === '') {
     return '.'
   }
-  
+
   // Strip trailing slashes
   path = path.replace(/\/+$/, '')
-  
+
   if (path === '') {
     return '/'
   }
-  
+
   // Find the last slash
   const i = path.lastIndexOf('/')
   if (i >= 0) {
     return path.substring(i + 1)
   }
-  
+
   return path
 }
 
@@ -42,21 +42,21 @@ export function Dir(path: string): string {
   if (path === '') {
     return '.'
   }
-  
+
   // Strip trailing slashes
   path = path.replace(/\/+$/, '')
-  
+
   if (path === '') {
     return '/'
   }
-  
+
   // Find the last slash
   const i = path.lastIndexOf('/')
   if (i >= 0) {
     const dir = path.substring(0, i)
     return Clean(dir === '' ? '/' : dir)
   }
-  
+
   return '.'
 }
 
@@ -65,13 +65,13 @@ export function Dir(path: string): string {
 // in the final element of path; it is empty if there is no dot.
 export function Ext(path: string): string {
   const base = Base(path)
-  
+
   // Handle special case: if the base starts with a dot and has no other dots,
   // it's a hidden file with no extension
   if (base.startsWith('.') && base.indexOf('.', 1) === -1) {
     return ''
   }
-  
+
   const i = base.lastIndexOf('.')
   if (i >= 0) {
     return base.substring(i)
@@ -85,11 +85,13 @@ export function Clean(path: string): string {
   if (path === '') {
     return '.'
   }
-  
+
   const isAbs = path.startsWith('/')
-  const segments = path.split('/').filter(segment => segment !== '' && segment !== '.')
+  const segments = path
+    .split('/')
+    .filter((segment) => segment !== '' && segment !== '.')
   const result: string[] = []
-  
+
   for (const segment of segments) {
     if (segment === '..') {
       if (result.length > 0 && result[result.length - 1] !== '..') {
@@ -101,13 +103,18 @@ export function Clean(path: string): string {
       result.push(segment)
     }
   }
-  
+
   let cleaned = result.join('/')
   if (isAbs) {
     cleaned = '/' + cleaned
   }
-  
-  return cleaned === '' ? (isAbs ? '/' : '.') : cleaned
+
+  return (
+    cleaned === '' ?
+      isAbs ? '/'
+      : '.'
+    : cleaned
+  )
 }
 
 // Join joins any number of path elements into a single path,
@@ -119,15 +126,15 @@ export function Join(...elem: string[]): string {
   if (elem.length === 0) {
     return ''
   }
-  
+
   // Filter out empty elements but handle absolute paths
   const parts: string[] = []
-  
+
   for (const e of elem) {
     if (e === '') {
       continue
     }
-    
+
     // If this element is absolute, start over from here
     if (IsAbs(e)) {
       parts.length = 0 // Clear previous parts
@@ -136,11 +143,11 @@ export function Join(...elem: string[]): string {
       parts.push(e)
     }
   }
-  
+
   if (parts.length === 0) {
     return ''
   }
-  
+
   return Clean(parts.join('/'))
 }
 
@@ -200,11 +207,11 @@ export function IsLocal(path: string): boolean {
   if (path === '' || IsAbs(path)) {
     return false
   }
-  
+
   // Check for .. components that would escape
   const segments = path.split('/')
   let depth = 0
-  
+
   for (const segment of segments) {
     if (segment === '..') {
       depth--
@@ -215,7 +222,7 @@ export function IsLocal(path: string): boolean {
       depth++
     }
   }
-  
+
   return true
 }
 
@@ -234,21 +241,21 @@ export function HasPrefix(p: string, prefix: string): boolean {
   if (prefix === '') {
     return true
   }
-  
+
   // Normalize both paths
   const normalP = Clean(p)
   const normalPrefix = Clean(prefix)
-  
+
   if (normalP === normalPrefix) {
     return true
   }
-  
+
   // Check if p starts with prefix followed by a separator
   if (normalP.startsWith(normalPrefix)) {
     const remaining = normalP.substring(normalPrefix.length)
     return remaining.startsWith('/')
   }
-  
+
   return false
 }
 
@@ -264,20 +271,23 @@ export function Abs(path: string): [string, Error | null] {
   return ['/' + Clean(path), null]
 }
 
-export function Rel(basepath: string, targpath: string): [string, Error | null] {
+export function Rel(
+  basepath: string,
+  targpath: string,
+): [string, Error | null] {
   // Simplified implementation - in reality this is much more complex
   const base = Clean(basepath)
   const targ = Clean(targpath)
-  
+
   if (base === targ) {
     return ['.', null]
   }
-  
+
   // Very basic relative path calculation
   if (targ.startsWith(base + '/')) {
     return [targ.substring(base.length + 1), null]
   }
-  
+
   return [targ, null]
 }
 
@@ -296,7 +306,11 @@ export function Glob(_pattern: string): [string[], Error | null] {
 // prefix; that is, if Walk is called with "dir" and finds a file "a"
 // in that directory, the walk function will be called with argument
 // "dir/a". The info argument is the fs.FileInfo for the named path.
-export type WalkFunc = (path: string, info: any, err: Error | null) => Error | null
+export type WalkFunc = (
+  path: string,
+  info: any,
+  err: Error | null,
+) => Error | null
 
 export function Walk(root: string, walkFn: WalkFunc): Error | null {
   // No filesystem support, just call the function with the root
@@ -311,4 +325,4 @@ export function WalkDir(_root: string, _walkFn: any): Error | null {
 // Localize is a stub - in Go it's used for Windows path localization
 export function Localize(path: string): [string, Error | null] {
   return [path, null]
-} 
+}
