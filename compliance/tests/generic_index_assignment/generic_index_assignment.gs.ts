@@ -1,7 +1,7 @@
 // Generated file based on generic_index_assignment.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export function modifyGenericSlice<S extends $.Slice<E>, E extends any>(s: S, i: number, v: E): void {
 	// This line causes the issue: s[i] = v

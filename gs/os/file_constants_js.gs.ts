@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { ErrUnimplemented } from "./error.gs.js";
 
 // JavaScript-specific stubs for file constants and operations

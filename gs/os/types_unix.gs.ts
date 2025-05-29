@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 import * as fs from "@goscript/io/fs/index.js"
 

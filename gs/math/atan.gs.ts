@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // xatan evaluates a series valid in the range [0, 0.66].
 export function xatan(x: number): number {

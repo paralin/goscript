@@ -1,7 +1,7 @@
 // Generated file based on generics_leading_int.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // leadingInt consumes the leading [0-9]* from s.
 export function leadingInt<bytes extends $.Bytes | string>(s: bytes): [number, bytes, boolean] {

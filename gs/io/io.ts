@@ -3,7 +3,7 @@
 // such as those in package os, into shared public interfaces that abstract
 // the functionality, plus some other related primitives.
 
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 
 // Simple error implementation for io package
 class IOError {

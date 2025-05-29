@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { IsNaN, NaN } from "./bits.gs.js";
 import { Copysign } from "./copysign.gs.js";
 import { Float32bits, Float32frombits, Float64bits, Float64frombits } from "./unsafe.gs.js";

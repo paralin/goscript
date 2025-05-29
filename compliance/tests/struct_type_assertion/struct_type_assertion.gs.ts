@@ -1,7 +1,7 @@
 // Generated file based on struct_type_assertion.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export async function main(): Promise<void> {
 	let i: null | any = {Name: "Alice", Number: 8005553424}

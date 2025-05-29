@@ -1,7 +1,7 @@
 // Generated file based on async_basic.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // This function receives from a channel, making it async.
 export async function receiveFromChan(ch: $.Channel<number> | null): Promise<number> {

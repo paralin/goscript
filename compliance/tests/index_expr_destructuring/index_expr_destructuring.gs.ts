@@ -1,7 +1,7 @@
 // Generated file based on index_expr_destructuring.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export function returnTwoInts(): [number, number] {
 	return [42, 24]

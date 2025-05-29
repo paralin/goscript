@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { ErrSyntax, ErrRange, NumError } from "./atoi.gs.js";
 
 // ParseFloat converts the string s to a floating-point number

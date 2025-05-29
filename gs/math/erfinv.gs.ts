@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { Inf, IsNaN, NaN } from "./bits.gs.js";
 import { Log } from "./log.gs.js";
 import { Sqrt } from "./sqrt.gs.js";

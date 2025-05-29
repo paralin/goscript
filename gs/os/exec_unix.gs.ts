@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { NewSyscallError, ErrUnimplemented } from "./error.gs.js";
 import { newDoneProcess, newHandleProcess, newPIDProcess, Process, ErrProcessDone } from "./exec.gs.js";
 

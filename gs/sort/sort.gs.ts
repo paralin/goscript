@@ -1,4 +1,4 @@
-import * as $ from '../builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 
 // Interface defines the methods required for sorting
 export interface Interface {

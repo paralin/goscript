@@ -1,6 +1,4 @@
-import * as $ from '@goscript/builtin/builtin.js'
-
-import * as errors from '@goscript/errors/index.js'
+import * as $ from '@goscript/builtin/index.js'
 
 import * as io from '@goscript/io/index.js'
 
@@ -90,7 +88,7 @@ export class Reader {
   public ReadAt(b: Uint8Array, off: number): [number, $.GoError] {
     const r = this
     if (off < 0) {
-      return [0, errors.New('strings.Reader.ReadAt: negative offset')]
+      return [0, $.newError('strings.Reader.ReadAt: negative offset')]
     }
     if (off >= ($.len(r!.s) as number)) {
       return [0, io.EOF]
@@ -119,7 +117,7 @@ export class Reader {
   public UnreadByte(): $.GoError {
     const r = this
     if (r!.i <= 0) {
-      return errors.New('strings.Reader.UnreadByte: at beginning of string')
+      return $.newError('strings.Reader.UnreadByte: at beginning of string')
     }
     r!.prevRune = -1
     r!.i--
@@ -151,10 +149,10 @@ export class Reader {
   public UnreadRune(): $.GoError {
     const r = this
     if (r!.i <= 0) {
-      return errors.New('strings.Reader.UnreadRune: at beginning of string')
+      return $.newError('strings.Reader.UnreadRune: at beginning of string')
     }
     if (r!.prevRune < 0) {
-      return errors.New(
+      return $.newError(
         'strings.Reader.UnreadRune: previous operation was not ReadRune',
       )
     }
@@ -179,11 +177,11 @@ export class Reader {
         abs = ($.len(r!.s) as number) + offset
         break
       default:
-        return [0, errors.New('strings.Reader.Seek: invalid whence')]
+        return [0, $.newError('strings.Reader.Seek: invalid whence')]
         break
     }
     if (abs < 0) {
-      return [0, errors.New('strings.Reader.Seek: negative position')]
+      return [0, $.newError('strings.Reader.Seek: negative position')]
     }
     r!.i = abs
     return [abs, null]

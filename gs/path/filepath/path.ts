@@ -1,13 +1,14 @@
 // Package filepath implements utility routines for manipulating filename paths
 // in a way compatible with the target operating system-defined file paths.
+import * as $ from "@goscript/builtin/index.js"
 
 // Path separator constants
 export const Separator = '/'
 export const ListSeparator = ':'
 
 // Error constants
-export const SkipDir = new Error('skip this directory')
-export const SkipAll = new Error('skip everything and stop the walk')
+export const SkipDir = $.newError('skip this directory')
+export const SkipAll = $.newError('skip everything and stop the walk')
 
 // Base returns the last element of path.
 // Trailing path separators are removed before extracting the last element.
@@ -262,7 +263,7 @@ export function HasPrefix(p: string, prefix: string): boolean {
 // Stubs for functions that require filesystem operations
 // These are simplified implementations for compatibility
 
-export function Abs(path: string): [string, Error | null] {
+export function Abs(path: string): [string, $.GoError] {
   if (IsAbs(path)) {
     return [Clean(path), null]
   }
@@ -274,7 +275,7 @@ export function Abs(path: string): [string, Error | null] {
 export function Rel(
   basepath: string,
   targpath: string,
-): [string, Error | null] {
+): [string, $.GoError] {
   // Simplified implementation - in reality this is much more complex
   const base = Clean(basepath)
   const targ = Clean(targpath)
@@ -291,12 +292,12 @@ export function Rel(
   return [targ, null]
 }
 
-export function EvalSymlinks(path: string): [string, Error | null] {
+export function EvalSymlinks(path: string): [string, $.GoError] {
   // No filesystem support, just return the cleaned path
   return [Clean(path), null]
 }
 
-export function Glob(_pattern: string): [string[], Error | null] {
+export function Glob(_pattern: string): [string[], $.GoError] {
   // No filesystem support, return empty array
   return [[], null]
 }
@@ -309,20 +310,20 @@ export function Glob(_pattern: string): [string[], Error | null] {
 export type WalkFunc = (
   path: string,
   info: any,
-  err: Error | null,
-) => Error | null
+  err: $.GoError,
+) => $.GoError
 
-export function Walk(root: string, walkFn: WalkFunc): Error | null {
+export function Walk(root: string, walkFn: WalkFunc): $.GoError {
   // No filesystem support, just call the function with the root
-  return walkFn(root, null, new Error('filesystem not supported'))
+  return walkFn(root, null, $.newError('filesystem not supported'))
 }
 
-export function WalkDir(_root: string, _walkFn: any): Error | null {
+export function WalkDir(_root: string, _walkFn: any): $.GoError {
   // No filesystem support
-  return new Error('filesystem not supported')
+  return $.newError('filesystem not supported')
 }
 
 // Localize is a stub - in Go it's used for Windows path localization
-export function Localize(path: string): [string, Error | null] {
+export function Localize(path: string): [string, $.GoError] {
   return [path, null]
 }

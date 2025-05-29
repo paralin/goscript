@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { CompareAndSwapPointer, LoadPointer, StorePointer, SwapPointer } from "./doc.gs.js";
 
 import * as unsafe from "@goscript/unsafe/index.js"

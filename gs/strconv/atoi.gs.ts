@@ -1,8 +1,7 @@
-import * as $ from "@goscript/builtin/builtin.js";
-import * as errors from "@goscript/errors/index.js";
+import * as $ from "@goscript/builtin/index.js";
 
-export let ErrRange: $.GoError = errors.New("value out of range");
-export let ErrSyntax: $.GoError = errors.New("invalid syntax");
+export let ErrRange: $.GoError = $.newError("value out of range");
+export let ErrSyntax: $.GoError = $.newError("invalid syntax");
 
 export class NumError {
 	// the failing function (ParseBool, ParseInt, ParseUint, ParseFloat, ParseComplex)
@@ -82,11 +81,11 @@ export function rangeError(fn: string, str: string): NumError {
 }
 
 export function baseError(fn: string, str: string, base: number): NumError {
-	return new NumError({Func: fn, Num: str, Err: errors.New("invalid base " + base)});
+	return new NumError({Func: fn, Num: str, Err: $.newError("invalid base " + base)});
 }
 
 export function bitSizeError(fn: string, str: string, bitSize: number): NumError {
-	return new NumError({Func: fn, Num: str, Err: errors.New("invalid bit size " + bitSize)});
+	return new NumError({Func: fn, Num: str, Err: $.newError("invalid bit size " + bitSize)});
 }
 
 export let IntSize: number = 64;

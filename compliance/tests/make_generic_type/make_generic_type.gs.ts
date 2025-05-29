@@ -1,7 +1,7 @@
 // Generated file based on make_generic_type.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export type Ints<T extends $.Comparable> = Map<T, {  }>;
 

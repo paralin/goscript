@@ -1,7 +1,7 @@
 // Generated file based on for_loop_multi_assign_mismatch.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export function getValues(): [number, boolean] {
 	return [42, true]

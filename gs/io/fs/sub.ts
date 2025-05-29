@@ -1,4 +1,4 @@
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 import { ValidPath, FS, PathError, ErrInvalid, File, DirEntry } from './fs.js'
 import { ReadDir } from './readdir.js'
 import { ReadFile } from './readfile.js'

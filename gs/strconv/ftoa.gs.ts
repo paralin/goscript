@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // FormatFloat converts the floating-point number f to a string,
 // according to the format fmt and precision prec. It rounds the

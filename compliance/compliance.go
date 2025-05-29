@@ -595,7 +595,7 @@ func copyFile(src, dst string) error {
 // It includes all "*.gs.ts" and "index.ts" files found recursively within testDir.
 // It sets up "paths" aliases for:
 //   - The test's own generated package: "@goscript/PARENT_MODULE/compliance/tests/TEST_NAME/*" -> "./*"
-//   - The goscript builtin types: "@goscript/builtin" -> relative path to "workspaceDir/gs/builtin/builtin.ts"
+//   - The goscript builtin types: "@goscript/builtin" -> relative path to "workspaceDir/gs/builtin/index.ts"
 //
 // Returns the path to the generated "tsconfig.json" file.
 func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir string) string {

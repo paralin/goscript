@@ -1,7 +1,7 @@
 // Generated file based on named_return_multiple.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // Test function with multiple named return values
 export function processValues(input: number): [number, string, boolean] {

@@ -593,7 +593,7 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 	goWriter := NewGoToTSCompiler(c.codeWriter, c.pkg, c.Analysis)
 
 	// Add import for the goscript runtime using namespace import and alias
-	c.codeWriter.WriteLinef("import * as $ from %q;", "@goscript/builtin/builtin.js")
+	c.codeWriter.WriteLinef("import * as $ from %q;", "@goscript/builtin/index.js")
 
 	// Check if there are any .pb.go files in this package and add imports for them
 	if err := c.addProtobufImports(); err != nil {

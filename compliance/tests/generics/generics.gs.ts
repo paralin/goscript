@@ -1,7 +1,7 @@
 // Generated file based on generics.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // Generic function with any constraint
 export function printVal<T extends any>(val: T): void {

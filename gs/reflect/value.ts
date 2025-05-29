@@ -26,7 +26,7 @@ import {
   Invalid,
 } from './type.js'
 import { ReflectValue, SelectCase, SelectRecv, SelectDefault } from './types.js'
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 
 interface ChannelObject {
   _sendQueue?: unknown[]

@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { ErrSyntax } from "./atoi.gs.js";
 
 // Quote returns a double-quoted Go string literal representing s.

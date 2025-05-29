@@ -1,6 +1,6 @@
 // Package utf8 implements functions and constants to support text encoded in UTF-8.
 
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 
 // RuneError is the "error" Rune or "Unicode replacement character"
 export const RuneError = 0xfffd

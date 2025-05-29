@@ -1,7 +1,7 @@
 // Generated file based on pointer_range_loop.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export async function main(): Promise<void> {
 	let arr = $.varRef($.arrayToSlice<number>([1, 2, 3]))

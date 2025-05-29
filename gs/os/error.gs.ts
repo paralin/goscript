@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // import * as poll from "@goscript/internal/poll/index.js" // Not available in JavaScript
 

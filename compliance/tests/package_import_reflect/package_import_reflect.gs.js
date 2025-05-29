@@ -1,7 +1,8 @@
 // Generated file based on package_import_reflect.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import * as reflect from "@goscript/reflect/index.js";
+
 export class Person {
     get Name() {
         return this._fields.Name.value;

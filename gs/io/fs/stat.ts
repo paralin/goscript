@@ -1,4 +1,4 @@
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 import { FS, FileInfo } from './fs.js'
 
 export type StatFS =

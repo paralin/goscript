@@ -1,4 +1,4 @@
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 
 export const Canceled = new Error('context canceled')
 Canceled.name = 'CanceledError'

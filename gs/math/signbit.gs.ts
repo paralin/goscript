@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { Float64bits } from "./unsafe.gs.js";
 
 // Signbit reports whether x is negative or negative zero.

@@ -1,7 +1,7 @@
 // Generated file based on utils.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // ExportedFromUtils is exported (uppercase) - should appear in index.ts
 export function ExportedFromUtils(): void {

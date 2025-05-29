@@ -1,7 +1,7 @@
 // Generated file based on protobuf_lite_ts.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { ExampleMsg } from "./protobuf_lite_ts.pb.js";
 
 export async function main(): Promise<void> {

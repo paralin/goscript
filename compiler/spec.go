@@ -539,7 +539,7 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 	// handwritten versions (in .goscript-assets) or transpiled versions (in goscript).
 	var tsImportPath string
 	if goPath == "github.com/aperturerobotics/goscript/builtin" {
-		tsImportPath = "@goscript/builtin/builtin.js"
+		tsImportPath = "@goscript/builtin/index.js"
 	} else {
 		tsImportPath = "@goscript/" + goPath
 	}

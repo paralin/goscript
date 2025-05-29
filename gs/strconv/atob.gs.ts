@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { syntaxError } from "./atoi.gs.js";
 
 // ParseBool returns the boolean value represented by the string.

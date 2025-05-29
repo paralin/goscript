@@ -1,7 +1,7 @@
 // Generated file based on selector_expr_lhs_multi_assign.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export class Point {
 	public get X(): number {

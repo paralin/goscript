@@ -1,4 +1,4 @@
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 import { makeStringFinder, stringFinder } from './search.js'
 import { Count, HasPrefix } from './strings.js'
 import { Builder } from './builder.js'

@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // Search uses binary search to find and return the smallest index i
 // in [0, n) at which f(i) is true, assuming that on the range [0, n),

@@ -1,7 +1,7 @@
 // Generated file based on variadic_function_call.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 import * as errors from "@goscript/errors/index.js"
 

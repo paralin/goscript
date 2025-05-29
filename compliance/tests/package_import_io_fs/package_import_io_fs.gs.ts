@@ -1,7 +1,7 @@
 // Generated file based on package_import_io_fs.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 import * as fs from "@goscript/io/fs/index.js"
 

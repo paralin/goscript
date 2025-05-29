@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { lstatNolog, statNolog } from "./stat_js.gs.js";
 import { Time, FileMode } from "./types_js.gs.js";
 

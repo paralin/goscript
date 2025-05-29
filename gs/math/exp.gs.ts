@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { Inf, IsInf, IsNaN } from "./bits.gs.js";
 // archExp2 and archExp imports removed - using optimized implementation
 import { Ldexp } from "./ldexp.gs.js";

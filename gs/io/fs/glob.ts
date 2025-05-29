@@ -1,4 +1,4 @@
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 import { Stat } from './stat.js'
 import { ReadDir } from './readdir.js'
 import { FS } from './fs.js'

@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { executable } from "./executable_js.gs.js";
 
 // Executable returns the path name for the executable that started

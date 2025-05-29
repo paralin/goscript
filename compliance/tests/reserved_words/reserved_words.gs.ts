@@ -1,7 +1,7 @@
 // Generated file based on reserved_words.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export async function main(): Promise<void> {
 	// Test reserved word conflicts that cause TypeScript compilation errors

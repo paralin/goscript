@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // Float32bits returns the IEEE 754 binary representation of f,
 // with the sign bit of f and the result in the same bit position.

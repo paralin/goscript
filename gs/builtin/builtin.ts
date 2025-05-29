@@ -1,12 +1,21 @@
-export * from './varRef.js'
-export * from './channel.js'
-export * from './defer.js'
-export * from './io.js'
-export * from './map.js'
-export * from './slice.js'
-export * from './type.js'
 import type { Slice, SliceProxy } from './slice.js'
 import { isSliceProxy } from './slice.js'
+
+/**
+ * Implementation of Go's built-in println function
+ * @param args Arguments to print
+ */
+export function println(...args: any[]): void {
+  console.log(...args)
+}
+
+/**
+ * Implementation of Go's built-in panic function
+ * @param args Arguments passed to panic
+ */
+export function panic(...args: any[]): void {
+  throw new Error(`panic: ${args.map((arg) => String(arg)).join(' ')}`)
+}
 
 // Bytes represents all valid []byte representations in TypeScript
 // This includes Uint8Array (the preferred representation) and $.Slice<number> (which includes null)
@@ -23,63 +32,6 @@ export function int(value: number): number {
   // For Go's int type on 64-bit systems, we should preserve the full value
   // since JavaScript numbers can safely represent integers up to Number.MAX_SAFE_INTEGER
   return Math.trunc(value)
-}
-
-// Copy is the Go builtin function that copies the contents of one slice to another.
-// It returns the number of elements copied.
-export function copy<T>(
-  dst: T[] | Uint8Array,
-  src: T[] | Uint8Array | string,
-): number {
-  // Handle string to Uint8Array copy (common in Go)
-  if (typeof src === 'string' && dst instanceof Uint8Array) {
-    const encoder = new TextEncoder()
-    const srcBytes = encoder.encode(src)
-    const n = Math.min(dst.length, srcBytes.length)
-    for (let i = 0; i < n; i++) {
-      dst[i] = srcBytes[i]
-    }
-    return n
-  }
-
-  // Handle Uint8Array to Uint8Array copy
-  if (dst instanceof Uint8Array && src instanceof Uint8Array) {
-    const n = Math.min(dst.length, src.length)
-    for (let i = 0; i < n; i++) {
-      dst[i] = src[i]
-    }
-    return n
-  }
-
-  // Handle array to array copy (original implementation)
-  if (Array.isArray(dst) && Array.isArray(src)) {
-    const n = Math.min(dst.length, src.length)
-    for (let i = 0; i < n; i++) {
-      dst[i] = src[i]
-    }
-    return n
-  }
-
-  // Handle mixed types - convert to compatible format
-  if (dst instanceof Uint8Array && Array.isArray(src)) {
-    const n = Math.min(dst.length, src.length)
-    for (let i = 0; i < n; i++) {
-      dst[i] = src[i] as number
-    }
-    return n
-  }
-
-  if (Array.isArray(dst) && src instanceof Uint8Array) {
-    const n = Math.min(dst.length, src.length)
-    for (let i = 0; i < n; i++) {
-      dst[i] = src[i] as T
-    }
-    return n
-  }
-
-  throw new Error(
-    `Unsupported copy operation between ${typeof dst} and ${typeof src}`,
-  )
 }
 
 // Duration multiplication helper for time package operations

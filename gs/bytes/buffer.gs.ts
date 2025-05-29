@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 const { copy, recover } = $;
 
 import { IndexByte } from "./bytes.gs.js";

@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { direntIno, direntNamlen, direntReclen, direntType } from "./dirent_js.gs.js";
 import { IsNotExist } from "./error.gs.js";
 import { newUnixDirent } from "./file_unix_js.gs.js";

@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { Index, IndexByte, asciiSpace } from "./bytes.gs.js";
 
 import * as iter from "@goscript/iter/index.js"

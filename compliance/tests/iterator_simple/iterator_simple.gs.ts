@@ -1,7 +1,7 @@
 // Generated file based on iterator_simple.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export function simpleIterator(_yield: ((p0: number) => boolean) | null): void {
 	for (let i = 0; i < 3; i++) {

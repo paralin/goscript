@@ -1,7 +1,7 @@
 // Generated file based on atomic_struct_field_init.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 import * as atomic from "@goscript/sync/atomic/index.js"
 

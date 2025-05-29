@@ -1,7 +1,7 @@
 // Generated file based on build_tags.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { testGeneric } from "./build_tags_generic.gs.js";
 import { testJSWasm } from "./build_tags_js.gs.js";
 

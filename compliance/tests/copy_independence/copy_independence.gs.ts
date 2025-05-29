@@ -1,7 +1,7 @@
 // Generated file based on copy_independence.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export class MyStruct {
 	public get MyInt(): number {

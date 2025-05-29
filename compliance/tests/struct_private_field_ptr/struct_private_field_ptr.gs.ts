@@ -1,7 +1,7 @@
 // Generated file based on struct_private_field_ptr.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export class MyStruct {
 	public get myPrivate(): $.VarRef<number> | null {

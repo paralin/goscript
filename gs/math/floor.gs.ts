@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { IsInf, IsNaN } from "./bits.gs.js";
 // archCeil, archFloor, archTrunc imports removed - using optimized implementation
 import { Modf } from "./modf.gs.js";

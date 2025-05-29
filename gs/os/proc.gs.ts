@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { NewSyscallError, ErrUnimplemented } from "./error.gs.js";
 
 import * as runtime from "@goscript/runtime/index.js"

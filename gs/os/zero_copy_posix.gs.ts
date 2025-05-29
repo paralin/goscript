@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { NewSyscallError } from "./error.gs.js";
 
 import * as io from "@goscript/io/index.js"

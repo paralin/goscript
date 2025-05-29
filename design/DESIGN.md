@@ -979,7 +979,7 @@ Go's zero values are mapped as follows:
 ## Packages and Imports
 
 - Go packages are mapped to TypeScript modules under the `@goscript/` scope (e.g., `import { MyType } from '@goscript/my/package';`).
-- The GoScript runtime is imported using the `@goscript/builtin` alias, which maps to the `builtin/builtin.ts` file.
+- The GoScript runtime is imported using the `@goscript/builtin` alias, which maps to the `gs/builtin/index.ts` file.
 - Standard Go library packages might require specific runtime implementations or shims.
 
 ## Code Generation Conventions

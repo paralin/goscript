@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 // SwapInt64 atomically stores new into *addr and returns the previous *addr value.
 // Consider using the more ergonomic and less error-prone [Int64.Swap] instead

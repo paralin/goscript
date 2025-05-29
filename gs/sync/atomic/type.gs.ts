@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { AddInt32, AddUint32, AddUintptr, AndInt32, AndUint32, AndUintptr, CompareAndSwapInt32, CompareAndSwapPointer, CompareAndSwapUint32, CompareAndSwapUintptr, LoadInt32, LoadPointer, LoadUint32, LoadUintptr, OrInt32, OrUint32, OrUintptr, StoreInt32, StorePointer, StoreUint32, StoreUintptr, SwapInt32, SwapPointer, SwapUint32, SwapUintptr, uintptr } from "./doc.gs.js";
 import { AddInt64, AddUint64, AndInt64, AndUint64, CompareAndSwapInt64, CompareAndSwapUint64, LoadInt64, LoadUint64, OrInt64, OrUint64, StoreInt64, StoreUint64, SwapInt64, SwapUint64 } from "./doc_64.gs.js";
 

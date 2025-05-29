@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { Float64bits, Float64frombits } from "./unsafe.gs.js";
 
 import * as bits from "@goscript/math/bits/index.js"

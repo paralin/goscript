@@ -1,7 +1,7 @@
 // Generated file based on inline_function_type_cast.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export type Greeter = ((name: string) => string) | null;
 

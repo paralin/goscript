@@ -816,97 +816,152 @@ export function append<T>(
 /**
  * Copies elements from src to dst.
  * @param dst The destination slice.
- * @param src The source slice.
+ * @param src The source slice or string.
  * @returns The number of elements copied.
  */
-export const copy = <T>(dst: Slice<T>, src: Slice<T>): number => {
-  if (dst === null || src === null) {
+export function copy(dst: Uint8Array, src: Uint8Array | string): number
+export function copy(dst: Uint8Array, src: Slice<number>): number
+export function copy<T>(dst: Slice<T>, src: Slice<T>): number
+export function copy<T>(dst: Slice<T>, src: string): number
+export function copy<T>(dst: Slice<T> | Uint8Array, src: Slice<T> | Uint8Array | string): number {
+  if (dst === null) {
     return 0
   }
 
-  const dstLen = len(dst)
-  const srcLen = len(src)
+  // Handle string source first
+  if (typeof src === 'string') {
+    return copyFromString(dst, src)
+  }
+
+  if (src === null) {
+    return 0
+  }
+
+  // Now we know src is Slice<T> | Uint8Array
+  const dstLen = dst instanceof Uint8Array ? dst.length : len(dst)
+  const srcLen = src instanceof Uint8Array ? src.length : len(src)
   const count = Math.min(dstLen, srcLen)
 
   if (count === 0) {
     return 0
   }
 
-  const isDstUint8Array = dst instanceof Uint8Array
-  const isSrcUint8Array = src instanceof Uint8Array
+  // Handle all combinations of dst and src types
+  if (dst instanceof Uint8Array && src instanceof Uint8Array) {
+    // Uint8Array to Uint8Array
+    dst.set(src.subarray(0, count))
+    return count
+  }
 
-  if (isDstUint8Array && isSrcUint8Array) {
-    ;(dst as Uint8Array).set((src as Uint8Array).subarray(0, count))
-  } else if (isDstUint8Array) {
-    // dst is Uint8Array, src is Slice<number> or number[]
-    const dstUint8 = dst as Uint8Array
+  if (dst instanceof Uint8Array) {
+    // Uint8Array destination, Slice<number> source
+    return copyToUint8Array(dst, src as Slice<number>, count)
+  }
+
+  if (src instanceof Uint8Array) {
+    // Slice<T> destination, Uint8Array source
+    return copyFromUint8Array(dst as Slice<T>, src, count)
+  }
+
+  // Both are Slice<T>
+  return copyBetweenSlices(dst as Slice<T>, src as Slice<T>, count)
+}
+
+/**
+ * Helper: Copy from string to any destination type
+ */
+function copyFromString<T>(dst: Slice<T> | Uint8Array, src: string): number {
+  const encoder = new TextEncoder()
+  const srcBytes = encoder.encode(src)
+  const dstLen = dst instanceof Uint8Array ? dst.length : len(dst)
+  const count = Math.min(dstLen, srcBytes.length)
+  
+  if (count === 0) {
+    return 0
+  }
+
+  if (dst instanceof Uint8Array) {
+    for (let i = 0; i < count; i++) {
+      dst[i] = srcBytes[i]
+    }
+  } else if (isComplexSlice(dst)) {
+    const dstMeta = dst.__meta__
+    for (let i = 0; i < count; i++) {
+      dstMeta.backing[dstMeta.offset + i] = srcBytes[i] as unknown as T
+      ;(dst as any)[i] = srcBytes[i]
+    }
+  } else if (Array.isArray(dst)) {
+    for (let i = 0; i < count; i++) {
+      dst[i] = srcBytes[i] as unknown as T
+    }
+  }
+  
+  return count
+}
+
+/**
+ * Helper: Copy from Slice<number> to Uint8Array
+ */
+function copyToUint8Array(dst: Uint8Array, src: Slice<number>, count: number): number {
+  if (isComplexSlice(src)) {
+    const srcMeta = src.__meta__
+    for (let i = 0; i < count; i++) {
+      dst[i] = srcMeta.backing[srcMeta.offset + i]
+    }
+  } else if (Array.isArray(src)) {
+    for (let i = 0; i < count; i++) {
+      dst[i] = src[i]
+    }
+  }
+  return count
+}
+
+/**
+ * Helper: Copy from Uint8Array to Slice<T>
+ */
+function copyFromUint8Array<T>(dst: Slice<T>, src: Uint8Array, count: number): number {
+  if (isComplexSlice(dst)) {
+    const dstMeta = dst.__meta__
+    for (let i = 0; i < count; i++) {
+      dstMeta.backing[dstMeta.offset + i] = src[i] as unknown as T
+      ;(dst as any)[i] = src[i]
+    }
+  } else if (Array.isArray(dst)) {
+    for (let i = 0; i < count; i++) {
+      dst[i] = src[i] as unknown as T
+    }
+  }
+  return count
+}
+
+/**
+ * Helper: Copy between two Slice<T> instances
+ */
+function copyBetweenSlices<T>(dst: Slice<T>, src: Slice<T>, count: number): number {
+  if (isComplexSlice(dst)) {
+    const dstMeta = dst.__meta__
+    
     if (isComplexSlice(src)) {
-      const srcMeta = (src as SliceProxy<number>).__meta__
+      const srcMeta = src.__meta__
       for (let i = 0; i < count; i++) {
-        dstUint8[i] = srcMeta.backing[srcMeta.offset + i]
+        dstMeta.backing[dstMeta.offset + i] = srcMeta.backing[srcMeta.offset + i]
+        ;(dst as any)[i] = srcMeta.backing[srcMeta.offset + i]
       }
-    } else {
-      // src is number[]
-      const srcArray = src as number[]
+    } else if (Array.isArray(src)) {
       for (let i = 0; i < count; i++) {
-        dstUint8[i] = srcArray[i]
+        dstMeta.backing[dstMeta.offset + i] = src[i]
+        ;(dst as any)[i] = src[i]
       }
     }
-  } else if (isSrcUint8Array) {
-    // src is Uint8Array, dst is Slice<number> or number[]
-    const srcUint8 = src as Uint8Array
-    if (isComplexSlice(dst)) {
-      const dstMeta = (dst as SliceProxy<number>).__meta__
-      const dstBacking = dstMeta.backing
-      const dstOffset = dstMeta.offset
+  } else if (Array.isArray(dst)) {
+    if (isComplexSlice(src)) {
+      const srcMeta = src.__meta__
       for (let i = 0; i < count; i++) {
-        dstBacking[dstOffset + i] = srcUint8[i]
-        // Also update the proxy view if dst is a proxy
-        ;(dst as any)[i] = srcUint8[i]
+        dst[i] = srcMeta.backing[srcMeta.offset + i]
       }
-    } else {
-      // dst is number[]
-      const dstArray = dst as number[]
+    } else if (Array.isArray(src)) {
       for (let i = 0; i < count; i++) {
-        dstArray[i] = srcUint8[i]
-      }
-    }
-  } else {
-    // Both are Slice<T> or T[] (original logic)
-    if (isComplexSlice(dst)) {
-      const dstOffset = (dst as SliceProxy<T>).__meta__.offset
-      const dstBacking = (dst as SliceProxy<T>).__meta__.backing
-
-      if (isComplexSlice(src)) {
-        const srcOffset = (src as SliceProxy<T>).__meta__.offset
-        const srcBacking = (src as SliceProxy<T>).__meta__.backing
-        for (let i = 0; i < count; i++) {
-          dstBacking[dstOffset + i] = srcBacking[srcOffset + i]
-          ;(dst as any)[i] = srcBacking[srcOffset + i] // Update proxy
-        }
-      } else {
-        // src is T[]
-        const srcArray = src as T[]
-        for (let i = 0; i < count; i++) {
-          dstBacking[dstOffset + i] = srcArray[i]
-          ;(dst as any)[i] = srcArray[i] // Update proxy
-        }
-      }
-    } else {
-      // dst is T[]
-      const dstArray = dst as T[]
-      if (isComplexSlice(src)) {
-        const srcOffset = (src as SliceProxy<T>).__meta__.offset
-        const srcBacking = (src as SliceProxy<T>).__meta__.backing
-        for (let i = 0; i < count; i++) {
-          dstArray[i] = srcBacking[srcOffset + i]
-        }
-      } else {
-        // src is T[]
-        const srcArray = src as T[]
-        for (let i = 0; i < count; i++) {
-          dstArray[i] = srcArray[i]
-        }
+        dst[i] = src[i]
       }
     }
   }

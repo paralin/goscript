@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { underlyingError, ErrUnimplemented } from "./error.gs.js";
 import { Root } from "./root_js.gs.js";
 import { File } from "./types_js.gs.js";

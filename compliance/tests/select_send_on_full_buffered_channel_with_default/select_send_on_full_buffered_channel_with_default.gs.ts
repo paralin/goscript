@@ -1,7 +1,7 @@
 // Generated file based on select_send_on_full_buffered_channel_with_default.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export async function main(): Promise<void> {
 	let ch = $.makeChannel<number>(1, 0, 'both')

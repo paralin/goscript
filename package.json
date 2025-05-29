@@ -36,8 +36,8 @@
     },
     "./gs/builtin": {
       "import": {
-        "types": "./dist/gs/builtin/builtin.d.ts",
-        "default": "./dist/gs/builtin/builtin.js"
+        "types": "./dist/gs/builtin/index.d.ts",
+        "default": "./dist/gs/builtin/index.js"
       }
     }
   },

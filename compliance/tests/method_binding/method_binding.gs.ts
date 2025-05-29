@@ -1,7 +1,7 @@
 // Generated file based on method_binding.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export class Counter {
 	public get value(): number {

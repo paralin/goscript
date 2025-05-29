@@ -1,7 +1,7 @@
 // Generated file based on missing_valueof_error.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 class buffer {
 	public get data(): $.Bytes {

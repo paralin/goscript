@@ -1,5 +1,5 @@
 // TypeScript implementation of Go's slices package
-import * as $ from '@goscript/builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 
 /**
  * All returns an iterator over index-value pairs in the slice.

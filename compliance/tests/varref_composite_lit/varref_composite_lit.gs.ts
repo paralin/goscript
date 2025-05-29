@@ -1,7 +1,7 @@
 // Generated file based on varref_composite_lit.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 export class MockInode {
 	public get Value(): number {

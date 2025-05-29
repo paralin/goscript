@@ -1,4 +1,4 @@
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 import { Frexp } from "./frexp.gs.js";
 import { Log } from "./log.gs.js";
 

@@ -1,6 +1,6 @@
-import * as $ from '../../../builtin/builtin.js'
+import * as $ from '@goscript/builtin/index.js'
 
-import * as stderrors from '../../../errors/index.js'
+import * as stderrors from '@goscript/errors/index.js'
 
 // Is reports whether any error in err's chain matches target.
 //

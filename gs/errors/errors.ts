@@ -1,22 +1,9 @@
-import * as $ from '@goscript/builtin/builtin.js'
-
-// GoScriptError implements the Go error interface
-class GoScriptError {
-  constructor(private message: string) {}
-
-  Error(): string {
-    return this.message
-  }
-
-  toString(): string {
-    return this.message
-  }
-}
+import * as $ from '@goscript/builtin/index.js'
 
 // New returns an error that formats as the given text.
 // Each call to New returns a distinct error value even if the text is identical.
 export function New(text: string): $.GoError {
-  return new GoScriptError(text)
+  return $.newError(text)
 }
 
 // ErrUnsupported indicates that a requested operation cannot be performed,
@@ -212,7 +199,7 @@ export function Join(...errs: $.GoError[]): $.GoError {
   }
 
   const message = nonNilErrs.map((err) => err!.Error()).join('\n')
-  const joinedError = new GoScriptError(message)
+  const joinedError = $.newError(message)
 
   // Add Unwrap method that returns the array of errors
   ;(joinedError as any).Unwrap = function (): $.GoError[] {

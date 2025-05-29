@@ -1,7 +1,7 @@
 // Generated file based on time_format_ext.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
-import * as $ from "@goscript/builtin/builtin.js";
+import * as $ from "@goscript/builtin/index.js";
 
 import * as time from "@goscript/time/index.js"
 
