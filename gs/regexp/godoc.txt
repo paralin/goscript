@@ -1,0 +1,103 @@
+package regexp // import "regexp"
+
+Package regexp implements regular expression search.
+
+The syntax of the regular expressions accepted is the same
+general syntax used by Perl, Python, and other languages.
+More precisely, it is the syntax accepted by RE2 and described at
+https://golang.org/s/re2syntax, except for \C.
+
+All characters are UTF-8-encoded code points.
+
+There are 16 methods of Regexp that match a regular expression and identify
+the matched text. Their names are matched by this regular expression:
+
+	Find(All)?(String)?(Submatch)?(Index)?
+
+If 'All' is present, the routine matches successive non-overlapping
+matches of the entire expression. Empty matches abutting a preceding
+match are ignored. The return value is a slice containing the successive
+return values of the corresponding non-'All' routine. These routines take
+an extra integer argument, n. If n >= 0, the function returns at most n
+matches/submatches; otherwise, it returns all of them.
+
+If 'String' is present, the argument is a string; otherwise it is a slice
+of bytes; return values are adjusted as appropriate.
+
+If 'Submatch' is present, the return value is a slice identifying the
+successive submatches of the expression. Submatches are matches of
+parenthesized subexpressions (also known as capturing groups) within the
+regular expression, numbered from left to right in order of opening
+parenthesis. Submatch 0 is the match of the entire expression, submatch 1 the
+match of the first parenthesized subexpression, and so on.
+
+If 'Index' is present, matches and submatches are identified by byte index
+pairs within the input string: result[2*n:2*n+1] identifies the indexes of the
+nth submatch. The pair for n==0 identifies the match of the entire expression.
+If 'Index' is not present, the match is identified by the text of the match.
+
+var ErrInvalidRepeatSize = errors.New("invalid repeat size")
+var ErrInvalidUTF8 = errors.New("invalid UTF-8")
+var ErrInvalidEscape = errors.New("invalid escape sequence")
+var ErrInvalidCharClass = errors.New("invalid character class")
+var ErrInvalidCharRange = errors.New("invalid character class range")
+var ErrMissingBracket = errors.New("missing closing ]")
+var ErrMissingParen = errors.New("missing closing )")
+var ErrMissingRepeatArgument = errors.New("missing argument to repetition operator")
+var ErrTrailingBackslash = errors.New("trailing backslash at end of expression")
+var ErrUnexpectedParen = errors.New("unexpected )")
+var ErrInvalidNamedCapture = errors.New("invalid named capture")
+var ErrInvalidPerlOp = errors.New("invalid or unsupported Perl syntax")
+var ErrNestingDepth = errors.New("expression nests too deeply")
+var ErrLarge = errors.New("expression too large")
+var ErrMissingBrace = errors.New("missing closing }")
+var ErrInvalidStdName = errors.New("invalid Unicode standard name")
+var ErrInvalidPerlName = errors.New("invalid named capture group")
+var ErrInternalError = errors.New("internal error")
+
+func Compile(expr string) (*Regexp, error)
+func CompilePOSIX(expr string) (*Regexp, error)
+func Match(pattern string, b []byte) (matched bool, err error)
+func MatchReader(pattern string, r io.RuneReader) (matched bool, err error)
+func MatchString(pattern string, s string) (matched bool, err error)
+func MustCompile(str string) *Regexp
+func MustCompilePOSIX(str string) *Regexp
+func QuoteMeta(s string) string
+type Regexp struct{ ... }
+    func (re *Regexp) Copy() *Regexp
+    func (re *Regexp) Expand(dst []byte, template []byte, src []byte, match []int) []byte
+    func (re *Regexp) ExpandString(dst []byte, template string, src string, match []int) []byte
+    func (re *Regexp) Find(b []byte) []byte
+    func (re *Regexp) FindAll(b []byte, n int) [][]byte
+    func (re *Regexp) FindAllIndex(b []byte, n int) [][]int
+    func (re *Regexp) FindAllString(s string, n int) []string
+    func (re *Regexp) FindAllStringIndex(s string, n int) [][]int
+    func (re *Regexp) FindAllStringSubmatch(s string, n int) [][]string
+    func (re *Regexp) FindAllStringSubmatchIndex(s string, n int) [][]int
+    func (re *Regexp) FindAllSubmatch(b []byte, n int) [][][]byte
+    func (re *Regexp) FindAllSubmatchIndex(b []byte, n int) [][]int
+    func (re *Regexp) FindIndex(b []byte) []int
+    func (re *Regexp) FindReaderIndex(r io.RuneReader) []int
+    func (re *Regexp) FindReaderSubmatchIndex(r io.RuneReader) []int
+    func (re *Regexp) FindString(s string) string
+    func (re *Regexp) FindStringIndex(s string) []int
+    func (re *Regexp) FindStringSubmatch(s string) []string
+    func (re *Regexp) FindStringSubmatchIndex(s string) []int
+    func (re *Regexp) FindSubmatch(b []byte) [][]byte
+    func (re *Regexp) FindSubmatchIndex(b []byte) []int
+    func (re *Regexp) LiteralPrefix() (prefix string, complete bool)
+    func (re *Regexp) Longest()
+    func (re *Regexp) Match(b []byte) bool
+    func (re *Regexp) MatchReader(r io.RuneReader) bool
+    func (re *Regexp) MatchString(s string) bool
+    func (re *Regexp) NumSubexp() int
+    func (re *Regexp) ReplaceAll(src, repl []byte) []byte
+    func (re *Regexp) ReplaceAllFunc(src []byte, repl func([]byte) []byte) []byte
+    func (re *Regexp) ReplaceAllLiteral(src, repl []byte) []byte
+    func (re *Regexp) ReplaceAllLiteralString(src, repl string) string
+    func (re *Regexp) ReplaceAllString(src, repl string) string
+    func (re *Regexp) ReplaceAllStringFunc(src string, repl func(string) string) string
+    func (re *Regexp) Split(s string, n int) []string
+    func (re *Regexp) String() string
+    func (re *Regexp) SubexpIndex(name string) int
+    func (re *Regexp) SubexpNames() []string
