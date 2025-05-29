@@ -30,6 +30,15 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 					c.tsw.WriteLiterally(pkgIdent.Name)
 					c.tsw.WriteLiterally(".")
 					c.tsw.WriteLiterally(selectorExpr.Sel.Name)
+
+					// Check if this is a function type and add | null
+					if typ := c.pkg.TypesInfo.TypeOf(a); typ != nil {
+						if namedType, isNamed := typ.(*types.Named); isNamed {
+							if _, isSignature := namedType.Underlying().(*types.Signature); isSignature {
+								c.tsw.WriteLiterally(" | null")
+							}
+						}
+					}
 					return
 				}
 			}

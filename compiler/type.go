@@ -259,6 +259,11 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 					}
 					c.tsw.WriteLiterally(">")
 				}
+
+				// Check if the underlying type is a function signature and add | null
+				if _, isSignature := t.Underlying().(*types.Signature); isSignature {
+					c.tsw.WriteLiterally(" | null")
+				}
 				return
 			}
 
@@ -282,6 +287,11 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 					}
 					c.tsw.WriteLiterally(">")
 				}
+
+				// Check if the underlying type is a function signature and add | null
+				if _, isSignature := t.Underlying().(*types.Signature); isSignature {
+					c.tsw.WriteLiterally(" | null")
+				}
 				return
 			}
 		}
@@ -300,6 +310,11 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 			c.WriteGoType(t.TypeArgs().At(i), GoTypeContextGeneral)
 		}
 		c.tsw.WriteLiterally(">")
+	}
+
+	// Check if the underlying type is a function signature and add | null for local types too
+	if _, isSignature := t.Underlying().(*types.Signature); isSignature {
+		c.tsw.WriteLiterally(" | null")
 	}
 }
 

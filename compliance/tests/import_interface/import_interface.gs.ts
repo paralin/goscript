@@ -9,7 +9,7 @@ import * as filepath from "@goscript/path/filepath/index.js"
 
 // This test demonstrates the issue where os.FileInfo gets expanded
 // to its full type definition instead of preserving the interface name
-export function walkFunction(path: string, info: os.FileInfo, walkFn: filepath.WalkFunc): $.GoError {
+export function walkFunction(path: string, info: os.FileInfo, walkFn: filepath.WalkFunc | null): $.GoError {
 	// Simple test function that takes os.FileInfo as parameter
 	if (info != null) {
 		console.log("File:", info!.Name())

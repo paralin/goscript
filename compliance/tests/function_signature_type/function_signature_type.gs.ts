@@ -5,19 +5,19 @@ import * as $ from "@goscript/builtin/builtin.js";
 
 export type Func1 = ((a: number, b: string) => [boolean, $.GoError]) | null;
 
-let fn1: Func1 = null
+let fn1: Func1 | null = null
 
 export type Func2 = ((p0: number, p1: string) => boolean) | null;
 
-let fn2: Func2 = null
+let fn2: Func2 | null = null
 
 export type Func3 = (() => void) | null;
 
-let fn3: Func3 = null
+let fn3: Func3 | null = null
 
 export type Func4 = ((a: number, ...b: string[]) => void) | null;
 
-let fn4: Func4 = null
+let fn4: Func4 | null = null
 
 export class MyError {
 	public get s(): string {
