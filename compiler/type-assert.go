@@ -47,22 +47,32 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 	}
 
 	var okIsBlank bool
-	var okName string
+	var okIsSelectorExpr bool
+	var okIdent *ast.Ident
+	var okSelectorExpr *ast.SelectorExpr
 
 	okExpr := lhs[1]
-	okIdent, ok := okExpr.(*ast.Ident)
-	if !ok {
-		return fmt.Errorf("ok expression is not an identifier: %T", okExpr)
+
+	// Handle different types of ok expressions
+	switch okE := okExpr.(type) {
+	case *ast.Ident:
+		okIdent = okE
+		okIsBlank = okIdent.Name == "_"
+	case *ast.SelectorExpr:
+		okSelectorExpr = okE
+		okIsSelectorExpr = true
+		okIsBlank = false // Selector expressions can't be blank
+	default:
+		return fmt.Errorf("ok expression must be an identifier or selector expression, got: %T", okExpr)
 	}
-	okIsBlank = okIdent.Name == "_"
-	okName = okIdent.Name
 
 	valueExpr := lhs[0]
 
 	// Determine if 'ok' variable is new in 'tok == token.DEFINE' context.
 	// This uses types.Info.Defs to see if the identifier is defined by this statement.
 	var okIsNewInDefine bool
-	if tok == token.DEFINE && !okIsBlank {
+	if tok == token.DEFINE && !okIsBlank && !okIsSelectorExpr {
+		// Only applies to identifiers, not selector expressions
 		if c.pkg.TypesInfo.Defs[okIdent] != nil {
 			okIsNewInDefine = true
 		}
@@ -81,6 +91,64 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 			if c.pkg.TypesInfo.Defs[valueIdent] != nil { // valueIdent is defined by this statement
 				valueIsNewInDefine = true
 			}
+		}
+
+		// For selector expressions as ok, we need to use temporary variables approach
+		if okIsSelectorExpr {
+			// Use temporary variables approach similar to SelectorExpr case
+			tempValName := "_gs_ta_val_" // Fixed name for temporary value
+			tempOkName := "_gs_ta_ok_"   // Fixed name for temporary ok status
+
+			// Declare temporary variables:
+			// let _gs_ta_val_: AssertedTypeTS;
+			c.tsw.WriteLiterally("let ")
+			c.tsw.WriteLiterally(tempValName)
+			c.tsw.WriteLiterally(": ")
+			c.WriteTypeExpr(assertedType) // TypeScript type for assertedType
+			c.tsw.WriteLine("")
+
+			// let _gs_ta_ok_: boolean;
+			c.tsw.WriteLiterally("let ")
+			c.tsw.WriteLiterally(tempOkName)
+			c.tsw.WriteLiterally(": boolean")
+			c.tsw.WriteLine("")
+
+			// Perform type assertion into temporary variables:
+			// ({ value: _gs_ta_val_, ok: _gs_ta_ok_ } = $.typeAssert<AssertedTypeTS>(expr, "GoTypeStr"));
+			c.tsw.WriteLiterally("({ value: ")
+			c.tsw.WriteLiterally(tempValName)
+			c.tsw.WriteLiterally(", ok: ")
+			c.tsw.WriteLiterally(tempOkName)
+			c.tsw.WriteLiterally(" } = $.typeAssert<")
+			c.WriteTypeExpr(assertedType) // Generic: <AssertedTypeTS>
+			c.tsw.WriteLiterally(">(")
+			if err := c.WriteValueExpr(interfaceExpr); err != nil { // Arg1: interfaceExpr
+				return fmt.Errorf("failed to write interface expression in type assertion call: %w", err)
+			}
+			c.tsw.WriteLiterally(", ")
+			c.writeTypeDescription(assertedType) // Arg2: type info for runtime
+			c.tsw.WriteLine("))")
+
+			// Assign temporary value to the value variable:
+			if !valueIsBlank {
+				if valueIsNewInDefine {
+					c.tsw.WriteLiterally("let ")
+				}
+				c.tsw.WriteLiterally(valueName)
+				c.tsw.WriteLiterally(" = ")
+				c.tsw.WriteLiterally(tempValName)
+				c.tsw.WriteLine("")
+			}
+
+			// Assign temporary ok to the selector expression:
+			if err := c.WriteValueExpr(okSelectorExpr); err != nil {
+				return fmt.Errorf("failed to write ok selector expression in type assertion: %w", err)
+			}
+			c.tsw.WriteLiterally(" = ")
+			c.tsw.WriteLiterally(tempOkName)
+			c.tsw.WriteLine("")
+
+			return nil
 		}
 
 		writeEndParen := false  // For wrapping assignment in parens to make it an expression
@@ -103,7 +171,7 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 				}
 				if !okIsBlank && okIsNewInDefine {
 					c.tsw.WriteLiterally("let ")
-					c.tsw.WriteLiterally(okName)
+					c.tsw.WriteLiterally(okIdent.Name)
 					c.tsw.WriteLiterally(": boolean")
 					c.tsw.WriteLine("")
 				}
@@ -129,7 +197,7 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 			parts = append(parts, fmt.Sprintf("value: %s", valueName))
 		}
 		if !okIsBlank {
-			parts = append(parts, fmt.Sprintf("ok: %s", okName))
+			parts = append(parts, fmt.Sprintf("ok: %s", okIdent.Name))
 		}
 		c.tsw.WriteLiterally(strings.Join(parts, ", "))
 		c.tsw.WriteLiterally(" } = $.typeAssert<")
@@ -193,13 +261,24 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 
 		// Assign temporary ok to the ok variable (e.g., okName = _gs_ta_ok_; or let okName = ...)
 		if !okIsBlank {
-			if okIsNewInDefine { // okIsNewInDefine was determined earlier based on tok == token.DEFINE and Defs check
-				c.tsw.WriteLiterally("let ")
+			if okIsSelectorExpr {
+				// Assign to selector expression
+				if err := c.WriteValueExpr(okSelectorExpr); err != nil {
+					return fmt.Errorf("failed to write ok selector expression in type assertion: %w", err)
+				}
+				c.tsw.WriteLiterally(" = ")
+				c.tsw.WriteLiterally(tempOkName)
+				c.tsw.WriteLine("")
+			} else {
+				// Assign to identifier
+				if okIsNewInDefine { // okIsNewInDefine was determined earlier based on tok == token.DEFINE and Defs check
+					c.tsw.WriteLiterally("let ")
+				}
+				c.tsw.WriteLiterally(okIdent.Name)
+				c.tsw.WriteLiterally(" = ")
+				c.tsw.WriteLiterally(tempOkName)
+				c.tsw.WriteLine("")
 			}
-			c.tsw.WriteLiterally(okName)
-			c.tsw.WriteLiterally(" = ")
-			c.tsw.WriteLiterally(tempOkName)
-			c.tsw.WriteLine("")
 		}
 
 	case *ast.IndexExpr:
@@ -279,13 +358,24 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 
 		// Assign temporary ok to the ok variable (e.g., okName = _gs_ta_ok_N_; or let okName = ...)
 		if !okIsBlank {
-			if okIsNewInDefine { // okIsNewInDefine was determined earlier based on tok == token.DEFINE and Defs check
-				c.tsw.WriteLiterally("let ")
+			if okIsSelectorExpr {
+				// Assign to selector expression
+				if err := c.WriteValueExpr(okSelectorExpr); err != nil {
+					return fmt.Errorf("failed to write ok selector expression in type assertion: %w", err)
+				}
+				c.tsw.WriteLiterally(" = ")
+				c.tsw.WriteLiterally(tempOkName)
+				c.tsw.WriteLine("")
+			} else {
+				// Assign to identifier
+				if okIsNewInDefine { // okIsNewInDefine was determined earlier based on tok == token.DEFINE and Defs check
+					c.tsw.WriteLiterally("let ")
+				}
+				c.tsw.WriteLiterally(okIdent.Name)
+				c.tsw.WriteLiterally(" = ")
+				c.tsw.WriteLiterally(tempOkName)
+				c.tsw.WriteLine("")
 			}
-			c.tsw.WriteLiterally(okName)
-			c.tsw.WriteLiterally(" = ")
-			c.tsw.WriteLiterally(tempOkName)
-			c.tsw.WriteLine("")
 		}
 
 	default:
