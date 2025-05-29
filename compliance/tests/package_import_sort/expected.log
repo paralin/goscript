@@ -1,0 +1,16 @@
+Original ints: 3 1 4 1 5 9
+Sorted ints: 1 1 3 4 5 9
+Ints are sorted: true
+Original strings: banana apple cherry
+Sorted strings: apple banana cherry
+Strings are sorted: true
+Original floats: 3.14 2.71 1.41
+Sorted floats: 1.41 2.71 3.14
+Floats are sorted: true
+Index of 4 in sorted ints: 3
+Index of 'banana' in sorted strings: 1
+Index of 2.71 in sorted floats: 1
+First index where value >= 5: 4
+Custom sorted slice: 1 2 5 8 9
+Custom slice is sorted: true
+test finished
