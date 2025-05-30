@@ -88,6 +88,8 @@ func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldTy
 	if isEmbedded {
 		if _, isPtr := fieldType.(*types.Pointer); isPtr {
 			c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
+		} else if _, isInterface := fieldType.Underlying().(*types.Interface); isInterface {
+			c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
 		} else {
 			typeForNew := fieldName
 			c.tsw.WriteLiterallyf("new %s(init?.%s)", typeForNew, fieldName)
