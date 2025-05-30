@@ -10,4 +10,21 @@ func main() {
 	}
 
 	println("preset time", setTime.String())
+	println("unix", setTime.Unix())
+	println("unix micro", setTime.UnixMicro())
+	println("unix nano", setTime.UnixNano())
+	println("unix milli", setTime.UnixMilli())
+
+	// day, month, etc.
+	println("day", setTime.Day())
+	println("month", setTime.Month())
+	println("year", setTime.Year())
+	println("hour", setTime.Hour())
+	println("minute", setTime.Minute())
+	println("second", setTime.Second())
+	println("nanosecond", setTime.Nanosecond())
+
+	// other functions on setTime
+	println("weekday", setTime.Weekday().String())
+	println("location", setTime.Location().String())
 }

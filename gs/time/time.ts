@@ -22,6 +22,106 @@ export class Time {
     return new Time(this._date, this._nsec, this._monotonic, this._location)
   }
 
+  // Unix returns t as a Unix time, the number of seconds elapsed since January 1, 1970 UTC
+  public Unix(): number {
+    return Math.floor(this._date.getTime() / 1000)
+  }
+
+  // UnixMilli returns t as a Unix time, the number of milliseconds elapsed since January 1, 1970 UTC
+  public UnixMilli(): number {
+    return this._date.getTime()
+  }
+
+  // UnixMicro returns t as a Unix time, the number of microseconds elapsed since January 1, 1970 UTC
+  public UnixMicro(): number {
+    return Math.floor(this._date.getTime() * 1000) + Math.floor(this._nsec / 1000)
+  }
+
+  // UnixNano returns t as a Unix time, the number of nanoseconds elapsed since January 1, 1970 UTC
+  public UnixNano(): number {
+    return this._date.getTime() * 1000000 + this._nsec
+  }
+
+  // Weekday returns the day of the week specified by t
+  public Weekday(): WeekdayValue {
+    if (this._location.offsetSeconds !== undefined) {
+      const offsetMs = this._location.offsetSeconds * 1000
+      const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
+      return new WeekdayValue(adjustedTime.getUTCDay() as Weekday)
+    }
+    return new WeekdayValue(this._date.getDay() as Weekday)
+  }
+
+  // Day returns the day of the month specified by t
+  public Day(): number {
+    if (this._location.offsetSeconds !== undefined) {
+      const offsetMs = this._location.offsetSeconds * 1000
+      const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
+      return adjustedTime.getUTCDate()
+    }
+    return this._date.getDate()
+  }
+
+  // Month returns the month of the year specified by t
+  public Month(): Month {
+    if (this._location.offsetSeconds !== undefined) {
+      const offsetMs = this._location.offsetSeconds * 1000
+      const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
+      return (adjustedTime.getUTCMonth() + 1) as Month
+    }
+    return (this._date.getMonth() + 1) as Month
+  }
+
+  // Year returns the year in which t occurs
+  public Year(): number {
+    if (this._location.offsetSeconds !== undefined) {
+      const offsetMs = this._location.offsetSeconds * 1000
+      const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
+      return adjustedTime.getUTCFullYear()
+    }
+    return this._date.getFullYear()
+  }
+
+  // Hour returns the hour within the day specified by t, in the range [0, 23]
+  public Hour(): number {
+    if (this._location.offsetSeconds !== undefined) {
+      const offsetMs = this._location.offsetSeconds * 1000
+      const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
+      return adjustedTime.getUTCHours()
+    }
+    return this._date.getHours()
+  }
+
+  // Minute returns the minute offset within the hour specified by t, in the range [0, 59]
+  public Minute(): number {
+    if (this._location.offsetSeconds !== undefined) {
+      const offsetMs = this._location.offsetSeconds * 1000
+      const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
+      return adjustedTime.getUTCMinutes()
+    }
+    return this._date.getMinutes()
+  }
+
+  // Second returns the second offset within the minute specified by t, in the range [0, 59]
+  public Second(): number {
+    if (this._location.offsetSeconds !== undefined) {
+      const offsetMs = this._location.offsetSeconds * 1000
+      const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
+      return adjustedTime.getUTCSeconds()
+    }
+    return this._date.getSeconds()
+  }
+
+  // Nanosecond returns the nanosecond offset within the second specified by t, in the range [0, 999999999]
+  public Nanosecond(): number {
+    return this._nsec
+  }
+
+  // Location returns the time zone information associated with t
+  public Location(): Location {
+    return this._location
+  }
+
   // Format returns a textual representation of the time value formatted according to the layout
   public Format(layout: string): string {
     // Implementation of Go's time formatting based on reference time:
@@ -520,6 +620,11 @@ export class Location {
   public get offsetSeconds(): number | undefined {
     return this._offsetSeconds
   }
+
+  // String returns a descriptive name for the time zone information
+  public String(): string {
+    return this._name
+  }
 }
 
 // Month represents a month of the year
@@ -536,6 +641,149 @@ export enum Month {
   October = 10,
   November = 11,
   December = 12,
+}
+
+// Weekday represents a day of the week
+export enum Weekday {
+  Sunday = 0,
+  Monday = 1,
+  Tuesday = 2,
+  Wednesday = 3,
+  Thursday = 4,
+  Friday = 5,
+  Saturday = 6,
+}
+
+// WeekdayString returns the string representation of a Weekday
+export function WeekdayString(w: Weekday): string {
+  const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  return names[w] || 'Unknown'
+}
+
+// WeekdayValue wraps a Weekday enum value and provides methods
+export class WeekdayValue {
+  private _value: Weekday
+
+  constructor(value: Weekday) {
+    this._value = value
+  }
+
+  public valueOf(): number {
+    return this._value
+  }
+
+  public String(): string {
+    return WeekdayString(this._value)
+  }
+}
+
+// ParseError describes a problem parsing a time string
+export class ParseError extends Error {
+  public layout: string
+  public value: string
+  public layoutElem: string
+  public valueElem: string
+  public message: string
+
+  constructor(
+    layout: string,
+    value: string,
+    layoutElem: string,
+    valueElem: string,
+    message: string,
+  ) {
+    super(message)
+    this.layout = layout
+    this.value = value
+    this.layoutElem = layoutElem
+    this.valueElem = valueElem
+    this.message = message
+    this.name = 'ParseError'
+  }
+}
+
+// Timer represents a single event timer
+export class Timer {
+  private _timeout: NodeJS.Timeout | number
+  private _duration: Duration
+  private _callback?: () => void
+
+  constructor(duration: Duration, callback?: () => void) {
+    this._duration = duration
+    this._callback = callback
+    const ms = duration.valueOf() / 1000000 // Convert nanoseconds to milliseconds
+    
+    if (callback) {
+      this._timeout = setTimeout(callback, ms)
+    } else {
+      this._timeout = setTimeout(() => {}, ms)
+    }
+  }
+
+  // Stop prevents the Timer from firing
+  public Stop(): boolean {
+    if (typeof this._timeout === 'number') {
+      clearTimeout(this._timeout)
+    } else {
+      clearTimeout(this._timeout)
+    }
+    return true
+  }
+
+  // Reset changes the timer to expire after duration d
+  public Reset(d: Duration): boolean {
+    this.Stop()
+    const ms = d.valueOf() / 1000000
+    if (this._callback) {
+      this._timeout = setTimeout(this._callback, ms)
+    } else {
+      this._timeout = setTimeout(() => {}, ms)
+    }
+    return true
+  }
+}
+
+// Ticker holds a channel that delivers ticks at intervals
+export class Ticker {
+  private _interval: NodeJS.Timeout | number
+  private _duration: Duration
+  private _stopped: boolean = false
+
+  constructor(duration: Duration) {
+    this._duration = duration
+    const ms = duration.valueOf() / 1000000 // Convert nanoseconds to milliseconds
+    this._interval = setInterval(() => {}, ms)
+  }
+
+  // Stop turns off a ticker
+  public Stop(): void {
+    this._stopped = true
+    if (typeof this._interval === 'number') {
+      clearInterval(this._interval)
+    } else {
+      clearInterval(this._interval)
+    }
+  }
+
+  // Reset stops a ticker and resets its period to the specified duration
+  public Reset(d: Duration): void {
+    this.Stop()
+    this._stopped = false
+    this._duration = d
+    const ms = d.valueOf() / 1000000
+    this._interval = setInterval(() => {}, ms)
+  }
+
+  // Channel returns an async iterator that yields time values
+  public async* Channel(): AsyncIterableIterator<Time> {
+    const ms = this._duration.valueOf() / 1000000
+    while (!this._stopped) {
+      await new Promise(resolve => setTimeout(resolve, ms))
+      if (!this._stopped) {
+        yield Now()
+      }
+    }
+  }
 }
 
 // Now returns the current local time with monotonic clock reading
@@ -640,3 +888,158 @@ export const DateTime = '2006-01-02 15:04:05'
 export const Layout = "01/02 03:04:05PM '06 -0700"
 export const RFC3339 = '2006-01-02T15:04:05Z07:00'
 export const Kitchen = '3:04PM'
+
+// Unix returns the local Time corresponding to the given Unix time,
+// sec seconds and nsec nanoseconds since January 1, 1970 UTC
+export function Unix(sec: number, nsec: number = 0): Time {
+  const ms = sec * 1000 + Math.floor(nsec / 1000000)
+  const remainingNsec = nsec % 1000000
+  return new Time(new globalThis.Date(ms), remainingNsec, undefined, UTC)
+}
+
+// UnixMilli returns the local Time corresponding to the given Unix time,
+// msec milliseconds since January 1, 1970 UTC
+export function UnixMilli(msec: number): Time {
+  return new Time(new globalThis.Date(msec), 0, undefined, UTC)
+}
+
+// UnixMicro returns the local Time corresponding to the given Unix time,
+// usec microseconds since January 1, 1970 UTC
+export function UnixMicro(usec: number): Time {
+  const ms = Math.floor(usec / 1000)
+  const nsec = (usec % 1000) * 1000
+  return new Time(new globalThis.Date(ms), nsec, undefined, UTC)
+}
+
+// UnixNano returns the local Time corresponding to the given Unix time,
+// nsec nanoseconds since January 1, 1970 UTC
+export function UnixNano(nsec: number): Time {
+  const ms = Math.floor(nsec / 1000000)
+  const remainingNsec = nsec % 1000000
+  return new Time(new globalThis.Date(ms), remainingNsec, undefined, UTC)
+}
+
+// ParseDuration parses a duration string
+// A duration string is a possibly signed sequence of decimal numbers,
+// each with optional fraction and a unit suffix
+export function ParseDuration(s: string): Duration {
+  const regex = /^([+-]?)(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)$/
+  const match = s.match(regex)
+  
+  if (!match) {
+    throw new Error(`time: invalid duration "${s}"`)
+  }
+  
+  const [, sign, valueStr, unit] = match
+  let value = parseFloat(valueStr)
+  if (sign === '-') value = -value
+  
+  let nanoseconds: number
+  switch (unit) {
+    case 'ns':
+      nanoseconds = value
+      break
+    case 'us':
+    case 'µs':
+      nanoseconds = value * 1000
+      break
+    case 'ms':
+      nanoseconds = value * 1000000
+      break
+    case 's':
+      nanoseconds = value * 1000000000
+      break
+    case 'm':
+      nanoseconds = value * 60000000000
+      break
+    case 'h':
+      nanoseconds = value * 3600000000000
+      break
+    default:
+      throw new Error(`time: unknown unit "${unit}" in duration "${s}"`)
+  }
+  
+  return new Duration(Math.floor(nanoseconds))
+}
+
+// Parse parses a formatted string and returns the time value it represents
+export function Parse(layout: string, value: string): Time {
+  return ParseInLocation(layout, value, UTC)
+}
+
+// ParseInLocation is like Parse but differs in two important ways
+export function ParseInLocation(layout: string, value: string, loc: Location): Time {
+  // This is a simplified implementation
+  // A full implementation would need to parse according to the layout format
+  
+  // Handle common layouts
+  if (layout === RFC3339 || layout === '2006-01-02T15:04:05Z07:00') {
+    const date = new globalThis.Date(value)
+    if (isNaN(date.getTime())) {
+      throw new ParseError(layout, value, '', '', `parsing time "${value}" as "${layout}": cannot parse`)
+    }
+    return new Time(date, 0, undefined, loc)
+  }
+  
+  if (layout === DateTime || layout === '2006-01-02 15:04:05') {
+    const date = new globalThis.Date(value)
+    if (isNaN(date.getTime())) {
+      throw new ParseError(layout, value, '', '', `parsing time "${value}" as "${layout}": cannot parse`)
+    }
+    return new Time(date, 0, undefined, loc)
+  }
+  
+  // Fallback to standard Date parsing
+  const date = new globalThis.Date(value)
+  if (isNaN(date.getTime())) {
+    throw new ParseError(layout, value, '', '', `parsing time "${value}" as "${layout}": cannot parse`)
+  }
+  return new Time(date, 0, undefined, loc)
+}
+
+// After waits for the duration to elapse and then returns the current time
+export async function After(d: Duration): Promise<Time> {
+  await Sleep(d)
+  return Now()
+}
+
+// AfterFunc waits for the duration to elapse and then calls f
+export function AfterFunc(d: Duration, f: () => void): Timer {
+  return new Timer(d, f)
+}
+
+// NewTimer creates a new Timer that will fire after the given duration
+export function NewTimer(d: Duration): Timer {
+  return new Timer(d)
+}
+
+// NewTicker returns a new Ticker containing a channel that will send the current time
+export function NewTicker(d: Duration): Ticker {
+  return new Ticker(d)
+}
+
+// Tick is a convenience wrapper for NewTicker providing access to the ticking channel only
+export function Tick(d: Duration): AsyncIterableIterator<Time> {
+  return new Ticker(d).Channel()
+}
+
+// LoadLocation returns the Location with the given name
+// This is a simplified implementation that only supports UTC and Local
+export function LoadLocation(name: string): Location {
+  switch (name) {
+    case 'UTC':
+      return UTC
+    case 'Local':
+      // Return a location that uses local time (no fixed offset)
+      return new Location('Local')
+    default:
+      throw new Error(`time: unknown time zone ${name}`)
+  }
+}
+
+// LoadLocationFromTZData returns a Location with the given name
+// This is a simplified implementation
+export function LoadLocationFromTZData(name: string, _data: Uint8Array): Location {
+  // In a real implementation, this would parse the timezone data
+  return new Location(name)
+}

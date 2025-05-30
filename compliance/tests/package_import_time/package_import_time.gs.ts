@@ -13,5 +13,22 @@ export async function main(): Promise<void> {
 	}
 
 	console.log("preset time", setTime.String())
+	console.log("unix", setTime.Unix())
+	console.log("unix micro", setTime.UnixMicro())
+	console.log("unix nano", setTime.UnixNano())
+	console.log("unix milli", setTime.UnixMilli())
+
+	// day, month, etc.
+	console.log("day", setTime.Day())
+	console.log("month", setTime.Month())
+	console.log("year", setTime.Year())
+	console.log("hour", setTime.Hour())
+	console.log("minute", setTime.Minute())
+	console.log("second", setTime.Second())
+	console.log("nanosecond", setTime.Nanosecond())
+
+	// other functions on setTime
+	console.log("weekday", setTime.Weekday()!.String())
+	console.log("location", setTime.Location()!.String())
 }
 
