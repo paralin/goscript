@@ -1,6 +1,6 @@
 // Package filepath implements utility routines for manipulating filename paths
 // in a way compatible with the target operating system-defined file paths.
-import * as $ from "@goscript/builtin/index.js"
+import * as $ from '@goscript/builtin/index.js'
 
 // Path separator constants
 export const Separator = $.stringToRune('/')
@@ -272,10 +272,7 @@ export function Abs(path: string): [string, $.GoError] {
   return ['/' + Clean(path), null]
 }
 
-export function Rel(
-  basepath: string,
-  targpath: string,
-): [string, $.GoError] {
+export function Rel(basepath: string, targpath: string): [string, $.GoError] {
   // Simplified implementation - in reality this is much more complex
   const base = Clean(basepath)
   const targ = Clean(targpath)
@@ -307,11 +304,7 @@ export function Glob(_pattern: string): [string[], $.GoError] {
 // prefix; that is, if Walk is called with "dir" and finds a file "a"
 // in that directory, the walk function will be called with argument
 // "dir/a". The info argument is the fs.FileInfo for the named path.
-export type WalkFunc = (
-  path: string,
-  info: any,
-  err: $.GoError,
-) => $.GoError
+export type WalkFunc = (path: string, info: any, err: $.GoError) => $.GoError
 
 export function Walk(root: string, walkFn: WalkFunc): $.GoError {
   // No filesystem support, just call the function with the root

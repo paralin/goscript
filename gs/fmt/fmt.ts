@@ -214,7 +214,10 @@ export function Print(...a: any[]): [number, $.GoError | null] {
   return [result.length, null]
 }
 
-export function Printf(format: string, ...a: any[]): [number, $.GoError | null] {
+export function Printf(
+  format: string,
+  ...a: any[]
+): [number, $.GoError | null] {
   const result = parseFormat(format, a)
   stdout.write(result)
   return [result.length, null]
@@ -341,7 +344,10 @@ export function Scan(..._a: any[]): [number, $.GoError | null] {
   return [0, $.newError('Scan not implemented')]
 }
 
-export function Scanf(_format: string, ..._a: any[]): [number, $.GoError | null] {
+export function Scanf(
+  _format: string,
+  ..._a: any[]
+): [number, $.GoError | null] {
   // TODO: Implement formatted scanning from stdin
   return [0, $.newError('Scanf not implemented')]
 }
@@ -365,7 +371,10 @@ export function Sscanf(
   return [0, $.newError('Sscanf not implemented')]
 }
 
-export function Sscanln(_str: string, ..._a: any[]): [number, $.GoError | null] {
+export function Sscanln(
+  _str: string,
+  ..._a: any[]
+): [number, $.GoError | null] {
   // TODO: Implement line scanning from string
   return [0, $.newError('Sscanln not implemented')]
 }

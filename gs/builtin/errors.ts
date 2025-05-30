@@ -15,7 +15,7 @@ export function newError(text: string): GoError {
 // toGoError converts a JavaScript Error to a Go error
 // if the error is already a Go error, it returns it unchanged
 export function toGoError(err: Error): GoError {
-  if ("Error" in err) {
+  if ('Error' in err) {
     return err as GoError
   }
   return {

@@ -1,0 +1,10 @@
+Custom name: custom_name.txt
+File name: test.txt
+Lock successful
+Unlock successful
+Wrote bytes: 9
+Read bytes: 5
+ReadAt bytes: 5
+Seek position: 0
+Truncate successful
+Close successful

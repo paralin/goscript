@@ -34,7 +34,9 @@ export class Time {
 
   // UnixMicro returns t as a Unix time, the number of microseconds elapsed since January 1, 1970 UTC
   public UnixMicro(): number {
-    return Math.floor(this._date.getTime() * 1000) + Math.floor(this._nsec / 1000)
+    return (
+      Math.floor(this._date.getTime() * 1000) + Math.floor(this._nsec / 1000)
+    )
   }
 
   // UnixNano returns t as a Unix time, the number of nanoseconds elapsed since January 1, 1970 UTC
@@ -656,7 +658,15 @@ export enum Weekday {
 
 // WeekdayString returns the string representation of a Weekday
 export function WeekdayString(w: Weekday): string {
-  const names = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const names = [
+    'Sunday',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+  ]
   return names[w] || 'Unknown'
 }
 
@@ -712,7 +722,7 @@ export class Timer {
     this._duration = duration
     this._callback = callback
     const ms = duration.valueOf() / 1000000 // Convert nanoseconds to milliseconds
-    
+
     if (callback) {
       this._timeout = setTimeout(callback, ms)
     } else {
@@ -775,10 +785,10 @@ export class Ticker {
   }
 
   // Channel returns an async iterator that yields time values
-  public async* Channel(): AsyncIterableIterator<Time> {
+  public async *Channel(): AsyncIterableIterator<Time> {
     const ms = this._duration.valueOf() / 1000000
     while (!this._stopped) {
-      await new Promise(resolve => setTimeout(resolve, ms))
+      await new Promise((resolve) => setTimeout(resolve, ms))
       if (!this._stopped) {
         yield Now()
       }
@@ -925,15 +935,15 @@ export function UnixNano(nsec: number): Time {
 export function ParseDuration(s: string): Duration {
   const regex = /^([+-]?)(\d+(?:\.\d+)?)(ns|us|µs|ms|s|m|h)$/
   const match = s.match(regex)
-  
+
   if (!match) {
     throw new Error(`time: invalid duration "${s}"`)
   }
-  
+
   const [, sign, valueStr, unit] = match
   let value = parseFloat(valueStr)
   if (sign === '-') value = -value
-  
+
   let nanoseconds: number
   switch (unit) {
     case 'ns':
@@ -958,7 +968,7 @@ export function ParseDuration(s: string): Duration {
     default:
       throw new Error(`time: unknown unit "${unit}" in duration "${s}"`)
   }
-  
+
   return new Duration(Math.floor(nanoseconds))
 }
 
@@ -968,31 +978,53 @@ export function Parse(layout: string, value: string): Time {
 }
 
 // ParseInLocation is like Parse but differs in two important ways
-export function ParseInLocation(layout: string, value: string, loc: Location): Time {
+export function ParseInLocation(
+  layout: string,
+  value: string,
+  loc: Location,
+): Time {
   // This is a simplified implementation
   // A full implementation would need to parse according to the layout format
-  
+
   // Handle common layouts
   if (layout === RFC3339 || layout === '2006-01-02T15:04:05Z07:00') {
     const date = new globalThis.Date(value)
     if (isNaN(date.getTime())) {
-      throw new ParseError(layout, value, '', '', `parsing time "${value}" as "${layout}": cannot parse`)
+      throw new ParseError(
+        layout,
+        value,
+        '',
+        '',
+        `parsing time "${value}" as "${layout}": cannot parse`,
+      )
     }
     return new Time(date, 0, undefined, loc)
   }
-  
+
   if (layout === DateTime || layout === '2006-01-02 15:04:05') {
     const date = new globalThis.Date(value)
     if (isNaN(date.getTime())) {
-      throw new ParseError(layout, value, '', '', `parsing time "${value}" as "${layout}": cannot parse`)
+      throw new ParseError(
+        layout,
+        value,
+        '',
+        '',
+        `parsing time "${value}" as "${layout}": cannot parse`,
+      )
     }
     return new Time(date, 0, undefined, loc)
   }
-  
+
   // Fallback to standard Date parsing
   const date = new globalThis.Date(value)
   if (isNaN(date.getTime())) {
-    throw new ParseError(layout, value, '', '', `parsing time "${value}" as "${layout}": cannot parse`)
+    throw new ParseError(
+      layout,
+      value,
+      '',
+      '',
+      `parsing time "${value}" as "${layout}": cannot parse`,
+    )
   }
   return new Time(date, 0, undefined, loc)
 }
@@ -1039,7 +1071,10 @@ export function LoadLocation(name: string): Location {
 
 // LoadLocationFromTZData returns a Location with the given name
 // This is a simplified implementation
-export function LoadLocationFromTZData(name: string, _data: Uint8Array): Location {
+export function LoadLocationFromTZData(
+  name: string,
+  _data: Uint8Array,
+): Location {
   // In a real implementation, this would parse the timezone data
   return new Location(name)
 }

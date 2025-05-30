@@ -25,7 +25,7 @@ export {
 } from './fmt.js'
 
 // Re-export types for TypeScript compilation
-export type { 
+export type {
   Formatter,
   GoStringer,
   Stringer,

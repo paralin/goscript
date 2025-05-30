@@ -379,7 +379,7 @@ export function max(a: number, b: number): number {
  * This is used to replace String.fromCharCode() in Go string(rune) conversions.
  * Since sometimes single-char rune literals are compiled to strings, this function
  * needs to handle both numbers (runes) and strings.
- * 
+ *
  * @param runeOrString A rune (Unicode code point as number) or a string
  * @returns The resulting string
  */

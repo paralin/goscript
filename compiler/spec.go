@@ -89,8 +89,19 @@ func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldTy
 		if _, isPtr := fieldType.(*types.Pointer); isPtr {
 			c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
 		} else {
-			typeForNew := fieldName
-			c.tsw.WriteLiterallyf("new %s(init?.%s)", typeForNew, fieldName)
+			// Check if the embedded type is an interface
+			embeddedTypeUnderlying := fieldType
+			if named, isNamed := embeddedTypeUnderlying.(*types.Named); isNamed {
+				embeddedTypeUnderlying = named.Underlying()
+			}
+			if _, isInterface := embeddedTypeUnderlying.(*types.Interface); isInterface {
+				// For interfaces, use the provided value or null instead of trying to instantiate
+				c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
+			} else {
+				// For structs, instantiate with provided fields
+				typeForNew := fieldName
+				c.tsw.WriteLiterallyf("new %s(init?.%s)", typeForNew, fieldName)
+			}
 		}
 	} else {
 		isStructValueType := false

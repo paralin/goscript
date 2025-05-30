@@ -823,7 +823,10 @@ export function copy(dst: Uint8Array, src: Uint8Array | string): number
 export function copy(dst: Uint8Array, src: Slice<number>): number
 export function copy<T>(dst: Slice<T>, src: Slice<T>): number
 export function copy<T>(dst: Slice<T>, src: string): number
-export function copy<T>(dst: Slice<T> | Uint8Array, src: Slice<T> | Uint8Array | string): number {
+export function copy<T>(
+  dst: Slice<T> | Uint8Array,
+  src: Slice<T> | Uint8Array | string,
+): number {
   if (dst === null) {
     return 0
   }
@@ -875,7 +878,7 @@ function copyFromString<T>(dst: Slice<T> | Uint8Array, src: string): number {
   const srcBytes = encoder.encode(src)
   const dstLen = dst instanceof Uint8Array ? dst.length : len(dst)
   const count = Math.min(dstLen, srcBytes.length)
-  
+
   if (count === 0) {
     return 0
   }
@@ -895,14 +898,18 @@ function copyFromString<T>(dst: Slice<T> | Uint8Array, src: string): number {
       dst[i] = srcBytes[i] as unknown as T
     }
   }
-  
+
   return count
 }
 
 /**
  * Helper: Copy from Slice<number> to Uint8Array
  */
-function copyToUint8Array(dst: Uint8Array, src: Slice<number>, count: number): number {
+function copyToUint8Array(
+  dst: Uint8Array,
+  src: Slice<number>,
+  count: number,
+): number {
   if (isComplexSlice(src)) {
     const srcMeta = src.__meta__
     for (let i = 0; i < count; i++) {
@@ -919,7 +926,11 @@ function copyToUint8Array(dst: Uint8Array, src: Slice<number>, count: number): n
 /**
  * Helper: Copy from Uint8Array to Slice<T>
  */
-function copyFromUint8Array<T>(dst: Slice<T>, src: Uint8Array, count: number): number {
+function copyFromUint8Array<T>(
+  dst: Slice<T>,
+  src: Uint8Array,
+  count: number,
+): number {
   if (isComplexSlice(dst)) {
     const dstMeta = dst.__meta__
     for (let i = 0; i < count; i++) {
@@ -937,14 +948,19 @@ function copyFromUint8Array<T>(dst: Slice<T>, src: Uint8Array, count: number): n
 /**
  * Helper: Copy between two Slice<T> instances
  */
-function copyBetweenSlices<T>(dst: Slice<T>, src: Slice<T>, count: number): number {
+function copyBetweenSlices<T>(
+  dst: Slice<T>,
+  src: Slice<T>,
+  count: number,
+): number {
   if (isComplexSlice(dst)) {
     const dstMeta = dst.__meta__
-    
+
     if (isComplexSlice(src)) {
       const srcMeta = src.__meta__
       for (let i = 0; i < count; i++) {
-        dstMeta.backing[dstMeta.offset + i] = srcMeta.backing[srcMeta.offset + i]
+        dstMeta.backing[dstMeta.offset + i] =
+          srcMeta.backing[srcMeta.offset + i]
         ;(dst as any)[i] = srcMeta.backing[srcMeta.offset + i]
       }
     } else if (Array.isArray(src)) {
