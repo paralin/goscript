@@ -229,6 +229,23 @@ func (c *GoToTSCompiler) WriteCompositeLit(exp *ast.CompositeLit) error {
 						c.WriteTypeExpr(exp.Type)
 					}
 				}
+			} else if aliasType, ok := litType.(*types.Alias); ok {
+				// Handle type aliases (like os.PathError)
+				if underlyingStruct, ok := aliasType.Underlying().(*types.Struct); ok {
+					structType = underlyingStruct
+					isStructLiteral = true
+
+					// Check if this is a protobuf type
+					if handled, err := c.writeProtobufCompositeLit(exp, litType); handled {
+						if err != nil {
+							return err
+						}
+					} else {
+						// Type alias for struct, use constructor
+						c.tsw.WriteLiterally("new ")
+						c.WriteTypeExpr(exp.Type)
+					}
+				}
 			} else if ptrType, ok := litType.(*types.Pointer); ok {
 				if namedElem, ok := ptrType.Elem().(*types.Named); ok {
 					if underlyingStruct, ok := namedElem.Underlying().(*types.Struct); ok {

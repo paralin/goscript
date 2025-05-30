@@ -22,6 +22,10 @@ export {
   Fscan,
   Fscanf,
   Fscanln,
+} from './fmt.js'
+
+// Re-export types for TypeScript compilation
+export type { 
   Formatter,
   GoStringer,
   Stringer,

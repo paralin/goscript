@@ -58,7 +58,7 @@ $.registerInterfaceType(
 );
 
 export type PathError = fs.PathError;
-export const PathError = null as any;
+export const PathError = fs.PathError;
 
 export class SyscallError {
 	public get Syscall(): string {
