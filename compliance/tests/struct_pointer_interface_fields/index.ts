@@ -1,1 +1,1 @@
-export { MyInterface, MyStruct } from "./struct_pointer_interface_fields.gs.js"
+export { MyReader, Reader, StringReader } from "./struct_pointer_interface_fields.gs.js"
