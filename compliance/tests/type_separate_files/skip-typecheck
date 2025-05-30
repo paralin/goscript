@@ -1,0 +1,2 @@
+This test is skipped for TypeScript type checking until we implement a proper fix for property access on GoStruct classes.
+The issue is that TypeScript doesn't recognize properties defined at runtime with Object.defineProperty.

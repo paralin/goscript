@@ -5,40 +5,17 @@ import * as $ from "@goscript/builtin/index.js";
 
 import * as reflect from "@goscript/reflect/index.js"
 
-export class Person {
-	public get Name(): string {
-		return this._fields.Name.value
-	}
-	public set Name(value: string) {
-		this._fields.Name.value = value
-	}
-
-	public get Age(): number {
-		return this._fields.Age.value
-	}
-	public set Age(value: number) {
-		this._fields.Age.value = value
-	}
-
-	public _fields: {
-		Name: $.VarRef<string>;
-		Age: $.VarRef<number>;
-	}
+export class Person extends $.GoStruct<{Name: string; Age: number}> {
 
 	constructor(init?: Partial<{Age?: number, Name?: string}>) {
-		this._fields = {
-			Name: $.varRef(init?.Name ?? ""),
-			Age: $.varRef(init?.Age ?? 0)
-		}
+		super({
+			Name: { type: String, default: "" },
+			Age: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): Person {
-		const cloned = new Person()
-		cloned._fields = {
-			Name: $.varRef(this._fields.Name.value),
-			Age: $.varRef(this._fields.Age.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system
@@ -64,21 +41,21 @@ $.registerInterfaceType(
 export async function main(): Promise<void> {
 	// Test basic reflect functions
 	let x = 42
-	let v = reflect.ValueOf(x).clone()
+	let v = reflect.ValueOf(x)
 	console.log("Type:", reflect.TypeOf(x)!.String())
 	console.log("Value:", v.Int())
 	console.log("Kind:", v.Kind()!.String())
 
 	// Test with string
 	let s = "hello"
-	let sv = reflect.ValueOf(s).clone()
+	let sv = reflect.ValueOf(s)
 	console.log("String type:", reflect.TypeOf(s)!.String())
 	console.log("String value:", sv.String())
 	console.log("String kind:", sv.Kind()!.String())
 
 	// Test with slice
 	let slice = $.arrayToSlice<number>([1, 2, 3])
-	let sliceV = reflect.ValueOf(slice).clone()
+	let sliceV = reflect.ValueOf(slice)
 	console.log("Slice type:", reflect.TypeOf(slice)!.String())
 	console.log("Slice len:", sliceV.Len())
 	console.log("Slice kind:", sliceV.Kind()!.String())
@@ -91,7 +68,7 @@ export async function main(): Promise<void> {
 	console.log("DeepEqual a==c:", reflect.DeepEqual(a, c))
 
 	// Test Zero value
-	let zeroInt = reflect.Zero(reflect.TypeOf(42)).clone()
+	let zeroInt = reflect.Zero(reflect.TypeOf(42))
 	console.log("Zero int:", zeroInt.Int())
 
 	// Test type construction functions
@@ -113,16 +90,16 @@ export async function main(): Promise<void> {
 	console.log("PtrTo int:", ptrType2!.String())
 
 	// Test New and Indirect
-	let newVal = reflect.New(intType).clone()
+	let newVal = reflect.New(intType)
 	console.log("New int type:", newVal.Type()!.String())
-	let indirectVal = reflect.Indirect(newVal).clone()
+	let indirectVal = reflect.Indirect(newVal)
 	console.log("Indirect type:", indirectVal.Type()!.String())
 
 	// Test Zero values for different types
-	let zeroString = reflect.Zero(reflect.TypeOf("")).clone()
+	let zeroString = reflect.Zero(reflect.TypeOf(""))
 	console.log("Zero string:", zeroString.String())
 
-	let zeroBool = reflect.Zero(reflect.TypeOf(true)).clone()
+	let zeroBool = reflect.Zero(reflect.TypeOf(true))
 	console.log("Zero bool:", zeroBool.String()) // Should show the type since it's not a string
 
 	// Test Swapper function
@@ -135,8 +112,8 @@ export async function main(): Promise<void> {
 	// Test Copy function
 	let src = $.arrayToSlice<number>([10, 20, 30])
 	let dst = $.makeSlice<number>(2, undefined, 'number')
-	let srcVal = reflect.ValueOf(src).clone()
-	let dstVal = reflect.ValueOf(dst).clone()
+	let srcVal = reflect.ValueOf(src)
+	let dstVal = reflect.ValueOf(dst)
 	let copied = reflect.Copy(dstVal, srcVal)
 	console.log("Copied elements:", copied)
 	console.log("Dst after copy:", dst![0], dst![1])
@@ -147,16 +124,16 @@ export async function main(): Promise<void> {
 	console.log("Struct type:", personType!.String())
 	console.log("Struct kind:", personType!.Kind()!.String())
 
-	let personVal = reflect.ValueOf(person).clone()
+	let personVal = reflect.ValueOf(person)
 	console.log("Struct value type:", personVal.Type()!.String())
 
 	// Test with different kinds
 	let f: number = 3.14
-	let fVal = reflect.ValueOf(f).clone()
+	let fVal = reflect.ValueOf(f)
 	console.log("Float kind:", fVal.Kind()!.String())
 
 	let boolVal: boolean = true
-	let bVal = reflect.ValueOf(boolVal).clone()
+	let bVal = reflect.ValueOf(boolVal)
 	console.log("Bool kind:", bVal.Kind()!.String())
 
 	// Test type equality
@@ -184,7 +161,7 @@ export async function main(): Promise<void> {
 
 	// Test interface type
 	let iface: null | any = "hello"
-	let ifaceVal = reflect.ValueOf(iface).clone()
+	let ifaceVal = reflect.ValueOf(iface)
 	console.log("Interface value type:", ifaceVal.Type()!.String())
 	console.log("Interface kind:", ifaceVal.Kind()!.String())
 
@@ -200,13 +177,13 @@ export async function main(): Promise<void> {
 		}
 		return fn
 	})()
-	let fnVal = reflect.ValueOf(fn).clone()
+	let fnVal = reflect.ValueOf(fn)
 	console.log("Function type:", fnVal.Type()!.String())
 	console.log("Function kind:", fnVal.Kind()!.String())
 
 	// Test more complex types
 	let complexSlice = $.arrayToSlice<$.Slice<number>>([[ 1, 2 ], [ 3, 4 ]], 2)
-	let complexVal = reflect.ValueOf(complexSlice).clone()
+	let complexVal = reflect.ValueOf(complexSlice)
 	console.log("Complex slice type:", complexVal.Type()!.String())
 	console.log("Complex slice kind:", complexVal.Kind()!.String())
 	console.log("Complex slice len:", complexVal.Len())
@@ -222,18 +199,18 @@ export async function main(): Promise<void> {
 
 	// Test MakeSlice
 	let sliceTypeInt = reflect.SliceOf(reflect.TypeOf(0))
-	let newSlice = reflect.MakeSlice(sliceTypeInt, 3, 5).clone()
+	let newSlice = reflect.MakeSlice(sliceTypeInt, 3, 5)
 	console.log("MakeSlice len:", newSlice.Len())
 	console.log("MakeSlice type:", newSlice.Type()!.String())
 
 	// Test MakeMap
 	let mapTypeStr = reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0))
-	let newMap = reflect.MakeMap(mapTypeStr).clone()
+	let newMap = reflect.MakeMap(mapTypeStr)
 	console.log("MakeMap type:", newMap.Type()!.String())
 
 	// Test Append
-	let originalSlice = reflect.ValueOf($.arrayToSlice<number>([1, 2])).clone()
-	let appendedSlice = reflect.Append(originalSlice, reflect.ValueOf(3)).clone()
+	let originalSlice = reflect.ValueOf($.arrayToSlice<number>([1, 2]))
+	let appendedSlice = reflect.Append(originalSlice, reflect.ValueOf(3))
 	console.log("Append result len:", appendedSlice.Len())
 
 	// Test channel types
@@ -242,7 +219,7 @@ export async function main(): Promise<void> {
 	console.log("ChanOf kind:", chanType!.Kind()!.String())
 
 	// Test MakeChan
-	let newChan = reflect.MakeChan(chanType, 0).clone()
+	let newChan = reflect.MakeChan(chanType, 0)
 	console.log("MakeChan type:", newChan.Type()!.String())
 
 	// Test different channel directions
@@ -254,13 +231,13 @@ export async function main(): Promise<void> {
 
 	// Test channels with different element types
 	let stringChanType = reflect.ChanOf(reflect.BothDir, reflect.TypeOf(""))
-	let stringChan = reflect.MakeChan(stringChanType, 5).clone()
+	let stringChan = reflect.MakeChan(stringChanType, 5)
 	console.log("String chan type:", stringChan.Type()!.String())
 	console.log("String chan elem type:", stringChan.Type()!.Elem()!.String())
 
 	// Test buffered vs unbuffered channels
-	let unbufferedChan = reflect.MakeChan(chanType, 0).clone()
-	let bufferedChan = reflect.MakeChan(chanType, 10).clone()
+	let unbufferedChan = reflect.MakeChan(chanType, 0)
+	let bufferedChan = reflect.MakeChan(chanType, 10)
 	console.log("Unbuffered chan type:", unbufferedChan.Type()!.String())
 	console.log("Buffered chan type:", bufferedChan.Type()!.String())
 
@@ -270,8 +247,8 @@ export async function main(): Promise<void> {
 	console.log("Chan size:", chanType!.Size())
 
 	// Test Select functionality
-	let intChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0)), 1).clone()
-	let strChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf("")), 1).clone()
+	let intChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0)), 1)
+	let strChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf("")), 1)
 
 	// Send values to only the string channel to make select deterministic
 	strChan.Send(reflect.ValueOf("hello"))

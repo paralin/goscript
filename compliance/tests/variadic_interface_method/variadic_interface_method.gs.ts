@@ -13,19 +13,15 @@ $.registerInterfaceType(
   [{ name: "Join", args: [{ name: "elem", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "string" } } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }]
 );
 
-export class PathJoiner {
-	public _fields: {
-	}
+export class PathJoiner extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): PathJoiner {
-		const cloned = new PathJoiner()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Join(...elem: string[]): string {

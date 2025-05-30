@@ -9,7 +9,7 @@ export async function main(): Promise<void> {
 
 	let { value: m, ok: ok } = $.typeAssert<Map<string, number> | null>(i, {kind: $.TypeKind.Map, keyType: {kind: $.TypeKind.Basic, name: 'string'}, elemType: {kind: $.TypeKind.Basic, name: 'number'}})
 	if (ok) {
-		console.log("Age:", $.mapGet(m, "age", 0)[0])
+		console.log("Age:", $.mapGet(m, "age", 0)[0]!)
 	} else {
 		console.log("Type assertion failed")
 	}

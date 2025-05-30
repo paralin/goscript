@@ -3,30 +3,16 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class MyStruct {
-	public get Val(): number {
-		return this._fields.Val.value
-	}
-	public set Val(value: number) {
-		this._fields.Val.value = value
-	}
-
-	public _fields: {
-		Val: $.VarRef<number>;
-	}
+export class MyStruct extends $.GoStruct<{Val: number}> {
 
 	constructor(init?: Partial<{Val?: number}>) {
-		this._fields = {
-			Val: $.varRef(init?.Val ?? 0)
-		}
+		super({
+			Val: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): MyStruct {
-		const cloned = new MyStruct()
-		cloned._fields = {
-			Val: $.varRef(this._fields.Val.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

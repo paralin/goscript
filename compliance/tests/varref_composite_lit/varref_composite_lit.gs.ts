@@ -3,30 +3,16 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class MockInode {
-	public get Value(): number {
-		return this._fields.Value.value
-	}
-	public set Value(value: number) {
-		this._fields.Value.value = value
-	}
-
-	public _fields: {
-		Value: $.VarRef<number>;
-	}
+export class MockInode extends $.GoStruct<{Value: number}> {
 
 	constructor(init?: Partial<{Value?: number}>) {
-		this._fields = {
-			Value: $.varRef(init?.Value ?? 0)
-		}
+		super({
+			Value: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): MockInode {
-		const cloned = new MockInode()
-		cloned._fields = {
-			Value: $.varRef(this._fields.Value.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public getValue(): number {

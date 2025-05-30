@@ -3,30 +3,16 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class content {
-	public get bytes(): $.Bytes {
-		return this._fields.bytes.value
-	}
-	public set bytes(value: $.Bytes) {
-		this._fields.bytes.value = value
-	}
-
-	public _fields: {
-		bytes: $.VarRef<$.Bytes>;
-	}
+export class content extends $.GoStruct<{bytes: $.Bytes}> {
 
 	constructor(init?: Partial<{bytes?: $.Bytes}>) {
-		this._fields = {
-			bytes: $.varRef(init?.bytes ?? new Uint8Array(0))
-		}
+		super({
+			bytes: { type: Object, default: new Uint8Array(0) }
+		}, init)
 	}
 
-	public clone(): content {
-		const cloned = new content()
-		cloned._fields = {
-			bytes: $.varRef(this._fields.bytes.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public ReadAt(b: $.Bytes, off: number): [number, $.GoError] {

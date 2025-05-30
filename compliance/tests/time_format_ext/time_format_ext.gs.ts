@@ -8,7 +8,7 @@ import * as time from "@goscript/time/index.js"
 export async function main(): Promise<void> {
 	// Fixed time with a specific offset and nanoseconds
 	let locPDT = time.FixedZone("PDT", -7 * 60 * 60) // -07:00
-	let t1 = time.Date(2025, time.May, 25, 17, 42, 56, 123456789, locPDT).clone()
+	let t1 = time.Date(2025, time.May, 25, 17, 42, 56, 123456789, locPDT)
 
 	console.log("--- Specific Time (2025-05-25 17:42:56.123456789 -0700 PDT) ---")
 	// Timezone patterns
@@ -34,13 +34,13 @@ export async function main(): Promise<void> {
 
 	// Fixed time with zero nanoseconds for trimming tests
 	let locPST = time.FixedZone("PST", -8 * 60 * 60) // -08:00
-	let t2 = time.Date(2025, time.May, 25, 17, 42, 56, 0, locPST).clone()
+	let t2 = time.Date(2025, time.May, 25, 17, 42, 56, 0, locPST)
 	console.log("--- Specific Time (2025-05-25 17:42:56.000 -0800 PST) ---")
 	console.log("Layout .999 (zero ns) -> " + t2.Format("15:04:05.999"))
 	console.log("Layout .000 (zero ns) -> " + t2.Format("15:04:05.000"))
 
 	// Fixed UTC time for Z and Z07:00 patterns
-	let t3 = time.Date(2025, time.May, 25, 17, 42, 56, 123456789, time.UTC).clone()
+	let t3 = time.Date(2025, time.May, 25, 17, 42, 56, 123456789, time.UTC)
 	console.log("--- UTC Time (2025-05-25 17:42:56.123456789 Z) ---")
 	console.log("Layout Z07:00 (UTC) -> " + t3.Format("2006-01-02 15:04:05 Z07:00"))
 	console.log("Layout Z (UTC)      -> " + t3.Format("2006-01-02 15:04:05 Z"))

@@ -3,19 +3,15 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class Greeter {
-	public _fields: {
-	}
+export class Greeter extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): Greeter {
-		const cloned = new Greeter()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Greet(): string {
@@ -42,19 +38,15 @@ $.registerInterfaceType(
   [{ name: "String", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }]
 );
 
-export class MyStringer {
-	public _fields: {
-	}
+export class MyStringer extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): MyStringer {
-		const cloned = new MyStringer()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public String(): string {

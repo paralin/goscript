@@ -13,16 +13,17 @@ export const makeMap = <K, V>(): Map<K, V> => {
  * @param defaultValue The default value to return if the key doesn't exist.
  * @returns A tuple [value, exists] where value is the map value or defaultValue, and exists is whether the key was found.
  */
-export function mapGet<K, V, D>(
+export function mapGet<K, V, D = V | null>(
   map: Map<K, V> | null,
   key: K,
   defaultValue: D,
 ): [V, true] | [D, false] {
   const exists = map?.has(key)
   if (exists) {
-    return [map!.get(key)!, true]
+    const value = map!.get(key)!
+    return [value, true] as [V, true]
   } else {
-    return [defaultValue, false]
+    return [defaultValue, false] as [D, false]
   }
 }
 

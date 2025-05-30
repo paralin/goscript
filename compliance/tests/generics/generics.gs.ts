@@ -18,40 +18,17 @@ export function getLength<S extends string | $.Bytes>(s: S): number {
 	return $.len(s)
 }
 
-export class Pair<T extends any> {
-	public get First(): T {
-		return this._fields.First.value
-	}
-	public set First(value: T) {
-		this._fields.First.value = value
-	}
-
-	public get Second(): T {
-		return this._fields.Second.value
-	}
-	public set Second(value: T) {
-		this._fields.Second.value = value
-	}
-
-	public _fields: {
-		First: $.VarRef<T>;
-		Second: $.VarRef<T>;
-	}
+export class Pair<T extends any> extends $.GoStruct<{First: T; Second: T}> {
 
 	constructor(init?: Partial<{First?: T, Second?: T}>) {
-		this._fields = {
-			First: $.varRef(init?.First ?? null as any),
-			Second: $.varRef(init?.Second ?? null as any)
-		}
+		super({
+			First: { type: Object, default: null as any },
+			Second: { type: Object, default: null as any }
+		}, init)
 	}
 
-	public clone(): Pair<T> {
-		const cloned = new Pair<T>()
-		cloned._fields = {
-			First: $.varRef(this._fields.First.value),
-			Second: $.varRef(this._fields.Second.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public GetFirst(): T {
@@ -104,12 +81,12 @@ export async function main(): Promise<void> {
 
 	// Test generic struct
 	console.log("=== Generic Struct ===")
-	let intPair = makePair(10, 20).clone()
+	let intPair = makePair(10, 20)
 	console.log(intPair.GetFirst())
 	console.log(intPair.First)
 	console.log(intPair.Second)
 
-	let stringPair = makePair("foo", "bar").clone()
+	let stringPair = makePair("foo", "bar")
 	console.log(stringPair.GetFirst())
 	console.log(stringPair.First)
 	console.log(stringPair.Second)
@@ -136,7 +113,7 @@ export async function main(): Promise<void> {
 
 	// Test type inference
 	console.log("=== Type Inference ===")
-	let result = makePair(100, 200).clone()
+	let result = makePair(100, 200)
 	console.log(result.First)
 	console.log(result.Second)
 }

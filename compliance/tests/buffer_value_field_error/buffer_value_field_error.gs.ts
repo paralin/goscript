@@ -3,30 +3,16 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class buffer {
-	public get data(): $.Bytes {
-		return this._fields.data.value
-	}
-	public set data(value: $.Bytes) {
-		this._fields.data.value = value
-	}
-
-	public _fields: {
-		data: $.VarRef<$.Bytes>;
-	}
+export class buffer extends $.GoStruct<{data: $.Bytes}> {
 
 	constructor(init?: Partial<{data?: $.Bytes}>) {
-		this._fields = {
-			data: $.varRef(init?.data ?? new Uint8Array(0))
-		}
+		super({
+			data: { type: Object, default: new Uint8Array(0) }
+		}, init)
 	}
 
-	public clone(): buffer {
-		const cloned = new buffer()
-		cloned._fields = {
-			data: $.varRef(this._fields.data.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public write(p: $.Bytes): void {

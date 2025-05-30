@@ -11,6 +11,6 @@ export async function main(): Promise<void> {
 	let mfs = $.makeMap<string, $.Bytes>()
 	$.mapSet(mfs, "test.txt", $.stringToBytes("hello world"))
 	console.log("Created map:", $.len(mfs))
-	console.log("Content:", $.bytesToString($.mapGet(mfs, "test.txt", new Uint8Array(0))[0]))
+	console.log("Content:", $.bytesToString($.mapGet(mfs, "test.txt", new Uint8Array(0))[0]!))
 }
 

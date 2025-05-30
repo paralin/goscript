@@ -18,40 +18,17 @@ $.registerInterfaceType(
   [{ name: "Close", args: [], returns: [{ type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }, { name: "Name", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }, { name: "Write", args: [{ name: "data", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }, { type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }]
 );
 
-export class MockFile {
-	public get filename(): string {
-		return this._fields.filename.value
-	}
-	public set filename(value: string) {
-		this._fields.filename.value = value
-	}
-
-	public get data(): $.Bytes {
-		return this._fields.data.value
-	}
-	public set data(value: $.Bytes) {
-		this._fields.data.value = value
-	}
-
-	public _fields: {
-		filename: $.VarRef<string>;
-		data: $.VarRef<$.Bytes>;
-	}
+export class MockFile extends $.GoStruct<{filename: string; data: $.Bytes}> {
 
 	constructor(init?: Partial<{data?: $.Bytes, filename?: string}>) {
-		this._fields = {
-			filename: $.varRef(init?.filename ?? ""),
-			data: $.varRef(init?.data ?? new Uint8Array(0))
-		}
+		super({
+			filename: { type: String, default: "" },
+			data: { type: Object, default: new Uint8Array(0) }
+		}, init)
 	}
 
-	public clone(): MockFile {
-		const cloned = new MockFile()
-		cloned._fields = {
-			filename: $.varRef(this._fields.filename.value),
-			data: $.varRef(this._fields.data.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Name(): string {

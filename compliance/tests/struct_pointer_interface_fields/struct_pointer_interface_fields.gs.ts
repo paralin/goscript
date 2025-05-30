@@ -13,40 +13,17 @@ $.registerInterfaceType(
   [{ name: "Method", args: [], returns: [] }]
 );
 
-export class MyStruct {
-	public get PointerField(): $.VarRef<number> | null {
-		return this._fields.PointerField.value
-	}
-	public set PointerField(value: $.VarRef<number> | null) {
-		this._fields.PointerField.value = value
-	}
-
-	public get interfaceField(): MyInterface {
-		return this._fields.interfaceField.value
-	}
-	public set interfaceField(value: MyInterface) {
-		this._fields.interfaceField.value = value
-	}
-
-	public _fields: {
-		PointerField: $.VarRef<$.VarRef<number> | null>;
-		interfaceField: $.VarRef<MyInterface>;
-	}
+export class MyStruct extends $.GoStruct<{PointerField: $.VarRef<number> | null; interfaceField: MyInterface}> {
 
 	constructor(init?: Partial<{PointerField?: $.VarRef<number> | null, interfaceField?: MyInterface}>) {
-		this._fields = {
-			PointerField: $.varRef(init?.PointerField ?? null),
-			interfaceField: $.varRef(init?.interfaceField ?? null)
-		}
+		super({
+			PointerField: { type: Object, default: null },
+			interfaceField: { type: Object, default: null }
+		}, init)
 	}
 
-	public clone(): MyStruct {
-		const cloned = new MyStruct()
-		cloned._fields = {
-			PointerField: $.varRef(this._fields.PointerField.value),
-			interfaceField: $.varRef(this._fields.interfaceField.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

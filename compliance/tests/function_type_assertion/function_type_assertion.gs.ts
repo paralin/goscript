@@ -23,30 +23,16 @@ export function getAdder(): null | any {
 	return Object.assign(add, { __goTypeName: 'Adder' })
 }
 
-export class FuncContainer {
-	public get myFunc(): null | any {
-		return this._fields.myFunc.value
-	}
-	public set myFunc(value: null | any) {
-		this._fields.myFunc.value = value
-	}
-
-	public _fields: {
-		myFunc: $.VarRef<null | any>;
-	}
+export class FuncContainer extends $.GoStruct<{myFunc: null | any}> {
 
 	constructor(init?: Partial<{myFunc?: null | any}>) {
-		this._fields = {
-			myFunc: $.varRef(init?.myFunc ?? null)
-		}
+		super({
+			myFunc: { type: Object, default: null }
+		}, init)
 	}
 
-	public clone(): FuncContainer {
-		const cloned = new FuncContainer()
-		cloned._fields = {
-			myFunc: $.varRef(this._fields.myFunc.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system
@@ -122,7 +108,7 @@ export async function main(): Promise<void> {
 	$.mapSet(funcMap, "adder", Object.assign(add, { __goTypeName: 'Adder' }))
 
 	let mapFn: Greeter | null
-	({ value: mapFn, ok: ok } = $.typeAssert<Greeter | null>($.mapGet(funcMap, "greeter", null)[0], {kind: $.TypeKind.Function, name: 'Greeter', params: [{ kind: $.TypeKind.Basic, name: "string" }], results: [{ kind: $.TypeKind.Basic, name: "string" }]}))
+	({ value: mapFn, ok: ok } = $.typeAssert<Greeter | null>($.mapGet(funcMap, "greeter", null)[0]!, {kind: $.TypeKind.Function, name: 'Greeter', params: [{ kind: $.TypeKind.Basic, name: "string" }], results: [{ kind: $.TypeKind.Basic, name: "string" }]}))
 	if (ok) {
 		console.log(mapFn!("Map"))
 	} else {
@@ -130,7 +116,7 @@ export async function main(): Promise<void> {
 	}
 
 	let mapAdderFn: Adder | null
-	({ value: mapAdderFn, ok: ok } = $.typeAssert<Adder | null>($.mapGet(funcMap, "adder", null)[0], {kind: $.TypeKind.Function, name: 'Adder', params: [{ kind: $.TypeKind.Basic, name: "number" }, { kind: $.TypeKind.Basic, name: "number" }], results: [{ kind: $.TypeKind.Basic, name: "number" }]}))
+	({ value: mapAdderFn, ok: ok } = $.typeAssert<Adder | null>($.mapGet(funcMap, "adder", null)[0]!, {kind: $.TypeKind.Function, name: 'Adder', params: [{ kind: $.TypeKind.Basic, name: "number" }, { kind: $.TypeKind.Basic, name: "number" }], results: [{ kind: $.TypeKind.Basic, name: "number" }]}))
 	if (ok) {
 		console.log(mapAdderFn!(1, 2))
 	} else {

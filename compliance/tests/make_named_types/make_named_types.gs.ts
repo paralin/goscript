@@ -16,6 +16,6 @@ export async function main(): Promise<void> {
 	type MyMap = Map<string, number> | null;
 	let m: MyMap = $.makeMap<string, number>()
 	$.mapSet(m, "test", 42)
-	console.log("Value:", $.mapGet(m, "test", 0)[0])
+	console.log("Value:", $.mapGet(m, "test", 0)[0]!)
 }
 
