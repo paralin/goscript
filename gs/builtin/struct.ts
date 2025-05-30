@@ -14,6 +14,8 @@ export interface FieldDescriptor<T> {
 export abstract class GoStruct<T extends Record<string, any>> {
   public _fields: { [K in keyof T]: VarRef<T[K]> }
   
+  [key: string]: any
+  
   constructor(fields: { [K in keyof T]: FieldDescriptor<T[K]> }, init?: any) {
     this._fields = {} as any
     
