@@ -519,8 +519,8 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 				embeddedName := named.Obj().Name()
 				// Check if the embedded type is an interface
 				if _, isInterface := fieldType.Underlying().(*types.Interface); isInterface {
-					// For embedded interfaces, use the interface type directly
-					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = embeddedName
+					// For embedded interfaces, use the full qualified interface type
+					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type())
 				} else {
 					// For embedded structs, use ConstructorParameters for field-based initialization
 					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
