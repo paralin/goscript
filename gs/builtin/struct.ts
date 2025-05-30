@@ -14,28 +14,28 @@ export interface FieldDescriptor<T> {
 export abstract class GoStruct<T extends Record<string, any>> {
   public _fields: { [K in keyof T]: VarRef<T[K]> }
   
-  [key: string]: any
   
-  constructor(fields: { [K in keyof T]: FieldDescriptor<T[K]> }, init?: any) {
+  constructor(fields: { [K in keyof T]: FieldDescriptor<T[K]> }, init?: Partial<T>) {
     this._fields = {} as any
     
     for (const [key, desc] of Object.entries(fields) as [keyof T, FieldDescriptor<any>][]) {
       let value: any
       
-      if (desc.isEmbedded && init && init[key]) {
-        if (init[key] instanceof Object && !(init[key] instanceof Array)) {
-          if (init[key]._fields) {
-            value = init[key];
+      if (desc.isEmbedded && init && key in init) {
+        const initValue = init[key as keyof typeof init];
+        if (initValue !== null && typeof initValue === 'object' && !Array.isArray(initValue)) {
+          if ('_fields' in initValue) {
+            value = initValue;
           } else {
             const EmbeddedType = desc.default?.constructor;
             if (EmbeddedType && typeof EmbeddedType === 'function') {
-              value = new EmbeddedType(init[key]);
+              value = new EmbeddedType(initValue);
             } else {
               value = desc.default;
             }
           }
         } else {
-          value = init[key] ?? desc.default;
+          value = initValue ?? desc.default;
         }
       } else {
         value = init?.[key] ?? desc.default;

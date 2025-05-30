@@ -40,7 +40,7 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 		underlyingType := tv.Type.Underlying()
 		// Check if it's a map type
 		if mapType, isMap := underlyingType.(*types.Map); isMap {
-			c.tsw.WriteLiterally("$.mapGet(")
+			c.tsw.WriteLiterally("($.mapGet(")
 			if err := c.WriteValueExpr(exp.X); err != nil {
 				return err
 			}
@@ -54,8 +54,10 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 			c.WriteZeroValueForType(mapType.Elem())
 			c.tsw.WriteLiterally(")[0]")
 			
-			c.tsw.WriteLiterally("!")
+			c.tsw.WriteLiterally(" as ")
+			c.WriteGoType(mapType.Elem(), GoTypeContextGeneral)
 			
+			c.tsw.WriteLiterally(")")
 			
 			return nil
 		}

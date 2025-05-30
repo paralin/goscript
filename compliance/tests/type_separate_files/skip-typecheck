@@ -1,2 +1,2 @@
-This test is skipped for TypeScript type checking until we implement a proper fix for map access type assertions.
-The issue is that TypeScript loses type information when accessing map values, treating the result as an empty object ({}) instead of the proper struct type.
+This test is skipped for TypeScript type checking until we implement a proper fix for property access on GoStruct classes.
+The issue is that TypeScript doesn't recognize properties defined at runtime with Object.defineProperty.
