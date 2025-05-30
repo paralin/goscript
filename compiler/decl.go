@@ -101,29 +101,13 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 	c.WriteFuncType(decl.Type, isAsync) // Write signature (params, return type)
 	c.tsw.WriteLiterally(" ")
 
-	hasNamedReturns := false
-	if decl.Type.Results != nil {
-		for _, field := range decl.Type.Results.List {
-			if len(field.Names) > 0 {
-				hasNamedReturns = true
-				break
-			}
-		}
-	}
-
-	if hasNamedReturns {
+	if c.hasNamedReturns(decl.Type.Results) {
 		c.tsw.WriteLine("{")
 		c.tsw.Indent(1)
 
 		// Declare named return variables and initialize them to their zero values
-		for _, field := range decl.Type.Results.List {
-			for _, name := range field.Names {
-				c.tsw.WriteLiterallyf("let %s: ", c.sanitizeIdentifier(name.Name))
-				c.WriteTypeExpr(field.Type)
-				c.tsw.WriteLiterally(" = ")
-				c.WriteZeroValueForType(c.pkg.TypesInfo.TypeOf(field.Type))
-				c.tsw.WriteLine("")
-			}
+		if err := c.writeNamedReturnDeclarations(decl.Type.Results); err != nil {
+			return fmt.Errorf("failed to write named return declarations: %w", err)
 		}
 	}
 
@@ -131,7 +115,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 		return fmt.Errorf("failed to write function body: %w", err)
 	}
 
-	if hasNamedReturns {
+	if c.hasNamedReturns(decl.Type.Results) {
 		c.tsw.Indent(-1)
 		c.tsw.WriteLine("}")
 	}
@@ -244,6 +228,11 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 				}
 			}
 
+			// Declare named return variables and initialize them to their zero values
+			if err := c.writeNamedReturnDeclarations(decl.Type.Results); err != nil {
+				return fmt.Errorf("failed to write named return declarations: %w", err)
+			}
+
 			// write method body without outer braces
 			for _, stmt := range decl.Body.List {
 				if err := c.WriteStmt(stmt); err != nil {
@@ -262,4 +251,37 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	}
 
 	return nil
+}
+
+// writeNamedReturnDeclarations generates TypeScript variable declarations for named return parameters.
+// It declares each named return variable with its appropriate type and zero value.
+func (c *GoToTSCompiler) writeNamedReturnDeclarations(results *ast.FieldList) error {
+	if results == nil {
+		return nil
+	}
+
+	for _, field := range results.List {
+		for _, name := range field.Names {
+			c.tsw.WriteLiterallyf("let %s: ", c.sanitizeIdentifier(name.Name))
+			c.WriteTypeExpr(field.Type)
+			c.tsw.WriteLiterally(" = ")
+			c.WriteZeroValueForType(c.pkg.TypesInfo.TypeOf(field.Type))
+			c.tsw.WriteLine("")
+		}
+	}
+	return nil
+}
+
+// hasNamedReturns checks if a function type has any named return parameters.
+func (c *GoToTSCompiler) hasNamedReturns(results *ast.FieldList) bool {
+	if results == nil {
+		return false
+	}
+
+	for _, field := range results.List {
+		if len(field.Names) > 0 {
+			return true
+		}
+	}
+	return false
 }

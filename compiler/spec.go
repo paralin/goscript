@@ -364,6 +364,11 @@ func (c *GoToTSCompiler) writeNamedTypeMethod(decl *ast.FuncDecl) error {
 				}
 			}
 
+			// Declare named return variables and initialize them to their zero values
+			if err := c.writeNamedReturnDeclarations(decl.Type.Results); err != nil {
+				return fmt.Errorf("failed to write named return declarations: %w", err)
+			}
+
 			// write method body without outer braces
 			for _, stmt := range decl.Body.List {
 				if err := c.WriteStmt(stmt); err != nil {
