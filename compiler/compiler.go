@@ -374,68 +374,6 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 	}
 	defer indexFile.Close() //nolint:errcheck
 
-	// Collect exported symbols from all files in the package
-	var exportedSymbols []string
-
-	// Iterate through all syntax files to find exported symbols
-	for i, syntax := range c.pkg.Syntax {
-		fileName := c.pkg.CompiledGoFiles[i]
-		baseFileName := filepath.Base(fileName)
-		gsFileName := strings.TrimSuffix(baseFileName, ".go") + ".gs"
-
-		// Only include this file if it was compiled (in our compiledFiles list)
-		fileWasCompiled := false
-		for _, compiledFile := range compiledFiles {
-			if compiledFile == gsFileName {
-				fileWasCompiled = true
-				break
-			}
-		}
-		if !fileWasCompiled {
-			continue
-		}
-
-		// Analyze declarations in this file to find exported symbols
-		for _, decl := range syntax.Decls {
-			switch d := decl.(type) {
-			case *ast.FuncDecl:
-				// Only include top-level functions (not methods)
-				if d.Recv == nil && d.Name.IsExported() {
-					exportedSymbols = append(exportedSymbols, d.Name.Name)
-				}
-			case *ast.GenDecl:
-				for _, spec := range d.Specs {
-					switch s := spec.(type) {
-					case *ast.TypeSpec:
-						if s.Name.IsExported() {
-							exportedSymbols = append(exportedSymbols, s.Name.Name)
-						}
-					case *ast.ValueSpec:
-						for _, name := range s.Names {
-							if name.IsExported() {
-								exportedSymbols = append(exportedSymbols, name.Name)
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	// Remove duplicates and sort
-	symbolMap := make(map[string]bool)
-	for _, symbol := range exportedSymbols {
-		symbolMap[symbol] = true
-	}
-
-	var uniqueSymbols []string
-	for symbol := range symbolMap {
-		uniqueSymbols = append(uniqueSymbols, symbol)
-	}
-
-	// Sort for consistent output
-	sort.Strings(uniqueSymbols)
-
 	// Write selective re-exports for each compiled file
 	for _, fileName := range compiledFiles {
 		// Check if this is a protobuf file
@@ -452,7 +390,8 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 		}
 
 		// Find which symbols this file exports
-		var fileSymbols []string
+		var valueSymbols []string
+		var typeSymbols []string
 
 		// Find the corresponding syntax file
 		for i, syntax := range c.pkg.Syntax {
@@ -469,19 +408,26 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 				switch d := decl.(type) {
 				case *ast.FuncDecl:
 					if d.Recv == nil && d.Name.IsExported() {
-						fileSymbols = append(fileSymbols, d.Name.Name)
+						valueSymbols = append(valueSymbols, d.Name.Name)
 					}
 				case *ast.GenDecl:
 					for _, spec := range d.Specs {
 						switch s := spec.(type) {
 						case *ast.TypeSpec:
 							if s.Name.IsExported() {
-								fileSymbols = append(fileSymbols, s.Name.Name)
+								// Check if this is an interface
+								_, isInterface := s.Type.(*ast.InterfaceType)
+								if isInterface {
+									typeSymbols = append(typeSymbols, s.Name.Name)
+								} else {
+									// For non-interface types (struct, primitive types), use regular export
+									valueSymbols = append(valueSymbols, s.Name.Name)
+								}
 							}
 						case *ast.ValueSpec:
 							for _, name := range s.Names {
 								if name.IsExported() {
-									fileSymbols = append(fileSymbols, name.Name)
+									valueSymbols = append(valueSymbols, name.Name)
 								}
 							}
 						}
@@ -491,11 +437,20 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 			break
 		}
 
-		// Write selective export if this file has exported symbols
-		if len(fileSymbols) > 0 {
-			sort.Strings(fileSymbols)
+		// Write exports if this file has exported symbols
+		if len(valueSymbols) > 0 {
+			sort.Strings(valueSymbols)
 			exportLine := fmt.Sprintf("export { %s } from \"./%s.js\"\n",
-				strings.Join(fileSymbols, ", "), fileName)
+				strings.Join(valueSymbols, ", "), fileName)
+			if _, err := indexFile.WriteString(exportLine); err != nil {
+				return err
+			}
+		}
+
+		if len(typeSymbols) > 0 {
+			sort.Strings(typeSymbols)
+			exportLine := fmt.Sprintf("export type { %s } from \"./%s.js\"\n",
+				strings.Join(typeSymbols, ", "), fileName)
 			if _, err := indexFile.WriteString(exportLine); err != nil {
 				return err
 			}

@@ -2,6 +2,8 @@ package main
 
 import (
 	"io"
+
+	"github.com/aperturerobotics/goscript/compliance/tests/interface_embedding/subpkg"
 )
 
 // File represents a file interface similar to billy.File
@@ -99,6 +101,12 @@ func (f *file) Name() string {
 	return f.name
 }
 
+// This struct embeds the qualified interface from subpkg to test qualified names
+type qualifiedFile struct {
+	subpkg.File // This should generate: constructor(init?: Partial<{File?: subpkg.File, metadata?: string}>)
+	metadata    string
+}
+
 func main() {
 	// Create a mock file implementation
 	mockFile := &MockFile{
@@ -183,5 +191,29 @@ func main() {
 		println("Close error:", err.Error())
 	} else {
 		println("Close successful")
+	}
+
+	// Test the qualified interface embedding
+	qualifiedMock := subpkg.NewMockFile("qualified.txt")
+	qf := &qualifiedFile{
+		File:     qualifiedMock,
+		metadata: "test metadata",
+	}
+
+	println("Qualified file name:", qf.Name())
+
+	err = qf.Close()
+	if err != nil {
+		println("Qualified close error:", err.Error())
+	} else {
+		println("Qualified close successful")
+	}
+
+	// Test qualified write
+	qn, err := qf.Write([]byte("qualified data"))
+	if err != nil {
+		println("Qualified write error:", err.Error())
+	} else {
+		println("Qualified wrote bytes:", qn)
 	}
 }

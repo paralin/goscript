@@ -5,6 +5,8 @@ import * as $ from "@goscript/builtin/index.js";
 
 import * as io from "@goscript/io/index.js"
 
+import * as subpkg from "@goscript/github.com/aperturerobotics/goscript/compliance/tests/interface_embedding/subpkg/index.js"
+
 export type File = null | {
 	// Lock locks the file like e.g. flock. It protects against access from
 	// other processes.
@@ -229,6 +231,64 @@ export class file {
 	);
 }
 
+export class qualifiedFile {
+	public get metadata(): string {
+		return this._fields.metadata.value
+	}
+	public set metadata(value: string) {
+		this._fields.metadata.value = value
+	}
+
+	public get File(): subpkg.File {
+		return this._fields.File.value
+	}
+	public set File(value: subpkg.File) {
+		this._fields.File.value = value
+	}
+
+	public _fields: {
+		File: $.VarRef<subpkg.File>;
+		metadata: $.VarRef<string>;
+	}
+
+	constructor(init?: Partial<{File?: subpkg.File, metadata?: string}>) {
+		this._fields = {
+			File: $.varRef(init?.File ?? null),
+			metadata: $.varRef(init?.metadata ?? "")
+		}
+	}
+
+	public clone(): qualifiedFile {
+		const cloned = new qualifiedFile()
+		cloned._fields = {
+			File: $.varRef(this._fields.File.value),
+			metadata: $.varRef(this._fields.metadata.value)
+		}
+		return cloned
+	}
+
+	public Close(): $.GoError {
+		return this.File!.Close()
+	}
+
+	public Name(): string {
+		return this.File!.Name()
+	}
+
+	public Write(data: $.Bytes): [number, $.GoError] {
+		return this.File!.Write(data)
+	}
+
+	// Register this type with the runtime type system
+	static __typeInfo = $.registerStructType(
+	  'qualifiedFile',
+	  new qualifiedFile(),
+	  [],
+	  qualifiedFile,
+	  {"File": "File", "metadata": { kind: $.TypeKind.Basic, name: "string" }}
+	);
+}
+
 export async function main(): Promise<void> {
 	// Create a mock file implementation
 	let mockFile = new MockFile({content: $.stringToBytes("Hello, World!"), filename: "test.txt", position: 0})
@@ -308,6 +368,28 @@ export async function main(): Promise<void> {
 		console.log("Close error:", err!.Error())
 	} else {
 		console.log("Close successful")
+	}
+
+	// Test the qualified interface embedding
+	let qualifiedMock = subpkg.NewMockFile("qualified.txt")
+	let qf = new qualifiedFile({metadata: "test metadata", File: qualifiedMock})
+
+	console.log("Qualified file name:", qf!.Name())
+
+	err = qf!.Close()
+	if (err != null) {
+		console.log("Qualified close error:", err!.Error())
+	} else {
+		console.log("Qualified close successful")
+	}
+
+	// Test qualified write
+	let qn: number
+	[qn, err] = qf!.Write($.stringToBytes("qualified data"))
+	if (err != null) {
+		console.log("Qualified write error:", err!.Error())
+	} else {
+		console.log("Qualified wrote bytes:", qn)
 	}
 }
 
