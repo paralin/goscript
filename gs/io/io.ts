@@ -41,12 +41,12 @@ export const SeekEnd = 2 // seek relative to the end
 
 // Reader is the interface that wraps the basic Read method
 export interface Reader {
-  Read(p: Uint8Array): [number, $.GoError]
+  Read(p: $.Bytes): [number, $.GoError]
 }
 
 // Writer is the interface that wraps the basic Write method
 export interface Writer {
-  Write(p: Uint8Array): [number, $.GoError]
+  Write(p: $.Bytes): [number, $.GoError]
 }
 
 // Closer is the interface that wraps the basic Close method
@@ -70,12 +70,12 @@ export interface ReadWriteSeeker extends Reader, Writer, Seeker {}
 
 // ReaderAt is the interface that wraps the basic ReadAt method
 export interface ReaderAt {
-  ReadAt(p: Uint8Array, off: number): [number, $.GoError]
+  ReadAt(p: $.Bytes, off: number): [number, $.GoError]
 }
 
 // WriterAt is the interface that wraps the basic WriteAt method
 export interface WriterAt {
-  WriteAt(p: Uint8Array, off: number): [number, $.GoError]
+  WriteAt(p: $.Bytes, off: number): [number, $.GoError]
 }
 
 // ByteReader is the interface that wraps the ReadByte method
@@ -120,8 +120,8 @@ export interface ReaderFrom {
 
 // Discard is a Writer on which all Write calls succeed without doing anything
 class DiscardWriter implements Writer {
-  Write(p: Uint8Array): [number, $.GoError] {
-    return [p.length, null]
+  Write(p: $.Bytes): [number, $.GoError] {
+    return [$.len(p), null]
   }
 }
 
@@ -149,14 +149,14 @@ export class LimitedReader implements Reader {
     this.N = n
   }
 
-  Read(p: Uint8Array): [number, $.GoError] {
+  Read(p: $.Bytes): [number, $.GoError] {
     if (this.N <= 0) {
       return [0, EOF]
     }
 
     let readBuf = p
-    if (p.length > this.N) {
-      readBuf = p.subarray(0, this.N)
+    if ($.len(p) > this.N) {
+      readBuf = $.goSlice(p, 0, this.N)
     }
 
     const [n, err] = this.R.Read(readBuf)
@@ -184,14 +184,14 @@ export class SectionReader implements Reader, Seeker, ReaderAt {
     this.limit = off + n
   }
 
-  Read(p: Uint8Array): [number, $.GoError] {
+  Read(p: $.Bytes): [number, $.GoError] {
     if (this.off >= this.limit) {
       return [0, EOF]
     }
 
     let max = this.limit - this.off
-    if (p.length > max) {
-      p = p.subarray(0, max)
+    if ($.len(p) > max) {
+      p = $.goSlice(p, 0, max)
     }
 
     const [n, err] = this.r.ReadAt(p, this.off)
@@ -223,14 +223,14 @@ export class SectionReader implements Reader, Seeker, ReaderAt {
     return [abs - this.base, null]
   }
 
-  ReadAt(p: Uint8Array, off: number): [number, $.GoError] {
+  ReadAt(p: $.Bytes, off: number): [number, $.GoError] {
     if (off < 0 || off >= this.limit - this.base) {
       return [0, EOF]
     }
 
     off += this.base
-    if (off + p.length > this.limit) {
-      p = p.subarray(0, this.limit - off)
+    if (off + $.len(p) > this.limit) {
+      p = $.goSlice(p, 0, this.limit - off)
       const [n, err] = this.r.ReadAt(p, off)
       if (err === null) {
         return [n, EOF]
@@ -267,13 +267,13 @@ export class OffsetWriter implements Writer, WriterAt {
     this.off = 0
   }
 
-  Write(p: Uint8Array): [number, $.GoError] {
+  Write(p: $.Bytes): [number, $.GoError] {
     const [n, err] = this.w.WriteAt(p, this.base + this.off)
     this.off += n
     return [n, err]
   }
 
-  WriteAt(p: Uint8Array, off: number): [number, $.GoError] {
+  WriteAt(p: $.Bytes, off: number): [number, $.GoError] {
     if (off < 0) {
       return [0, newError('io.OffsetWriter.WriteAt: negative offset')]
     }
@@ -316,7 +316,7 @@ export function Copy(dst: Writer, src: Reader): [number, $.GoError] {
 export function CopyBuffer(
   dst: Writer,
   src: Reader,
-  buf: Uint8Array | null,
+  buf: $.Bytes | null,
 ): [number, $.GoError] {
   // If src implements WriterTo, use it
   if ('WriteTo' in src && typeof (src as any).WriteTo === 'function') {
@@ -329,14 +329,14 @@ export function CopyBuffer(
   }
 
   if (buf === null) {
-    buf = new Uint8Array(32 * 1024) // 32KB default buffer
+    buf = $.makeSlice<number>(32 * 1024, undefined, 'byte') // 32KB default buffer
   }
 
   let written = 0
   while (true) {
     const [nr, er] = src.Read(buf)
     if (nr > 0) {
-      const [nw, ew] = dst.Write(buf.subarray(0, nr))
+      const [nw, ew] = dst.Write($.goSlice(buf, 0, nr))
       if (nw < 0 || nr < nw) {
         if (ew === null) {
           return [written, ErrShortWrite]
@@ -381,16 +381,16 @@ export function CopyN(
 // ReadAtLeast reads from r into buf until it has read at least min bytes
 export function ReadAtLeast(
   r: Reader,
-  buf: Uint8Array,
+  buf: $.Bytes,
   min: number,
 ): [number, $.GoError] {
-  if (buf.length < min) {
+  if ($.len(buf) < min) {
     return [0, ErrShortBuffer]
   }
 
   let n = 0
   while (n < min) {
-    const [nn, err] = r.Read(buf.subarray(n))
+    const [nn, err] = r.Read($.goSlice(buf, n))
     n += nn
     if (err !== null) {
       if (err === EOF && n >= min) {
@@ -406,36 +406,44 @@ export function ReadAtLeast(
 }
 
 // ReadFull reads exactly len(buf) bytes from r into buf
-export function ReadFull(r: Reader, buf: Uint8Array): [number, $.GoError] {
-  return ReadAtLeast(r, buf, buf.length)
+export function ReadFull(r: Reader, buf: $.Bytes): [number, $.GoError] {
+  return ReadAtLeast(r, buf, $.len(buf))
 }
 
 // ReadAll reads from r until an error or EOF and returns the data it read
-export function ReadAll(r: Reader): [Uint8Array, $.GoError] {
-  const chunks: Uint8Array[] = []
+export function ReadAll(r: Reader): [$.Bytes, $.GoError] {
+  const chunks: $.Bytes[] = []
   let totalLength = 0
-  const buf = new Uint8Array(512)
+  const buf = $.makeSlice<number>(512, undefined, 'byte')
 
   while (true) {
     const [n, err] = r.Read(buf)
     if (n > 0) {
-      chunks.push(buf.subarray(0, n))
+      chunks.push($.goSlice(buf, 0, n))
       totalLength += n
     }
     if (err !== null) {
       if (err === EOF) {
         break
       }
-      return [new Uint8Array(0), err]
+      return [$.makeSlice<number>(0, undefined, 'byte'), err]
     }
   }
 
   // Combine all chunks
-  const result = new Uint8Array(totalLength)
+  const result = $.makeSlice<number>(totalLength, undefined, 'byte')
   let offset = 0
   for (const chunk of chunks) {
-    result.set(chunk, offset)
-    offset += chunk.length
+    if (chunk instanceof Uint8Array) {
+      // Handle Uint8Array chunks
+      const resultSlice = $.goSlice(result, offset, offset + chunk.length)
+      $.copy(resultSlice, chunk)
+    } else {
+      // Handle Slice<number> chunks
+      const resultSlice = $.goSlice(result, offset, offset + $.len(chunk))
+      $.copy(resultSlice, chunk)
+    }
+    offset += $.len(chunk)
   }
 
   return [result, null]
@@ -461,7 +469,7 @@ class multiReader implements Reader {
     this.readers = readers
   }
 
-  Read(p: Uint8Array): [number, $.GoError] {
+  Read(p: $.Bytes): [number, $.GoError] {
     while (this.readers.length > 0) {
       if (this.readers.length === 1) {
         // Optimization for single reader
@@ -502,17 +510,17 @@ class multiWriter implements Writer {
     this.writers = writers
   }
 
-  Write(p: Uint8Array): [number, $.GoError] {
+  Write(p: $.Bytes): [number, $.GoError] {
     for (const w of this.writers) {
       const [n, err] = w.Write(p)
       if (err !== null) {
         return [n, err]
       }
-      if (n !== p.length) {
+      if (n !== $.len(p)) {
         return [n, ErrShortWrite]
       }
     }
-    return [p.length, null]
+    return [$.len(p), null]
   }
 }
 
@@ -530,10 +538,10 @@ class teeReader implements Reader {
     this.w = w
   }
 
-  Read(p: Uint8Array): [number, $.GoError] {
+  Read(p: $.Bytes): [number, $.GoError] {
     const [n, err] = this.r.Read(p)
     if (n > 0) {
-      const [nw, ew] = this.w.Write(p.subarray(0, n))
+      const [nw, ew] = this.w.Write($.goSlice(p, 0, n))
       if (ew !== null) {
         return [n, ew]
       }

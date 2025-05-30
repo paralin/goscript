@@ -403,5 +403,5 @@ export interface ScanState {
     f: (r: number) => boolean,
   ): [Uint8Array, Error | null]
   Width(): [number, boolean]
-  Read(buf: Uint8Array): [number, Error | null]
+  Read(buf: $.Bytes): [number, Error | null]
 }
