@@ -19,4 +19,8 @@ func main() {
 	// Test type assertion
 	var mode os.FileMode = os.FileMode(0755)
 	println("Mode type:", int(mode))
+
+	// Test direct variable conversion
+	directMode := os.FileMode(0777)
+	println("Direct mode:", int(directMode))
 }

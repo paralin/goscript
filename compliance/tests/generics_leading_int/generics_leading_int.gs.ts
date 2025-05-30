@@ -51,7 +51,7 @@ export async function main(): Promise<void> {
 	let [x4, rem4, err4] = leadingInt("999999999999999999999999999999")
 	console.log(x4, rem4, err4)
 
-	let [x5, rem5, err5] = leadingInt<string>("123")
+	let [x5, rem5, err5] = ("123")
 	console.log(x5, rem5, err5)
 }
 

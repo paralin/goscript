@@ -1041,6 +1041,17 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 								c.tsw.WriteLiterally(".valueOf()")
 								return nil // Handled conversion from type with methods to int
 							}
+						} else if aliasType, isAlias := argType.(*types.Alias); isAlias {
+							// Check if we're converting from a type alias (like os.FileMode) to int
+							if types.Identical(types.Typ[types.Int], aliasType.Underlying()) {
+								// This is a conversion from a type alias to int
+								// Use valueOf() instead of $.int()
+								if err := c.WriteValueExpr(arg); err != nil {
+									return fmt.Errorf("failed to write argument for valueOf conversion: %w", err)
+								}
+								c.tsw.WriteLiterally(".valueOf()")
+								return nil // Handled conversion from type alias to int
+							}
 						}
 					}
 				}
@@ -1188,7 +1199,88 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 			c.tsw.WriteLiterally(")")
 			return nil // Handled regular function call
 		}
-	} else {
+	} else if selExpr, selIsSelector := expFun.(*ast.SelectorExpr); selIsSelector {
+		// Handle qualified type conversions like os.FileMode(value)
+		if len(exp.Args) == 1 {
+			// Check if this is a type conversion using a qualified type name
+			if obj := c.pkg.TypesInfo.Uses[selExpr.Sel]; obj != nil {
+				// Check if the object is a type name
+				if typeName, isType := obj.(*types.TypeName); isType {
+					arg := exp.Args[0]
+
+					// Check if we're converting FROM a type with receiver methods TO its underlying type
+					if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
+						if namedArgType, isNamed := argType.(*types.Named); isNamed {
+							argTypeName := namedArgType.Obj().Name()
+							// Check if the argument type has receiver methods
+							if c.hasReceiverMethods(argTypeName) {
+								// Check if we're converting to the underlying type
+								targetType := typeName.Type()
+								underlyingType := namedArgType.Underlying()
+								if types.Identical(targetType, underlyingType) {
+									// This is a conversion from a type with methods to its underlying type
+									// Use valueOf() instead of TypeScript cast
+									if err := c.WriteValueExpr(arg); err != nil {
+										return fmt.Errorf("failed to write argument for valueOf conversion: %w", err)
+									}
+									c.tsw.WriteLiterally(".valueOf()")
+									return nil // Handled conversion from type with methods to underlying type
+								}
+							}
+						}
+					}
+
+					// Check if this is a function type
+					if _, isFuncType := typeName.Type().Underlying().(*types.Signature); isFuncType {
+						// For function types, we need to add a __goTypeName property
+						c.tsw.WriteLiterally("Object.assign(")
+
+						// Write the argument first
+						if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+							return fmt.Errorf("failed to write argument for function type cast: %w", err)
+						}
+
+						// Add the __goTypeName property with the qualified function type name
+						if err := c.WriteValueExpr(expFun); err != nil {
+							return fmt.Errorf("failed to write qualified type name: %w", err)
+						}
+						c.tsw.WriteLiterally(")")
+						return nil // Handled qualified function type cast
+					} else {
+						// Check if this is an alias type (like os.FileMode) that maps to a wrapper class
+						if _, isAlias := typeName.Type().(*types.Alias); isAlias {
+							// For type aliases that represent wrapper classes, use constructor
+							c.tsw.WriteLiterally("new ")
+							if err := c.WriteValueExpr(expFun); err != nil {
+								return fmt.Errorf("failed to write qualified type name: %w", err)
+							}
+							c.tsw.WriteLiterally("(")
+							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+								return fmt.Errorf("failed to write argument for type alias constructor: %w", err)
+							}
+							c.tsw.WriteLiterally(")")
+							return nil // Handled type alias conversion
+						} else {
+							// For other qualified types, use the TypeScript "as" operator
+							c.tsw.WriteLiterally("(")
+							if err := c.WriteValueExpr(exp.Args[0]); err != nil {
+								return fmt.Errorf("failed to write argument for qualified type cast: %w", err)
+							}
+
+							// Then use the TypeScript "as" operator with the qualified type name
+							c.tsw.WriteLiterally(" as ")
+							if err := c.WriteValueExpr(expFun); err != nil {
+								return fmt.Errorf("failed to write qualified type name: %w", err)
+							}
+							c.tsw.WriteLiterally(")")
+							return nil // Handled qualified type cast
+						}
+					}
+				}
+			}
+		}
+
+		// Not a type conversion, continue with regular selector expression handling
 		// Check if this is an async method call (e.g., mu.Lock())
 		if selExpr, ok := expFun.(*ast.SelectorExpr); ok {
 			// Check if this is a method call on a variable (e.g., mu.Lock())

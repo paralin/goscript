@@ -52,13 +52,17 @@ export class file {
 }
 
 export async function main(): Promise<void> {
-	let f = new file({mode: os.FileMode(0o644), name: "test.txt"})
+	let f = new file({mode: new os.FileMode(0o644), name: "test.txt"})
 
 	console.log("File mode:", $.int(f.mode))
 	console.log("File name:", f.name)
 
 	// Test type assertion
-	let mode: os.FileMode = os.FileMode(0o755)
+	let mode: os.FileMode = new os.FileMode(0o755)
 	console.log("Mode type:", $.int(mode))
+
+	// Test direct variable conversion
+	let directMode = new os.FileMode(0o777)
+	console.log("Direct mode:", $.int(directMode))
 }
 
