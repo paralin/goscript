@@ -459,24 +459,18 @@ function matchesBasicType(value: any, info: TypeInfo): boolean {
 function matchesStructType(value: any, info: TypeInfo): boolean {
   if (!isStructTypeInfo(info)) return false
 
-  // For structs, use instanceof with the constructor
+  // For named struct types with constructors, use instanceof (nominal matching)
   if (info.ctor && value instanceof info.ctor) {
     return true
   }
 
-  // Check if the value has all methods defined in the struct's TypeInfo
-  // This is a structural check, not a signature check here.
-  // Signature checks are more relevant for interface satisfaction.
-  if (info.methods && typeof value === 'object' && value !== null) {
-    const allMethodsExist = info.methods.every(
-      (methodSig) => typeof (value as any)[methodSig.name] === 'function',
-    )
-    if (!allMethodsExist) {
-      return false
-    }
-    // Further signature checking could be added here if needed for struct-to-struct assignability
+  // For named struct types with constructors, if instanceof fails, return false
+  // This ensures named struct types use exact type matching
+  if (info.ctor) {
+    return false
   }
 
+  // For anonymous struct types (no constructor), use structural matching
   if (typeof value === 'object' && value !== null && info.fields) {
     const fieldNames = Object.keys(info.fields || {})
     const valueFields = Object.keys(value)
@@ -850,97 +844,12 @@ export function typeAssert<T>(
   typeInfo: string | TypeInfo,
 ): TypeAssertResult<T> {
   const normalizedType = normalizeTypeInfo(typeInfo)
-
   if (isPointerTypeInfo(normalizedType) && value === null) {
     return { value: null as unknown as T, ok: true }
   }
 
-  if (
-    isStructTypeInfo(normalizedType) &&
-    normalizedType.methods &&
-    normalizedType.methods.length > 0 &&
-    typeof value === 'object' &&
-    value !== null
-  ) {
-    // Check if the value implements all methods of the struct type with compatible signatures.
-    // This is more for interface satisfaction by a struct.
-    // For struct-to-struct assertion, usually instanceof or field checks are primary.
-    const allMethodsMatch = normalizedType.methods.every(
-      (requiredMethodSig) => {
-        const actualMethod = (value as any)[requiredMethodSig.name]
-        if (typeof actualMethod !== 'function') {
-          return false
-        }
-        const valueTypeInfoVal = (value as any).$typeInfo
-        if (valueTypeInfoVal) {
-          const normalizedValueType = normalizeTypeInfo(valueTypeInfoVal)
-          if (
-            isStructTypeInfo(normalizedValueType) ||
-            isInterfaceTypeInfo(normalizedValueType)
-          ) {
-            const actualValueMethodSig = normalizedValueType.methods.find(
-              (m) => m.name === requiredMethodSig.name,
-            )
-            if (actualValueMethodSig) {
-              // Perform full signature comparison using MethodSignatures
-              const paramsMatch = areMethodArgsArraysIdentical(
-                requiredMethodSig.args,
-                actualValueMethodSig.args,
-              )
-              const resultsMatch = areMethodArgsArraysIdentical(
-                requiredMethodSig.returns,
-                actualValueMethodSig.returns,
-              )
-              return paramsMatch && resultsMatch
-            } else {
-              // Value has TypeInfo listing methods, but this specific method isn't listed.
-              // This implies a mismatch for strict signature check based on TypeInfo.
-              return false
-            }
-          }
-        }
-
-        // If the function exists and there's no type info, assume it matches.
-        // TODO check this
-        return true
-      },
-    )
-
-    if (allMethodsMatch) {
-      return { value: value as T, ok: true }
-    }
-  }
-
-  if (
-    isStructTypeInfo(normalizedType) &&
-    normalizedType.fields &&
-    typeof value === 'object' &&
-    value !== null
-  ) {
-    const fieldNames = Object.keys(normalizedType.fields)
-    const valueFields = Object.keys(value)
-
-    // For struct type assertions, we need exact field matching
-    const structFieldsMatch =
-      fieldNames.length === valueFields.length &&
-      fieldNames.every((field: string) => field in value) &&
-      valueFields.every((field) => fieldNames.includes(field))
-
-    if (structFieldsMatch) {
-      const typesMatch = Object.entries(normalizedType.fields).every(
-        ([fieldName, fieldType]) => {
-          return matchesType(
-            value[fieldName],
-            normalizeTypeInfo(fieldType as TypeInfo | string),
-          )
-        },
-      )
-
-      return { value: value as T, ok: typesMatch }
-    } else {
-      return { value: null as unknown as T, ok: false }
-    }
-  }
+  // Removed struct matching logic - struct types should use nominal matching
+  // via matchesStructType in matchesType, not structural matching here
 
   if (
     isMapTypeInfo(normalizedType) &&
@@ -991,7 +900,6 @@ export function typeAssert<T>(
   }
 
   const matches = matchesType(value, normalizedType)
-
   if (matches) {
     return { value: value as T, ok: true }
   }
