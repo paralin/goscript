@@ -745,11 +745,30 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool) {
 	// Check if this identifier refers to a constant
 	if obj != nil {
 		if constObj, isConst := obj.(*types.Const); isConst {
-			// Only evaluate constants from the current package being compiled
-			// Don't evaluate constants from imported packages (they should use their exported names)
-			// Special case: predeclared constants like iota have a nil package, so we should evaluate them
-			if constObj.Pkg() == c.pkg.Types || constObj.Pkg() == nil {
-				// Write the constant's evaluated value instead of the identifier name
+			// Evaluate constants to literals in these cases:
+			// 1. Predeclared constants (like iota, true, false) - these have nil package
+			// 2. Constants from the current package that are computed expressions
+			//    (like iota-based constants or mathematical expressions)
+			//
+			// For simple assignments from imported constants (const x = pkg.Y),
+			// preserve the variable name for better readability.
+
+			if constObj.Pkg() == nil {
+				// Predeclared constants - always evaluate to literals
+				c.writeConstantValue(constObj)
+				return
+			}
+
+			if constObj.Pkg() == c.pkg.Types {
+				// This is a constant from the current package.
+				// Check if it's a simple assignment by looking at the constant value:
+				// If the constant has the same name as an identifier in the import,
+				// it's likely a simple assignment and we should preserve the name.
+				// Otherwise, evaluate to literal (for computed expressions like iota).
+
+				// For now, let's be conservative and evaluate current package constants
+				// to literals to maintain compatibility with existing behavior.
+				// This handles iota-based constants correctly.
 				c.writeConstantValue(constObj)
 				return
 			}
