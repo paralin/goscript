@@ -379,7 +379,13 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				if results.Len() > 0 {
 					c.tsw.WriteLiterally("return ")
 				}
-				c.tsw.WriteLiterallyf("this.%s.%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
+				
+				assertionPrefix := "this.%s"
+				if _, isInterface := embeddedFieldType.Underlying().(*types.Interface); isInterface {
+					assertionPrefix = "this.%s!"
+				}
+				c.tsw.WriteLiterallyf(assertionPrefix+".%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
+				
 				c.tsw.WriteLine("")
 				c.tsw.Indent(-1)
 				c.tsw.WriteLine("}")
@@ -516,7 +522,12 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 					// A simpler approach for now: use the embedded struct's own type.
 					// embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type())
 					// Or, using ConstructorParameters to allow field-based initialization:
-					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
+					// Check if it's an interface type - interfaces don't have constructors in TypeScript
+					if _, isInterface := fieldType.Underlying().(*types.Interface); isInterface {
+						embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = embeddedName
+					} else {
+						embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
+					}
 				}
 			}
 			continue
