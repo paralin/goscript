@@ -96,8 +96,8 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 		// For selector expressions as ok, we need to use temporary variables approach
 		if okIsSelectorExpr {
 			// Use temporary variables approach similar to SelectorExpr case
-			tempValName := "_gs_ta_val_" // Fixed name for temporary value
-			tempOkName := "_gs_ta_ok_"   // Fixed name for temporary ok status
+			tempValName := fmt.Sprintf("_gs_ta_val_%d_", typeAssertExpr.Pos()) // Unique name based on AST position
+			tempOkName := fmt.Sprintf("_gs_ta_ok_%d_", typeAssertExpr.Pos())   // Unique name based on AST position
 
 			// Declare temporary variables:
 			// let _gs_ta_val_: AssertedTypeTS;
@@ -217,8 +217,8 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 
 	case *ast.SelectorExpr:
 		// Handle s.field, ok := expr.(Type)
-		tempValName := "_gs_ta_val_" // Fixed name for temporary value
-		tempOkName := "_gs_ta_ok_"   // Fixed name for temporary ok status
+		tempValName := fmt.Sprintf("_gs_ta_val_%d_", typeAssertExpr.Pos()) // Unique name based on AST position
+		tempOkName := fmt.Sprintf("_gs_ta_ok_%d_", typeAssertExpr.Pos())   // Unique name based on AST position
 
 		// Declare temporary variables:
 		// let _gs_ta_val_: AssertedTypeTS;
