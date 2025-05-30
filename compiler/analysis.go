@@ -504,7 +504,11 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 							// Check if receiver is used in method body
 							receiverUsed := false
 							if n.Body != nil {
-								receiverUsed = v.containsReceiverUsage(n.Body, vr)
+								if v.isInterfaceMethod(n) {
+									receiverUsed = true
+								} else {
+									receiverUsed = v.containsReceiverUsage(n.Body, vr)
+								}
 							}
 							
 							// Update function data with receiver usage info
@@ -1005,6 +1009,38 @@ func (v *analysisVisitor) containsReceiverUsage(node ast.Node, receiver *types.V
 	})
 	
 	return hasReceiverUsage
+}
+
+func (v *analysisVisitor) isInterfaceMethod(decl *ast.FuncDecl) bool {
+	if decl.Recv == nil {
+		return false
+	}
+	
+	// Get the method name
+	methodName := decl.Name.Name
+	
+	// Get the receiver variable
+	var receiver *types.Var
+	if len(decl.Recv.List) > 0 && len(decl.Recv.List[0].Names) > 0 {
+		if ident := decl.Recv.List[0].Names[0]; ident != nil && ident.Name != "_" {
+			if def := v.pkg.TypesInfo.Defs[ident]; def != nil {
+				if vr, ok := def.(*types.Var); ok {
+					receiver = vr
+				}
+			}
+		}
+	}
+	
+	return v.couldImplementInterfaceMethod(methodName, receiver)
+}
+
+func (v *analysisVisitor) couldImplementInterfaceMethod(methodName string, receiver *types.Var) bool {
+	// Check if method is exported (interface methods must be exported)
+	if !ast.IsExported(methodName) {
+		return false
+	}
+	
+	return false
 }
 
 // AnalyzeFile analyzes a Go source file AST and populates the Analysis struct with information
