@@ -43,6 +43,14 @@ type VariableUsageInfo struct {
 	Destinations []AssignmentInfo
 }
 
+// ShadowingInfo tracks variable shadowing in if statement initializations
+type ShadowingInfo struct {
+	// ShadowedVariables maps shadowed variable names to their outer scope objects
+	ShadowedVariables map[string]types.Object
+	// TempVariables maps shadowed variable names to temporary variable names
+	TempVariables map[string]string
+}
+
 // FunctionTypeInfo represents Go function type information for reflection
 type FunctionTypeInfo struct {
 	Params   []types.Type // Parameter types
@@ -69,8 +77,9 @@ type NodeInfo struct {
 	IsBareReturn      bool
 	EnclosingFuncDecl *ast.FuncDecl
 	EnclosingFuncLit  *ast.FuncLit
-	IsInsideFunction  bool // true if this declaration is inside a function body
-	IsMethodValue     bool // true if this SelectorExpr is a method value that needs binding
+	IsInsideFunction  bool           // true if this declaration is inside a function body
+	IsMethodValue     bool           // true if this SelectorExpr is a method value that needs binding
+	ShadowingInfo     *ShadowingInfo // variable shadowing information for if statements
 }
 
 // Analysis holds information gathered during the analysis phase of the Go code compilation.
@@ -268,6 +277,30 @@ func (a *Analysis) IsMethodValue(node *ast.SelectorExpr) bool {
 		return false
 	}
 	return nodeInfo.IsMethodValue
+}
+
+// HasVariableShadowing returns whether the given node has variable shadowing issues
+func (a *Analysis) HasVariableShadowing(node ast.Node) bool {
+	if node == nil {
+		return false
+	}
+	nodeInfo := a.NodeData[node]
+	if nodeInfo == nil {
+		return false
+	}
+	return nodeInfo.ShadowingInfo != nil
+}
+
+// GetShadowingInfo returns the variable shadowing information for the given node
+func (a *Analysis) GetShadowingInfo(node ast.Node) *ShadowingInfo {
+	if node == nil {
+		return nil
+	}
+	nodeInfo := a.NodeData[node]
+	if nodeInfo == nil {
+		return nil
+	}
+	return nodeInfo.ShadowingInfo
 }
 
 // analysisVisitor implements ast.Visitor and is used to traverse the AST during analysis.
@@ -631,6 +664,19 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		return v // Continue traversal
 
 	case *ast.AssignStmt:
+		// Detect variable shadowing in any := assignment
+		if n.Tok == token.DEFINE {
+			shadowingInfo := v.detectVariableShadowing(n)
+			if shadowingInfo != nil {
+				// Store shadowing info on the assignment statement itself
+				if v.analysis.NodeData[n] == nil {
+					v.analysis.NodeData[n] = &NodeInfo{}
+				}
+				v.analysis.NodeData[n].ShadowingInfo = shadowingInfo
+			}
+		}
+
+		// Continue with the existing assignment analysis logic
 		for i, currentLHSExpr := range n.Lhs {
 			if i >= len(n.Rhs) {
 				break // Should not happen in valid Go
@@ -775,6 +821,22 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 						v.analysis.NodeData[spec] = &NodeInfo{}
 					}
 					v.analysis.NodeData[spec].IsInsideFunction = true
+				}
+			}
+		}
+		return v // Continue traversal
+
+	case *ast.IfStmt:
+		// Detect variable shadowing in if statement initializations
+		if n.Init != nil {
+			if assignStmt, ok := n.Init.(*ast.AssignStmt); ok && assignStmt.Tok == token.DEFINE {
+				shadowingInfo := v.detectVariableShadowing(assignStmt)
+				if shadowingInfo != nil {
+					// Initialize NodeData for this if statement
+					if v.analysis.NodeData[n] == nil {
+						v.analysis.NodeData[n] = &NodeInfo{}
+					}
+					v.analysis.NodeData[n].ShadowingInfo = shadowingInfo
 				}
 			}
 		}
@@ -1223,5 +1285,114 @@ func (v *analysisVisitor) markFunctionVariable(ident *ast.Ident, funcType *types
 	if funcNode := v.analysis.FunctionAssignments[obj]; funcNode != nil {
 		// Mark the function node for reflection
 		v.analysis.MarkFunctionForReflection(funcNode, funcType)
+	}
+}
+
+// detectVariableShadowing detects variable shadowing in any := assignment
+func (v *analysisVisitor) detectVariableShadowing(assignStmt *ast.AssignStmt) *ShadowingInfo {
+	shadowingInfo := &ShadowingInfo{
+		ShadowedVariables: make(map[string]types.Object),
+		TempVariables:     make(map[string]string),
+	}
+
+	hasShadowing := false
+
+	// First, collect all LHS variable names that are being declared
+	lhsVarNames := make(map[string]*ast.Ident)
+	for _, lhsExpr := range assignStmt.Lhs {
+		if lhsIdent, ok := lhsExpr.(*ast.Ident); ok && lhsIdent.Name != "_" {
+			lhsVarNames[lhsIdent.Name] = lhsIdent
+		}
+	}
+
+	// Next, check all RHS expressions for usage of variables that are also being declared on LHS
+	for _, rhsExpr := range assignStmt.Rhs {
+		v.findVariableUsageInExpr(rhsExpr, lhsVarNames, shadowingInfo, &hasShadowing)
+	}
+
+	if hasShadowing {
+		return shadowingInfo
+	}
+	return nil
+}
+
+// findVariableUsageInExpr recursively searches for variable usage in an expression
+func (v *analysisVisitor) findVariableUsageInExpr(expr ast.Expr, lhsVarNames map[string]*ast.Ident, shadowingInfo *ShadowingInfo, hasShadowing *bool) {
+	if expr == nil {
+		return
+	}
+
+	switch e := expr.(type) {
+	case *ast.Ident:
+		// Check if this identifier is being shadowed
+		if lhsIdent, exists := lhsVarNames[e.Name]; exists {
+			// This variable is being used on RHS but also declared on LHS - this is shadowing!
+
+			// Get the outer scope object for this variable
+			if outerObj := v.pkg.TypesInfo.Uses[e]; outerObj != nil {
+				// Make sure this isn't the same object as the LHS (which would mean no shadowing)
+				if lhsObj := v.pkg.TypesInfo.Defs[lhsIdent]; lhsObj != outerObj {
+					shadowingInfo.ShadowedVariables[e.Name] = outerObj
+					shadowingInfo.TempVariables[e.Name] = "_temp_" + e.Name
+					*hasShadowing = true
+				}
+			}
+		}
+
+	case *ast.CallExpr:
+		// Check function arguments
+		for _, arg := range e.Args {
+			v.findVariableUsageInExpr(arg, lhsVarNames, shadowingInfo, hasShadowing)
+		}
+		// Check function expression itself
+		v.findVariableUsageInExpr(e.Fun, lhsVarNames, shadowingInfo, hasShadowing)
+
+	case *ast.SelectorExpr:
+		// Check the base expression (e.g., x in x.Method())
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+
+	case *ast.IndexExpr:
+		// Check both the expression and index (e.g., arr[i])
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+		v.findVariableUsageInExpr(e.Index, lhsVarNames, shadowingInfo, hasShadowing)
+
+	case *ast.SliceExpr:
+		// Check the expression and slice bounds
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+		if e.Low != nil {
+			v.findVariableUsageInExpr(e.Low, lhsVarNames, shadowingInfo, hasShadowing)
+		}
+		if e.High != nil {
+			v.findVariableUsageInExpr(e.High, lhsVarNames, shadowingInfo, hasShadowing)
+		}
+		if e.Max != nil {
+			v.findVariableUsageInExpr(e.Max, lhsVarNames, shadowingInfo, hasShadowing)
+		}
+
+	case *ast.UnaryExpr:
+		// Check the operand (e.g., &x, -x, !x)
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+
+	case *ast.BinaryExpr:
+		// Check both operands (e.g., x + y)
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+		v.findVariableUsageInExpr(e.Y, lhsVarNames, shadowingInfo, hasShadowing)
+
+	case *ast.ParenExpr:
+		// Check the parenthesized expression
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+
+	case *ast.TypeAssertExpr:
+		// Check the expression being type-asserted
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+
+	case *ast.StarExpr:
+		// Check the expression being dereferenced
+		v.findVariableUsageInExpr(e.X, lhsVarNames, shadowingInfo, hasShadowing)
+
+	// Add more expression types as needed
+	default:
+		// For other expression types, we might need to add specific handling
+		// For now, we'll ignore them as they're less common in shadowing scenarios
 	}
 }

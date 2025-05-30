@@ -18,8 +18,9 @@ export function secondFunc(x: number): number {
 export async function main(): Promise<void> {
 	let [, x] = firstFunc()
 	// This is the problematic pattern: x is shadowed but also used in the call
+	let _temp_x = x
 	{
-		let x = secondFunc(x)
+		let x = secondFunc(_temp_x)
 		if (x != 0) {
 			console.log("Function returned value")
 			return 

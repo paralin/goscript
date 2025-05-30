@@ -639,6 +639,9 @@ type GoToTSCompiler struct {
 	pkg *packages.Package
 
 	analysis *Analysis
+
+	// shadowingContext tracks temporary variable mappings when we're in a shadowing context
+	shadowingContext map[string]string
 }
 
 // It initializes the compiler with a `TSCodeWriter` for output,
@@ -646,9 +649,10 @@ type GoToTSCompiler struct {
 // analysis results (`Analysis`) to guide the translation process.
 func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analysis) *GoToTSCompiler {
 	return &GoToTSCompiler{
-		tsw:      tsw,
-		pkg:      pkg,
-		analysis: analysis,
+		tsw:              tsw,
+		pkg:              pkg,
+		analysis:         analysis,
+		shadowingContext: make(map[string]string),
 	}
 }
 
@@ -667,6 +671,12 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool) {
 	if exp.Name == "nil" {
 		c.tsw.WriteLiterally("null")
+		return
+	}
+
+	// Check if we're in a shadowing context and should use a temporary variable
+	if tempVarName, exists := c.shadowingContext[exp.Name]; exists {
+		c.tsw.WriteLiterally(c.sanitizeIdentifier(tempVarName))
 		return
 	}
 
