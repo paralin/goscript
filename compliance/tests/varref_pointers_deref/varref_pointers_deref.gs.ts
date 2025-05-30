@@ -1,4 +1,4 @@
-// Generated file based on wip_2.go
+// Generated file based on varref_pointers_deref.go
 // Updated when compliance tests are re-run, DO NOT EDIT!
 
 import * as $ from "@goscript/builtin/index.js";

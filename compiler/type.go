@@ -588,14 +588,32 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 			if results.Len() == 0 {
 				c.tsw.WriteLiterally("void")
 			} else if results.Len() == 1 {
-				c.WriteGoType(results.At(0).Type(), GoTypeContextFunctionReturn) // Recursive call for result type
+				// Try to use AST information if available to preserve qualified names
+				if astField != nil && astField.Type != nil {
+					if funcType, ok := astField.Type.(*ast.FuncType); ok && funcType.Results != nil && len(funcType.Results.List) == 1 {
+						c.WriteTypeExpr(funcType.Results.List[0].Type)
+					} else {
+						c.WriteGoType(results.At(0).Type(), GoTypeContextFunctionReturn) // Fallback
+					}
+				} else {
+					c.WriteGoType(results.At(0).Type(), GoTypeContextFunctionReturn) // Fallback
+				}
 			} else {
 				c.tsw.WriteLiterally("[")
 				for j := 0; j < results.Len(); j++ {
 					if j > 0 {
 						c.tsw.WriteLiterally(", ")
 					}
-					c.WriteGoType(results.At(j).Type(), GoTypeContextFunctionReturn) // Recursive call for result type
+					// Try to use AST information if available to preserve qualified names
+					if astField != nil && astField.Type != nil {
+						if funcType, ok := astField.Type.(*ast.FuncType); ok && funcType.Results != nil && j < len(funcType.Results.List) {
+							c.WriteTypeExpr(funcType.Results.List[j].Type)
+						} else {
+							c.WriteGoType(results.At(j).Type(), GoTypeContextFunctionReturn) // Fallback
+						}
+					} else {
+						c.WriteGoType(results.At(j).Type(), GoTypeContextFunctionReturn) // Fallback
+					}
 				}
 				c.tsw.WriteLiterally("]")
 			}
