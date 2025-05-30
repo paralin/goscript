@@ -26,40 +26,17 @@ $.registerInterfaceType(
   [{ name: "Compare", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }] }, { name: "Equal", args: [{ name: "", type: { kind: $.TypeKind.Interface, methods: [] } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }] }]
 );
 
-export class ValueContainer<T extends any> {
-	public get value(): T {
-		return this._fields.value.value
-	}
-	public set value(value: T) {
-		this._fields.value.value = value
-	}
-
-	public get count(): number {
-		return this._fields.count.value
-	}
-	public set count(value: number) {
-		this._fields.count.value = value
-	}
-
-	public _fields: {
-		value: $.VarRef<T>;
-		count: $.VarRef<number>;
-	}
+export class ValueContainer<T extends any> extends $.GoStruct<{value: T; count: number}> {
 
 	constructor(init?: Partial<{count?: number, value?: T}>) {
-		this._fields = {
-			value: $.varRef(init?.value ?? null as any),
-			count: $.varRef(init?.count ?? 0)
-		}
+		super({
+			value: { type: Object, default: null as any },
+			count: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): ValueContainer<T> {
-		const cloned = new ValueContainer<T>()
-		cloned._fields = {
-			value: $.varRef(this._fields.value.value),
-			count: $.varRef(this._fields.count.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Get(): T {
@@ -88,30 +65,16 @@ export class ValueContainer<T extends any> {
 	);
 }
 
-export class StringValueContainer {
-	public get value(): string {
-		return this._fields.value.value
-	}
-	public set value(value: string) {
-		this._fields.value.value = value
-	}
-
-	public _fields: {
-		value: $.VarRef<string>;
-	}
+export class StringValueContainer extends $.GoStruct<{value: string}> {
 
 	constructor(init?: Partial<{value?: string}>) {
-		this._fields = {
-			value: $.varRef(init?.value ?? "")
-		}
+		super({
+			value: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): StringValueContainer {
-		const cloned = new StringValueContainer()
-		cloned._fields = {
-			value: $.varRef(this._fields.value.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Compare(other: string): number {

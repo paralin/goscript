@@ -3,40 +3,17 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class Message {
-	public get priority(): number {
-		return this._fields.priority.value
-	}
-	public set priority(value: number) {
-		this._fields.priority.value = value
-	}
-
-	public get text(): string {
-		return this._fields.text.value
-	}
-	public set text(value: string) {
-		this._fields.text.value = value
-	}
-
-	public _fields: {
-		priority: $.VarRef<number>;
-		text: $.VarRef<string>;
-	}
+export class Message extends $.GoStruct<{priority: number; text: string}> {
 
 	constructor(init?: Partial<{priority?: number, text?: string}>) {
-		this._fields = {
-			priority: $.varRef(init?.priority ?? 0),
-			text: $.varRef(init?.text ?? "")
-		}
+		super({
+			priority: { type: Number, default: 0 },
+			text: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): Message {
-		const cloned = new Message()
-		cloned._fields = {
-			priority: $.varRef(this._fields.priority.value),
-			text: $.varRef(this._fields.text.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

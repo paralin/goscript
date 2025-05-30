@@ -3,42 +3,17 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class TestStruct {
-	// IntField is a commented integer field.
-	public get IntField(): number {
-		return this._fields.IntField.value
-	}
-	public set IntField(value: number) {
-		this._fields.IntField.value = value
-	}
-
-	// StringField is a commented string field.
-	public get StringField(): string {
-		return this._fields.StringField.value
-	}
-	public set StringField(value: string) {
-		this._fields.StringField.value = value
-	}
-
-	public _fields: {
-		IntField: $.VarRef<number>;
-		StringField: $.VarRef<string>;
-	}
+export class TestStruct extends $.GoStruct<{IntField: number; StringField: string}> {
 
 	constructor(init?: Partial<{IntField?: number, StringField?: string}>) {
-		this._fields = {
-			IntField: $.varRef(init?.IntField ?? 0),
-			StringField: $.varRef(init?.StringField ?? "")
-		}
+		super({
+			IntField: { type: Number, default: 0 },
+			StringField: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): TestStruct {
-		const cloned = new TestStruct()
-		cloned._fields = {
-			IntField: $.varRef(this._fields.IntField.value),
-			StringField: $.varRef(this._fields.StringField.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

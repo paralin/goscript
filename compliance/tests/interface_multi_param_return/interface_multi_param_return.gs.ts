@@ -13,19 +13,15 @@ $.registerInterfaceType(
   [{ name: "Process", args: [{ name: "data", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }, { name: "count", type: { kind: $.TypeKind.Basic, name: "number" } }, { name: "_", type: { kind: $.TypeKind.Basic, name: "string" } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "boolean" } }, { type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }]
 );
 
-export class MyProcessor {
-	public _fields: {
-	}
+export class MyProcessor extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): MyProcessor {
-		const cloned = new MyProcessor()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Process(data: $.Bytes, count: number, _: string): [boolean, $.GoError] {

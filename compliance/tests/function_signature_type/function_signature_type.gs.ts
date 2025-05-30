@@ -19,30 +19,16 @@ export type Func4 = ((a: number, ...b: string[]) => void) | null;
 
 let fn4: Func4 | null = null
 
-export class MyError {
-	public get s(): string {
-		return this._fields.s.value
-	}
-	public set s(value: string) {
-		this._fields.s.value = value
-	}
-
-	public _fields: {
-		s: $.VarRef<string>;
-	}
+export class MyError extends $.GoStruct<{s: string}> {
 
 	constructor(init?: Partial<{s?: string}>) {
-		this._fields = {
-			s: $.varRef(init?.s ?? "")
-		}
+		super({
+			s: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): MyError {
-		const cloned = new MyError()
-		cloned._fields = {
-			s: $.varRef(this._fields.s.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Error(): string {

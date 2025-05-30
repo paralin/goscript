@@ -3,40 +3,17 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class Point {
-	public get X(): number {
-		return this._fields.X.value
-	}
-	public set X(value: number) {
-		this._fields.X.value = value
-	}
-
-	public get Y(): number {
-		return this._fields.Y.value
-	}
-	public set Y(value: number) {
-		this._fields.Y.value = value
-	}
-
-	public _fields: {
-		X: $.VarRef<number>;
-		Y: $.VarRef<number>;
-	}
+export class Point extends $.GoStruct<{X: number; Y: number}> {
 
 	constructor(init?: Partial<{X?: number, Y?: number}>) {
-		this._fields = {
-			X: $.varRef(init?.X ?? 0),
-			Y: $.varRef(init?.Y ?? 0)
-		}
+		super({
+			X: { type: Number, default: 0 },
+			Y: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): Point {
-		const cloned = new Point()
-		cloned._fields = {
-			X: $.varRef(this._fields.X.value),
-			Y: $.varRef(this._fields.Y.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

@@ -3,40 +3,17 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class MyStruct {
-	public get publicField(): string {
-		return this._fields.publicField.value
-	}
-	public set publicField(value: string) {
-		this._fields.publicField.value = value
-	}
-
-	public get privateField(): number {
-		return this._fields.privateField.value
-	}
-	public set privateField(value: number) {
-		this._fields.privateField.value = value
-	}
-
-	public _fields: {
-		publicField: $.VarRef<string>;
-		privateField: $.VarRef<number>;
-	}
+export class MyStruct extends $.GoStruct<{publicField: string; privateField: number}> {
 
 	constructor(init?: Partial<{privateField?: number, publicField?: string}>) {
-		this._fields = {
-			publicField: $.varRef(init?.publicField ?? ""),
-			privateField: $.varRef(init?.privateField ?? 0)
-		}
+		super({
+			publicField: { type: String, default: "" },
+			privateField: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): MyStruct {
-		const cloned = new MyStruct()
-		cloned._fields = {
-			publicField: $.varRef(this._fields.publicField.value),
-			privateField: $.varRef(this._fields.privateField.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system
@@ -60,7 +37,7 @@ export function accessPrivateField(s: MyStruct): void {
 }
 
 export async function main(): Promise<void> {
-	let s = NewMyStruct("hello", 123).clone()
+	let s = NewMyStruct("hello", 123)
 	accessPrivateField(s)
 }
 

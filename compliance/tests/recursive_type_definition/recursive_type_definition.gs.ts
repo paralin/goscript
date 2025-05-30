@@ -13,19 +13,15 @@ $.registerInterfaceType(
   [{ name: "MethodA", args: [{ name: "a", type: "A" }], returns: [] }]
 );
 
-export class B {
-	public _fields: {
-	}
+export class B extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): B {
-		const cloned = new B()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public MethodB(valB: B | null): void {

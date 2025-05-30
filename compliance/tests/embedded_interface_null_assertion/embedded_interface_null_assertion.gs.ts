@@ -13,44 +13,17 @@ $.registerInterfaceType(
   [{ name: "Read", args: [{ name: "p", type: { kind: $.TypeKind.Slice, elemType: { kind: $.TypeKind.Basic, name: "number" } } }], returns: [{ type: { kind: $.TypeKind.Basic, name: "number" } }, { type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }]
 );
 
-export class MyReader {
-	public get name(): string {
-		return this._fields.name.value
-	}
-	public set name(value: string) {
-		this._fields.name.value = value
-	}
-
-	public get Reader(): Reader {
-		return this._fields.Reader.value
-	}
-	public set Reader(value: Reader) {
-		this._fields.Reader.value = value
-	}
-
-	public _fields: {
-		Reader: $.VarRef<Reader>;
-		name: $.VarRef<string>;
-	}
+export class MyReader extends $.GoStruct<{Reader: Reader; name: string}> {
 
 	constructor(init?: Partial<{Reader?: Reader, name?: string}>) {
-		this._fields = {
-			Reader: $.varRef(init?.Reader ?? null),
-			name: $.varRef(init?.name ?? "")
-		}
+		super({
+			Reader: { type: Object, default: null, isEmbedded: true },
+			name: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): MyReader {
-		const cloned = new MyReader()
-		cloned._fields = {
-			Reader: $.varRef(this._fields.Reader.value),
-			name: $.varRef(this._fields.name.value)
-		}
-		return cloned
-	}
-
-	public Read(p: $.Bytes): [number, $.GoError] {
-		return this.Reader!.Read(p)
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system
@@ -63,40 +36,17 @@ export class MyReader {
 	);
 }
 
-export class StringReader {
-	public get data(): string {
-		return this._fields.data.value
-	}
-	public set data(value: string) {
-		this._fields.data.value = value
-	}
-
-	public get pos(): number {
-		return this._fields.pos.value
-	}
-	public set pos(value: number) {
-		this._fields.pos.value = value
-	}
-
-	public _fields: {
-		data: $.VarRef<string>;
-		pos: $.VarRef<number>;
-	}
+export class StringReader extends $.GoStruct<{data: string; pos: number}> {
 
 	constructor(init?: Partial<{data?: string, pos?: number}>) {
-		this._fields = {
-			data: $.varRef(init?.data ?? ""),
-			pos: $.varRef(init?.pos ?? 0)
-		}
+		super({
+			data: { type: String, default: "" },
+			pos: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): StringReader {
-		const cloned = new StringReader()
-		cloned._fields = {
-			data: $.varRef(this._fields.data.value),
-			pos: $.varRef(this._fields.pos.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Read(p: $.Bytes): [number, $.GoError] {

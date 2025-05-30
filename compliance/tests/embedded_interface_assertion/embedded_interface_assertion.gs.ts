@@ -32,19 +32,15 @@ $.registerInterfaceType(
   []
 );
 
-export class MyStruct {
-	public _fields: {
-	}
+export class MyStruct extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): MyStruct {
-		const cloned = new MyStruct()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Read(p: $.Bytes): [number, $.GoError] {

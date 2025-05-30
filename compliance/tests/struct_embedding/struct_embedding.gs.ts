@@ -3,40 +3,17 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class Person {
-	public get Name(): string {
-		return this._fields.Name.value
-	}
-	public set Name(value: string) {
-		this._fields.Name.value = value
-	}
-
-	public get Age(): number {
-		return this._fields.Age.value
-	}
-	public set Age(value: number) {
-		this._fields.Age.value = value
-	}
-
-	public _fields: {
-		Name: $.VarRef<string>;
-		Age: $.VarRef<number>;
-	}
+export class Person extends $.GoStruct<{Name: string; Age: number}> {
 
 	constructor(init?: Partial<{Age?: number, Name?: string}>) {
-		this._fields = {
-			Name: $.varRef(init?.Name ?? ""),
-			Age: $.varRef(init?.Age ?? 0)
-		}
+		super({
+			Name: { type: String, default: "" },
+			Age: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): Person {
-		const cloned = new Person()
-		cloned._fields = {
-			Name: $.varRef(this._fields.Name.value),
-			Age: $.varRef(this._fields.Age.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Greet(): void {
@@ -54,58 +31,17 @@ export class Person {
 	);
 }
 
-export class Employee {
-	public get ID(): number {
-		return this._fields.ID.value
-	}
-	public set ID(value: number) {
-		this._fields.ID.value = value
+export class Employee extends $.GoStruct<{Person: Person; ID: number}> {
+
+	constructor(init?: Partial<{ID?: number, Person?: Person | Partial<{Age?: number, Name?: string}>}>) {
+		super({
+			Person: { type: Object, default: new Person(), isEmbedded: true },
+			ID: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public get Person(): Person {
-		return this._fields.Person.value
-	}
-	public set Person(value: Person) {
-		this._fields.Person.value = value
-	}
-
-	public _fields: {
-		Person: $.VarRef<Person>;
-		ID: $.VarRef<number>;
-	}
-
-	constructor(init?: Partial<{ID?: number, Person?: Partial<ConstructorParameters<typeof Person>[0]>}>) {
-		this._fields = {
-			Person: $.varRef(new Person(init?.Person)),
-			ID: $.varRef(init?.ID ?? 0)
-		}
-	}
-
-	public clone(): Employee {
-		const cloned = new Employee()
-		cloned._fields = {
-			Person: $.varRef(this._fields.Person.value.clone()),
-			ID: $.varRef(this._fields.ID.value)
-		}
-		return cloned
-	}
-
-	public get Name(): string {
-		return this.Person.Name
-	}
-	public set Name(value: string) {
-		this.Person.Name = value
-	}
-
-	public get Age(): number {
-		return this.Person.Age
-	}
-	public set Age(value: number) {
-		this.Person.Age = value
-	}
-
-	public Greet(): void {
-		this.Person.Greet()
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system
@@ -118,40 +54,17 @@ export class Employee {
 	);
 }
 
-export class Address {
-	public get Street(): string {
-		return this._fields.Street.value
-	}
-	public set Street(value: string) {
-		this._fields.Street.value = value
-	}
-
-	public get City(): string {
-		return this._fields.City.value
-	}
-	public set City(value: string) {
-		this._fields.City.value = value
-	}
-
-	public _fields: {
-		Street: $.VarRef<string>;
-		City: $.VarRef<string>;
-	}
+export class Address extends $.GoStruct<{Street: string; City: string}> {
 
 	constructor(init?: Partial<{City?: string, Street?: string}>) {
-		this._fields = {
-			Street: $.varRef(init?.Street ?? ""),
-			City: $.varRef(init?.City ?? "")
-		}
+		super({
+			Street: { type: String, default: "" },
+			City: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): Address {
-		const cloned = new Address()
-		cloned._fields = {
-			Street: $.varRef(this._fields.Street.value),
-			City: $.varRef(this._fields.City.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public FullAddress(): string {
@@ -169,30 +82,16 @@ export class Address {
 	);
 }
 
-export class Contact {
-	public get Phone(): string {
-		return this._fields.Phone.value
-	}
-	public set Phone(value: string) {
-		this._fields.Phone.value = value
-	}
-
-	public _fields: {
-		Phone: $.VarRef<string>;
-	}
+export class Contact extends $.GoStruct<{Phone: string}> {
 
 	constructor(init?: Partial<{Phone?: string}>) {
-		this._fields = {
-			Phone: $.varRef(init?.Phone ?? "")
-		}
+		super({
+			Phone: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): Contact {
-		const cloned = new Contact()
-		cloned._fields = {
-			Phone: $.varRef(this._fields.Phone.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Call(): void {
@@ -210,107 +109,19 @@ export class Contact {
 	);
 }
 
-export class Manager {
-	public get Level(): number {
-		return this._fields.Level.value
-	}
-	public set Level(value: number) {
-		this._fields.Level.value = value
+export class Manager extends $.GoStruct<{Person: Person; Address: Address; Contact: Contact; Level: number}> {
+
+	constructor(init?: Partial<{Address?: Address | Partial<{City?: string, Street?: string}>, Contact?: Contact | Partial<{Phone?: string}>, Level?: number, Person?: Person | Partial<{Age?: number, Name?: string}>}>) {
+		super({
+			Person: { type: Object, default: new Person(), isEmbedded: true },
+			Address: { type: Object, default: new Address(), isEmbedded: true },
+			Contact: { type: Object, default: new Contact(), isEmbedded: true },
+			Level: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public get Person(): Person {
-		return this._fields.Person.value
-	}
-	public set Person(value: Person) {
-		this._fields.Person.value = value
-	}
-
-	public get Address(): Address {
-		return this._fields.Address.value
-	}
-	public set Address(value: Address) {
-		this._fields.Address.value = value
-	}
-
-	public get Contact(): Contact {
-		return this._fields.Contact.value
-	}
-	public set Contact(value: Contact) {
-		this._fields.Contact.value = value
-	}
-
-	public _fields: {
-		Person: $.VarRef<Person>;
-		Address: $.VarRef<Address>;
-		Contact: $.VarRef<Contact>;
-		Level: $.VarRef<number>;
-	}
-
-	constructor(init?: Partial<{Address?: Partial<ConstructorParameters<typeof Address>[0]>, Contact?: Partial<ConstructorParameters<typeof Contact>[0]>, Level?: number, Person?: Partial<ConstructorParameters<typeof Person>[0]>}>) {
-		this._fields = {
-			Person: $.varRef(new Person(init?.Person)),
-			Address: $.varRef(new Address(init?.Address)),
-			Contact: $.varRef(new Contact(init?.Contact)),
-			Level: $.varRef(init?.Level ?? 0)
-		}
-	}
-
-	public clone(): Manager {
-		const cloned = new Manager()
-		cloned._fields = {
-			Person: $.varRef(this._fields.Person.value.clone()),
-			Address: $.varRef(this._fields.Address.value.clone()),
-			Contact: $.varRef(this._fields.Contact.value.clone()),
-			Level: $.varRef(this._fields.Level.value)
-		}
-		return cloned
-	}
-
-	public get Name(): string {
-		return this.Person.Name
-	}
-	public set Name(value: string) {
-		this.Person.Name = value
-	}
-
-	public get Age(): number {
-		return this.Person.Age
-	}
-	public set Age(value: number) {
-		this.Person.Age = value
-	}
-
-	public Greet(): void {
-		this.Person.Greet()
-	}
-
-	public get Street(): string {
-		return this.Address.Street
-	}
-	public set Street(value: string) {
-		this.Address.Street = value
-	}
-
-	public get City(): string {
-		return this.Address.City
-	}
-	public set City(value: string) {
-		this.Address.City = value
-	}
-
-	public FullAddress(): string {
-		return this.Address.FullAddress()
-	}
-
-	public get Phone(): string {
-		return this.Contact.Phone
-	}
-	public set Phone(value: string) {
-		this.Contact.Phone = value
-	}
-
-	public Call(): void {
-		this.Contact.Call()
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

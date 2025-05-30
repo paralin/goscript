@@ -13,19 +13,15 @@ $.registerInterfaceType(
   [{ name: "Method", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }]
 );
 
-export class ConcreteA {
-	public _fields: {
-	}
+export class ConcreteA extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): ConcreteA {
-		const cloned = new ConcreteA()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Method(): string {
@@ -42,19 +38,15 @@ export class ConcreteA {
 	);
 }
 
-export class ConcreteB {
-	public _fields: {
-	}
+export class ConcreteB extends $.GoStruct<{}> {
 
 	constructor(init?: Partial<{}>) {
-		this._fields = {}
+		super({
+		}, init)
 	}
 
-	public clone(): ConcreteB {
-		const cloned = new ConcreteB()
-		cloned._fields = {
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Method(): string {
@@ -71,40 +63,17 @@ export class ConcreteB {
 	);
 }
 
-export class Container {
-	public get hasA(): boolean {
-		return this._fields.hasA.value
-	}
-	public set hasA(value: boolean) {
-		this._fields.hasA.value = value
-	}
-
-	public get hasB(): boolean {
-		return this._fields.hasB.value
-	}
-	public set hasB(value: boolean) {
-		this._fields.hasB.value = value
-	}
-
-	public _fields: {
-		hasA: $.VarRef<boolean>;
-		hasB: $.VarRef<boolean>;
-	}
+export class Container extends $.GoStruct<{hasA: boolean; hasB: boolean}> {
 
 	constructor(init?: Partial<{hasA?: boolean, hasB?: boolean}>) {
-		this._fields = {
-			hasA: $.varRef(init?.hasA ?? false),
-			hasB: $.varRef(init?.hasB ?? false)
-		}
+		super({
+			hasA: { type: Boolean, default: false },
+			hasB: { type: Boolean, default: false }
+		}, init)
 	}
 
-	public clone(): Container {
-		const cloned = new Container()
-		cloned._fields = {
-			hasA: $.varRef(this._fields.hasA.value),
-			hasB: $.varRef(this._fields.hasB.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

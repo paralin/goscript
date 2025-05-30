@@ -3,40 +3,17 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class file {
-	public get name(): string {
-		return this._fields.name.value
-	}
-	public set name(value: string) {
-		this._fields.name.value = value
-	}
-
-	public get data(): $.Bytes {
-		return this._fields.data.value
-	}
-	public set data(value: $.Bytes) {
-		this._fields.data.value = value
-	}
-
-	public _fields: {
-		name: $.VarRef<string>;
-		data: $.VarRef<$.Bytes>;
-	}
+export class file extends $.GoStruct<{name: string; data: $.Bytes}> {
 
 	constructor(init?: Partial<{data?: $.Bytes, name?: string}>) {
-		this._fields = {
-			name: $.varRef(init?.name ?? ""),
-			data: $.varRef(init?.data ?? new Uint8Array(0))
-		}
+		super({
+			name: { type: String, default: "" },
+			data: { type: Object, default: new Uint8Array(0) }
+		}, init)
 	}
 
-	public clone(): file {
-		const cloned = new file()
-		cloned._fields = {
-			name: $.varRef(this._fields.name.value),
-			data: $.varRef(this._fields.data.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

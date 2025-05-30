@@ -3,40 +3,17 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class MyStruct {
-	public get MyInt(): number {
-		return this._fields.MyInt.value
-	}
-	public set MyInt(value: number) {
-		this._fields.MyInt.value = value
-	}
-
-	public get MyString(): string {
-		return this._fields.MyString.value
-	}
-	public set MyString(value: string) {
-		this._fields.MyString.value = value
-	}
-
-	public _fields: {
-		MyInt: $.VarRef<number>;
-		MyString: $.VarRef<string>;
-	}
+export class MyStruct extends $.GoStruct<{MyInt: number; MyString: string}> {
 
 	constructor(init?: Partial<{MyInt?: number, MyString?: string}>) {
-		this._fields = {
-			MyInt: $.varRef(init?.MyInt ?? 0),
-			MyString: $.varRef(init?.MyString ?? "")
-		}
+		super({
+			MyInt: { type: Number, default: 0 },
+			MyString: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): MyStruct {
-		const cloned = new MyStruct()
-		cloned._fields = {
-			MyInt: $.varRef(this._fields.MyInt.value),
-			MyString: $.varRef(this._fields.MyString.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system
@@ -49,40 +26,17 @@ export class MyStruct {
 	);
 }
 
-export class NestedStruct {
-	public get Value(): number {
-		return this._fields.Value.value
-	}
-	public set Value(value: number) {
-		this._fields.Value.value = value
-	}
-
-	public get InnerStruct(): MyStruct {
-		return this._fields.InnerStruct.value
-	}
-	public set InnerStruct(value: MyStruct) {
-		this._fields.InnerStruct.value = value
-	}
-
-	public _fields: {
-		Value: $.VarRef<number>;
-		InnerStruct: $.VarRef<MyStruct>;
-	}
+export class NestedStruct extends $.GoStruct<{Value: number; InnerStruct: MyStruct}> {
 
 	constructor(init?: Partial<{InnerStruct?: MyStruct, Value?: number}>) {
-		this._fields = {
-			Value: $.varRef(init?.Value ?? 0),
-			InnerStruct: $.varRef(init?.InnerStruct?.clone() ?? new MyStruct())
-		}
+		super({
+			Value: { type: Number, default: 0 },
+			InnerStruct: { type: Object, default: new MyStruct() }
+		}, init)
 	}
 
-	public clone(): NestedStruct {
-		const cloned = new NestedStruct()
-		cloned._fields = {
-			Value: $.varRef(this._fields.Value.value),
-			InnerStruct: $.varRef(this._fields.InnerStruct.value?.clone() ?? null)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

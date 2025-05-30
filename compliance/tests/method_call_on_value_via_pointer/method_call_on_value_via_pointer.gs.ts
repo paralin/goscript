@@ -3,30 +3,16 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class MyStruct {
-	public get MyInt(): number {
-		return this._fields.MyInt.value
-	}
-	public set MyInt(value: number) {
-		this._fields.MyInt.value = value
-	}
-
-	public _fields: {
-		MyInt: $.VarRef<number>;
-	}
+export class MyStruct extends $.GoStruct<{MyInt: number}> {
 
 	constructor(init?: Partial<{MyInt?: number}>) {
-		this._fields = {
-			MyInt: $.varRef(init?.MyInt ?? 0)
-		}
+		super({
+			MyInt: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): MyStruct {
-		const cloned = new MyStruct()
-		cloned._fields = {
-			MyInt: $.varRef(this._fields.MyInt.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// GetValue returns the MyInt field (value receiver).

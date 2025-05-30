@@ -25,50 +25,18 @@ $.registerInterfaceType(
   [{ name: "Lock", args: [], returns: [{ type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }, { name: "Name", args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: "string" } }] }, { name: "Truncate", args: [{ name: "size", type: { kind: $.TypeKind.Basic, name: "number" } }], returns: [{ type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }, { name: "Unlock", args: [], returns: [{ type: { kind: $.TypeKind.Interface, name: 'GoError', methods: [{ name: 'Error', args: [], returns: [{ type: { kind: $.TypeKind.Basic, name: 'string' } }] }] } }] }]
 );
 
-export class MockFile {
-	public get filename(): string {
-		return this._fields.filename.value
-	}
-	public set filename(value: string) {
-		this._fields.filename.value = value
-	}
-
-	public get content(): $.Bytes {
-		return this._fields.content.value
-	}
-	public set content(value: $.Bytes) {
-		this._fields.content.value = value
-	}
-
-	public get position(): number {
-		return this._fields.position.value
-	}
-	public set position(value: number) {
-		this._fields.position.value = value
-	}
-
-	public _fields: {
-		filename: $.VarRef<string>;
-		content: $.VarRef<$.Bytes>;
-		position: $.VarRef<number>;
-	}
+export class MockFile extends $.GoStruct<{filename: string; content: $.Bytes; position: number}> {
 
 	constructor(init?: Partial<{content?: $.Bytes, filename?: string, position?: number}>) {
-		this._fields = {
-			filename: $.varRef(init?.filename ?? ""),
-			content: $.varRef(init?.content ?? new Uint8Array(0)),
-			position: $.varRef(init?.position ?? 0)
-		}
+		super({
+			filename: { type: String, default: "" },
+			content: { type: Object, default: new Uint8Array(0) },
+			position: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): MockFile {
-		const cloned = new MockFile()
-		cloned._fields = {
-			filename: $.varRef(this._fields.filename.value),
-			content: $.varRef(this._fields.content.value),
-			position: $.varRef(this._fields.position.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Name(): string {
@@ -148,77 +116,22 @@ export class MockFile {
 	);
 }
 
-export class file {
-	public get name(): string {
-		return this._fields.name.value
-	}
-	public set name(value: string) {
-		this._fields.name.value = value
-	}
-
-	public get File(): File {
-		return this._fields.File.value
-	}
-	public set File(value: File) {
-		this._fields.File.value = value
-	}
-
-	public _fields: {
-		File: $.VarRef<File>;
-		name: $.VarRef<string>;
-	}
+export class file extends $.GoStruct<{File: File; name: string}> {
 
 	constructor(init?: Partial<{File?: File, name?: string}>) {
-		this._fields = {
-			File: $.varRef(init?.File ?? null),
-			name: $.varRef(init?.name ?? "")
-		}
+		super({
+			File: { type: Object, default: null, isEmbedded: true },
+			name: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): file {
-		const cloned = new file()
-		cloned._fields = {
-			File: $.varRef(this._fields.File.value),
-			name: $.varRef(this._fields.name.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Name(): string {
 		const f = this
 		return f!.name
-	}
-
-	public Close(): $.GoError {
-		return this.File!.Close()
-	}
-
-	public Lock(): $.GoError {
-		return this.File!.Lock()
-	}
-
-	public Read(p: $.Bytes): [number, $.GoError] {
-		return this.File!.Read(p)
-	}
-
-	public ReadAt(p: $.Bytes, off: number): [number, $.GoError] {
-		return this.File!.ReadAt(p, off)
-	}
-
-	public Seek(offset: number, whence: number): [number, $.GoError] {
-		return this.File!.Seek(offset, whence)
-	}
-
-	public Truncate(size: number): $.GoError {
-		return this.File!.Truncate(size)
-	}
-
-	public Unlock(): $.GoError {
-		return this.File!.Unlock()
-	}
-
-	public Write(p: $.Bytes): [number, $.GoError] {
-		return this.File!.Write(p)
 	}
 
 	// Register this type with the runtime type system
@@ -231,52 +144,17 @@ export class file {
 	);
 }
 
-export class qualifiedFile {
-	public get metadata(): string {
-		return this._fields.metadata.value
-	}
-	public set metadata(value: string) {
-		this._fields.metadata.value = value
-	}
-
-	public get File(): subpkg.File {
-		return this._fields.File.value
-	}
-	public set File(value: subpkg.File) {
-		this._fields.File.value = value
-	}
-
-	public _fields: {
-		File: $.VarRef<subpkg.File>;
-		metadata: $.VarRef<string>;
-	}
+export class qualifiedFile extends $.GoStruct<{File: subpkg.File; metadata: string}> {
 
 	constructor(init?: Partial<{File?: subpkg.File, metadata?: string}>) {
-		this._fields = {
-			File: $.varRef(init?.File ?? null),
-			metadata: $.varRef(init?.metadata ?? "")
-		}
+		super({
+			File: { type: Object, default: null, isEmbedded: true },
+			metadata: { type: String, default: "" }
+		}, init)
 	}
 
-	public clone(): qualifiedFile {
-		const cloned = new qualifiedFile()
-		cloned._fields = {
-			File: $.varRef(this._fields.File.value),
-			metadata: $.varRef(this._fields.metadata.value)
-		}
-		return cloned
-	}
-
-	public Close(): $.GoError {
-		return this.File!.Close()
-	}
-
-	public Name(): string {
-		return this.File!.Name()
-	}
-
-	public Write(data: $.Bytes): [number, $.GoError] {
-		return this.File!.Write(data)
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

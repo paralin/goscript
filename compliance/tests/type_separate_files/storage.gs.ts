@@ -4,40 +4,17 @@
 import * as $ from "@goscript/builtin/index.js";
 import { file } from "./memory.gs.js";
 
-export class storage {
-	public get files(): Map<string, file | null> | null {
-		return this._fields.files.value
-	}
-	public set files(value: Map<string, file | null> | null) {
-		this._fields.files.value = value
-	}
-
-	public get children(): Map<string, Map<string, file | null> | null> | null {
-		return this._fields.children.value
-	}
-	public set children(value: Map<string, Map<string, file | null> | null> | null) {
-		this._fields.children.value = value
-	}
-
-	public _fields: {
-		files: $.VarRef<Map<string, file | null> | null>;
-		children: $.VarRef<Map<string, Map<string, file | null> | null> | null>;
-	}
+export class storage extends $.GoStruct<{files: Map<string, file | null> | null; children: Map<string, Map<string, file | null> | null> | null}> {
 
 	constructor(init?: Partial<{children?: Map<string, Map<string, file | null> | null> | null, files?: Map<string, file | null> | null}>) {
-		this._fields = {
-			files: $.varRef(init?.files ?? null),
-			children: $.varRef(init?.children ?? null)
-		}
+		super({
+			files: { type: Object, default: null },
+			children: { type: Object, default: null }
+		}, init)
 	}
 
-	public clone(): storage {
-		const cloned = new storage()
-		cloned._fields = {
-			files: $.varRef(this._fields.files.value),
-			children: $.varRef(this._fields.children.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

@@ -3,30 +3,16 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class Foo {
-	public get done(): $.Channel<boolean> | null {
-		return this._fields.done.value
-	}
-	public set done(value: $.Channel<boolean> | null) {
-		this._fields.done.value = value
-	}
-
-	public _fields: {
-		done: $.VarRef<$.Channel<boolean> | null>;
-	}
+export class Foo extends $.GoStruct<{done: $.Channel<boolean> | null}> {
 
 	constructor(init?: Partial<{done?: $.Channel<boolean> | null}>) {
-		this._fields = {
-			done: $.varRef(init?.done ?? null)
-		}
+		super({
+			done: { type: Object, default: null }
+		}, init)
 	}
 
-	public clone(): Foo {
-		const cloned = new Foo()
-		cloned._fields = {
-			done: $.varRef(this._fields.done.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public async Bar(): Promise<void> {

@@ -3,30 +3,16 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class Counter {
-	public get value(): number {
-		return this._fields.value.value
-	}
-	public set value(value: number) {
-		this._fields.value.value = value
-	}
-
-	public _fields: {
-		value: $.VarRef<number>;
-	}
+export class Counter extends $.GoStruct<{value: number}> {
 
 	constructor(init?: Partial<{value?: number}>) {
-		this._fields = {
-			value: $.varRef(init?.value ?? 0)
-		}
+		super({
+			value: { type: Number, default: 0 }
+		}, init)
 	}
 
-	public clone(): Counter {
-		const cloned = new Counter()
-		cloned._fields = {
-			value: $.varRef(this._fields.value.value)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	public Increment(): void {

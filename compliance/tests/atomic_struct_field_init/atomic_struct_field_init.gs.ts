@@ -5,50 +5,18 @@ import * as $ from "@goscript/builtin/index.js";
 
 import * as atomic from "@goscript/sync/atomic/index.js"
 
-export class MyStruct {
-	public get closed(): atomic.Bool {
-		return this._fields.closed.value
-	}
-	public set closed(value: atomic.Bool) {
-		this._fields.closed.value = value
-	}
-
-	public get count(): atomic.Int32 {
-		return this._fields.count.value
-	}
-	public set count(value: atomic.Int32) {
-		this._fields.count.value = value
-	}
-
-	public get flag(): atomic.Uint32 {
-		return this._fields.flag.value
-	}
-	public set flag(value: atomic.Uint32) {
-		this._fields.flag.value = value
-	}
-
-	public _fields: {
-		closed: $.VarRef<atomic.Bool>;
-		count: $.VarRef<atomic.Int32>;
-		flag: $.VarRef<atomic.Uint32>;
-	}
+export class MyStruct extends $.GoStruct<{closed: atomic.Bool; count: atomic.Int32; flag: atomic.Uint32}> {
 
 	constructor(init?: Partial<{closed?: atomic.Bool, count?: atomic.Int32, flag?: atomic.Uint32}>) {
-		this._fields = {
-			closed: $.varRef(init?.closed?.clone() ?? new atomic.Bool()),
-			count: $.varRef(init?.count?.clone() ?? new atomic.Int32()),
-			flag: $.varRef(init?.flag?.clone() ?? new atomic.Uint32())
-		}
+		super({
+			closed: { type: Object, default: new atomic.Bool() },
+			count: { type: Object, default: new atomic.Int32() },
+			flag: { type: Object, default: new atomic.Uint32() }
+		}, init)
 	}
 
-	public clone(): MyStruct {
-		const cloned = new MyStruct()
-		cloned._fields = {
-			closed: $.varRef(this._fields.closed.value?.clone() ?? null),
-			count: $.varRef(this._fields.count.value?.clone() ?? null),
-			flag: $.varRef(this._fields.flag.value?.clone() ?? null)
-		}
-		return cloned
+	public clone(): this {
+		return super.clone()
 	}
 
 	// Register this type with the runtime type system

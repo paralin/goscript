@@ -427,9 +427,16 @@ func shouldApplyClone(pkg *packages.Package, rhs ast.Expr) bool {
 		return false
 	}
 
-	// Optimization: If it's a composite literal for a struct, no need to clone
+	// Optimizations: Don't clone for expressions that already produce fresh values
+	
+	// If it's a composite literal for a struct, no need to clone
 	// as it's already a fresh value
 	if _, isCompositeLit := rhs.(*ast.CompositeLit); isCompositeLit {
+		return false
+	}
+	
+	// If it's a function call, no need to clone as function results are already fresh values
+	if _, isCallExpr := rhs.(*ast.CallExpr); isCallExpr {
 		return false
 	}
 
