@@ -48,12 +48,10 @@ export class MyStruct {
 	}
 
 	public Read(p: $.Bytes): [number, $.GoError] {
-		const m = this
 		return [0, null]
 	}
 
 	public Close(): $.GoError {
-		const m = this
 		return null
 	}
 

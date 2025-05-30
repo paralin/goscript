@@ -19,7 +19,6 @@ export class Greeter {
 	}
 
 	public Greet(): string {
-		const g = this
 		return "Hello from Greeter"
 	}
 
@@ -59,7 +58,6 @@ export class MyStringer {
 	}
 
 	public String(): string {
-		const ms = this
 		return "MyStringer implementation"
 	}
 

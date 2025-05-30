@@ -32,7 +32,6 @@ export class MyStorage {
 	}
 
 	public Stat(filename: string): [os.FileInfo, $.GoError] {
-		const s = this
 		return [null, null]
 	}
 
