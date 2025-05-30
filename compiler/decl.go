@@ -209,15 +209,24 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 
 	c.tsw.WriteLiterally(" ")
 
-	// Bind receiver name to this
+	// Bind receiver name to this conditionally
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
 		recvName := recvField.Names[0].Name
 		if recvName != "_" {
+			// Check if receiver is actually used
+			var needsReceiverBinding bool
+			if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
+				needsReceiverBinding = c.analysis.IsReceiverUsed(obj)
+			}
+			
 			c.tsw.WriteLine("{")
 			c.tsw.Indent(1)
-			// Sanitize the receiver name to avoid conflicts with TypeScript reserved words
-			sanitizedRecvName := c.sanitizeIdentifier(recvName)
-			c.tsw.WriteLinef("const %s = this", sanitizedRecvName)
+			
+			if needsReceiverBinding {
+				// Sanitize the receiver name to avoid conflicts with TypeScript reserved words
+				sanitizedRecvName := c.sanitizeIdentifier(recvName)
+				c.tsw.WriteLinef("const %s = this", sanitizedRecvName)
+			}
 
 			// Add using statement if needed
 			if c.analysis.NeedsDefer(decl.Body) {

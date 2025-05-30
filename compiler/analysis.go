@@ -61,6 +61,7 @@ type FunctionTypeInfo struct {
 // FunctionInfo consolidates function-related tracking data.
 type FunctionInfo struct {
 	IsAsync      bool
+	ReceiverUsed bool
 	NamedReturns []string
 }
 
@@ -193,6 +194,17 @@ func (a *Analysis) IsAsyncFunc(obj types.Object) bool {
 		return false
 	}
 	return funcInfo.IsAsync
+}
+
+func (a *Analysis) IsReceiverUsed(obj types.Object) bool {
+	if obj == nil {
+		return false
+	}
+	funcInfo := a.FunctionData[obj]
+	if funcInfo == nil {
+		return false
+	}
+	return funcInfo.ReceiverUsed
 }
 
 // IsFuncLitAsync checks if a function literal is async based on our analysis.
@@ -488,6 +500,20 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 							// Add the receiver variable to the VariableUsage map
 							// to ensure it is properly analyzed for varRefing
 							v.getOrCreateUsageInfo(v.currentReceiver)
+							
+							// Check if receiver is used in method body
+							receiverUsed := false
+							if n.Body != nil {
+								receiverUsed = v.containsReceiverUsage(n.Body, vr)
+							}
+							
+							// Update function data with receiver usage info
+							if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
+								if v.analysis.FunctionData[obj] == nil {
+									v.analysis.FunctionData[obj] = &FunctionInfo{}
+								}
+								v.analysis.FunctionData[obj].ReceiverUsed = receiverUsed
+							}
 						}
 					}
 				}
@@ -943,6 +969,34 @@ func (v *analysisVisitor) containsDefer(block *ast.BlockStmt) bool {
 	})
 
 	return hasDefer
+}
+
+// containsReceiverUsage checks if a method body contains any references to the receiver variable.
+func (v *analysisVisitor) containsReceiverUsage(node ast.Node, receiver *types.Var) bool {
+	if receiver == nil {
+		return false
+	}
+	
+	var hasReceiverUsage bool
+	
+	ast.Inspect(node, func(n ast.Node) bool {
+		if n == nil {
+			return true
+		}
+		
+		switch ident := n.(type) {
+		case *ast.Ident:
+			// Check if this identifier refers to the receiver variable
+			if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil && obj == receiver {
+				hasReceiverUsage = true
+				return false
+			}
+		}
+		
+		return true
+	})
+	
+	return hasReceiverUsage
 }
 
 // AnalyzeFile analyzes a Go source file AST and populates the Analysis struct with information
