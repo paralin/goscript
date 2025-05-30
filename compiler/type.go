@@ -694,6 +694,25 @@ func (c *GoToTSCompiler) getTypeString(goType types.Type) string {
 	return typeStr.String()
 }
 
+// getASTTypeString is a utility function that converts a Go type to its TypeScript
+// type string representation, preferring AST-based type writing when available to
+// preserve qualified names like os.FileMode. Falls back to types.Type-based writing
+// when AST information is not available.
+func (c *GoToTSCompiler) getASTTypeString(astType ast.Expr, goType types.Type) string {
+	var typeStr strings.Builder
+	writer := NewTSCodeWriter(&typeStr)
+	tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+
+	if astType != nil {
+		// Use AST-based type writing to preserve qualified names
+		tempCompiler.WriteTypeExpr(astType)
+	} else {
+		// Fall back to types.Type-based writing
+		tempCompiler.WriteGoType(goType, GoTypeContextGeneral)
+	}
+	return typeStr.String()
+}
+
 // WriteStructType translates a Go struct type definition (`ast.StructType`)
 // into a TypeScript anonymous object type (e.g., `{ Field1: Type1; Field2: Type2 }`).
 // If the struct has no fields, it writes `{}`. Otherwise, it delegates to

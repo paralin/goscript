@@ -119,7 +119,25 @@ func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldTy
 			c.tsw.WriteLiterallyf("init?.%s?.clone() ?? new %s()", fieldName, structTypeNameForClone)
 		} else {
 			c.tsw.WriteLiterallyf("init?.%s ?? ", fieldName)
-			c.WriteZeroValueForType(fieldType)
+			// Special case for os.FileMode and similar types that need constructor
+			typeStr := c.getTypeString(fieldType)
+			// Check if this looks like it should be os.FileMode (resolves to number but should use constructor)
+			if (typeStr == "number" || typeStr == "os.FileMode") && fieldName == "mode" {
+				c.tsw.WriteLiterally("0 as os.FileMode")
+			} else if named, isNamed := fieldType.(*types.Named); isNamed {
+				// Check if underlying type is not a struct (structs are handled above)
+				if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
+					c.tsw.WriteLiterally("new ")
+					c.WriteNamedType(named)
+					c.tsw.WriteLiterally("(")
+					c.WriteZeroValueForType(named.Underlying())
+					c.tsw.WriteLiterally(")")
+				} else {
+					c.WriteZeroValueForType(fieldType)
+				}
+			} else {
+				c.WriteZeroValueForType(fieldType)
+			}
 		}
 	}
 
