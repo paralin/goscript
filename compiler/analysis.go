@@ -984,12 +984,20 @@ func (v *analysisVisitor) containsReceiverUsage(node ast.Node, receiver *types.V
 			return true
 		}
 		
-		switch ident := n.(type) {
+		switch expr := n.(type) {
 		case *ast.Ident:
 			// Check if this identifier refers to the receiver variable
-			if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil && obj == receiver {
+			if obj := v.pkg.TypesInfo.Uses[expr]; obj != nil && obj == receiver {
 				hasReceiverUsage = true
 				return false
+			}
+		case *ast.SelectorExpr:
+			// Check if selector expression uses the receiver (e.g., m.Field, m.Method())
+			if ident, ok := expr.X.(*ast.Ident); ok {
+				if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil && obj == receiver {
+					hasReceiverUsage = true
+					return false
+				}
 			}
 		}
 		
