@@ -1,6 +1,6 @@
-// Pattern matching functions for filepath
+import * as $ from '@goscript/builtin/index.js'
 
-export const ErrBadPattern = new Error('syntax error in pattern')
+export const ErrBadPattern = $.newError('syntax error in pattern')
 
 // Match reports whether name matches the shell file name pattern.
 // The pattern syntax is:
@@ -23,7 +23,7 @@ export const ErrBadPattern = new Error('syntax error in pattern')
 // Match requires pattern to match all of name, not just a substring.
 // The only possible returned error is ErrBadPattern, when pattern
 // is malformed.
-export function Match(pattern: string, name: string): [boolean, Error | null] {
+export function Match(pattern: string, name: string): [boolean, $.GoError] {
   try {
     // Validate pattern first
     validatePattern(pattern)
@@ -236,7 +236,7 @@ function matchCharClass(
 //
 // Glob ignores file system errors such as I/O errors reading directories.
 // The only possible returned error is ErrBadPattern, when pattern is malformed.
-export function Glob(pattern: string): [string[], Error | null] {
+export function Glob(pattern: string): [string[], $.GoError] {
   try {
     // Validate the pattern using the same logic as Match
     validatePattern(pattern)

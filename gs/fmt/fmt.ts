@@ -21,7 +21,7 @@ export interface State {
   Flag(c: number): boolean
   Precision(): [number, boolean]
   Width(): [number, boolean]
-  Write(b: Uint8Array): [number, Error | null]
+  Write(b: Uint8Array): [number, $.GoError | null]
 }
 
 // Simple printf-style formatting implementation
@@ -208,19 +208,19 @@ let stdout = {
 }
 
 // Print functions
-export function Print(...a: any[]): [number, Error | null] {
+export function Print(...a: any[]): [number, $.GoError | null] {
   const result = a.map(defaultFormat).join(' ')
   stdout.write(result)
   return [result.length, null]
 }
 
-export function Printf(format: string, ...a: any[]): [number, Error | null] {
+export function Printf(format: string, ...a: any[]): [number, $.GoError | null] {
   const result = parseFormat(format, a)
   stdout.write(result)
   return [result.length, null]
 }
 
-export function Println(...a: any[]): [number, Error | null] {
+export function Println(...a: any[]): [number, $.GoError | null] {
   const result = a.map(defaultFormat).join(' ') + '\n'
   stdout.write(result)
   return [result.length, null]
@@ -240,32 +240,32 @@ export function Sprintln(...a: any[]): string {
 }
 
 // Fprint functions (write to Writer) - simplified implementation
-export function Fprint(w: any, ...a: any[]): [number, Error | null] {
+export function Fprint(w: any, ...a: any[]): [number, $.GoError | null] {
   const result = a.map(defaultFormat).join(' ')
   if (w && w.Write) {
     return w.Write(new TextEncoder().encode(result))
   }
-  return [0, new Error('Writer does not implement Write method')]
+  return [0, $.newError('Writer does not implement Write method')]
 }
 
 export function Fprintf(
   w: any,
   format: string,
   ...a: any[]
-): [number, Error | null] {
+): [number, $.GoError | null] {
   const result = parseFormat(format, a)
   if (w && w.Write) {
     return w.Write(new TextEncoder().encode(result))
   }
-  return [0, new Error('Writer does not implement Write method')]
+  return [0, $.newError('Writer does not implement Write method')]
 }
 
-export function Fprintln(w: any, ...a: any[]): [number, Error | null] {
+export function Fprintln(w: any, ...a: any[]): [number, $.GoError | null] {
   const result = a.map(defaultFormat).join(' ') + '\n'
   if (w && w.Write) {
     return w.Write(new TextEncoder().encode(result))
   }
-  return [0, new Error('Writer does not implement Write method')]
+  return [0, $.newError('Writer does not implement Write method')]
 }
 
 // Append functions (append to byte slice)
@@ -336,72 +336,72 @@ export function FormatString(state: State, verb: number): string {
 }
 
 // Scanning functions - stubbed for now
-export function Scan(..._a: any[]): [number, Error | null] {
+export function Scan(..._a: any[]): [number, $.GoError | null] {
   // TODO: Implement scanning from stdin
-  return [0, new Error('Scan not implemented')]
+  return [0, $.newError('Scan not implemented')]
 }
 
-export function Scanf(_format: string, ..._a: any[]): [number, Error | null] {
+export function Scanf(_format: string, ..._a: any[]): [number, $.GoError | null] {
   // TODO: Implement formatted scanning from stdin
-  return [0, new Error('Scanf not implemented')]
+  return [0, $.newError('Scanf not implemented')]
 }
 
-export function Scanln(..._a: any[]): [number, Error | null] {
+export function Scanln(..._a: any[]): [number, $.GoError | null] {
   // TODO: Implement line scanning from stdin
-  return [0, new Error('Scanln not implemented')]
+  return [0, $.newError('Scanln not implemented')]
 }
 
-export function Sscan(_str: string, ..._a: any[]): [number, Error | null] {
+export function Sscan(_str: string, ..._a: any[]): [number, $.GoError | null] {
   // TODO: Implement scanning from string
-  return [0, new Error('Sscan not implemented')]
+  return [0, $.newError('Sscan not implemented')]
 }
 
 export function Sscanf(
   _str: string,
   _format: string,
   ..._a: any[]
-): [number, Error | null] {
+): [number, $.GoError | null] {
   // TODO: Implement formatted scanning from string
-  return [0, new Error('Sscanf not implemented')]
+  return [0, $.newError('Sscanf not implemented')]
 }
 
-export function Sscanln(_str: string, ..._a: any[]): [number, Error | null] {
+export function Sscanln(_str: string, ..._a: any[]): [number, $.GoError | null] {
   // TODO: Implement line scanning from string
-  return [0, new Error('Sscanln not implemented')]
+  return [0, $.newError('Sscanln not implemented')]
 }
 
-export function Fscan(_r: any, ..._a: any[]): [number, Error | null] {
+export function Fscan(_r: any, ..._a: any[]): [number, $.GoError | null] {
   // TODO: Implement scanning from Reader
-  return [0, new Error('Fscan not implemented')]
+  return [0, $.newError('Fscan not implemented')]
 }
 
 export function Fscanf(
   _r: any,
   _format: string,
   ..._a: any[]
-): [number, Error | null] {
+): [number, $.GoError | null] {
   // TODO: Implement formatted scanning from Reader
-  return [0, new Error('Fscanf not implemented')]
+  return [0, $.newError('Fscanf not implemented')]
 }
 
-export function Fscanln(_r: any, ..._a: any[]): [number, Error | null] {
+export function Fscanln(_r: any, ..._a: any[]): [number, $.GoError | null] {
   // TODO: Implement line scanning from Reader
-  return [0, new Error('Fscanln not implemented')]
+  return [0, $.newError('Fscanln not implemented')]
 }
 
 // Scanner and ScanState interfaces - stubbed
 export interface Scanner {
-  Scan(state: ScanState, verb: number): Error | null
+  Scan(state: ScanState, verb: number): $.GoError | null
 }
 
 export interface ScanState {
-  ReadRune(): [number, number, Error | null]
-  UnreadRune(): Error | null
+  ReadRune(): [number, number, $.GoError | null]
+  UnreadRune(): $.GoError | null
   SkipSpace(): void
   Token(
     skipSpace: boolean,
     f: (r: number) => boolean,
-  ): [Uint8Array, Error | null]
+  ): [Uint8Array, $.GoError | null]
   Width(): [number, boolean]
-  Read(buf: $.Bytes): [number, Error | null]
+  Read(buf: $.Bytes): [number, $.GoError | null]
 }
