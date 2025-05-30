@@ -380,12 +380,11 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 					c.tsw.WriteLiterally("return ")
 				}
 				
-				// Check if the embedded field is an interface type and add null assertion
+				assertionPrefix := "this.%s"
 				if _, isInterface := embeddedFieldType.Underlying().(*types.Interface); isInterface {
-					c.tsw.WriteLiterallyf("this.%s!.%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
-				} else {
-					c.tsw.WriteLiterallyf("this.%s.%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
+					assertionPrefix = "this.%s!"
 				}
+				c.tsw.WriteLiterallyf(assertionPrefix+".%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
 				
 				c.tsw.WriteLine("")
 				c.tsw.Indent(-1)
