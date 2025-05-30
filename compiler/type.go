@@ -567,7 +567,17 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 			c.tsw.WriteLiterally(method.Name())
 			c.tsw.WriteLiterally("(") // Start params
 			params := sig.Params()
-			for j := 0; j < params.Len(); j++ {
+
+			// Check if this is a variadic method
+			isVariadic := sig.Variadic()
+
+			// Handle regular parameters (all parameters if not variadic, or all but last if variadic)
+			paramCount := params.Len()
+			if isVariadic && paramCount > 0 {
+				paramCount-- // Don't process the last parameter in the regular loop for variadic functions
+			}
+
+			for j := 0; j < paramCount; j++ {
 				if j > 0 {
 					c.tsw.WriteLiterally(", ")
 				}
@@ -580,6 +590,35 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 				c.tsw.WriteLiterally(": ")
 				c.WriteGoType(paramVar.Type(), GoTypeContextGeneral) // Recursive call for param type
 			}
+
+			// Handle variadic parameter if present
+			if isVariadic && params.Len() > 0 {
+				if paramCount > 0 { // Add comma if there were regular parameters
+					c.tsw.WriteLiterally(", ")
+				}
+
+				// Get the last parameter (the variadic one)
+				paramVar := params.At(params.Len() - 1)
+				paramName := paramVar.Name()
+				if paramName == "" || paramName == "_" {
+					paramName = fmt.Sprintf("_p%d", params.Len()-1)
+				}
+
+				// Write variadic parameter with ... prefix
+				c.tsw.WriteLiterally("...")
+				c.tsw.WriteLiterally(c.sanitizeIdentifier(paramName))
+				c.tsw.WriteLiterally(": ")
+
+				// For variadic parameters, the type is a slice, so we need the element type + []
+				if sliceType, ok := paramVar.Type().(*types.Slice); ok {
+					c.WriteGoType(sliceType.Elem(), GoTypeContextVariadicParam) // Use variadic context to avoid null prefix
+					c.tsw.WriteLiterally("[]")
+				} else {
+					// Fallback if it's not a slice type (shouldn't happen for valid variadic parameters)
+					c.WriteGoType(paramVar.Type(), GoTypeContextGeneral)
+				}
+			}
+
 			c.tsw.WriteLiterally(")") // End params
 
 			// Return type
