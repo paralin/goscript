@@ -40,8 +40,8 @@ export class Pair<T extends any> {
 
 	constructor(init?: Partial<{First?: T, Second?: T}>) {
 		this._fields = {
-			First: $.varRef(init?.First ?? null as any),
-			Second: $.varRef(init?.Second ?? null as any)
+			First: $.varRef(init?.First ?? null),
+			Second: $.varRef(init?.Second ?? null)
 		}
 	}
 

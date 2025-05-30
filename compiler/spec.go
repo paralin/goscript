@@ -112,51 +112,58 @@ func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldTy
 			}
 		}
 	} else {
-		isStructValueType := false
-		var structTypeNameForClone string
-		if named, ok := fieldType.(*types.Named); ok {
-			if _, isStruct := named.Underlying().(*types.Struct); isStruct {
-				isStructValueType = true
-				structTypeNameForClone = c.getTypeString(fieldType)
-			}
-		}
-
-		if isStructValueType {
-			c.tsw.WriteLiterallyf("init?.%s?.clone() ?? new %s()", fieldName, structTypeNameForClone)
+		// Check if this is an interface field first (before checking for named types)
+		_, isInterface := fieldType.Underlying().(*types.Interface)
+		if isInterface {
+			// For interface fields, always use null as zero value
+			c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
 		} else {
-			c.tsw.WriteLiterallyf("init?.%s ?? ", fieldName)
-			// Check if this is a named type or type alias and use constructor instead of null
-			if named, isNamed := fieldType.(*types.Named); isNamed {
-				// This is a named type
-				// Check if underlying type is not a struct (structs are handled above)
-				if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
-					c.tsw.WriteLiterally("new ")
-					c.WriteNamedType(named)
-					c.tsw.WriteLiterally("(")
-					c.WriteZeroValueForType(named.Underlying())
-					c.tsw.WriteLiterally(")")
-				} else {
-					c.WriteZeroValueForType(fieldType)
+			isStructValueType := false
+			var structTypeNameForClone string
+			if named, ok := fieldType.(*types.Named); ok {
+				if _, isStruct := named.Underlying().(*types.Struct); isStruct {
+					isStructValueType = true
+					structTypeNameForClone = c.getTypeString(fieldType)
 				}
-			} else if alias, isAlias := fieldType.(*types.Alias); isAlias {
-				// This is a type alias (like os.FileMode)
-				// Check if underlying type is not a struct
-				if _, isStruct := alias.Underlying().(*types.Struct); !isStruct {
-					c.tsw.WriteLiterally("new ")
-					// Use AST type information if available to preserve qualified names
-					if astType != nil {
-						c.WriteTypeExpr(astType)
-					} else {
-						c.WriteGoType(fieldType, GoTypeContextGeneral)
-					}
-					c.tsw.WriteLiterally("(")
-					c.WriteZeroValueForType(alias.Underlying())
-					c.tsw.WriteLiterally(")")
-				} else {
-					c.WriteZeroValueForType(fieldType)
-				}
+			}
+
+			if isStructValueType {
+				c.tsw.WriteLiterallyf("init?.%s?.clone() ?? new %s()", fieldName, structTypeNameForClone)
 			} else {
-				c.WriteZeroValueForType(fieldType)
+				c.tsw.WriteLiterallyf("init?.%s ?? ", fieldName)
+				// Check if this is a named type or type alias and use constructor instead of null
+				if named, isNamed := fieldType.(*types.Named); isNamed {
+					// This is a named type
+					// Check if underlying type is not a struct (structs are handled above)
+					if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
+						c.tsw.WriteLiterally("new ")
+						c.WriteNamedType(named)
+						c.tsw.WriteLiterally("(")
+						c.WriteZeroValueForType(named.Underlying())
+						c.tsw.WriteLiterally(")")
+					} else {
+						c.WriteZeroValueForType(fieldType)
+					}
+				} else if alias, isAlias := fieldType.(*types.Alias); isAlias {
+					// This is a type alias (like os.FileMode)
+					// Check if underlying type is not a struct
+					if _, isStruct := alias.Underlying().(*types.Struct); !isStruct {
+						c.tsw.WriteLiterally("new ")
+						// Use AST type information if available to preserve qualified names
+						if astType != nil {
+							c.WriteTypeExpr(astType)
+						} else {
+							c.WriteGoType(fieldType, GoTypeContextGeneral)
+						}
+						c.tsw.WriteLiterally("(")
+						c.WriteZeroValueForType(alias.Underlying())
+						c.tsw.WriteLiterally(")")
+					} else {
+						c.WriteZeroValueForType(fieldType)
+					}
+				} else {
+					c.WriteZeroValueForType(fieldType)
+				}
 			}
 		}
 	}
