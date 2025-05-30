@@ -301,22 +301,6 @@ function areFuncSignaturesIdentical(
   )
 }
 
-function areMethodArgsArraysIdentical(
-  args1?: MethodArg[],
-  args2?: MethodArg[],
-): boolean {
-  if (args1 === undefined && args2 === undefined) return true
-  if (args1 === undefined || args2 === undefined) return false
-  if (args1.length !== args2.length) return false
-  for (let i = 0; i < args1.length; i++) {
-    // Compare based on type only, names of args/results don't affect signature identity here.
-    if (!areTypeInfosIdentical(args1[i].type, args2[i].type)) {
-      return false
-    }
-  }
-  return true
-}
-
 export function areTypeInfosIdentical(
   type1InfoOrName: string | TypeInfo,
   type2InfoOrName: string | TypeInfo,
