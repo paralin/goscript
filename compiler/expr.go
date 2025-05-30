@@ -54,8 +54,8 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 			c.WriteZeroValueForType(mapType.Elem())
 			c.tsw.WriteLiterally(")[0]")
 			
-			// This fixes TypeScript compilation errors when accessing properties on map values
 			c.tsw.WriteLiterally("!")
+			
 			
 			return nil
 		}

@@ -14,8 +14,6 @@ export interface FieldDescriptor<T> {
 export abstract class GoStruct<T extends Record<string, any>> {
   public _fields: { [K in keyof T]: VarRef<T[K]> }
   
-  [key: string]: T[keyof T] | ((...args: any[]) => any) | { [K in keyof T]: VarRef<T[K]> }
-  
   constructor(fields: { [K in keyof T]: FieldDescriptor<T[K]> }, init?: any) {
     this._fields = {} as any
     
@@ -80,10 +78,15 @@ export abstract class GoStruct<T extends Record<string, any>> {
       
       const descriptor = Object.getOwnPropertyDescriptor(proto, key)
       if (descriptor && typeof descriptor.value === 'function') {
-        this[key] = function(...args: any[]) {
-          const currentEmbeddedValue = this._fields[embeddedKey].value
-          return currentEmbeddedValue[key].apply(currentEmbeddedValue, args)
-        }
+        Object.defineProperty(this, key, {
+          value: function(...args: any[]) {
+            const currentEmbeddedValue = this._fields[embeddedKey].value
+            return currentEmbeddedValue[key].apply(currentEmbeddedValue, args)
+          },
+          enumerable: true,
+          configurable: true,
+          writable: true
+        })
       }
     }
   }
