@@ -63,7 +63,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			if fieldType == nil {
 				fieldType = types.Typ[types.Invalid]
 			}
-			c.writeGetterSetter(fieldName, fieldType, field.Doc, field.Comment)
+			c.writeGetterSetter(fieldName, fieldType, field.Doc, field.Comment, field.Type)
 		}
 	}
 
@@ -72,7 +72,17 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		field := underlyingStruct.Field(i)
 		if field.Anonymous() {
 			fieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
-			c.writeGetterSetter(fieldKeyName, field.Type(), nil, nil)
+			c.writeGetterSetter(fieldKeyName, field.Type(), nil, nil, nil)
+		}
+	}
+
+	// Create a mapping from field names to AST types for preserving qualified names
+	fieldASTTypes := make(map[string]ast.Expr)
+	for _, field := range t.Fields.List {
+		if len(field.Names) > 0 {
+			for _, name := range field.Names {
+				fieldASTTypes[name.Name] = field.Type
+			}
 		}
 	}
 
@@ -93,14 +103,17 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		if fieldKeyName == "_" {
 			continue
 		}
-		fieldTsType := c.getTypeString(field.Type())
+
+		// Use AST-based type string when available, fall back to types-based
+		astType := fieldASTTypes[fieldKeyName]
+		fieldTsType := c.getASTTypeString(astType, field.Type())
 		c.tsw.WriteLinef("%s: $.VarRef<%s>;", fieldKeyName, fieldTsType)
 	}
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
 
 	// Generate the flattened type string for the constructor init parameter
-	flattenedInitType := c.generateFlattenedInitTypeString(goStructType)
+	flattenedInitType := c.generateFlattenedInitTypeString(goStructType, fieldASTTypes)
 
 	c.tsw.WriteLine("")
 	c.tsw.WriteLinef("constructor(init?: Partial<%s>) {", flattenedInitType)
@@ -132,7 +145,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				c.tsw.WriteLine(",")
 			}
 
-			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous(), fieldASTTypes[fieldKeyName])
 			firstFieldWritten = true
 		}
 		if firstFieldWritten {
@@ -481,7 +494,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 //
 // The resulting string is sorted by field name for deterministic output and represents
 // the shape of the object expected by the struct's TypeScript constructor.
-func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named) string {
+func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named, fieldASTTypes map[string]ast.Expr) string {
 	if structType == nil {
 		return "{}"
 	}
@@ -528,7 +541,7 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 			}
 			continue
 		}
-		fieldMap[fieldName] = c.getTypeString(field.Type())
+		fieldMap[fieldName] = c.getASTTypeString(fieldASTTypes[fieldName], field.Type())
 	}
 
 	// Promoted fields (handled by Go's embedding, init should use direct/embedded names)

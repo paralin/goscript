@@ -9,13 +9,13 @@ import * as syscall from "@goscript/syscall/index.js"
 // Re-export essential types
 export type Time = time.Time;
 export type FileInfo = fs.FileInfo;
-export type FileMode = fs.FileMode;
+export { FileMode } from "@goscript/io/fs/index.js";
 export type DirEntry = fs.DirEntry;
 
 // Export runtime values for ES module compatibility  
 export const Time = null as any;
 export const FileInfo = null as any;
-export const FileMode = null as any;
+// FileMode is now a class, so we re-export it directly from fs
 export const DirEntry = null as any;
 
 // Getpagesize returns the underlying system's memory page size.

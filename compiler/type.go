@@ -72,6 +72,38 @@ func (c *GoToTSCompiler) WriteGoType(typ types.Type, context GoTypeContext) {
 	case *types.Struct:
 		c.WriteStructType(t)
 	case *types.Alias:
+		// Check if this type alias is from an imported package
+		aliasObj := t.Obj()
+		if aliasObj != nil && aliasObj.Pkg() != nil && aliasObj.Pkg() != c.pkg.Types {
+			// This type alias is from an imported package, find the import alias
+			aliasPkg := aliasObj.Pkg()
+			aliasPkgPath := aliasPkg.Path()
+			aliasPkgName := aliasPkg.Name() // Get the actual package name
+
+			// Try to find the import alias by matching the package name or path
+			for importAlias := range c.analysis.Imports {
+				// First, try to match by the actual package name
+				if importAlias == aliasPkgName {
+					// Write the qualified name: importAlias.TypeName
+					c.tsw.WriteLiterally(importAlias)
+					c.tsw.WriteLiterally(".")
+					c.tsw.WriteLiterally(aliasObj.Name())
+					return
+				}
+
+				// Fallback: try to match by path-based package name (for backwards compatibility)
+				pts := strings.Split(aliasPkgPath, "/")
+				defaultPkgName := pts[len(pts)-1]
+				if importAlias == defaultPkgName || importAlias == aliasPkgPath {
+					// Write the qualified name: importAlias.TypeName
+					c.tsw.WriteLiterally(importAlias)
+					c.tsw.WriteLiterally(".")
+					c.tsw.WriteLiterally(aliasObj.Name())
+					return
+				}
+			}
+		}
+		// For local type aliases or unmatched imports, expand to underlying type
 		c.WriteGoType(t.Underlying(), context)
 	case *types.TypeParam:
 		// For type parameters, write the type parameter name (e.g., "T", "K", etc.)
@@ -691,6 +723,25 @@ func (c *GoToTSCompiler) getTypeString(goType types.Type) string {
 	writer := NewTSCodeWriter(&typeStr)
 	tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
 	tempCompiler.WriteGoType(goType, GoTypeContextGeneral)
+	return typeStr.String()
+}
+
+// getASTTypeString is a utility function that converts a Go type to its TypeScript
+// type string representation, preferring AST-based type writing when available to
+// preserve qualified names like os.FileMode. Falls back to types.Type-based writing
+// when AST information is not available.
+func (c *GoToTSCompiler) getASTTypeString(astType ast.Expr, goType types.Type) string {
+	var typeStr strings.Builder
+	writer := NewTSCodeWriter(&typeStr)
+	tempCompiler := NewGoToTSCompiler(writer, c.pkg, c.analysis)
+
+	if astType != nil {
+		// Use AST-based type writing to preserve qualified names
+		tempCompiler.WriteTypeExpr(astType)
+	} else {
+		// Fall back to types.Type-based writing
+		tempCompiler.WriteGoType(goType, GoTypeContextGeneral)
+	}
 	return typeStr.String()
 }
 

@@ -369,72 +369,87 @@ $.registerInterfaceType(
   ],
 )
 
-export type FileMode = number
+export class FileMode {
+  constructor(private _value: number) {}
+
+  valueOf(): number {
+    return this._value
+  }
+
+  toString(): string {
+    return String(this._value)
+  }
+
+  static from(value: number): FileMode {
+    return new FileMode(value)
+  }
+}
 
 // The single letters are the abbreviations
 // used by the String method's formatting.
 // d: is a directory
-export let ModeDir: FileMode = 2147483648
+export let ModeDir: FileMode = new FileMode(2147483648)
 
 // a: append-only
-export let ModeAppend: FileMode = 0
+export let ModeAppend: FileMode = new FileMode(0)
 
 // l: exclusive use
-export let ModeExclusive: FileMode = 0
+export let ModeExclusive: FileMode = new FileMode(0)
 
 // T: temporary file; Plan 9 only
-export let ModeTemporary: FileMode = 0
+export let ModeTemporary: FileMode = new FileMode(0)
 
 // L: symbolic link
-export let ModeSymlink: FileMode = 0
+export let ModeSymlink: FileMode = new FileMode(0)
 
 // D: device file
-export let ModeDevice: FileMode = 0
+export let ModeDevice: FileMode = new FileMode(0)
 
 // p: named pipe (FIFO)
-export let ModeNamedPipe: FileMode = 0
+export let ModeNamedPipe: FileMode = new FileMode(0)
 
 // S: Unix domain socket
-export let ModeSocket: FileMode = 0
+export let ModeSocket: FileMode = new FileMode(0)
 
 // u: setuid
-export let ModeSetuid: FileMode = 0
+export let ModeSetuid: FileMode = new FileMode(0)
 
 // g: setgid
-export let ModeSetgid: FileMode = 0
+export let ModeSetgid: FileMode = new FileMode(0)
 
 // c: Unix character device, when ModeDevice is set
-export let ModeCharDevice: FileMode = 0
+export let ModeCharDevice: FileMode = new FileMode(0)
 
 // t: sticky
-export let ModeSticky: FileMode = 0
+export let ModeSticky: FileMode = new FileMode(0)
 
 // ?: non-regular file; nothing else is known about this file
-export let ModeIrregular: FileMode = 0
+export let ModeIrregular: FileMode = new FileMode(0)
 
 // Mask for the type bits. For regular files, none will be set.
-export let ModeType: FileMode =
-  2147483648 | 134217728 | 33554432 | 16777216 | 67108864 | 2097152 | 524288
+export let ModeType: FileMode = new FileMode(
+  2147483648 | 134217728 | 33554432 | 16777216 | 67108864 | 2097152 | 524288,
+)
 
 // Unix permission bits
-export let ModePerm: FileMode = 0o777
+export let ModePerm: FileMode = new FileMode(0o777)
 
 // FileMode methods
 export function fileModeString(mode: FileMode): string {
   const buf: string[] = []
 
   // File type
-  if (mode & ModeDir) buf.push('d')
-  else if (mode & ModeSymlink) buf.push('L')
-  else if (mode & ModeDevice) buf.push('D')
-  else if (mode & ModeNamedPipe) buf.push('p')
-  else if (mode & ModeSocket) buf.push('S')
-  else if (mode & ModeCharDevice) buf.push('c')
-  else if (mode & ModeIrregular) buf.push('?')
+  if (mode.valueOf() & ModeDir.valueOf()) buf.push('d')
+  else if (mode.valueOf() & ModeSymlink.valueOf()) buf.push('L')
+  else if (mode.valueOf() & ModeDevice.valueOf()) buf.push('D')
+  else if (mode.valueOf() & ModeNamedPipe.valueOf()) buf.push('p')
+  else if (mode.valueOf() & ModeSocket.valueOf()) buf.push('S')
+  else if (mode.valueOf() & ModeCharDevice.valueOf()) buf.push('c')
+  else if (mode.valueOf() & ModeIrregular.valueOf()) buf.push('?')
   else buf.push('-')
 
   // Permission bits
-  const perm = mode & ModePerm
+  const perm = mode.valueOf() & ModePerm.valueOf()
   buf.push(perm & 0o400 ? 'r' : '-')
   buf.push(perm & 0o200 ? 'w' : '-')
   buf.push(perm & 0o100 ? 'x' : '-')
@@ -449,7 +464,7 @@ export function fileModeString(mode: FileMode): string {
 }
 
 export function fileModeType(mode: FileMode): FileMode {
-  return mode & ModeType
+  return new FileMode(mode.valueOf() & ModeType.valueOf())
 }
 
 export class PathError {
