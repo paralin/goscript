@@ -203,8 +203,8 @@ describe('path/filepath - Path manipulation functions', () => {
 
   describe('Constants', () => {
     it('should have correct separator constants', () => {
-      expect(Separator).toBe('/')
-      expect(ListSeparator).toBe(':')
+      expect(Separator).toBe(47)
+      expect(ListSeparator).toBe(58)
     })
   })
 })
