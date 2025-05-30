@@ -72,7 +72,7 @@ export class Reader {
   }
 
   // Read implements the [io.Reader] interface.
-  public Read(b: Uint8Array): [number, $.GoError] {
+  public Read(b: $.Bytes): [number, $.GoError] {
     const r = this
     if (r!.i >= ($.len(r!.s) as number)) {
       return [0, io.EOF]
