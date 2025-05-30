@@ -294,123 +294,12 @@ func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
 
 // writeNamedTypeMethod writes a method for a named type, handling receiver binding properly
 func (c *GoToTSCompiler) writeNamedTypeMethod(decl *ast.FuncDecl) error {
-	if decl.Doc != nil {
-		c.WriteDoc(decl.Doc)
-	}
-
-	// Determine if method is async
-	var isAsync bool
-	if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
-		isAsync = c.analysis.IsAsyncFunc(obj)
-	}
-
-	// Methods are typically public in the TS output
-	c.tsw.WriteLiterally("public ")
-
-	// Add async modifier if needed
-	if isAsync {
-		c.tsw.WriteLiterally("async ")
-	}
-
-	// Keep original Go casing for method names
-	if err := c.WriteValueExpr(decl.Name); err != nil { // Method name is a value identifier
+	_, err := c.writeMethodSignature(decl)
+	if err != nil {
 		return err
 	}
 
-	// Write signature (parameters and return type)
-	funcType := decl.Type
-	c.tsw.WriteLiterally("(")
-	if funcType.Params != nil {
-		c.WriteFieldList(funcType.Params, true) // true = arguments
-	}
-	c.tsw.WriteLiterally(")")
-
-	// Handle return type
-	if funcType.Results != nil && len(funcType.Results.List) > 0 {
-		c.tsw.WriteLiterally(": ")
-		if isAsync {
-			c.tsw.WriteLiterally("Promise<")
-		}
-		if len(funcType.Results.List) == 1 {
-			// Single return value
-			resultType := funcType.Results.List[0].Type
-			c.WriteTypeExpr(resultType)
-		} else {
-			// Multiple return values -> tuple type
-			c.tsw.WriteLiterally("[")
-			for i, field := range funcType.Results.List {
-				if i > 0 {
-					c.tsw.WriteLiterally(", ")
-				}
-				c.WriteTypeExpr(field.Type)
-			}
-			c.tsw.WriteLiterally("]")
-		}
-		if isAsync {
-			c.tsw.WriteLiterally(">")
-		}
-	} else {
-		// No return value -> void
-		if isAsync {
-			c.tsw.WriteLiterally(": Promise<void>")
-		} else {
-			c.tsw.WriteLiterally(": void")
-		}
-	}
-
-	c.tsw.WriteLiterally(" ")
-
-	// For named types with methods, bind receiver name to this._value conditionally
-	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
-		recvName := recvField.Names[0].Name
-		if recvName != "_" {
-			// Check if receiver is actually used
-			var needsReceiverBinding bool
-			if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
-				needsReceiverBinding = c.analysis.IsReceiverUsed(obj)
-			}
-
-			c.tsw.WriteLine("{")
-			c.tsw.Indent(1)
-
-			if needsReceiverBinding {
-				// Bind the receiver name to this._value for value types
-				sanitizedRecvName := c.sanitizeIdentifier(recvName)
-				c.tsw.WriteLinef("const %s = this._value", sanitizedRecvName)
-			}
-
-			// Add using statement if needed
-			if c.analysis.NeedsDefer(decl.Body) {
-				if c.analysis.IsInAsyncFunction(decl) {
-					c.tsw.WriteLine("await using __defer = new $.AsyncDisposableStack();")
-				} else {
-					c.tsw.WriteLine("using cleanup = new $.DisposableStack();")
-				}
-			}
-
-			// Declare named return variables and initialize them to their zero values
-			if err := c.writeNamedReturnDeclarations(decl.Type.Results); err != nil {
-				return fmt.Errorf("failed to write named return declarations: %w", err)
-			}
-
-			// write method body without outer braces
-			for _, stmt := range decl.Body.List {
-				if err := c.WriteStmt(stmt); err != nil {
-					return fmt.Errorf("failed to write statement in function body: %w", err)
-				}
-			}
-			c.tsw.Indent(-1)
-			c.tsw.WriteLine("}")
-
-			return nil
-		}
-	}
-	// no named receiver, write whole body
-	if err := c.WriteStmt(decl.Body); err != nil {
-		return fmt.Errorf("failed to write function body: %w", err)
-	}
-
-	return nil
+	return c.writeMethodBodyWithReceiverBinding(decl, "this._value")
 }
 
 // WriteTypeSpec writes the type specification to the output.

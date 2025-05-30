@@ -142,6 +142,49 @@ func (c *GoToTSCompiler) WriteFuncDeclAsFunction(decl *ast.FuncDecl) error {
 //
 // This function assumes it is called only for `FuncDecl` nodes that are methods.
 func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
+	_, err := c.writeMethodSignature(decl)
+	if err != nil {
+		return err
+	}
+
+	return c.writeMethodBodyWithReceiverBinding(decl, "this")
+}
+
+// writeNamedReturnDeclarations generates TypeScript variable declarations for named return parameters.
+// It declares each named return variable with its appropriate type and zero value.
+func (c *GoToTSCompiler) writeNamedReturnDeclarations(results *ast.FieldList) error {
+	if results == nil {
+		return nil
+	}
+
+	for _, field := range results.List {
+		for _, name := range field.Names {
+			c.tsw.WriteLiterallyf("let %s: ", c.sanitizeIdentifier(name.Name))
+			c.WriteTypeExpr(field.Type)
+			c.tsw.WriteLiterally(" = ")
+			c.WriteZeroValueForType(c.pkg.TypesInfo.TypeOf(field.Type))
+			c.tsw.WriteLine("")
+		}
+	}
+	return nil
+}
+
+// hasNamedReturns checks if a function type has any named return parameters.
+func (c *GoToTSCompiler) hasNamedReturns(results *ast.FieldList) bool {
+	if results == nil {
+		return false
+	}
+
+	for _, field := range results.List {
+		if len(field.Names) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// writeMethodSignature writes the TypeScript method signature including async, public modifiers, name, parameters, and return type
+func (c *GoToTSCompiler) writeMethodSignature(decl *ast.FuncDecl) (bool, error) {
 	if decl.Doc != nil {
 		c.WriteDoc(decl.Doc)
 	}
@@ -162,11 +205,10 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 
 	// Keep original Go casing for method names
 	if err := c.WriteValueExpr(decl.Name); err != nil { // Method name is a value identifier
-		return err
+		return isAsync, err
 	}
 
 	// Write signature (parameters and return type)
-	// We adapt the logic from WriteFuncType here, but without the 'function' keyword
 	funcType := decl.Type
 	c.tsw.WriteLiterally("(")
 	if funcType.Params != nil {
@@ -208,8 +250,13 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	}
 
 	c.tsw.WriteLiterally(" ")
+	return isAsync, nil
+}
 
-	// Bind receiver name to this conditionally
+// writeMethodBodyWithReceiverBinding writes the method body with optional receiver binding
+// receiverTarget should be "this" for struct methods or "this._value" for named type methods
+func (c *GoToTSCompiler) writeMethodBodyWithReceiverBinding(decl *ast.FuncDecl, receiverTarget string) error {
+	// Bind receiver name conditionally
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
 		recvName := recvField.Names[0].Name
 		if recvName != "_" {
@@ -225,7 +272,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 			if needsReceiverBinding {
 				// Sanitize the receiver name to avoid conflicts with TypeScript reserved words
 				sanitizedRecvName := c.sanitizeIdentifier(recvName)
-				c.tsw.WriteLinef("const %s = this", sanitizedRecvName)
+				c.tsw.WriteLinef("const %s = %s", sanitizedRecvName, receiverTarget)
 			}
 
 			// Add using statement if needed
@@ -233,7 +280,7 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 				if c.analysis.IsInAsyncFunction(decl) {
 					c.tsw.WriteLine("await using __defer = new $.AsyncDisposableStack();")
 				} else {
-					c.tsw.WriteLine("using cleanup = new $.DisposableStack();")
+					c.tsw.WriteLine("using __defer = new $.DisposableStack();")
 				}
 			}
 
@@ -260,37 +307,4 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 	}
 
 	return nil
-}
-
-// writeNamedReturnDeclarations generates TypeScript variable declarations for named return parameters.
-// It declares each named return variable with its appropriate type and zero value.
-func (c *GoToTSCompiler) writeNamedReturnDeclarations(results *ast.FieldList) error {
-	if results == nil {
-		return nil
-	}
-
-	for _, field := range results.List {
-		for _, name := range field.Names {
-			c.tsw.WriteLiterallyf("let %s: ", c.sanitizeIdentifier(name.Name))
-			c.WriteTypeExpr(field.Type)
-			c.tsw.WriteLiterally(" = ")
-			c.WriteZeroValueForType(c.pkg.TypesInfo.TypeOf(field.Type))
-			c.tsw.WriteLine("")
-		}
-	}
-	return nil
-}
-
-// hasNamedReturns checks if a function type has any named return parameters.
-func (c *GoToTSCompiler) hasNamedReturns(results *ast.FieldList) bool {
-	if results == nil {
-		return false
-	}
-
-	for _, field := range results.List {
-		if len(field.Names) > 0 {
-			return true
-		}
-	}
-	return false
 }
