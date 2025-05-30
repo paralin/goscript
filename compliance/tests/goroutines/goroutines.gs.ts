@@ -69,7 +69,7 @@ export async function anotherWorker(name: string): Promise<void> {
 
 export async function main(): Promise<void> {
 	// Create a slice to collect all messages
-	let allMessages = $.makeSlice<Message>(0, totalMessages + 3) // +3 for main thread messages
+	let allMessages = $.makeSlice<Message>(0, 8 + 3) // +3 for main thread messages
 
 	// Add initial message
 	allMessages = $.append(allMessages, new Message({priority: 0, text: "Main: Starting workers"}))
@@ -98,7 +98,7 @@ queueMicrotask(async () => {
 allMessages = $.append(allMessages, new Message({priority: 1, text: "Main: Workers started"}))
 
 // Collect all messages from goroutines
-for (let i = 0; i < totalMessages; i++) {
+for (let i = 0; i < 8; i++) {
 	allMessages = $.append(allMessages, await $.chanRecv(messages))
 }
 
@@ -110,7 +110,7 @@ for (let i = 0; i < $.len(allMessages); i++) {
 	{
 		for (let j = i + 1; j < $.len(allMessages); j++) {
 			if (allMessages![i].priority > allMessages![j].priority) {
-				[allMessages![i], allMessages![j]] = [allMessages![j], allMessages![i]]
+				;[allMessages![i], allMessages![j]] = [allMessages![j], allMessages![i]]
 			}
 		}
 	}

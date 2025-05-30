@@ -63,7 +63,7 @@ export async function main(): Promise<void> {
 	for (let i = 0; i < n - 1; i++) {
 		for (let j = 0; j < n - i - 1; j++) {
 			if (scoreResults![j] > scoreResults![j + 1]) {
-				[scoreResults![j], scoreResults![j + 1]] = [scoreResults![j + 1], scoreResults![j]]
+				;[scoreResults![j], scoreResults![j + 1]] = [scoreResults![j + 1], scoreResults![j]]
 			}
 		}
 	}

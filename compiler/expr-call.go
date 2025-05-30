@@ -97,6 +97,37 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 				}
 			}
 		}
+
+		// Handle general slice type conversions like []T(namedType) where namedType has underlying type []T
+		if arrayType.Len == nil && len(exp.Args) == 1 {
+			arg := exp.Args[0]
+			if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
+				// Check if the argument is a named type with a slice underlying type
+				if namedArgType, isNamed := argType.(*types.Named); isNamed {
+					// Check if the named type has receiver methods (is a wrapper class)
+					typeName := namedArgType.Obj().Name()
+					if c.hasReceiverMethods(typeName) {
+						// Check if the underlying type matches the target slice type
+						if sliceUnderlying, isSlice := namedArgType.Underlying().(*types.Slice); isSlice {
+							// Get the target slice type
+							targetType := c.pkg.TypesInfo.TypeOf(arrayType)
+							if targetSliceType, isTargetSlice := targetType.Underlying().(*types.Slice); isTargetSlice {
+								// Check if element types are compatible
+								if types.Identical(sliceUnderlying.Elem(), targetSliceType.Elem()) {
+									// This is a conversion from NamedType to []T where NamedType has underlying []T
+									// Use valueOf() to get the underlying slice
+									if err := c.WriteValueExpr(arg); err != nil {
+										return fmt.Errorf("failed to write argument for slice type conversion: %w", err)
+									}
+									c.tsw.WriteLiterally(".valueOf()")
+									return nil // Handled named type to slice conversion
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	if funIdent, funIsIdent := expFun.(*ast.Ident); funIsIdent {
@@ -274,7 +305,12 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 					}
 
 					c.tsw.WriteLiterally("$.makeSlice<")
-					c.WriteGoType(goElemType, GoTypeContextGeneral) // Write the element type
+					// Use AST-based type writing to preserve qualified names
+					if arrType, ok := exp.Args[0].(*ast.ArrayType); ok {
+						c.WriteTypeExpr(arrType.Elt)
+					} else {
+						c.WriteGoType(goElemType, GoTypeContextGeneral)
+					}
 					c.tsw.WriteLiterally(">(")
 
 					hasCapacity := len(exp.Args) == 3

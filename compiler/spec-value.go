@@ -153,7 +153,14 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 					}
 				} else {
 					// Not a pointer type, write as is.
-					c.WriteGoType(goType, GoTypeContextGeneral)
+					// Use AST-based type writing if explicit type is provided, otherwise use WriteGoType
+					if a.Type != nil {
+						// Explicit type annotation in Go code - use AST to preserve qualified names
+						c.WriteTypeExpr(a.Type)
+					} else {
+						// No explicit type - use type inference from WriteGoType
+						c.WriteGoType(goType, GoTypeContextGeneral)
+					}
 				}
 			}
 		}
@@ -246,6 +253,16 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 											if types.Identical(objType, namedType.Underlying()) {
 												needsConstructor = true
 											}
+										}
+									}
+								}
+							case *ast.CallExpr:
+								// Check if this is a make() call that returns the underlying type
+								if funIdent, ok := expr.Fun.(*ast.Ident); ok && funIdent.Name == "make" {
+									// Check if the make call returns a type that matches the underlying type
+									if exprType := c.pkg.TypesInfo.TypeOf(expr); exprType != nil {
+										if types.Identical(exprType, namedType.Underlying()) {
+											needsConstructor = true
 										}
 									}
 								}

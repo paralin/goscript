@@ -14,7 +14,7 @@ export function walkFunction(path: string, info: os.FileInfo, walkFn: filepath.W
 	if (info != null) {
 		console.log("File:", info!.Name())
 	}
-	[, ] = [path, walkFn]
+	;[, ] = [path, walkFn]
 	return null
 }
 

@@ -188,7 +188,6 @@ func (c *GoToTSCompiler) hasReceiverMethods(typeName string) bool {
 // WriteNamedTypeWithMethods generates a TypeScript class for a Go named type that has receiver methods
 func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
 	className := a.Name.Name
-	underlyingType := c.pkg.TypesInfo.TypeOf(a.Type)
 
 	// Add export for Go-exported types (but not if inside a function)
 	isInsideFunction := false
@@ -206,13 +205,15 @@ func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
 
 	// Constructor that takes the underlying type value
 	c.tsw.WriteLiterally("constructor(private _value: ")
-	c.WriteGoType(underlyingType, GoTypeContextGeneral)
+	// Use AST-based type writing to preserve qualified names like os.FileInfo
+	c.WriteTypeExpr(a.Type)
 	c.tsw.WriteLine(") {}")
 	c.tsw.WriteLine("")
 
 	// valueOf method to get the underlying value (for type conversions and operations)
 	c.tsw.WriteLiterally("valueOf(): ")
-	c.WriteGoType(underlyingType, GoTypeContextGeneral)
+	// Use AST-based type writing to preserve qualified names like os.FileInfo
+	c.WriteTypeExpr(a.Type)
 	c.tsw.WriteLine(" {")
 	c.tsw.Indent(1)
 	c.tsw.WriteLine("return this._value")
@@ -230,7 +231,8 @@ func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
 
 	// Static from method for type conversion
 	c.tsw.WriteLiterallyf("static from(value: ")
-	c.WriteGoType(underlyingType, GoTypeContextGeneral)
+	// Use AST-based type writing to preserve qualified names like os.FileInfo
+	c.WriteTypeExpr(a.Type)
 	c.tsw.WriteLiterallyf("): %s {", className)
 	c.tsw.WriteLine("")
 	c.tsw.Indent(1)

@@ -124,6 +124,12 @@ func (c *GoToTSCompiler) writeAssignmentCore(lhs, rhs []ast.Expr, tok token.Toke
 			}
 		}
 
+		// Add semicolon before destructuring assignment to prevent TypeScript
+		// from interpreting it as array access on the previous line
+		if tok != token.DEFINE {
+			c.tsw.WriteLiterally(";")
+		}
+
 		// Use array destructuring for multi-variable assignments
 		c.tsw.WriteLiterally("[")
 		for i, l := range lhs {

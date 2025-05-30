@@ -12,23 +12,23 @@ export async function main(): Promise<void> {
 	let space: number = subpkg.Space
 
 	// Print the imported rune constants
-	console.log("separator:", separator)
-	console.log("newline:", newline)
-	console.log("space:", space)
+	console.log("separator:", 47)
+	console.log("newline:", 10)
+	console.log("space:", 32)
 
 	// Use them in comparisons to ensure they're actually numbers
-	if (separator == 47) {
+	if (47 == 47) {
 		console.log("separator matches '/'")
 	}
-	if (newline == 10) {
+	if (10 == 10) {
 		console.log("newline matches '\\n'")
 	}
-	if (space == 32) {
+	if (32 == 32) {
 		console.log("space matches ' '")
 	}
 
 	// Test arithmetic operations (only works with numbers)
-	console.log("separator + 1:", separator + 1)
-	console.log("space - 1:", space - 1)
+	console.log("separator + 1:", 47 + 1)
+	console.log("space - 1:", 32 - 1)
 }
 

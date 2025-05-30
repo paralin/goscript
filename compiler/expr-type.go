@@ -45,6 +45,26 @@ func (c *GoToTSCompiler) WriteTypeExpr(a ast.Expr) {
 		}
 	}
 
+	// Handle array/slice types to preserve qualified names in element types
+	if arrayType, ok := a.(*ast.ArrayType); ok {
+		if arrayType.Len == nil {
+			// Slice type: []T -> $.Slice<T>
+			// Check if it's a []byte slice first
+			if ident, ok := arrayType.Elt.(*ast.Ident); ok && ident.Name == "byte" {
+				c.tsw.WriteLiterally("$.Bytes")
+				return
+			}
+			c.tsw.WriteLiterally("$.Slice<")
+			c.WriteTypeExpr(arrayType.Elt) // Recursively handle element type preserving qualified names
+			c.tsw.WriteLiterally(">")
+		} else {
+			// Array type: [N]T -> T[]
+			c.WriteTypeExpr(arrayType.Elt) // Recursively handle element type preserving qualified names
+			c.tsw.WriteLiterally("[]")
+		}
+		return
+	}
+
 	// Get type information for the expression and use WriteGoType
 	typ := c.pkg.TypesInfo.TypeOf(a)
 	c.WriteGoType(typ, GoTypeContextGeneral)
