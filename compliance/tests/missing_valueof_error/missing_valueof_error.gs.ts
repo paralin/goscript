@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-class buffer {
+export class buffer {
 	public get data(): $.Bytes {
 		return this._fields.data.value
 	}
@@ -39,7 +39,7 @@ class buffer {
 	);
 }
 
-class printer {
+export class printer {
 	public get buf(): buffer | null {
 		return this._fields.buf.value
 	}

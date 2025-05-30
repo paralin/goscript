@@ -49,7 +49,7 @@ export async function main(): Promise<void> {
 	let scoreResults: $.Slice<string> = null
 
 	// Using string concatenation to build the output string
-	for (const [name, grade] of stringMap.entries()) {
+	for (const [name, grade] of stringMap?.entries() ?? []) {
 		{
 			// Using string concatenation to build the output string
 			let result = "  - Name: " + name + " Grade: " + grade

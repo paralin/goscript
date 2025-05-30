@@ -12,9 +12,9 @@ export function getValue(): [string, number] {
 }
 
 // Simple iterator function that mimics maps.All behavior
-export function simpleIterator(m: Map<string, number>): ((p0: ((p0: string, p1: number) => boolean) | null) => void) | null {
+export function simpleIterator(m: Map<string, number> | null): ((p0: ((p0: string, p1: number) => boolean) | null) => void) | null {
 	return (_yield: ((p0: string, p1: number) => boolean) | null): void => {
-		for (const [k, v] of m.entries()) {
+		for (const [k, v] of m?.entries() ?? []) {
 			{
 				if (!_yield!(k, v)) {
 					break

@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-class formatter {
+export class formatter {
 	public get wid(): number {
 		return this._fields.wid.value
 	}
@@ -139,7 +139,7 @@ class formatter {
 	);
 }
 
-class printer {
+export class printer {
 	public get buf(): $.Bytes {
 		return this._fields.buf.value
 	}

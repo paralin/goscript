@@ -490,13 +490,31 @@ func WriteTypeScriptRunner(t *testing.T, parentModulePath, testDir, tempDir stri
 		}
 	}
 
+	var mainFile string
 	if len(goFiles) > 1 {
-		t.Logf("warning: found multiple Go files in %s, using the first one for runner: %s", testDir, goFiles[0])
+		// Search for a file containing "func main("
+		for _, file := range goFiles {
+			content, err := os.ReadFile(file)
+			if err != nil {
+				t.Logf("warning: failed to read file %s: %v", file, err)
+				continue
+			}
+			if strings.Contains(string(content), "func main(") {
+				mainFile = file
+				break
+			}
+		}
+		if mainFile == "" {
+			t.Logf("warning: could not find any Go file containing 'func main(' in %s, using first file: %s", testDir, goFiles[0])
+			mainFile = goFiles[0]
+		}
+	} else {
+		mainFile = goFiles[0]
 	}
 
 	// Determine tsFileName relative to the test's package root
-	// e.g. if goFiles[0] is testDir/sub/main.go, relGoPath is sub/main.go
-	relGoPath, _ := filepath.Rel(testDir, goFiles[0])
+	// e.g. if mainFile is testDir/sub/main.go, relGoPath is sub/main.go
+	relGoPath, _ := filepath.Rel(testDir, mainFile)
 	tsFileRelPath := strings.TrimSuffix(relGoPath, ".go") + ".gs.ts"
 
 	testName := filepath.Base(testDir)

@@ -373,14 +373,15 @@ func (c *GoToTSCompiler) WriteArrayType(t *types.Array) {
 }
 
 // WriteMapType translates a Go map type (map[K]V) to its TypeScript equivalent.
-// It generates Map<K_ts, V_ts>, where K_ts and V_ts are the translated key
+// It generates Map<K_ts, V_ts> | null, where K_ts and V_ts are the translated key
 // and element types respectively.
+// Maps are nilable in Go, so they are represented as nullable types in TypeScript.
 func (c *GoToTSCompiler) WriteMapType(t *types.Map) {
 	c.tsw.WriteLiterally("Map<")
 	c.WriteGoType(t.Key(), GoTypeContextGeneral)
 	c.tsw.WriteLiterally(", ")
 	c.WriteGoType(t.Elem(), GoTypeContextGeneral)
-	c.tsw.WriteLiterally(">")
+	c.tsw.WriteLiterally("> | null")
 }
 
 // WriteChannelType translates a Go channel type (chan T) to its TypeScript equivalent.

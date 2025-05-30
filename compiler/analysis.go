@@ -125,6 +125,14 @@ type PackageAnalysis struct {
 	// FunctionCalls maps file names to the functions they call from other files
 	// Key: filename (without .go extension), Value: map[sourceFile][]functionNames
 	FunctionCalls map[string]map[string][]string
+
+	// TypeDefs maps file names to the types defined in that file
+	// Key: filename (without .go extension), Value: list of type names
+	TypeDefs map[string][]string
+
+	// TypeCalls maps file names to the types they reference from other files
+	// Key: filename (without .go extension), Value: map[sourceFile][]typeNames
+	TypeCalls map[string]map[string][]string
 }
 
 // NewAnalysis creates a new Analysis instance.
@@ -146,6 +154,8 @@ func NewPackageAnalysis() *PackageAnalysis {
 	return &PackageAnalysis{
 		FunctionDefs:  make(map[string][]string),
 		FunctionCalls: make(map[string]map[string][]string),
+		TypeDefs:      make(map[string][]string),
+		TypeCalls:     make(map[string]map[string][]string),
 	}
 }
 
@@ -1036,6 +1046,7 @@ func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
 		baseFileName := strings.TrimSuffix(filepath.Base(fileName), ".go")
 
 		var functions []string
+		var types []string
 		for _, decl := range syntax.Decls {
 			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
 				// Only collect top-level functions (not methods)
@@ -1043,10 +1054,21 @@ func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
 					functions = append(functions, funcDecl.Name.Name)
 				}
 			}
+			if genDecl, ok := decl.(*ast.GenDecl); ok {
+				// Collect type declarations
+				for _, spec := range genDecl.Specs {
+					if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+						types = append(types, typeSpec.Name.Name)
+					}
+				}
+			}
 		}
 
 		if len(functions) > 0 {
 			analysis.FunctionDefs[baseFileName] = functions
+		}
+		if len(types) > 0 {
+			analysis.TypeDefs[baseFileName] = types
 		}
 	}
 
@@ -1108,6 +1130,71 @@ func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
 
 		if len(callsFromOtherFiles) > 0 {
 			analysis.FunctionCalls[baseFileName] = callsFromOtherFiles
+		}
+	}
+
+	// Third pass: analyze type references and determine which need imports
+	for i, syntax := range pkg.Syntax {
+		fileName := pkg.CompiledGoFiles[i]
+		baseFileName := strings.TrimSuffix(filepath.Base(fileName), ".go")
+
+		// Find all type references in this file
+		typeRefsFromOtherFiles := make(map[string][]string)
+
+		ast.Inspect(syntax, func(n ast.Node) bool {
+			// Look for type references in struct fields, function parameters, etc.
+			if ident, ok := n.(*ast.Ident); ok {
+				// Check if this identifier refers to a type
+				if obj := pkg.TypesInfo.Uses[ident]; obj != nil {
+					if _, ok := obj.(*types.TypeName); ok {
+						typeName := ident.Name
+
+						// Check if this type is defined in the current file
+						currentFileTypes := analysis.TypeDefs[baseFileName]
+						isDefinedInCurrentFile := false
+						for _, t := range currentFileTypes {
+							if t == typeName {
+								isDefinedInCurrentFile = true
+								break
+							}
+						}
+
+						// If not defined in current file, find which file defines it
+						if !isDefinedInCurrentFile {
+							for sourceFile, types := range analysis.TypeDefs {
+								if sourceFile == baseFileName {
+									continue // Skip current file
+								}
+								for _, t := range types {
+									if t == typeName {
+										// Found the type in another file
+										if typeRefsFromOtherFiles[sourceFile] == nil {
+											typeRefsFromOtherFiles[sourceFile] = []string{}
+										}
+										// Check if already added to avoid duplicates
+										found := false
+										for _, existing := range typeRefsFromOtherFiles[sourceFile] {
+											if existing == typeName {
+												found = true
+												break
+											}
+										}
+										if !found {
+											typeRefsFromOtherFiles[sourceFile] = append(typeRefsFromOtherFiles[sourceFile], typeName)
+										}
+										break
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+			return true
+		})
+
+		if len(typeRefsFromOtherFiles) > 0 {
+			analysis.TypeCalls[baseFileName] = typeRefsFromOtherFiles
 		}
 	}
 

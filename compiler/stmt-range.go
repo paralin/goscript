@@ -157,7 +157,7 @@ func (c *GoToTSCompiler) writeMapRange(exp *ast.RangeStmt) error {
 	if err := c.WriteValueExpr(exp.X); err != nil {
 		return fmt.Errorf("failed to write range loop map expression: %w", err)
 	}
-	c.tsw.WriteLiterally(".entries()) {")
+	c.tsw.WriteLiterally("?.entries() ?? []) {")
 	c.tsw.Indent(1)
 	c.tsw.WriteLine("")
 

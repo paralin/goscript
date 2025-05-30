@@ -18,9 +18,9 @@ export async function main(): Promise<void> {
 	}
 
 	// Test type assertion assignment with map indexed LHS using regular assignment
-	let m: Map<string, null | any> = $.makeMap<string, null | any>()
+	let m: Map<string, null | any> | null = $.makeMap<string, null | any>()
 	$.mapSet(m, "key2", 123)
-	let mapResults: Map<string, null | any> = $.makeMap<string, null | any>()
+	let mapResults: Map<string, null | any> | null = $.makeMap<string, null | any>()
 	let ok2: boolean = false
 	let _gs_ta_val_545_: number
 	let _gs_ta_ok_545_: boolean

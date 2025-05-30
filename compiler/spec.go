@@ -196,7 +196,7 @@ func (c *GoToTSCompiler) WriteNamedTypeWithMethods(a *ast.TypeSpec) error {
 		isInsideFunction = nodeInfo.IsInsideFunction
 	}
 
-	if a.Name.IsExported() && !isInsideFunction {
+	if !isInsideFunction {
 		c.tsw.WriteLiterally("export ")
 	}
 
@@ -404,13 +404,13 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 			return c.WriteNamedTypeWithMethods(a)
 		}
 
-		// type alias - add export for Go-exported types (but not if inside a function)
+		// Always export types for cross-file imports within the same package (but not if inside a function)
 		isInsideFunction := false
 		if nodeInfo := c.analysis.NodeData[a]; nodeInfo != nil {
 			isInsideFunction = nodeInfo.IsInsideFunction
 		}
 
-		if a.Name.IsExported() && !isInsideFunction {
+		if !isInsideFunction {
 			c.tsw.WriteLiterally("export ")
 		}
 		c.tsw.WriteLiterally("type ")
@@ -438,7 +438,7 @@ func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.Interfac
 		isInsideFunction = nodeInfo.IsInsideFunction
 	}
 
-	if a.Name.IsExported() && !isInsideFunction {
+	if !isInsideFunction {
 		c.tsw.WriteLiterally("export ")
 	}
 	c.tsw.WriteLiterally("type ")

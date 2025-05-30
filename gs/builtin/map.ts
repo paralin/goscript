@@ -5,6 +5,7 @@
 export const makeMap = <K, V>(): Map<K, V> => {
   return new Map<K, V>()
 }
+
 /**
  * Gets a value from a map, returning a tuple [value, exists].
  * @param map The map to get from.
@@ -13,13 +14,13 @@ export const makeMap = <K, V>(): Map<K, V> => {
  * @returns A tuple [value, exists] where value is the map value or defaultValue, and exists is whether the key was found.
  */
 export function mapGet<K, V, D>(
-  map: Map<K, V>,
+  map: Map<K, V> | null,
   key: K,
   defaultValue: D,
 ): [V, true] | [D, false] {
-  const exists = map.has(key)
+  const exists = map?.has(key)
   if (exists) {
-    return [map.get(key)!, true]
+    return [map!.get(key)!, true]
   } else {
     return [defaultValue, false]
   }
@@ -31,7 +32,10 @@ export function mapGet<K, V, D>(
  * @param key The key to set.
  * @param value The value to set.
  */
-export const mapSet = <K, V>(map: Map<K, V>, key: K, value: V): void => {
+export const mapSet = <K, V>(map: Map<K, V> | null, key: K, value: V): void => {
+  if (!map) {
+    throw new Error('assign to nil map')
+  }
   map.set(key, value)
 }
 
@@ -40,8 +44,8 @@ export const mapSet = <K, V>(map: Map<K, V>, key: K, value: V): void => {
  * @param map The map to delete from.
  * @param key The key to delete.
  */
-export const deleteMapEntry = <K, V>(map: Map<K, V>, key: K): void => {
-  map.delete(key)
+export const deleteMapEntry = <K, V>(map: Map<K, V> | null, key: K): void => {
+  map?.delete(key)
 }
 
 /**
@@ -50,6 +54,6 @@ export const deleteMapEntry = <K, V>(map: Map<K, V>, key: K): void => {
  * @param key The key to check.
  * @returns True if the key exists, false otherwise.
  */
-export const mapHas = <K, V>(map: Map<K, V>, key: K): boolean => {
-  return map.has(key)
+export const mapHas = <K, V>(map: Map<K, V> | null, key: K): boolean => {
+  return map?.has(key) ?? false
 }

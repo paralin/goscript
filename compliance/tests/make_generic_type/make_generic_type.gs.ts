@@ -3,7 +3,7 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export type Ints<T extends $.Comparable> = Map<T, {  }>;
+export type Ints<T extends $.Comparable> = Map<T, {  }> | null;
 
 export async function main(): Promise<void> {
 	// This should trigger the unhandled make call error

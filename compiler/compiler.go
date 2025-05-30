@@ -621,6 +621,61 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 		}
 	}
 
+	// Generate auto-imports for types from other files in the same package
+	if typeImports := c.PackageAnalysis.TypeCalls[currentFileName]; typeImports != nil {
+		// Sort source files for consistent import order
+		var sourceFiles []string
+		for sourceFile := range typeImports {
+			sourceFiles = append(sourceFiles, sourceFile)
+		}
+		sort.Strings(sourceFiles)
+
+		for _, sourceFile := range sourceFiles {
+			typeImports := typeImports[sourceFile]
+			if len(typeImports) > 0 {
+				// Filter out protobuf types - they should be imported from .pb.js files, not .gs.js files
+				var nonProtobufTypes []string
+				for _, typeName := range typeImports {
+					// Check if this type is a protobuf type by looking for it in the package
+					isProtobuf := false
+					if typeObj := c.pkg.Types.Scope().Lookup(typeName); typeObj != nil {
+						objType := typeObj.Type()
+						if namedType, ok := objType.(*types.Named); ok {
+							obj := namedType.Obj()
+							if obj != nil && obj.Pkg() != nil {
+								// Check if the type is defined in the current package and has a corresponding .pb.go file
+								if obj.Pkg() == c.pkg.Types {
+									// Check if there's a .pb.go file in the package that exports this type
+									// For now, we'll use a simple heuristic: if the type name ends with "Msg"
+									// and there's a .pb.go file in the package, assume it's a protobuf type
+									if strings.HasSuffix(typeName, "Msg") {
+										// Check if there are any .pb.go files in this package
+										for _, fileName := range c.pkg.CompiledGoFiles {
+											if strings.HasSuffix(fileName, ".pb.go") {
+												isProtobuf = true
+												break
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+					if !isProtobuf {
+						nonProtobufTypes = append(nonProtobufTypes, typeName)
+					}
+				}
+
+				if len(nonProtobufTypes) > 0 {
+					// Sort types for consistent output
+					sort.Strings(nonProtobufTypes)
+					c.codeWriter.WriteLinef("import { %s } from \"./%s.gs.js\";",
+						strings.Join(nonProtobufTypes, ", "), sourceFile)
+				}
+			}
+		}
+	}
+
 	c.codeWriter.WriteLine("") // Add a newline after imports
 
 	if err := goWriter.WriteDecls(f.Decls); err != nil {
