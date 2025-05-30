@@ -980,6 +980,12 @@ func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) e
 				continue
 			}
 
+			// Skip .test.ts files
+			if strings.HasSuffix(fileName, ".test.ts") {
+				// c.le.Debugf("Skipping test file: %s", fileName)
+				continue
+			}
+
 			// Remove existing file if it exists (but preserve directories)
 			if stat, err := os.Stat(outputEntryPath); err == nil && !stat.IsDir() {
 				if err := os.Remove(outputEntryPath); err != nil {
