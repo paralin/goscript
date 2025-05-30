@@ -218,10 +218,10 @@ func (c *GoToTSCompiler) WriteFuncDeclAsMethod(decl *ast.FuncDecl) error {
 			if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
 				needsReceiverBinding = c.analysis.IsReceiverUsed(obj)
 			}
-			
+
 			c.tsw.WriteLine("{")
 			c.tsw.Indent(1)
-			
+
 			if needsReceiverBinding {
 				// Sanitize the receiver name to avoid conflicts with TypeScript reserved words
 				sanitizedRecvName := c.sanitizeIdentifier(recvName)

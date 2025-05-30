@@ -369,10 +369,10 @@ func (c *GoToTSCompiler) writeNamedTypeMethod(decl *ast.FuncDecl) error {
 			if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
 				needsReceiverBinding = c.analysis.IsReceiverUsed(obj)
 			}
-			
+
 			c.tsw.WriteLine("{")
 			c.tsw.Indent(1)
-			
+
 			if needsReceiverBinding {
 				// Bind the receiver name to this._value for value types
 				sanitizedRecvName := c.sanitizeIdentifier(recvName)

@@ -500,7 +500,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 							// Add the receiver variable to the VariableUsage map
 							// to ensure it is properly analyzed for varRefing
 							v.getOrCreateUsageInfo(v.currentReceiver)
-							
+
 							// Check if receiver is used in method body
 							receiverUsed := false
 							if n.Body != nil {
@@ -510,7 +510,7 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 									receiverUsed = v.containsReceiverUsage(n.Body, vr)
 								}
 							}
-							
+
 							// Update function data with receiver usage info
 							if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
 								if v.analysis.FunctionData[obj] == nil {
@@ -980,14 +980,14 @@ func (v *analysisVisitor) containsReceiverUsage(node ast.Node, receiver *types.V
 	if receiver == nil {
 		return false
 	}
-	
+
 	var hasReceiverUsage bool
-	
+
 	ast.Inspect(node, func(n ast.Node) bool {
 		if n == nil {
 			return true
 		}
-		
+
 		switch expr := n.(type) {
 		case *ast.Ident:
 			// Check if this identifier refers to the receiver variable
@@ -1004,10 +1004,10 @@ func (v *analysisVisitor) containsReceiverUsage(node ast.Node, receiver *types.V
 				}
 			}
 		}
-		
+
 		return true
 	})
-	
+
 	return hasReceiverUsage
 }
 
@@ -1015,10 +1015,10 @@ func (v *analysisVisitor) isInterfaceMethod(decl *ast.FuncDecl) bool {
 	if decl.Recv == nil {
 		return false
 	}
-	
+
 	// Get the method name
 	methodName := decl.Name.Name
-	
+
 	// Get the receiver variable
 	var receiver *types.Var
 	if len(decl.Recv.List) > 0 && len(decl.Recv.List[0].Names) > 0 {
@@ -1030,7 +1030,7 @@ func (v *analysisVisitor) isInterfaceMethod(decl *ast.FuncDecl) bool {
 			}
 		}
 	}
-	
+
 	return v.couldImplementInterfaceMethod(methodName, receiver)
 }
 
@@ -1039,7 +1039,7 @@ func (v *analysisVisitor) couldImplementInterfaceMethod(methodName string, recei
 	if !ast.IsExported(methodName) {
 		return false
 	}
-	
+
 	return false
 }
 
