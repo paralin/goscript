@@ -117,17 +117,14 @@ export class MockFile {
 	}
 
 	public Close(): $.GoError {
-		const m = this
 		return null
 	}
 
 	public Lock(): $.GoError {
-		const m = this
 		return null
 	}
 
 	public Unlock(): $.GoError {
-		const m = this
 		return null
 	}
 

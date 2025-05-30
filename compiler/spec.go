@@ -86,7 +86,9 @@ func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldTy
 	c.tsw.WriteLiterally(": $.varRef(")
 
 	if isEmbedded {
-		if _, isPtr := fieldType.(*types.Pointer); isPtr {
+		_, isPtr := fieldType.(*types.Pointer)
+		_, isInterface := fieldType.Underlying().(*types.Interface)
+		if isPtr || isInterface {
 			c.tsw.WriteLiterallyf("init?.%s ?? null", fieldName)
 		} else {
 			// Check if the embedded type is an interface
@@ -358,15 +360,24 @@ func (c *GoToTSCompiler) writeNamedTypeMethod(decl *ast.FuncDecl) error {
 
 	c.tsw.WriteLiterally(" ")
 
-	// For named types with methods, bind receiver name to this._value
+	// For named types with methods, bind receiver name to this._value conditionally
 	if recvField := decl.Recv.List[0]; len(recvField.Names) > 0 {
 		recvName := recvField.Names[0].Name
 		if recvName != "_" {
+			// Check if receiver is actually used
+			var needsReceiverBinding bool
+			if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
+				needsReceiverBinding = c.analysis.IsReceiverUsed(obj)
+			}
+			
 			c.tsw.WriteLine("{")
 			c.tsw.Indent(1)
-			// Bind the receiver name to this._value for value types
-			sanitizedRecvName := c.sanitizeIdentifier(recvName)
-			c.tsw.WriteLinef("const %s = this._value", sanitizedRecvName)
+			
+			if needsReceiverBinding {
+				// Bind the receiver name to this._value for value types
+				sanitizedRecvName := c.sanitizeIdentifier(recvName)
+				c.tsw.WriteLinef("const %s = this._value", sanitizedRecvName)
+			}
 
 			// Add using statement if needed
 			if c.analysis.NeedsDefer(decl.Body) {

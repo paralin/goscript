@@ -395,19 +395,13 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				if results.Len() > 0 {
 					c.tsw.WriteLiterally("return ")
 				}
-				// Check if the embedded type is an interface and add null assertion
-				embeddedFieldTypeUnderlying := embeddedFieldType
-				if ptr, isPtr := embeddedFieldTypeUnderlying.(*types.Pointer); isPtr {
-					embeddedFieldTypeUnderlying = ptr.Elem()
+
+				assertionPrefix := "this.%s"
+				if _, isInterface := embeddedFieldType.Underlying().(*types.Interface); isInterface {
+					assertionPrefix = "this.%s!"
 				}
-				if named, isNamed := embeddedFieldTypeUnderlying.(*types.Named); isNamed {
-					embeddedFieldTypeUnderlying = named.Underlying()
-				}
-				if _, isInterface := embeddedFieldTypeUnderlying.(*types.Interface); isInterface {
-					c.tsw.WriteLiterallyf("this.%s!.%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
-				} else {
-					c.tsw.WriteLiterallyf("this.%s.%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
-				}
+				c.tsw.WriteLiterallyf(assertionPrefix+".%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
+
 				c.tsw.WriteLine("")
 				c.tsw.Indent(-1)
 				c.tsw.WriteLine("}")
@@ -517,27 +511,19 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 
 		if field.Anonymous() {
 			fieldType := field.Type()
-			isPtr := false
 			if ptr, ok := fieldType.(*types.Pointer); ok {
 				fieldType = ptr.Elem()
-				isPtr = true
 			}
 
 			if named, ok := fieldType.(*types.Named); ok {
 				embeddedName := named.Obj().Name()
 				// Check if the embedded type is an interface
-				embeddedTypeUnderlying := named.Underlying()
-				if _, isInterface := embeddedTypeUnderlying.(*types.Interface); isInterface {
+				if _, isInterface := fieldType.Underlying().(*types.Interface); isInterface {
 					// For embedded interfaces, use the interface type directly
-					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type())
+					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = embeddedName
 				} else {
-					// For embedded structs, handle as before
-					if isPtr {
-						embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type()) // MyEmbeddedType | null
-					} else {
-						// For value-type embedded structs, allow initializing with its fields.
-						embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
-					}
+					// For embedded structs, use ConstructorParameters for field-based initialization
+					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
 				}
 			}
 			continue
