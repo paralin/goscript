@@ -1,0 +1,8 @@
+separator: 47
+newline: 10
+space: 32
+separator matches '/'
+newline matches '\n'
+space matches ' '
+separator + 1: 48
+space - 1: 31

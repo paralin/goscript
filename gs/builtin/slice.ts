@@ -1024,6 +1024,19 @@ export const stringToRunes = (str: string): number[] => {
 }
 
 /**
+ * Converts a single-character string to its Unicode code point (rune).
+ * Used for readable rune constants like $.stringToRune('/') instead of 47.
+ * @param str A single-character string.
+ * @returns The Unicode code point as a number.
+ */
+export const stringToRune = (str: string): number => {
+  if (str.length === 0) {
+    return 0
+  }
+  return str.codePointAt(0) || 0
+}
+
+/**
  * Converts an array of Unicode code points (runes) to a string.
  * @param runes The input array of numbers representing Unicode code points.
  * @returns The resulting string.

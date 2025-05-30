@@ -3,8 +3,8 @@
 import * as $ from "@goscript/builtin/index.js"
 
 // Path separator constants
-export const Separator = '/'
-export const ListSeparator = ':'
+export const Separator = $.stringToRune('/')
+export const ListSeparator = $.stringToRune(':')
 
 // Error constants
 export const SkipDir = $.newError('skip this directory')
@@ -234,7 +234,7 @@ export function SplitList(path: string): string[] {
   if (path === '') {
     return []
   }
-  return path.split(ListSeparator)
+  return path.split(String.fromCharCode(ListSeparator))
 }
 
 // HasPrefix tests whether the path p begins with prefix.
