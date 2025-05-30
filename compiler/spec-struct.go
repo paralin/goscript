@@ -63,7 +63,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			if fieldType == nil {
 				fieldType = types.Typ[types.Invalid]
 			}
-			c.writeGetterSetter(fieldName, fieldType, field.Doc, field.Comment)
+			c.writeGetterSetter(fieldName, fieldType, field.Doc, field.Comment, field.Type)
 		}
 	}
 
@@ -72,7 +72,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		field := underlyingStruct.Field(i)
 		if field.Anonymous() {
 			fieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
-			c.writeGetterSetter(fieldKeyName, field.Type(), nil, nil)
+			c.writeGetterSetter(fieldKeyName, field.Type(), nil, nil, nil)
 		}
 	}
 
@@ -145,7 +145,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				c.tsw.WriteLine(",")
 			}
 
-			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous(), fieldASTTypes[fieldKeyName])
 			firstFieldWritten = true
 		}
 		if firstFieldWritten {

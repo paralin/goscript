@@ -56,8 +56,14 @@ func (c *GoToTSCompiler) getEmbeddedFieldKeyName(fieldType types.Type) string {
 	}
 }
 
-func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Type, doc, comment *ast.CommentGroup) {
-	fieldTypeStr := c.getTypeString(fieldType)
+func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Type, doc, comment *ast.CommentGroup, astType ast.Expr) {
+	// Use AST type information if available to preserve qualified names
+	var fieldTypeStr string
+	if astType != nil {
+		fieldTypeStr = c.getASTTypeString(astType, fieldType)
+	} else {
+		fieldTypeStr = c.getTypeString(fieldType)
+	}
 
 	// Generate getter
 	if doc != nil {
@@ -81,7 +87,7 @@ func (c *GoToTSCompiler) writeGetterSetter(fieldName string, fieldType types.Typ
 	c.tsw.WriteLine("")
 }
 
-func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
+func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool, astType ast.Expr) {
 	c.tsw.WriteLiterally(fieldName)
 	c.tsw.WriteLiterally(": $.varRef(")
 
@@ -119,18 +125,32 @@ func (c *GoToTSCompiler) writeVarRefedFieldInitializer(fieldName string, fieldTy
 			c.tsw.WriteLiterallyf("init?.%s?.clone() ?? new %s()", fieldName, structTypeNameForClone)
 		} else {
 			c.tsw.WriteLiterallyf("init?.%s ?? ", fieldName)
-			// Special case for os.FileMode and similar types that need constructor
-			typeStr := c.getTypeString(fieldType)
-			// Check if this looks like it should be os.FileMode (resolves to number but should use constructor)
-			if (typeStr == "number" || typeStr == "os.FileMode") && fieldName == "mode" {
-				c.tsw.WriteLiterally("0 as os.FileMode")
-			} else if named, isNamed := fieldType.(*types.Named); isNamed {
+			// Check if this is a named type or type alias and use constructor instead of null
+			if named, isNamed := fieldType.(*types.Named); isNamed {
+				// This is a named type
 				// Check if underlying type is not a struct (structs are handled above)
 				if _, isStruct := named.Underlying().(*types.Struct); !isStruct {
 					c.tsw.WriteLiterally("new ")
 					c.WriteNamedType(named)
 					c.tsw.WriteLiterally("(")
 					c.WriteZeroValueForType(named.Underlying())
+					c.tsw.WriteLiterally(")")
+				} else {
+					c.WriteZeroValueForType(fieldType)
+				}
+			} else if alias, isAlias := fieldType.(*types.Alias); isAlias {
+				// This is a type alias (like os.FileMode)
+				// Check if underlying type is not a struct
+				if _, isStruct := alias.Underlying().(*types.Struct); !isStruct {
+					c.tsw.WriteLiterally("new ")
+					// Use AST type information if available to preserve qualified names
+					if astType != nil {
+						c.WriteTypeExpr(astType)
+					} else {
+						c.WriteGoType(fieldType, GoTypeContextGeneral)
+					}
+					c.tsw.WriteLiterally("(")
+					c.WriteZeroValueForType(alias.Underlying())
 					c.tsw.WriteLiterally(")")
 				} else {
 					c.WriteZeroValueForType(fieldType)

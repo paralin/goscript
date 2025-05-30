@@ -6,10 +6,10 @@ import * as $ from "@goscript/builtin/index.js";
 import * as os from "@goscript/os/index.js"
 
 export class file {
-	public get mode(): number {
+	public get mode(): os.FileMode {
 		return this._fields.mode.value
 	}
-	public set mode(value: number) {
+	public set mode(value: os.FileMode) {
 		this._fields.mode.value = value
 	}
 
@@ -27,7 +27,7 @@ export class file {
 
 	constructor(init?: Partial<{mode?: os.FileMode, name?: string}>) {
 		this._fields = {
-			mode: $.varRef(init?.mode ?? 0 as os.FileMode),
+			mode: $.varRef(init?.mode ?? new os.FileMode(0)),
 			name: $.varRef(init?.name ?? "")
 		}
 	}
@@ -52,13 +52,13 @@ export class file {
 }
 
 export async function main(): Promise<void> {
-	let f = new file({mode: 0o644, name: "test.txt"})
+	let f = new file({mode: os.FileMode(0o644), name: "test.txt"})
 
 	console.log("File mode:", $.int(f.mode))
 	console.log("File name:", f.name)
 
 	// Test type assertion
-	let mode: os.FileMode = 0o755
+	let mode: os.FileMode = os.FileMode(0o755)
 	console.log("Mode type:", $.int(mode))
 }
 

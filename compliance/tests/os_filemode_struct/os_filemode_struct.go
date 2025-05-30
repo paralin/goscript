@@ -9,7 +9,7 @@ type file struct {
 
 func main() {
 	f := file{
-		mode: 0644,
+		mode: os.FileMode(0644),
 		name: "test.txt",
 	}
 
@@ -17,6 +17,6 @@ func main() {
 	println("File name:", f.name)
 
 	// Test type assertion
-	var mode os.FileMode = 0755
+	var mode os.FileMode = os.FileMode(0755)
 	println("Mode type:", int(mode))
 }
