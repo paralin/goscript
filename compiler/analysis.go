@@ -61,6 +61,7 @@ type FunctionTypeInfo struct {
 // FunctionInfo consolidates function-related tracking data.
 type FunctionInfo struct {
 	IsAsync      bool
+	ReceiverUsed bool
 	NamedReturns []string
 }
 
@@ -193,6 +194,17 @@ func (a *Analysis) IsAsyncFunc(obj types.Object) bool {
 		return false
 	}
 	return funcInfo.IsAsync
+}
+
+func (a *Analysis) IsReceiverUsed(obj types.Object) bool {
+	if obj == nil {
+		return false
+	}
+	funcInfo := a.FunctionData[obj]
+	if funcInfo == nil {
+		return false
+	}
+	return funcInfo.ReceiverUsed
 }
 
 // IsFuncLitAsync checks if a function literal is async based on our analysis.
@@ -488,6 +500,24 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 							// Add the receiver variable to the VariableUsage map
 							// to ensure it is properly analyzed for varRefing
 							v.getOrCreateUsageInfo(v.currentReceiver)
+							
+							// Check if receiver is used in method body
+							receiverUsed := false
+							if n.Body != nil {
+								if v.isInterfaceMethod(n) {
+									receiverUsed = true
+								} else {
+									receiverUsed = v.containsReceiverUsage(n.Body, vr)
+								}
+							}
+							
+							// Update function data with receiver usage info
+							if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
+								if v.analysis.FunctionData[obj] == nil {
+									v.analysis.FunctionData[obj] = &FunctionInfo{}
+								}
+								v.analysis.FunctionData[obj].ReceiverUsed = receiverUsed
+							}
 						}
 					}
 				}
@@ -943,6 +973,74 @@ func (v *analysisVisitor) containsDefer(block *ast.BlockStmt) bool {
 	})
 
 	return hasDefer
+}
+
+// containsReceiverUsage checks if a method body contains any references to the receiver variable.
+func (v *analysisVisitor) containsReceiverUsage(node ast.Node, receiver *types.Var) bool {
+	if receiver == nil {
+		return false
+	}
+	
+	var hasReceiverUsage bool
+	
+	ast.Inspect(node, func(n ast.Node) bool {
+		if n == nil {
+			return true
+		}
+		
+		switch expr := n.(type) {
+		case *ast.Ident:
+			// Check if this identifier refers to the receiver variable
+			if obj := v.pkg.TypesInfo.Uses[expr]; obj != nil && obj == receiver {
+				hasReceiverUsage = true
+				return false
+			}
+		case *ast.SelectorExpr:
+			// Check if selector expression uses the receiver (e.g., m.Field, m.Method())
+			if ident, ok := expr.X.(*ast.Ident); ok {
+				if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil && obj == receiver {
+					hasReceiverUsage = true
+					return false
+				}
+			}
+		}
+		
+		return true
+	})
+	
+	return hasReceiverUsage
+}
+
+func (v *analysisVisitor) isInterfaceMethod(decl *ast.FuncDecl) bool {
+	if decl.Recv == nil {
+		return false
+	}
+	
+	// Get the method name
+	methodName := decl.Name.Name
+	
+	// Get the receiver variable
+	var receiver *types.Var
+	if len(decl.Recv.List) > 0 && len(decl.Recv.List[0].Names) > 0 {
+		if ident := decl.Recv.List[0].Names[0]; ident != nil && ident.Name != "_" {
+			if def := v.pkg.TypesInfo.Defs[ident]; def != nil {
+				if vr, ok := def.(*types.Var); ok {
+					receiver = vr
+				}
+			}
+		}
+	}
+	
+	return v.couldImplementInterfaceMethod(methodName, receiver)
+}
+
+func (v *analysisVisitor) couldImplementInterfaceMethod(methodName string, receiver *types.Var) bool {
+	// Check if method is exported (interface methods must be exported)
+	if !ast.IsExported(methodName) {
+		return false
+	}
+	
+	return false
 }
 
 // AnalyzeFile analyzes a Go source file AST and populates the Analysis struct with information

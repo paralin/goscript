@@ -47,7 +47,6 @@ export class content {
 	}
 
 	public ProcessData(input: number): [number, string, boolean] {
-		const c = this
 		let result: number = 0
 		let status: string = ""
 		let valid: boolean = false

@@ -29,7 +29,6 @@ export class MyProcessor {
 	}
 
 	public Process(data: $.Bytes, count: number, _: string): [boolean, $.GoError] {
-		const p = this
 		if (count > 0 && $.len(data) > 0) {
 			console.log("Processing successful")
 			return [true, null]

@@ -29,7 +29,6 @@ export class B {
 	}
 
 	public MethodB(valB: B | null): void {
-		const b = this
 	}
 
 	// Register this type with the runtime type system

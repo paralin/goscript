@@ -29,7 +29,6 @@ export class PathJoiner {
 	}
 
 	public Join(...elem: string[]): string {
-		const p = this
 		let result = ""
 		for (let i = 0; i < $.len(elem); i++) {
 			const e = elem![i]
