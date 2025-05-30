@@ -52,7 +52,9 @@ func (c *GoToTSCompiler) WriteIndexExpr(exp *ast.IndexExpr) error {
 
 			// Generate the zero value as the default value for mapGet
 			c.WriteZeroValueForType(mapType.Elem())
-			c.tsw.WriteLiterally(")[0]") // Extract the value from the tuple
+			c.tsw.WriteLiterally(")[0]")
+			
+			
 			return nil
 		}
 

@@ -20,7 +20,8 @@ export function mapGet<K, V, D>(
 ): [V, true] | [D, false] {
   const exists = map?.has(key)
   if (exists) {
-    return [map!.get(key)!, true]
+    const value = map!.get(key)!
+    return [value, true]
   } else {
     return [defaultValue, false]
   }

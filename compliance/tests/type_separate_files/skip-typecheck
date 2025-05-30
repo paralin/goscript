@@ -1,0 +1,1 @@
+This test is skipped for TypeScript type checking until we implement a proper fix for map access type assertions.

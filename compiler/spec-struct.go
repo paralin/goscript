@@ -33,12 +33,10 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		c.WriteTypeParameters(a.TypeParams)
 	}
 
-	c.tsw.WriteLiterally(" ")
-	c.tsw.WriteLine("{")
-	c.tsw.Indent(1)
-
-	className := a.Name.Name
-
+	// Generate the field type interface for GoStruct
+	c.tsw.WriteLiterally(" extends $.GoStruct<{")
+	
+	// Collect field types for the generic interface
 	goStructType, ok := c.pkg.TypesInfo.Defs[a.Name].Type().(*types.Named)
 	if !ok {
 		return fmt.Errorf("could not get named type for %s", a.Name.Name)
@@ -48,39 +46,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		return fmt.Errorf("underlying type of %s is not a struct", a.Name.Name)
 	}
 
-	// Generate getters and setters for each non-embedded field first
-	for _, field := range t.Fields.List {
-		if len(field.Names) == 0 { // Skip anonymous/embedded fields here; they are handled below or via promotion
-			continue
-		}
-		for _, name := range field.Names {
-			fieldName := name.Name
-			// Skip underscore fields
-			if fieldName == "_" {
-				continue
-			}
-			fieldType := c.pkg.TypesInfo.TypeOf(field.Type)
-			if fieldType == nil {
-				fieldType = types.Typ[types.Invalid]
-			}
-			c.writeGetterSetter(fieldName, fieldType, field.Doc, field.Comment)
-		}
-	}
-
-	// Generate getters and setters for EMBEDDED struct fields themselves
-	for i := range underlyingStruct.NumFields() {
-		field := underlyingStruct.Field(i)
-		if field.Anonymous() {
-			fieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
-			c.writeGetterSetter(fieldKeyName, field.Type(), nil, nil)
-		}
-	}
-
-	// Define the _fields property type
-	c.tsw.WriteLiterally("public _fields: {")
-	c.tsw.Indent(1)
-	c.tsw.WriteLine("")
-
+	first := true
 	for i := 0; i < underlyingStruct.NumFields(); i++ {
 		field := underlyingStruct.Field(i)
 		var fieldKeyName string
@@ -89,15 +55,22 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		} else {
 			fieldKeyName = field.Name()
 		}
-		// Skip underscore fields
 		if fieldKeyName == "_" {
 			continue
 		}
+		if !first {
+			c.tsw.WriteLiterally("; ")
+		}
+		first = false
 		fieldTsType := c.getTypeString(field.Type())
-		c.tsw.WriteLinef("%s: $.VarRef<%s>;", fieldKeyName, fieldTsType)
+		c.tsw.WriteLiterallyf("%s: %s", fieldKeyName, fieldTsType)
 	}
-	c.tsw.Indent(-1)
-	c.tsw.WriteLine("}")
+	
+	c.tsw.WriteLiterally("}> {")
+	c.tsw.WriteLine("")
+	c.tsw.Indent(1)
+
+	className := a.Name.Name
 
 	// Generate the flattened type string for the constructor init parameter
 	flattenedInitType := c.generateFlattenedInitTypeString(goStructType)
@@ -105,13 +78,11 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLine("")
 	c.tsw.WriteLinef("constructor(init?: Partial<%s>) {", flattenedInitType)
 	c.tsw.Indent(1)
-	c.tsw.WriteLiterally("this._fields = {")
+	c.tsw.WriteLine("super({")
+	c.tsw.Indent(1)
 
 	numFields := underlyingStruct.NumFields()
 	if numFields != 0 {
-		c.tsw.WriteLine("")
-		c.tsw.Indent(1)
-
 		firstFieldWritten := false
 		for i := range numFields {
 			field := underlyingStruct.Field(i)
@@ -132,16 +103,15 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				c.tsw.WriteLine(",")
 			}
 
-			c.writeVarRefedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
+			c.writeFieldDescriptor(fieldKeyName, fieldType, field.Anonymous())
 			firstFieldWritten = true
 		}
 		if firstFieldWritten {
 			c.tsw.WriteLine("")
 		}
-		c.tsw.Indent(-1)
 	}
-	c.tsw.WriteLine("}")
-
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}, init)")
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
 	c.tsw.WriteLine("")
@@ -163,42 +133,9 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		cloneReturnType += ">"
 	}
 
-	c.tsw.WriteLinef("public clone(): %s {", cloneReturnType)
+	c.tsw.WriteLine("public clone(): this {")
 	c.tsw.Indent(1)
-	c.tsw.WriteLinef("const cloned = new %s()", cloneReturnType)
-	c.tsw.WriteLine("cloned._fields = {")
-	c.tsw.Indent(1)
-
-	firstFieldWritten := false
-	for i := range numFields {
-		field := underlyingStruct.Field(i)
-		fieldType := field.Type()
-		var fieldKeyName string
-		if field.Anonymous() {
-			fieldKeyName = c.getEmbeddedFieldKeyName(field.Type())
-		} else {
-			fieldKeyName = field.Name()
-		}
-
-		// Skip underscore fields
-		if fieldKeyName == "_" {
-			continue
-		}
-
-		if firstFieldWritten {
-			c.tsw.WriteLine(",")
-		}
-
-		c.writeClonedFieldInitializer(fieldKeyName, fieldType, field.Anonymous())
-		firstFieldWritten = true
-	}
-	if firstFieldWritten {
-		c.tsw.WriteLine("")
-	}
-
-	c.tsw.Indent(-1)
-	c.tsw.WriteLine("}")
-	c.tsw.WriteLine("return cloned")
+	c.tsw.WriteLine("return super.clone()")
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
 
@@ -234,8 +171,6 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 		}
 	}
 
-	// Generate getters/setters and wrapper methods for PROMOTED fields/methods from embedded structs
-	seenPromotedFields := make(map[string]bool)
 	directMethods := make(map[string]bool)
 	// Populate directMethods (methods defined directly on this struct type)
 	for i := range goStructType.NumMethods() {
@@ -249,162 +184,6 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 				if namedElem, ok := ptrRecv.Elem().(*types.Named); ok && namedElem.Obj() == goStructType.Obj() {
 					directMethods[method.Name()] = true
 				}
-			}
-		}
-	}
-
-	for i := range underlyingStruct.NumFields() {
-		field := underlyingStruct.Field(i)
-		if !field.Anonymous() {
-			continue
-		}
-
-		embeddedFieldType := field.Type()
-		embeddedFieldKeyName := c.getEmbeddedFieldKeyName(field.Type())
-
-		// Skip if not a named type (required for proper embedding promotion)
-		trueEmbeddedType := embeddedFieldType
-		if ptr, isPtr := trueEmbeddedType.(*types.Pointer); isPtr {
-			trueEmbeddedType = ptr.Elem()
-		}
-		if _, isNamed := trueEmbeddedType.(*types.Named); !isNamed {
-			continue
-		}
-
-		// Promoted fields
-		if namedEmbedded, ok := trueEmbeddedType.(*types.Named); ok {
-			if underlyingEmbeddedStruct, ok := namedEmbedded.Underlying().(*types.Struct); ok {
-				for j := 0; j < underlyingEmbeddedStruct.NumFields(); j++ {
-					promotedField := underlyingEmbeddedStruct.Field(j)
-					if !promotedField.Exported() && promotedField.Pkg() != c.pkg.Types {
-						continue
-					}
-					promotedFieldName := promotedField.Name()
-					if seenPromotedFields[promotedFieldName] {
-						continue
-					}
-					// Check for conflicts with outer struct's own fields or other promoted fields
-					conflict := false
-					for k := 0; k < underlyingStruct.NumFields(); k++ {
-						if !underlyingStruct.Field(k).Anonymous() && underlyingStruct.Field(k).Name() == promotedFieldName {
-							conflict = true
-							break
-						}
-					}
-					if conflict {
-						continue
-					}
-
-					seenPromotedFields[promotedFieldName] = true
-					tsPromotedFieldType := c.getTypeString(promotedField.Type())
-					c.tsw.WriteLine("")
-					c.tsw.WriteLinef("public get %s(): %s {", promotedFieldName, tsPromotedFieldType)
-					c.tsw.Indent(1)
-					// Check if the embedded type is an interface and add null assertion
-					embeddedFieldTypeUnderlying := embeddedFieldType
-					if ptr, isPtr := embeddedFieldTypeUnderlying.(*types.Pointer); isPtr {
-						embeddedFieldTypeUnderlying = ptr.Elem()
-					}
-					if named, isNamed := embeddedFieldTypeUnderlying.(*types.Named); isNamed {
-						embeddedFieldTypeUnderlying = named.Underlying()
-					}
-					if _, isInterface := embeddedFieldTypeUnderlying.(*types.Interface); isInterface {
-						c.tsw.WriteLinef("return this.%s!.%s", embeddedFieldKeyName, promotedFieldName)
-					} else {
-						c.tsw.WriteLinef("return this.%s.%s", embeddedFieldKeyName, promotedFieldName)
-					}
-					c.tsw.Indent(-1)
-					c.tsw.WriteLine("}")
-					c.tsw.WriteLinef("public set %s(value: %s) {", promotedFieldName, tsPromotedFieldType)
-					c.tsw.Indent(1)
-					if _, isInterface := embeddedFieldTypeUnderlying.(*types.Interface); isInterface {
-						c.tsw.WriteLinef("this.%s!.%s = value", embeddedFieldKeyName, promotedFieldName)
-					} else {
-						c.tsw.WriteLinef("this.%s.%s = value", embeddedFieldKeyName, promotedFieldName)
-					}
-					c.tsw.Indent(-1)
-					c.tsw.WriteLine("}")
-				}
-			}
-		}
-
-		// Promoted methods
-		embeddedMethodSet := types.NewMethodSet(embeddedFieldType) // Use original field type for method set
-		for k := range embeddedMethodSet.Len() {
-			methodSelection := embeddedMethodSet.At(k)
-			method := methodSelection.Obj().(*types.Func)
-			methodName := method.Name()
-
-			// Skip if it's not a promoted method (indirect) or if it's shadowed by a direct method or an already processed promoted method
-			if len(methodSelection.Index()) == 1 && !directMethods[methodName] && !seenPromotedFields[methodName] {
-				// Check for conflict with outer struct's own fields
-				conflictWithField := false
-				for k_idx := 0; k_idx < underlyingStruct.NumFields(); k_idx++ {
-					if !underlyingStruct.Field(k_idx).Anonymous() && underlyingStruct.Field(k_idx).Name() == methodName {
-						conflictWithField = true
-						break
-					}
-				}
-				if conflictWithField {
-					continue
-				}
-
-				seenPromotedFields[methodName] = true // Mark as handled to avoid duplicates from other embeddings
-				sig := method.Type().(*types.Signature)
-				c.tsw.WriteLine("")
-				c.tsw.WriteLiterally("public ")
-				c.tsw.WriteLiterally(methodName)
-				c.tsw.WriteLiterally("(")
-				params := sig.Params()
-				paramNames := make([]string, params.Len())
-				for j := 0; j < params.Len(); j++ {
-					param := params.At(j)
-					paramName := param.Name()
-					if paramName == "" || paramName == "_" {
-						paramName = fmt.Sprintf("_p%d", j)
-					}
-					paramNames[j] = paramName
-					if j > 0 {
-						c.tsw.WriteLiterally(", ")
-					}
-					c.tsw.WriteLiterally(paramName)
-					c.tsw.WriteLiterally(": ")
-					c.WriteGoType(param.Type(), GoTypeContextGeneral)
-				}
-				c.tsw.WriteLiterally(")")
-				results := sig.Results()
-				if results.Len() > 0 {
-					c.tsw.WriteLiterally(": ")
-					if results.Len() == 1 {
-						c.WriteGoType(results.At(0).Type(), GoTypeContextFunctionReturn)
-					} else {
-						c.tsw.WriteLiterally("[")
-						for j := 0; j < results.Len(); j++ {
-							if j > 0 {
-								c.tsw.WriteLiterally(", ")
-							}
-							c.WriteGoType(results.At(j).Type(), GoTypeContextFunctionReturn)
-						}
-						c.tsw.WriteLiterally("]")
-					}
-				} else {
-					c.tsw.WriteLiterally(": void")
-				}
-				c.tsw.WriteLine(" {")
-				c.tsw.Indent(1)
-				if results.Len() > 0 {
-					c.tsw.WriteLiterally("return ")
-				}
-
-				assertionPrefix := "this.%s"
-				if _, isInterface := embeddedFieldType.Underlying().(*types.Interface); isInterface {
-					assertionPrefix = "this.%s!"
-				}
-				c.tsw.WriteLiterallyf(assertionPrefix+".%s(%s)", embeddedFieldKeyName, methodName, strings.Join(paramNames, ", "))
-
-				c.tsw.WriteLine("")
-				c.tsw.Indent(-1)
-				c.tsw.WriteLine("}")
 			}
 		}
 	}
@@ -522,8 +301,9 @@ func (c *GoToTSCompiler) generateFlattenedInitTypeString(structType *types.Named
 					// For embedded interfaces, use the full qualified interface type
 					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = c.getTypeString(field.Type())
 				} else {
-					// For embedded structs, use ConstructorParameters for field-based initialization
-					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("Partial<ConstructorParameters<typeof %s>[0]>", embeddedName)
+					// For embedded structs, use a union type that accepts both the struct type and a partial initialization object
+					fieldTypeString := c.generateStructFieldsTypeString(fieldType)
+					embeddedTypeMap[c.getEmbeddedFieldKeyName(field.Type())] = fmt.Sprintf("%s | Partial<{%s}>", embeddedName, fieldTypeString)
 				}
 			}
 			continue
