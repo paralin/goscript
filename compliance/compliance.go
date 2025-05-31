@@ -698,7 +698,7 @@ func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir 
 	return tsconfigPath
 }
 
-// RunTypeScriptTypeCheck executes the TypeScript compiler (`tsc`) to perform type checking
+// RunTypeScriptTypeCheck executes the TypeScript compiler (`tsgo`) to perform type checking
 // on the generated TypeScript files in a test directory.
 //
 // Parameters:
@@ -716,10 +716,23 @@ func WriteTypeCheckConfig(t *testing.T, parentModulePath, workspaceDir, testDir 
 func RunTypeScriptTypeCheck(t *testing.T, workspaceDir, testDir string, tsconfigPath string) {
 	t.Helper()
 	t.Run("TypeCheck", func(t *testing.T) {
-		// tsconfigPath is already testDir/tsconfig.json
 		nodeBinDir := filepath.Join(workspaceDir, "node_modules", ".bin")
-		cmd := exec.Command(filepath.Join(nodeBinDir, "tsgo"), "--project", filepath.Base(tsconfigPath)) // Use "tsconfig.json"
-		cmd.Dir = testDir                                                                                // Run tsc from the test directory where tsconfig.json is located
+		tsgoPath := filepath.Join(nodeBinDir, "tsgo")
+
+		// Log information for debugging
+		t.Logf("TypeCheck: tsgo command path: %s", tsgoPath)
+		t.Logf("TypeCheck: tsconfig path: %s", tsconfigPath)
+		t.Logf("TypeCheck: working directory: %s", testDir)
+
+		// Check if tsgo executable exists from Go's perspective
+		if _, statErr := os.Stat(tsgoPath); statErr != nil {
+			t.Logf("TypeCheck: os.Stat error for %s: %v", tsgoPath, statErr)
+		} else {
+			t.Logf("TypeCheck: os.Stat successful for %s", tsgoPath)
+		}
+
+		cmd := exec.Command(tsgoPath, "--project", filepath.Base(tsconfigPath))
+		cmd.Dir = testDir
 
 		output, err := cmd.CombinedOutput() // Capture both stdout and stderr
 		if err != nil {
