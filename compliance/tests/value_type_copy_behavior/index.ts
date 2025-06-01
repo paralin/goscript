@@ -1,1 +1,1 @@
-export { MyStruct, NestedStruct } from "./value_type_copy_behavior.gs.js"
+export type { MyStruct, NestedStruct } from "./value_type_copy_behavior.gs.js"

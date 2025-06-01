@@ -1,1 +1,1 @@
-export { MyStruct } from "./pointer_struct_assign_clone.gs.js"
+export type { MyStruct } from "./pointer_struct_assign_clone.gs.js"

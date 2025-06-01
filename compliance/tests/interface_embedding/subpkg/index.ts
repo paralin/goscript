@@ -1,2 +1,2 @@
-export { MockFile, NewMockFile } from "./subpkg.gs.js"
-export type { File } from "./subpkg.gs.js"
+export { NewMockFile } from "./subpkg.gs.js"
+export type { File, MockFile } from "./subpkg.gs.js"

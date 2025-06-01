@@ -1,1 +1,1 @@
-export { Pair } from "./generics.gs.js"
+export type { Pair } from "./generics.gs.js"

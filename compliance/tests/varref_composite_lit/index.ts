@@ -1,1 +1,1 @@
-export { MockInode } from "./varref_composite_lit.gs.js"
+export type { MockInode } from "./varref_composite_lit.gs.js"
