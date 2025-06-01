@@ -251,64 +251,44 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 	return "unknown"
 }
 
-// isNamedTypeWithBasicUnderlying checks if a given type is a named type with an underlying basic type.
-// This indicates the type is likely implemented as a TypeScript class with a valueOf() method.
-// It handles multiple levels of named type indirection (e.g., type A B; type B C; type C string).
-func (c *GoToTSCompiler) isNamedTypeWithBasicUnderlying(t types.Type) bool {
+// getFinalUnderlyingType traverses the chain of named types to find the ultimate underlying type.
+// This handles cases like: type A B; type B C; type C string.
+// Returns the final underlying type and whether the original type was a named type.
+func (c *GoToTSCompiler) getFinalUnderlyingType(t types.Type) (types.Type, bool) {
 	if t == nil {
-		return false
+		return nil, false
 	}
 
 	// Check if this is a named type
-	namedType, ok := t.(*types.Named)
-	if !ok {
-		return false
+	namedType, isNamed := t.(*types.Named)
+	if !isNamed {
+		return t, false
 	}
 
 	// Follow the chain of named types to find the ultimate underlying type
-	// This handles cases like: type A B; type B C; type C string
 	ultimate := namedType
 	for {
 		underlying := ultimate.Underlying()
-		if underlyingNamed, isNamed := underlying.(*types.Named); isNamed {
+		if underlyingNamed, isNamedUnderlying := underlying.(*types.Named); isNamedUnderlying {
 			// Continue following the chain
 			ultimate = underlyingNamed
 		} else {
 			// We've reached the final underlying type
-			if _, isBasic := underlying.(*types.Basic); isBasic {
-				// This is a named type with a basic underlying type
-				return true
-			}
-			break
+			return underlying, true
 		}
 	}
-
-	return false
 }
 
 // isNamedNumericType checks if a given type is a named type with an underlying numeric type.
-// This is a specialized version of isNamedTypeWithBasicUnderlying for numeric operations.
 func (c *GoToTSCompiler) isNamedNumericType(t types.Type) bool {
-	if !c.isNamedTypeWithBasicUnderlying(t) {
+	finalType, wasNamed := c.getFinalUnderlyingType(t)
+	if !wasNamed {
 		return false
 	}
 
-	// We know it's a named type with basic underlying, now check if it's numeric
-	namedType := t.(*types.Named)
-
-	// Follow the chain to get the final basic type
-	ultimate := namedType
-	for {
-		underlying := ultimate.Underlying()
-		if underlyingNamed, isNamed := underlying.(*types.Named); isNamed {
-			ultimate = underlyingNamed
-		} else {
-			if basicType, isBasic := underlying.(*types.Basic); isBasic {
-				info := basicType.Info()
-				return (info&types.IsInteger) != 0 || (info&types.IsFloat) != 0
-			}
-			break
-		}
+	if basicType, isBasic := finalType.(*types.Basic); isBasic {
+		info := basicType.Info()
+		return (info&types.IsInteger) != 0 || (info&types.IsFloat) != 0
 	}
 
 	return false
@@ -322,6 +302,25 @@ func (c *GoToTSCompiler) needsValueOfForBitwiseOp(expr ast.Expr) bool {
 	}
 
 	exprType := c.pkg.TypesInfo.TypeOf(expr)
+	if exprType == nil {
+		return false
+	}
+
+	// Don't add valueOf() for basic literals (numeric, string, bool literals)
+	switch expr.(type) {
+	case *ast.BasicLit:
+		return false
+	}
+
+	// Check if this is a constant value - constants with named types should not get valueOf()
+	// because they resolve to their literal values
+	if tv, ok := c.pkg.TypesInfo.Types[expr]; ok {
+		if tv.Value != nil {
+			// This is a constant expression, don't add valueOf()
+			return false
+		}
+	}
+
 	return c.isNamedNumericType(exprType)
 }
 

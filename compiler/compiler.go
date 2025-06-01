@@ -415,14 +415,9 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 						switch s := spec.(type) {
 						case *ast.TypeSpec:
 							if s.Name.IsExported() {
-								// Check if this is an interface
-								_, isInterface := s.Type.(*ast.InterfaceType)
-								if isInterface {
-									typeSymbols = append(typeSymbols, s.Name.Name)
-								} else {
-									// For non-interface types (struct, primitive types), use regular export
-									valueSymbols = append(valueSymbols, s.Name.Name)
-								}
+								// All type declarations (interfaces, structs, type definitions, type aliases)
+								// become TypeScript types and must be exported with "export type"
+								typeSymbols = append(typeSymbols, s.Name.Name)
 							}
 						case *ast.ValueSpec:
 							for _, name := range s.Names {
