@@ -5,6 +5,7 @@ import (
 	"go/ast"
 	"go/token"
 	"go/types"
+	"strings"
 )
 
 // WriteCallExpr translates a Go function call expression (`ast.CallExpr`)
@@ -123,6 +124,17 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 // writeCallArguments writes the argument list for a function call
 func (c *GoToTSCompiler) writeCallArguments(exp *ast.CallExpr) error {
 	c.tsw.WriteLiterally("(")
+
+	// Get function signature for parameter type checking
+	var funcSig *types.Signature
+	if c.pkg != nil && c.pkg.TypesInfo != nil {
+		if funcType := c.pkg.TypesInfo.TypeOf(exp.Fun); funcType != nil {
+			if sig, ok := funcType.(*types.Signature); ok {
+				funcSig = sig
+			}
+		}
+	}
+
 	for i, arg := range exp.Args {
 		if i != 0 {
 			c.tsw.WriteLiterally(", ")
@@ -131,19 +143,201 @@ func (c *GoToTSCompiler) writeCallArguments(exp *ast.CallExpr) error {
 		if exp.Ellipsis != token.NoPos && i == len(exp.Args)-1 {
 			c.tsw.WriteLiterally("...")
 		}
-		if err := c.WriteValueExpr(arg); err != nil {
-			return fmt.Errorf("failed to write argument %d in call: %w", i, err)
+
+		// Check if we need to auto-wrap this argument
+		needsWrapping := false
+		var wrapperTypeName string
+
+		if funcSig != nil && i < funcSig.Params().Len() {
+			paramType := funcSig.Params().At(i).Type()
+
+			if c.analysis != nil {
+				isWrapper := c.analysis.IsWrapperType(paramType)
+
+				if isWrapper {
+					// Check if the argument is a literal or non-wrapper type that should be wrapped
+					argType := c.pkg.TypesInfo.TypeOf(arg)
+
+					argIsWrapper := false
+					if argType != nil {
+						argIsWrapper = c.analysis.IsWrapperType(argType)
+					}
+
+					// Check if the argument is a basic literal that should be wrapped
+					isBasicLiteral := false
+					if _, ok := arg.(*ast.BasicLit); ok {
+						isBasicLiteral = true
+					}
+
+					if argType == nil || !argIsWrapper || isBasicLiteral {
+						// This argument should be wrapped
+						needsWrapping = true
+
+						// Get the wrapper type name for constructor call
+						if namedType, ok := paramType.(*types.Named); ok {
+							if obj := namedType.Obj(); obj != nil {
+								if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
+									// Imported type like os.FileMode
+									if importAlias := c.getImportAlias(obj.Pkg().Path()); importAlias != "" {
+										wrapperTypeName = importAlias + "." + obj.Name()
+									} else {
+										wrapperTypeName = obj.Name()
+									}
+								} else {
+									// Local type
+									wrapperTypeName = obj.Name()
+								}
+							}
+						}
+
+						// Handle type aliases (Go 1.9+)
+						if aliasType, ok := paramType.(*types.Alias); ok {
+							if obj := aliasType.Obj(); obj != nil {
+								if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
+									// Imported type like os.FileMode
+									pkgPath := obj.Pkg().Path()
+									if importAlias := c.getImportAlias(pkgPath); importAlias != "" {
+										wrapperTypeName = importAlias + "." + obj.Name()
+									} else {
+										wrapperTypeName = obj.Name()
+									}
+								} else {
+									// Local type
+									wrapperTypeName = obj.Name()
+								}
+							}
+						}
+					}
+				}
+			}
 		}
-		// Add non-null assertion for spread arguments that might be null
-		if exp.Ellipsis != token.NoPos && i == len(exp.Args)-1 {
-			// Check if the argument type is potentially nullable (slice)
-			if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
-				if _, isSlice := argType.Underlying().(*types.Slice); isSlice {
-					c.tsw.WriteLiterally("!")
+
+		if needsWrapping && wrapperTypeName != "" {
+			// Auto-wrap the argument with constructor call
+			c.tsw.WriteLiterally("new ")
+			c.tsw.WriteLiterally(wrapperTypeName)
+			c.tsw.WriteLiterally("(")
+			if err := c.WriteValueExpr(arg); err != nil {
+				return fmt.Errorf("failed to write wrapped argument: %w", err)
+			}
+			c.tsw.WriteLiterally(")")
+		} else {
+			// Normal argument writing
+			if err := c.WriteValueExpr(arg); err != nil {
+				return fmt.Errorf("failed to write argument: %w", err)
+			}
+		}
+	}
+
+	c.tsw.WriteLiterally(")")
+	return nil
+}
+
+// getImportAlias returns the import alias for a given package path
+func (c *GoToTSCompiler) getImportAlias(pkgPath string) string {
+	if c.analysis == nil {
+		return ""
+	}
+
+	// First try to find by exact package path
+	for importAlias := range c.analysis.Imports {
+		if importInfo := c.analysis.Imports[importAlias]; importInfo != nil {
+			if importInfo.importPath == pkgPath {
+				return importAlias
+			}
+		}
+	}
+
+	// Fallback: try to match by package name extracted from path
+	parts := strings.Split(pkgPath, "/")
+	defaultPkgName := parts[len(parts)-1]
+
+	for importAlias := range c.analysis.Imports {
+		if importAlias == defaultPkgName {
+			return importAlias
+		}
+	}
+
+	return ""
+}
+
+// writeAutoWrappedArgument writes an argument, auto-wrapping it if needed based on the expected parameter type
+func (c *GoToTSCompiler) writeAutoWrappedArgument(arg ast.Expr, expectedType types.Type) error {
+	// Check if we need to auto-wrap this argument
+	needsWrapping := false
+	var wrapperTypeName string
+
+	if c.analysis != nil && c.analysis.IsWrapperType(expectedType) {
+		// Check if the argument is a literal or non-wrapper type that should be wrapped
+		argType := c.pkg.TypesInfo.TypeOf(arg)
+
+		argIsWrapper := false
+		if argType != nil {
+			argIsWrapper = c.analysis.IsWrapperType(argType)
+		}
+
+		// Check if the argument is a basic literal that should be wrapped
+		isBasicLiteral := false
+		if _, ok := arg.(*ast.BasicLit); ok {
+			isBasicLiteral = true
+		}
+
+		if argType == nil || !argIsWrapper || isBasicLiteral {
+			// This argument should be wrapped
+			needsWrapping = true
+
+			// Get the wrapper type name for constructor call
+			if namedType, ok := expectedType.(*types.Named); ok {
+				if obj := namedType.Obj(); obj != nil {
+					if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
+						// Imported type like os.FileMode
+						if importAlias := c.getImportAlias(obj.Pkg().Path()); importAlias != "" {
+							wrapperTypeName = importAlias + "." + obj.Name()
+						} else {
+							wrapperTypeName = obj.Name()
+						}
+					} else {
+						// Local type
+						wrapperTypeName = obj.Name()
+					}
+				}
+			}
+
+			// Handle type aliases (Go 1.9+)
+			if aliasType, ok := expectedType.(*types.Alias); ok {
+				if obj := aliasType.Obj(); obj != nil {
+					if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
+						// Imported type like os.FileMode
+						pkgPath := obj.Pkg().Path()
+						if importAlias := c.getImportAlias(pkgPath); importAlias != "" {
+							wrapperTypeName = importAlias + "." + obj.Name()
+						} else {
+							wrapperTypeName = obj.Name()
+						}
+					} else {
+						// Local type
+						wrapperTypeName = obj.Name()
+					}
 				}
 			}
 		}
 	}
-	c.tsw.WriteLiterally(")")
+
+	if needsWrapping && wrapperTypeName != "" {
+		// Auto-wrap the argument with constructor call
+		c.tsw.WriteLiterally("new ")
+		c.tsw.WriteLiterally(wrapperTypeName)
+		c.tsw.WriteLiterally("(")
+		if err := c.WriteValueExpr(arg); err != nil {
+			return fmt.Errorf("failed to write wrapped argument: %w", err)
+		}
+		c.tsw.WriteLiterally(")")
+	} else {
+		// Normal argument writing
+		if err := c.WriteValueExpr(arg); err != nil {
+			return fmt.Errorf("failed to write argument: %w", err)
+		}
+	}
+
 	return nil
 }

@@ -5,16 +5,20 @@ import (
 )
 
 // Local named types for testing
-type LocalInt int32
-type LocalUint uint16
-type LocalFloat float32
-type LocalString string
-type LocalBool bool
+type (
+	LocalInt    int32
+	LocalUint   uint16
+	LocalFloat  float32
+	LocalString string
+	LocalBool   bool
+)
 
 // Multi-level local types
-type LocalLevel1 LocalLevel2
-type LocalLevel2 LocalLevel3
-type LocalLevel3 int
+type (
+	LocalLevel1 LocalLevel2
+	LocalLevel2 LocalLevel3
+	LocalLevel3 int
+)
 
 func main() {
 	// Test basic named numeric types with bitwise operations

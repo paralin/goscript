@@ -41,14 +41,14 @@ func main() {
 	println("ModePerm:", int(fs.ModePerm))
 
 	// Test FileMode methods
-	mode := fs.FileMode(fs.ModeDir | 0755)
+	mode := fs.FileMode(fs.ModeDir | 0o755)
 	println("FileMode.IsDir():", mode.IsDir())
 	println("FileMode.IsRegular():", mode.IsRegular())
 	println("FileMode.Perm():", int(mode.Perm()))
 	println("FileMode.Type():", int(mode.Type()))
 	println("FileMode.String():", mode.String())
 
-	regularMode := fs.FileMode(0644)
+	regularMode := fs.FileMode(0o644)
 	println("Regular file IsDir():", regularMode.IsDir())
 	println("Regular file IsRegular():", regularMode.IsRegular())
 

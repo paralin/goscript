@@ -115,6 +115,10 @@ type Analysis struct {
 
 	// PackageMetadata holds package-level metadata
 	PackageMetadata map[string]interface{}
+
+	// WrapperTypes tracks types that should be implemented as wrapper classes
+	// This includes both local types with methods and imported types that are known wrapper types
+	WrapperTypes map[types.Type]bool
 }
 
 // PackageAnalysis holds cross-file analysis data for a package
@@ -147,6 +151,7 @@ func NewAnalysis() *Analysis {
 		ReflectedFunctions:  make(map[ast.Node]*ReflectedFunctionInfo),
 		FunctionAssignments: make(map[types.Object]ast.Node),
 		PackageMetadata:     make(map[string]interface{}),
+		WrapperTypes:        make(map[types.Type]bool),
 	}
 }
 
@@ -1580,4 +1585,92 @@ func (v *analysisVisitor) findVariableUsageInExpr(expr ast.Expr, lhsVarNames map
 		// For other expression types, we might need to add specific handling
 		// For now, we'll ignore them as they're less common in shadowing scenarios
 	}
+}
+
+// IsWrapperType returns whether the given type should be implemented as a wrapper class
+// This includes both local types with methods and imported types that are known wrapper types
+func (a *Analysis) IsWrapperType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+
+	// Check if we've already determined this type is a wrapper type
+	if isWrapper, exists := a.WrapperTypes[t]; exists {
+		return isWrapper
+	}
+
+	// For named types, check if they have methods
+	if namedType, ok := t.(*types.Named); ok {
+		// Exclude struct types - they should remain as classes, not wrapper types
+		if _, isStruct := namedType.Underlying().(*types.Struct); isStruct {
+			a.WrapperTypes[t] = false
+			return false
+		}
+
+		// Exclude interface types
+		if _, isInterface := namedType.Underlying().(*types.Interface); isInterface {
+			a.WrapperTypes[t] = false
+			return false
+		}
+
+		// Check for common wrapper type patterns from standard library FIRST
+		// This is important for imported types that we can't analyze methods for
+		if obj := namedType.Obj(); obj != nil && obj.Pkg() != nil {
+			pkgPath := obj.Pkg().Path()
+			typeName := obj.Name()
+
+			// Known wrapper types from standard library
+			isKnownWrapper := false
+			switch pkgPath {
+			case "os":
+				isKnownWrapper = typeName == "FileMode"
+			case "time":
+				isKnownWrapper = typeName == "Duration"
+			case "syscall":
+				// Many syscall types are wrappers
+				isKnownWrapper = true
+			}
+
+			if isKnownWrapper {
+				a.WrapperTypes[t] = true
+				return true
+			}
+		}
+
+		// Check if this type has methods defined on it (for local types)
+		if namedType.NumMethods() > 0 {
+			a.WrapperTypes[t] = true
+			return true
+		}
+	}
+
+	// Handle type aliases (Go 1.9+)
+	if aliasType, ok := t.(*types.Alias); ok {
+		// Get the underlying type and check if it's a known wrapper type
+		if obj := aliasType.Obj(); obj != nil && obj.Pkg() != nil {
+			pkgPath := obj.Pkg().Path()
+			typeName := obj.Name()
+
+			// Known wrapper types from standard library
+			isKnownWrapper := false
+			switch pkgPath {
+			case "os":
+				isKnownWrapper = typeName == "FileMode"
+			case "time":
+				isKnownWrapper = typeName == "Duration"
+			case "syscall":
+				// Many syscall types are wrappers
+				isKnownWrapper = true
+			}
+
+			if isKnownWrapper {
+				a.WrapperTypes[t] = true
+				return true
+			}
+		}
+	}
+
+	// Cache negative result
+	a.WrapperTypes[t] = false
+	return false
 }

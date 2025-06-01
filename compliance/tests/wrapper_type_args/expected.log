@@ -1,0 +1,8 @@
+TestFileMode called with mode=644
+TestFileMode called with mode=755
+TestMyMode called with mode=755, executable=true
+TestMyMode called with mode=600, executable=false
+MkdirAll called with path=/tmp/test, perm=700
+TestFileMode called with mode=644
+TestFileMode called with mode=777
+Test completed 

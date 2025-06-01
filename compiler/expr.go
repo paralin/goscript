@@ -295,21 +295,13 @@ func (c *GoToTSCompiler) isNamedNumericType(t types.Type) bool {
 }
 
 // isWrapperType checks if a type is implemented as a wrapper class with valueOf() method
-// This is true for named types that have methods defined on them
+// This uses pre-computed analysis data to detect both local and imported wrapper types
 func (c *GoToTSCompiler) isWrapperType(t types.Type) bool {
-	if t == nil {
+	if t == nil || c.analysis == nil {
 		return false
 	}
 
-	// Follow any type aliases to get to the actual named type
-	namedType, ok := t.(*types.Named)
-	if !ok {
-		return false
-	}
-
-	// If the named type has methods, it's implemented as a class with valueOf()
-	numMethods := namedType.NumMethods()
-	return numMethods > 0
+	return c.analysis.IsWrapperType(t)
 }
 
 // needsValueOfForBitwiseOp checks if an operand in a bitwise operation needs .valueOf() to be called

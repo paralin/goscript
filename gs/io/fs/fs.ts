@@ -472,15 +472,14 @@ export function fileModeString(mode: FileMode): string {
   else if (w & ModeDevice.valueOf()) {
     if (w & ModeCharDevice.valueOf()) buf.push('c')
     else buf.push('D')
-  }
-  else if (w & ModeIrregular.valueOf()) buf.push('?')
+  } else if (w & ModeIrregular.valueOf()) buf.push('?')
   else buf.push('-')
 
   // Permission bits
   const perm = w & ModePerm.valueOf()
   buf.push(perm & 0o400 ? 'r' : '-')
   buf.push(perm & 0o200 ? 'w' : '-')
-  
+
   // Execute/search for user
   if (perm & 0o100) {
     if (w & ModeSetuid.valueOf()) buf.push('s')
@@ -489,10 +488,10 @@ export function fileModeString(mode: FileMode): string {
     if (w & ModeSetuid.valueOf()) buf.push('S')
     else buf.push('-')
   }
-  
+
   buf.push(perm & 0o040 ? 'r' : '-')
   buf.push(perm & 0o020 ? 'w' : '-')
-  
+
   // Execute/search for group
   if (perm & 0o010) {
     if (w & ModeSetgid.valueOf()) buf.push('s')
@@ -501,10 +500,10 @@ export function fileModeString(mode: FileMode): string {
     if (w & ModeSetgid.valueOf()) buf.push('S')
     else buf.push('-')
   }
-  
+
   buf.push(perm & 0o004 ? 'r' : '-')
   buf.push(perm & 0o002 ? 'w' : '-')
-  
+
   // Execute/search for other
   if (perm & 0o001) {
     if (w & ModeSticky.valueOf()) buf.push('t')
