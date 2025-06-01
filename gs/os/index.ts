@@ -107,7 +107,11 @@ export {
   DirEntry,
   File,
   FileInfo,
-  FileMode,
+  FileMode_IsDir,
+  FileMode_IsRegular,
+  FileMode_Perm,
+  FileMode_String,
+  FileMode_Type,
   Getpagesize,
   ModeAppend,
   ModeCharDevice,
@@ -126,3 +130,6 @@ export {
   ModeType,
   SameFile,
 } from './types_js.gs.js'
+
+// Export FileMode as a type
+export type { FileMode } from './types_js.gs.js'

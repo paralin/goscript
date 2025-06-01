@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "errors",
+    "io",
+    "iter",
+    "unicode",
+    "unicode/utf8"
+  ]
+} 

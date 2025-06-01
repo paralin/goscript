@@ -200,10 +200,24 @@ function parseFormat(format: string, args: any[]): string {
 // Global stdout simulation for Print functions
 let stdout = {
   write: (data: string) => {
-    // For now, just use a simple implementation that doesn't output
-    // In the real implementation, this would interact with the Go runtime
-    // The test will still pass because it only checks compilation
-    $.println(data)
+    // Use process.stdout.write if available (Node.js), otherwise fallback to console.log
+    // but we need to avoid adding extra newlines that console.log adds
+    if (typeof process !== 'undefined' && process.stdout && process.stdout.write) {
+      process.stdout.write(data)
+    } else {
+      // In browser environments, we need to use console.log but handle newlines carefully
+      // If the data already ends with \n, we should strip it to avoid double newlines
+      if (data.endsWith('\n')) {
+        console.log(data.slice(0, -1))
+      } else {
+        // Use console.log without adding newline by using a custom method
+        if (console.log) {
+          // For data without newlines, we can just print it directly
+          // This is a bit of a hack but works for most cases
+          console.log(data)
+        }
+      }
+    }
   },
 }
 

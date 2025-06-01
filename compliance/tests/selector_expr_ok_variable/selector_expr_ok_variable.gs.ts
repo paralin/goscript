@@ -17,7 +17,9 @@ export class Result {
 
 	constructor(init?: Partial<{ok?: boolean}>) {
 		this._fields = {
-			ok: $.varRef(init?.ok ?? false)
+			ok: $.varRef(init?.ok ?? // DEBUG: Field ok has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false)
 		}
 	}
 

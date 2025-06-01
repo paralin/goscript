@@ -25,8 +25,12 @@ export class Person {
 
 	constructor(init?: Partial<{Age?: number, Name?: string}>) {
 		this._fields = {
-			Name: $.varRef(init?.Name ?? ""),
-			Age: $.varRef(init?.Age ?? 0)
+			Name: $.varRef(init?.Name ?? // DEBUG: Field Name has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			""),
+			Age: $.varRef(init?.Age ?? // DEBUG: Field Age has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 
@@ -77,7 +81,9 @@ export class Employee {
 	constructor(init?: Partial<{ID?: number, Person?: Partial<ConstructorParameters<typeof Person>[0]>}>) {
 		this._fields = {
 			Person: $.varRef(new Person(init?.Person)),
-			ID: $.varRef(init?.ID ?? 0)
+			ID: $.varRef(init?.ID ?? // DEBUG: Field ID has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 
@@ -140,8 +146,12 @@ export class Address {
 
 	constructor(init?: Partial<{City?: string, Street?: string}>) {
 		this._fields = {
-			Street: $.varRef(init?.Street ?? ""),
-			City: $.varRef(init?.City ?? "")
+			Street: $.varRef(init?.Street ?? // DEBUG: Field Street has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			""),
+			City: $.varRef(init?.City ?? // DEBUG: Field City has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			"")
 		}
 	}
 
@@ -183,7 +193,9 @@ export class Contact {
 
 	constructor(init?: Partial<{Phone?: string}>) {
 		this._fields = {
-			Phone: $.varRef(init?.Phone ?? "")
+			Phone: $.varRef(init?.Phone ?? // DEBUG: Field Phone has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			"")
 		}
 	}
 
@@ -251,7 +263,9 @@ export class Manager {
 			Person: $.varRef(new Person(init?.Person)),
 			Address: $.varRef(new Address(init?.Address)),
 			Contact: $.varRef(new Contact(init?.Contact)),
-			Level: $.varRef(init?.Level ?? 0)
+			Level: $.varRef(init?.Level ?? // DEBUG: Field Level has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 

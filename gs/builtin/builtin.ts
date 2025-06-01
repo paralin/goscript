@@ -23,7 +23,7 @@ export type Bytes = Uint8Array | Slice<number>
 
 // int converts a value to a Go int type, handling proper signed integer conversion
 // This ensures that values like 2147483648 (2^31) are properly handled according to Go semantics
-export function int(value: number | { valueOf(): number | null }): number {
+export function int(value: number): number {
   // In Go, int is typically 64-bit on 64-bit systems, but for compatibility with JavaScript
   // we need to handle the conversion properly. The issue is that JavaScript's number type
   // can represent values larger than 32-bit signed integers, but when cast in certain contexts
@@ -33,38 +33,13 @@ export function int(value: number | { valueOf(): number | null }): number {
   // since JavaScript numbers can safely represent integers up to Number.MAX_SAFE_INTEGER
   //
   // For this we use Math.trunc.
-  if (typeof value === 'object' && 'valueOf' in value) {
-    return Math.trunc(value.valueOf() ?? 0)
-  }
   return Math.trunc(value)
 }
 
 // Duration multiplication helper for time package operations
 // Handles expressions like time.Hour * 24
 export function multiplyDuration(duration: any, multiplier: number): any {
-  // Check if duration has a multiply method (like our Duration class)
-  if (duration && typeof duration.multiply === 'function') {
-    return duration.multiply(multiplier)
-  }
-
-  // Check if duration has a valueOf method for numeric operations
-  if (duration && typeof duration.valueOf === 'function') {
-    const numValue = duration.valueOf()
-    // Return an object with the same structure but multiplied value
-    if (typeof numValue === 'number') {
-      // Try to create a new instance of the same type
-      if (duration.constructor) {
-        return new duration.constructor(numValue * multiplier)
-      }
-      // Fallback: return a simple object with valueOf
-      return {
-        valueOf: () => numValue * multiplier,
-        toString: () => (numValue * multiplier).toString() + 'ns',
-      }
-    }
-  }
-
-  // Fallback for simple numeric values
+  // Duration is now a number type alias, so just multiply directly
   if (typeof duration === 'number') {
     return duration * multiplier
   }
@@ -91,8 +66,7 @@ export function normalizeBytes(
     | number[]
     | null
     | undefined
-    | { data: number[] }
-    | { valueOf(): number[] },
+    | { data: number[] },
 ): Uint8Array {
   if (bytes === null || bytes === undefined) {
     return new Uint8Array(0)
@@ -117,18 +91,6 @@ export function normalizeBytes(
     return new Uint8Array(bytes)
   }
 
-  // Handle objects with valueOf() method that returns a number array
-  if (
-    bytes &&
-    typeof bytes === 'object' &&
-    'valueOf' in bytes &&
-    typeof bytes.valueOf === 'function'
-  ) {
-    const value = bytes.valueOf()
-    if (Array.isArray(value)) {
-      return new Uint8Array(value)
-    }
-  }
 
   throw new Error(`Cannot normalize bytes of type ${typeof bytes}: ${bytes}`)
 }

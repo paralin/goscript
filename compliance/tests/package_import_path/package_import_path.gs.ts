@@ -39,7 +39,8 @@ export async function main(): Promise<void> {
 	let [matched, err] = path.Match("*.txt", "file.txt")
 	if (err != null) {
 		console.log("Match error:", err!.Error())
-	} else {
+	}
+	 else {
 		console.log("Match result:", matched)
 	}
 

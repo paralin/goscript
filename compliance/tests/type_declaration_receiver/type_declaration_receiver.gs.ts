@@ -3,108 +3,73 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class FileMode {
-	constructor(private _value: number) {}
+export type FileMode = number;
 
-	valueOf(): number {
-		return this._value
+export function FileMode_String(fm: FileMode): string {
+	if (fm == 0) {
+		return "none"
 	}
-
-	toString(): string {
-		return String(this._value)
-	}
-
-	static from(value: number): FileMode {
-		return new FileMode(value)
-	}
-
-	// String returns a string representation of the FileMode
-	public String(): string {
-		const fm = this._value
-		if (fm == 0) {
-			return "none"
-		}
-		return "some"
-	}
-
-	// IsZero checks if the FileMode is zero
-	public IsZero(): boolean {
-		const fm = this._value
-		return fm == 0
-	}
-
-	// Add adds a value to the FileMode
-	public Add(val: number): FileMode {
-		const fm = this._value
-		return new FileMode(fm.valueOf() + val)
-	}
+	return "some"
 }
 
-export class CustomString {
-	constructor(private _value: string) {}
+export function FileMode_IsZero(fm: FileMode): boolean {
+	return fm == 0
+}
 
-	valueOf(): string {
-		return this._value
-	}
+export function FileMode_Add(fm: FileMode, val: number): FileMode {
+	return (fm + val as FileMode)
+}
 
-	toString(): string {
-		return String(this._value)
-	}
 
-	static from(value: string): CustomString {
-		return new CustomString(value)
-	}
+export type CustomString = string;
 
-	// Length returns the length of the custom string
-	public Length(): number {
-		const cs = this._value
-		return $.len(cs)
-	}
+export function CustomString_Length(cs: CustomString): number {
+	return $.len(cs)
+}
 
-	// Upper converts to uppercase
-	public Upper(): string {
-		const cs = this._value
-		let s = cs
-		let result = ""
-		{
-			const _runes = $.stringToRunes(s)
-			for (let i = 0; i < _runes.length; i++) {
-				const r = _runes[i]
-				{
-					if (r >= 97 && r <= 122) {
-						result += $.runeOrStringToString(r - 32)
-					} else {
-						result += $.runeOrStringToString(r)
-					}
+export function CustomString_Upper(cs: CustomString): string {
+	let s = cs
+	let result = ""
+	{
+		const _runes = $.stringToRunes(s)
+		for (let i = 0; i < _runes.length; i++) {
+			const r = _runes[i]
+			{
+				if (r >= 97 && r <= 122) {
+					result += $.runeOrStringToString(r - 32)
+				}
+				 else {
+					result += $.runeOrStringToString(r)
 				}
 			}
 		}
-		return result
 	}
+	return result
 }
+
 
 export async function main(): Promise<void> {
 	// Test FileMode type with receiver methods
-	let fm: FileMode = new FileMode(0)
-	console.log("FileMode(0).String():", fm.String())
-	console.log("FileMode(0).IsZero():", fm.IsZero())
+	let fm: FileMode = 0
+	console.log("FileMode(0).String():", FileMode_String(fm))
+	console.log("FileMode(0).IsZero():", FileMode_IsZero(fm))
 
 	// Test method calls on type conversion
-	console.log("FileMode(5).String():", new FileMode(5)!.String())
-	console.log("FileMode(5).IsZero():", new FileMode(5)!.IsZero())
+	console.log("FileMode(5).String():", FileMode_String((5 as FileMode)))
+	console.log("FileMode(5).IsZero():", FileMode_IsZero((5 as FileMode)))
 
 	// Test method chaining
-	let result = new FileMode(3)!.Add(2)
-	console.log("FileMode(3).Add(2):", result.valueOf())
-	console.log("FileMode(3).Add(2).String():", result.String())
+	let result = FileMode_Add((3 as FileMode), 2)
+	console.log("FileMode(3).Add(2):", result)
+	console.log("FileMode(3).Add(2).String():", FileMode_String(result))
 
 	// Test CustomString type
-	let cs: CustomString = new CustomString("hello")
-	console.log("CustomString(\"hello\").Length():", cs.Length())
-	console.log("CustomString(\"hello\").Upper():", cs.Upper())
+	let cs: CustomString = "hello"
+	console.log("CustomString(\"hello\").Length():", CustomString_Length(cs))
+	console.log("CustomString(\"hello\").Upper():", CustomString_Upper(cs))
 
 	// Test method calls on type conversion
-	console.log("CustomString(\"world\").Length():", new CustomString("world")!.Length())
-	console.log("CustomString(\"world\").Upper():", new CustomString("world")!.Upper())
+	console.log("CustomString(\"world\").Length():", CustomString_Length(("world" as CustomString)))
+	console.log("CustomString(\"world\").Upper():", CustomString_Upper(("world" as CustomString)))
 }
 

@@ -17,7 +17,9 @@ export class content {
 
 	constructor(init?: Partial<{bytes?: $.Bytes}>) {
 		this._fields = {
-			bytes: $.varRef(init?.bytes ?? new Uint8Array(0))
+			bytes: $.varRef(init?.bytes ?? // DEBUG: Field bytes has type []byte (*types.Slice)
+			// DEBUG: Using default zero value
+			new Uint8Array(0))
 		}
 	}
 
@@ -54,10 +56,12 @@ export class content {
 		if (input > 10) {
 			status = "high"
 			valid = true
-		} else if (input > 0) {
+		}
+		 else if (input > 0) {
 			status = "low"
 			valid = true
-		} else {
+		}
+		 else {
 			// status and valid will be zero values
 			status = "invalid"
 		}
@@ -85,7 +89,8 @@ export async function main(): Promise<void> {
 	// Expected: nil
 	if (err1 == null) {
 		console.log("nil") // Expected: nil
-	} else {
+	}
+	 else {
 		console.log("error")
 	}
 	console.log($.bytesToString(buf)) // Expected: Hello
@@ -98,7 +103,8 @@ export async function main(): Promise<void> {
 	// Expected: nil
 	if (err2 == null) {
 		console.log("nil") // Expected: nil
-	} else {
+	}
+	 else {
 		console.log("error")
 	}
 	console.log($.bytesToString(buf2)) // Expected: World!

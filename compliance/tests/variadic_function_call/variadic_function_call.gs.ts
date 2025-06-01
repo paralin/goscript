@@ -7,7 +7,7 @@ import * as errors from "@goscript/errors/index.js"
 
 // TestFS simulates the function signature from the user's example
 export function TestFS(fsys: string, ...expected: string[]): $.GoError {
-	return testFS(fsys, ...expected!)
+	return testFS(fsys, ...(expected ?? []))
 }
 
 // testFS is the variadic function being called
@@ -31,11 +31,12 @@ export async function main(): Promise<void> {
 	let expected = $.arrayToSlice<string>(["file1.txt", "file2.txt", "file3.txt"])
 
 	// This is the problematic line - should generate spread syntax in TypeScript
-	let err = TestFS("myfs", ...expected!)
+	let err = TestFS("myfs", ...(expected ?? []))
 
 	if (err != null) {
 		console.log("Error: " + err!.Error())
-	} else {
+	}
+	 else {
 		console.log("Success!")
 	}
 }

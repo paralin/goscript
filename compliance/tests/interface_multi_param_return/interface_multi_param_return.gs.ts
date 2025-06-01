@@ -55,7 +55,8 @@ export async function main(): Promise<void> {
 
 	if (success) {
 		console.log("Main: Success reported")
-	} else {
+	}
+	 else {
 		console.log("Main: Failure reported")
 	}
 
@@ -63,7 +64,8 @@ export async function main(): Promise<void> {
 	;[success] = processor!.Process(data, 5, "unused")
 	if (success) {
 		console.log("Main: Success reported")
-	} else {
+	}
+	 else {
 		console.log("Main: Failure reported")
 	}
 }

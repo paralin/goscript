@@ -8,7 +8,8 @@ export async function main(): Promise<void> {
 	let n = 7
 	if (n % 2 == 0) {
 		console.log("Even: Expected: (no output)")
-	} else {
+	}
+	 else {
 		console.log("Odd: Expected: Odd, Actual: Odd")
 	}
 }

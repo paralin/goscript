@@ -1,4 +1,4 @@
-import { ReflectValue, ChanDir, StructField } from './types.js'
+import { ReflectValue, StructField } from './types.js'
 import { MapIter } from './map.js'
 
 // rtype is the common implementation of most values
@@ -10,17 +10,16 @@ export class rtype {
   }
 
   String(): string {
-    return this.kind.String()
+    return Kind_String(this.kind)
   }
 
   Pointers(): boolean {
-    // Return true for pointer-like types
-    const k = this.kind.valueOf()
+    const k = this.kind
     return (
-      k === Ptr.valueOf() ||
-      k === Map.valueOf() ||
-      k === Slice.valueOf() ||
-      k === Interface.valueOf()
+      k === Ptr ||
+      k === Map ||
+      k === Slice ||
+      k === Interface
     )
   }
 }
@@ -42,15 +41,14 @@ export class flag {
     if (typeof _value === 'number') {
       this._value = _value
     } else {
-      this._value = _value.valueOf()
+      this._value = _value
     }
   }
 
   valueOf(): number {
-    return typeof this._value === 'number' ? this._value : this._value.valueOf()
+    return typeof this._value === 'number' ? this._value : this._value
   }
 
-  // Support arithmetic operations
   static from(value: number | Kind): flag {
     return new flag(value)
   }
@@ -80,86 +78,93 @@ export class bitVector {
 }
 
 // Kind represents the specific kind of type that a Type represents.
-export class Kind {
-  constructor(private _value: number) {}
+export type Kind = number
 
-  valueOf(): number {
-    return this._value
+// Kind_String returns the string representation of a Kind (wrapper function naming)
+export function Kind_String(k: Kind): string {
+  const kindNames = [
+    'invalid',
+    'bool',
+    'int',
+    'int8',
+    'int16',
+    'int32',
+    'int64',
+    'uint',
+    'uint8',
+    'uint16',
+    'uint32',
+    'uint64',
+    'uintptr',
+    'float32',
+    'float64',
+    'complex64',
+    'complex128',
+    'array',
+    'chan',
+    'func',
+    'interface',
+    'map',
+    'ptr',
+    'slice',
+    'string',
+    'struct',
+    'unsafe.Pointer',
+  ]
+  if (k >= 0 && k < kindNames.length) {
+    return kindNames[k]
   }
+  return 'invalid'
+}
 
-  toString(): string {
-    return this.String()
-  }
+// Channel direction constants and type
+export type ChanDir = number
 
-  static from(value: number): Kind {
-    return new Kind(value)
-  }
+export const RecvDir: ChanDir = 1
+export const SendDir: ChanDir = 2
+export const BothDir: ChanDir = 3
 
-  public String(): string {
-    const kindNames = [
-      'invalid',
-      'bool',
-      'int',
-      'int8',
-      'int16',
-      'int32',
-      'int64',
-      'uint',
-      'uint8',
-      'uint16',
-      'uint32',
-      'uint64',
-      'uintptr',
-      'float32',
-      'float64',
-      'complex64',
-      'complex128',
-      'array',
-      'chan',
-      'func',
-      'interface',
-      'map',
-      'ptr',
-      'slice',
-      'string',
-      'struct',
-      'unsafe.Pointer',
-    ]
-    if (this._value >= 0 && this._value < kindNames.length) {
-      return kindNames[this._value]
-    }
-    return 'invalid'
+export function ChanDir_String(d: ChanDir): string {
+  switch (d) {
+    case RecvDir:
+      return "RecvDir"
+    case SendDir:
+      return "SendDir"  
+    case BothDir:
+      return "BothDir"
+    default:
+      return "ChanDir(" + d + ")"
   }
 }
 
 // Kind constants
-export const Invalid = new Kind(0)
-export const Bool = new Kind(1)
-export const Int = new Kind(2)
-export const Int8 = new Kind(3)
-export const Int16 = new Kind(4)
-export const Int32 = new Kind(5)
-export const Int64 = new Kind(6)
-export const Uint = new Kind(7)
-export const Uint8 = new Kind(8)
-export const Uint16 = new Kind(9)
-export const Uint32 = new Kind(10)
-export const Uint64 = new Kind(11)
-export const Uintptr = new Kind(12)
-export const Float32 = new Kind(13)
-export const Float64 = new Kind(14)
-export const Complex64 = new Kind(15)
-export const Complex128 = new Kind(16)
-export const Array = new Kind(17)
-export const Chan = new Kind(18)
-export const Func = new Kind(19)
-export const Interface = new Kind(20)
-export const Map = new Kind(21)
-export const Ptr = new Kind(22)
-export const Slice = new Kind(23)
-export const String = new Kind(24)
-export const Struct = new Kind(25)
-export const UnsafePointer = new Kind(26)
+export const Invalid: Kind = 0
+export const Bool: Kind = 1
+export const Int: Kind = 2
+export const Int8: Kind = 3
+export const Int16: Kind = 4
+export const Int32: Kind = 5
+export const Int64: Kind = 6
+export const Uint: Kind = 7
+export const Uint8: Kind = 8
+export const Uint16: Kind = 9
+export const Uint32: Kind = 10
+export const Uint64: Kind = 11
+export const Uintptr: Kind = 12
+export const Float32: Kind = 13
+export const Float64: Kind = 14
+export const Complex64: Kind = 15
+export const Complex128: Kind = 16
+export const Array: Kind = 17
+export const Chan: Kind = 18
+export const Func: Kind = 19
+export const Interface: Kind = 20
+export const Map: Kind = 21
+export const Ptr: Kind = 22
+export const Slice: Kind = 23
+export const String: Kind = 24
+export const Struct: Kind = 25
+export const UnsafePointer: Kind = 26
 
 // Type is the representation of a Go type.
 export interface Type {
@@ -206,7 +211,7 @@ export class Value {
     }
     throw new Error(
       'reflect: call of reflect.Value.Int on ' +
-        this._type.Kind().String() +
+        Kind_String(this._type.Kind()) +
         ' Value',
     )
   }
@@ -217,7 +222,7 @@ export class Value {
     }
     throw new Error(
       'reflect: call of reflect.Value.Uint on ' +
-        this._type.Kind().String() +
+        Kind_String(this._type.Kind()) +
         ' Value',
     )
   }
@@ -228,7 +233,7 @@ export class Value {
     }
     throw new Error(
       'reflect: call of reflect.Value.Float on ' +
-        this._type.Kind().String() +
+        Kind_String(this._type.Kind()) +
         ' Value',
     )
   }
@@ -239,7 +244,7 @@ export class Value {
     }
     throw new Error(
       'reflect: call of reflect.Value.Bool on ' +
-        this._type.Kind().String() +
+        Kind_String(this._type.Kind()) +
         ' Value',
     )
   }
@@ -249,7 +254,7 @@ export class Value {
       return this._value
     }
     // Special case for bool values - display as <bool Value>
-    if (this._type.Kind().valueOf() === Bool.valueOf()) {
+    if (this._type.Kind() === Bool) {
       return '<bool Value>'
     }
     return this._type.String()
@@ -294,7 +299,7 @@ export class Value {
 
     throw new Error(
       'reflect: call of reflect.Value.Len on ' +
-        this._type.Kind().String() +
+        Kind_String(this._type.Kind()) +
         ' Value',
     )
   }
@@ -321,7 +326,7 @@ export class Value {
     }
     throw new Error(
       'reflect: call of reflect.Value.Index on ' +
-        this._type.Kind().String() +
+        Kind_String(this._type.Kind()) +
         ' Value',
     )
   }
@@ -332,7 +337,7 @@ export class Value {
     }
     throw new Error(
       'reflect: call of reflect.Value.Bytes on ' +
-        this._type.Kind().String() +
+        Kind_String(this._type.Kind()) +
         ' Value',
     )
   }
@@ -401,7 +406,7 @@ export class Value {
 
   // Send sends a value to a channel
   public Send(x: Value): void {
-    if (this._type.Kind().valueOf() !== Chan.valueOf()) {
+    if (this._type.Kind() !== Chan) {
       throw new Error('reflect: send on non-chan type')
     }
 
@@ -711,12 +716,12 @@ class ChannelType implements Type {
   public String(): string {
     // Format: chan T, <-chan T, or chan<- T
     const elem = this._elemType.String()
-    switch (this._dir.valueOf()) {
-      case 1: // RecvDir
+    switch (this._dir) {
+      case RecvDir:
         return `<-chan ${elem}`
-      case 2: // SendDir
+      case SendDir:
         return `chan<- ${elem}`
-      case 3: // BothDir
+      case BothDir:
       default:
         return `chan ${elem}`
     }
@@ -995,13 +1000,13 @@ export function ChanOf(dir: ChanDir, t: Type): Type {
 
 // Additional functions from merged files
 export function canRangeFunc(t: Type): boolean {
-  const kind = t.Kind().valueOf()
-  return kind === 23 || kind === 17 || kind === 24 // slice, array, string
+  const kind = t.Kind()
+  return kind === Slice || kind === Array || kind === String
 }
 
 export function canRangeFunc2(t: Type): boolean {
-  const kind = t.Kind().valueOf()
-  return kind === 21 // map
+  const kind = t.Kind()
+  return kind === Map
 }
 
 export function funcLayout(

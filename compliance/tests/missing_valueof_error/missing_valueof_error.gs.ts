@@ -17,7 +17,9 @@ export class buffer {
 
 	constructor(init?: Partial<{data?: $.Bytes}>) {
 		this._fields = {
-			data: $.varRef(init?.data ?? new Uint8Array(0))
+			data: $.varRef(init?.data ?? // DEBUG: Field data has type []byte (*types.Slice)
+			// DEBUG: Using default zero value
+			new Uint8Array(0))
 		}
 	}
 
@@ -53,7 +55,9 @@ export class printer {
 
 	constructor(init?: Partial<{buf?: buffer | null}>) {
 		this._fields = {
-			buf: $.varRef(init?.buf ?? null)
+			buf: $.varRef(init?.buf ?? // DEBUG: Field buf has type *github.com/aperturerobotics/goscript/compliance/tests/missing_valueof_error.buffer (*types.Pointer)
+			// DEBUG: Using default zero value
+			null)
 		}
 	}
 
@@ -69,7 +73,8 @@ export class printer {
 		const p = this
 		if ($.cap(p.buf!.data) > 64 * 1024) {
 			p.buf = null
-		} else {
+		}
+		 else {
 			// Reset buffer
 			p.buf!.data = $.goSlice(p.buf!.data, undefined, 0)
 		}
@@ -110,7 +115,8 @@ export async function main(): Promise<void> {
 	p.free()
 	if (p.buf != null) {
 		console.log("Buffer not freed, capacity:", p.checkCapacity())
-	} else {
+	}
+	 else {
 		console.log("Buffer was freed")
 	}
 }

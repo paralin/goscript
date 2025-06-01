@@ -294,70 +294,6 @@ func (c *GoToTSCompiler) isNamedNumericType(t types.Type) bool {
 	return false
 }
 
-// isWrapperType checks if a type is implemented as a wrapper class with valueOf() method
-// This is true for named types that have methods defined on them
-func (c *GoToTSCompiler) isWrapperType(t types.Type) bool {
-	if t == nil {
-		return false
-	}
-
-	// Follow any type aliases to get to the actual named type
-	namedType, ok := t.(*types.Named)
-	if !ok {
-		return false
-	}
-
-	// If the named type has methods, it's implemented as a class with valueOf()
-	numMethods := namedType.NumMethods()
-	return numMethods > 0
-}
-
-// needsValueOfForBitwiseOp checks if an operand in a bitwise operation needs .valueOf() to be called
-// This is needed for custom types (like FileMode) that have a valueOf() method and need to be treated as numbers
-func (c *GoToTSCompiler) needsValueOfForBitwiseOp(expr ast.Expr) bool {
-	if c.pkg == nil || c.pkg.TypesInfo == nil {
-		return false
-	}
-
-	exprType := c.pkg.TypesInfo.TypeOf(expr)
-	if exprType == nil {
-		return false
-	}
-
-	// Don't add valueOf() for basic literals (numeric, string, bool literals)
-	switch expr.(type) {
-	case *ast.BasicLit:
-		return false
-	}
-
-	// Check if this is a compile-time constant of a primitive type
-	if tv, ok := c.pkg.TypesInfo.Types[expr]; ok {
-		if tv.Value != nil {
-			// This is a constant expression - but only skip valueOf() if it's truly a primitive type
-			// (not a named type with methods that happens to be constant)
-			if _, isBasic := exprType.(*types.Basic); isBasic {
-				// Primitive constant, don't add valueOf()
-				return false
-			}
-		}
-	}
-
-	// Check if this type is implemented as a wrapper class with valueOf()
-	return c.isWrapperType(exprType)
-}
-
-// writeBitwiseOperand writes an operand for a bitwise operation, adding .valueOf() if needed
-func (c *GoToTSCompiler) writeBitwiseOperand(expr ast.Expr) error {
-	if c.needsValueOfForBitwiseOp(expr) {
-		if err := c.WriteValueExpr(expr); err != nil {
-			return err
-		}
-		c.tsw.WriteLiterally(".valueOf()")
-		return nil
-	}
-	return c.WriteValueExpr(expr)
-}
-
 // WriteBinaryExpr translates a Go binary expression (`ast.BinaryExpr`) into its
 // TypeScript equivalent.
 // It handles several cases:
@@ -542,16 +478,10 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 		c.tsw.WriteLiterally("(") // Add opening parenthesis for bitwise operations
 	}
 
-	// For bitwise operations, use special operand writing that adds .valueOf() when needed
-	if isBitwise {
-		if err := c.writeBitwiseOperand(exp.X); err != nil {
-			return fmt.Errorf("failed to write binary expression left operand: %w", err)
-		}
-	} else {
-		if err := c.WriteValueExpr(exp.X); err != nil {
-			return fmt.Errorf("failed to write binary expression left operand: %w", err)
-		}
+	if err := c.WriteValueExpr(exp.X); err != nil {
+		return fmt.Errorf("failed to write binary expression left operand: %w", err)
 	}
+
 	c.tsw.WriteLiterally(" ")
 	tokStr, ok := TokenToTs(exp.Op)
 	if !ok {
@@ -561,15 +491,8 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 	c.tsw.WriteLiterally(tokStr)
 	c.tsw.WriteLiterally(" ")
 
-	// For bitwise operations, use special operand writing that adds .valueOf() when needed
-	if isBitwise {
-		if err := c.writeBitwiseOperand(exp.Y); err != nil {
-			return fmt.Errorf("failed to write binary expression right operand: %w", err)
-		}
-	} else {
-		if err := c.WriteValueExpr(exp.Y); err != nil {
-			return fmt.Errorf("failed to write binary expression right operand: %w", err)
-		}
+	if err := c.WriteValueExpr(exp.Y); err != nil {
+		return fmt.Errorf("failed to write binary expression right operand: %w", err)
 	}
 
 	if isBitwise {

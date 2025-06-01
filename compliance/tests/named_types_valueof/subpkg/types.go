@@ -3,18 +3,24 @@ package subpkg
 // Named types with different basic underlying types
 
 // Numeric types
-type MyInt int
-type MyUint uint32
-type MyFloat float64
+type (
+	MyInt   int
+	MyUint  uint32
+	MyFloat float64
+)
 
 // String and bool types
-type MyString string
-type MyBool bool
+type (
+	MyString string
+	MyBool   bool
+)
 
 // Multiple levels of indirection
-type Level1 Level2
-type Level2 Level3
-type Level3 uint64
+type (
+	Level1 Level2
+	Level2 Level3
+	Level3 uint64
+)
 
 // Constants for testing
 const (

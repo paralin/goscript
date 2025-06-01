@@ -27,8 +27,12 @@ export class Person {
 
 	constructor(init?: Partial<{Age?: number, Name?: string}>) {
 		this._fields = {
-			Name: $.varRef(init?.Name ?? ""),
-			Age: $.varRef(init?.Age ?? 0)
+			Name: $.varRef(init?.Name ?? // DEBUG: Field Name has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			""),
+			Age: $.varRef(init?.Age ?? // DEBUG: Field Age has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 
@@ -67,21 +71,21 @@ export async function main(): Promise<void> {
 	let v = reflect.ValueOf(x).clone()
 	console.log("Type:", reflect.TypeOf(x)!.String())
 	console.log("Value:", v.Int())
-	console.log("Kind:", v.Kind()!.String())
+	console.log("Kind:", reflect.Kind_String(v.Kind()))
 
 	// Test with string
 	let s = "hello"
 	let sv = reflect.ValueOf(s).clone()
 	console.log("String type:", reflect.TypeOf(s)!.String())
 	console.log("String value:", sv.String())
-	console.log("String kind:", sv.Kind()!.String())
+	console.log("String kind:", reflect.Kind_String(sv.Kind()))
 
 	// Test with slice
 	let slice = $.arrayToSlice<number>([1, 2, 3])
 	let sliceV = reflect.ValueOf(slice).clone()
 	console.log("Slice type:", reflect.TypeOf(slice)!.String())
 	console.log("Slice len:", sliceV.Len())
-	console.log("Slice kind:", sliceV.Kind()!.String())
+	console.log("Slice kind:", reflect.Kind_String(sliceV.Kind()))
 
 	// Test DeepEqual
 	let a = $.arrayToSlice<number>([1, 2, 3])
@@ -98,15 +102,15 @@ export async function main(): Promise<void> {
 	let intType = reflect.TypeOf(0)
 	let sliceType = reflect.SliceOf(intType)
 	console.log("SliceOf int:", sliceType!.String())
-	console.log("SliceOf kind:", sliceType!.Kind()!.String())
+	console.log("SliceOf kind:", reflect.Kind_String(sliceType!.Kind()))
 
 	let arrayType = reflect.ArrayOf(5, intType)
 	console.log("ArrayOf 5 int:", arrayType!.String())
-	console.log("ArrayOf kind:", arrayType!.Kind()!.String())
+	console.log("ArrayOf kind:", reflect.Kind_String(arrayType!.Kind()))
 
 	let ptrType = reflect.PointerTo(intType)
 	console.log("PointerTo int:", ptrType!.String())
-	console.log("PointerTo kind:", ptrType!.Kind()!.String())
+	console.log("PointerTo kind:", reflect.Kind_String(ptrType!.Kind()))
 
 	// Test PtrTo (alias for PointerTo)
 	let ptrType2 = reflect.PtrTo(intType)
@@ -145,7 +149,7 @@ export async function main(): Promise<void> {
 	let person = new Person({Age: 30, Name: "Alice"})
 	let personType = reflect.TypeOf(person)
 	console.log("Struct type:", personType!.String())
-	console.log("Struct kind:", personType!.Kind()!.String())
+	console.log("Struct kind:", reflect.Kind_String(personType!.Kind()))
 
 	let personVal = reflect.ValueOf(person).clone()
 	console.log("Struct value type:", personVal.Type()!.String())
@@ -153,11 +157,11 @@ export async function main(): Promise<void> {
 	// Test with different kinds
 	let f: number = 3.14
 	let fVal = reflect.ValueOf(f).clone()
-	console.log("Float kind:", fVal.Kind()!.String())
+	console.log("Float kind:", reflect.Kind_String(fVal.Kind()))
 
 	let boolVal: boolean = true
 	let bVal = reflect.ValueOf(boolVal).clone()
-	console.log("Bool kind:", bVal.Kind()!.String())
+	console.log("Bool kind:", reflect.Kind_String(bVal.Kind()))
 
 	// Test type equality
 	let intType1 = reflect.TypeOf(1)
@@ -170,7 +174,7 @@ export async function main(): Promise<void> {
 	// Test map type construction
 	let mapType = reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0))
 	console.log("MapOf string->int:", mapType!.String())
-	console.log("MapOf kind:", mapType!.Kind()!.String())
+	console.log("MapOf kind:", reflect.Kind_String(mapType!.Kind()))
 
 	// Test channel direction constants
 	console.log("Chan kinds available")
@@ -186,7 +190,7 @@ export async function main(): Promise<void> {
 	let iface: null | any = "hello"
 	let ifaceVal = reflect.ValueOf(iface).clone()
 	console.log("Interface value type:", ifaceVal.Type()!.String())
-	console.log("Interface kind:", ifaceVal.Kind()!.String())
+	console.log("Interface kind:", reflect.Kind_String(ifaceVal.Kind()))
 
 	// Test function type
 	let fn = (() => {
@@ -202,13 +206,13 @@ export async function main(): Promise<void> {
 	})()
 	let fnVal = reflect.ValueOf(fn).clone()
 	console.log("Function type:", fnVal.Type()!.String())
-	console.log("Function kind:", fnVal.Kind()!.String())
+	console.log("Function kind:", reflect.Kind_String(fnVal.Kind()))
 
 	// Test more complex types
 	let complexSlice = $.arrayToSlice<$.Slice<number>>([[ 1, 2 ], [ 3, 4 ]], 2)
 	let complexVal = reflect.ValueOf(complexSlice).clone()
 	console.log("Complex slice type:", complexVal.Type()!.String())
-	console.log("Complex slice kind:", complexVal.Kind()!.String())
+	console.log("Complex slice kind:", reflect.Kind_String(complexVal.Kind()))
 	console.log("Complex slice len:", complexVal.Len())
 
 	// Test type methods
@@ -239,7 +243,7 @@ export async function main(): Promise<void> {
 	// Test channel types
 	let chanType = reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
 	console.log("ChanOf type:", chanType!.String())
-	console.log("ChanOf kind:", chanType!.Kind()!.String())
+	console.log("ChanOf kind:", reflect.Kind_String(chanType!.Kind()))
 
 	// Test MakeChan
 	let newChan = reflect.MakeChan(chanType, 0).clone()
@@ -266,7 +270,7 @@ export async function main(): Promise<void> {
 
 	// Test channel reflection properties
 	console.log("Chan elem type:", chanType!.Elem()!.String())
-	console.log("Chan elem kind:", chanType!.Elem()!.Kind()!.String())
+	console.log("Chan elem kind:", reflect.Kind_String(chanType!.Elem()!.Kind()))
 	console.log("Chan size:", chanType!.Size())
 
 	// Test Select functionality
@@ -286,10 +290,12 @@ export async function main(): Promise<void> {
 		// Print the actual received value
 		if (chosen == 0) {
 			console.log("Select recv value:", recv.Int())
-		} else if (chosen == 1) {
+		}
+		 else if (chosen == 1) {
 			console.log("Select recv value:", recv.String())
 		}
-	} else {
+	}
+	 else {
 		console.log("Select recv type: invalid")
 	}
 }

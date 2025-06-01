@@ -1,12 +1,14 @@
 package compiler
 
 import (
+	"encoding/json"
 	"go/ast"
 	"go/token"
 	"go/types"
 	"path/filepath"
 	"strings"
 
+	"github.com/aperturerobotics/goscript"
 	"golang.org/x/tools/go/packages"
 )
 
@@ -81,6 +83,7 @@ type NodeInfo struct {
 	IsInsideFunction  bool           // true if this declaration is inside a function body
 	IsMethodValue     bool           // true if this SelectorExpr is a method value that needs binding
 	ShadowingInfo     *ShadowingInfo // variable shadowing information for if statements
+	IdentifierMapping string         // replacement name for this identifier (e.g., receiver -> "receiver")
 }
 
 // Analysis holds information gathered during the analysis phase of the Go code compilation.
@@ -115,6 +118,10 @@ type Analysis struct {
 
 	// PackageMetadata holds package-level metadata
 	PackageMetadata map[string]interface{}
+
+	// WrapperTypes tracks types that should be implemented as wrapper classes
+	// This includes both local types with methods and imported types that are known wrapper types
+	WrapperTypes map[types.Type]bool
 }
 
 // PackageAnalysis holds cross-file analysis data for a package
@@ -136,6 +143,12 @@ type PackageAnalysis struct {
 	TypeCalls map[string]map[string][]string
 }
 
+// GsMetadata represents the structure of a meta.json file in gs/ packages
+type GsMetadata struct {
+	Dependencies []string        `json:"dependencies,omitempty"`
+	AsyncMethods map[string]bool `json:"asyncMethods,omitempty"`
+}
+
 // NewAnalysis creates a new Analysis instance.
 func NewAnalysis() *Analysis {
 	return &Analysis{
@@ -147,6 +160,7 @@ func NewAnalysis() *Analysis {
 		ReflectedFunctions:  make(map[ast.Node]*ReflectedFunctionInfo),
 		FunctionAssignments: make(map[types.Object]ast.Node),
 		PackageMetadata:     make(map[string]interface{}),
+		WrapperTypes:        make(map[types.Type]bool),
 	}
 }
 
@@ -1299,85 +1313,91 @@ func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
 	return analysis
 }
 
-// LoadPackageMetadata loads metadata from gs packages to determine which functions are async
+// LoadPackageMetadata loads metadata from gs packages using embedded JSON files
 func (a *Analysis) LoadPackageMetadata() {
-	// List of gs packages that have metadata
-	metadataPackages := []string{
-		"github.com/aperturerobotics/goscript/gs/sync",
-		"github.com/aperturerobotics/goscript/gs/unicode",
-	}
+	// Use the embedded filesystem from gs.go
+	// The GsOverrides embed.FS should be available but we need to import it
+	// For now, let's iterate through known packages and load their meta.json files
 
-	for _, pkgPath := range metadataPackages {
-		cfg := &packages.Config{
-			Mode: packages.NeedTypes | packages.NeedTypesInfo | packages.NeedSyntax,
-		}
+	// Discover all packages in the embedded gs/ directory
+	packagePaths := a.discoverEmbeddedGsPackages()
 
-		pkgs, err := packages.Load(cfg, pkgPath)
-		if err != nil || len(pkgs) == 0 {
-			continue // Skip if package can't be loaded
-		}
+	for _, pkgPath := range packagePaths {
+		metaFilePath := filepath.Join("gs", pkgPath, "meta.json")
 
-		pkg := pkgs[0]
-		if pkg.Types == nil {
-			continue
-		}
+		// Try to read the meta.json file from embedded filesystem
+		// We need access to the embedded FS, which should be imported from the parent package
+		if metadata := a.loadGsMetadata(metaFilePath); metadata != nil {
+			// Store async method information
+			for methodKey, isAsync := range metadata.AsyncMethods {
+				// Convert "Type.Method" format to our internal key format
+				parts := strings.Split(methodKey, ".")
+				if len(parts) == 2 {
+					typeName := parts[0]
+					methodName := parts[1]
+					// The key format is "pkgName.TypeNameMethodNameInfo"
+					key := pkgPath + "." + typeName + methodName + "Info"
 
-		// Extract the package name (e.g., "sync" from "github.com/aperturerobotics/goscript/gs/sync")
-		parts := strings.Split(pkgPath, "/")
-		pkgName := parts[len(parts)-1]
-
-		// Look for metadata variables in the package scope
-		scope := pkg.Types.Scope()
-		for _, name := range scope.Names() {
-			obj := scope.Lookup(name)
-			if obj == nil {
-				continue
-			}
-
-			// Check if this is a metadata variable (ends with "Info")
-			if strings.HasSuffix(name, "Info") {
-				if varObj, ok := obj.(*types.Var); ok {
-					// Store the metadata with a key like "sync.MutexLock"
-					methodName := strings.TrimSuffix(name, "Info")
-					key := pkgName + "." + methodName
-					a.PackageMetadata[key] = varObj
+					// Store the async value directly in PackageMetadata
+					a.PackageMetadata[key] = isAsync
 				}
 			}
 		}
 	}
 }
 
-// IsMethodAsync checks if a method call is async based on package metadata
-func (a *Analysis) IsMethodAsync(pkgName, typeName, methodName string) bool {
-	// The metadata keys are stored as "sync.MutexLock", "sync.WaitGroupWait", etc.
-	// We need to match "sync.Mutex.Lock" -> "sync.MutexLock"
-	key := pkgName + "." + typeName + methodName
+// discoverEmbeddedGsPackages finds all packages in the embedded gs/ directory
+func (a *Analysis) discoverEmbeddedGsPackages() []string {
+	var packageList []string
 
-	if metaObj, exists := a.PackageMetadata[key]; exists {
-		if varObj, ok := metaObj.(*types.Var); ok {
-			// Try to get the actual value of the variable
-			// For now, we'll use the variable name to determine if it's async
-			// The variable names follow the pattern: MutexLockInfo, WaitGroupWaitInfo, etc.
-			// We can check if the corresponding metadata indicates IsAsync: true
-			varName := varObj.Name()
+	// Read the gs/ directory from the embedded filesystem
+	entries, err := goscript.GsOverrides.ReadDir("gs")
+	if err != nil {
+		// If we can't read the gs/ directory, return empty list
+		return packageList
+	}
 
-			// Based on our metadata definitions, these should be async:
-			asyncMethods := map[string]bool{
-				"MutexLockInfo":        true,
-				"RWMutexLockInfo":      true,
-				"RWMutexRLockInfo":     true,
-				"WaitGroupWaitInfo":    true,
-				"OnceDoInfo":           true,
-				"CondWaitInfo":         true,
-				"MapDeleteInfo":        true,
-				"MapLoadInfo":          true,
-				"MapLoadAndDeleteInfo": true,
-				"MapLoadOrStoreInfo":   true,
-				"MapRangeInfo":         true,
-				"MapStoreInfo":         true,
+	// Iterate through all entries in gs/
+	for _, entry := range entries {
+		if entry.IsDir() {
+			packageName := entry.Name()
+
+			// Skip special directories like github.com
+			if strings.Contains(packageName, ".") {
+				continue
 			}
 
-			isAsync := asyncMethods[varName]
+			packageList = append(packageList, packageName)
+		}
+	}
+
+	return packageList
+}
+
+// loadGsMetadata loads metadata from a meta.json file in the embedded filesystem
+func (a *Analysis) loadGsMetadata(metaFilePath string) *GsMetadata {
+	// Read the meta.json file from the embedded filesystem
+	content, err := goscript.GsOverrides.ReadFile(metaFilePath)
+	if err != nil {
+		return nil // No metadata file found
+	}
+
+	var metadata GsMetadata
+	if err := json.Unmarshal(content, &metadata); err != nil {
+		return nil // Invalid JSON
+	}
+
+	return &metadata
+}
+
+// IsMethodAsync checks if a method call is async based on package metadata
+func (a *Analysis) IsMethodAsync(pkgName, typeName, methodName string) bool {
+	// The metadata keys are stored as "pkgName.TypeNameMethodNameInfo"
+	// e.g., "sync.MutexLockInfo", "sync.WaitGroupWaitInfo", etc.
+	key := pkgName + "." + typeName + methodName + "Info"
+
+	if asyncValue, exists := a.PackageMetadata[key]; exists {
+		if isAsync, ok := asyncValue.(bool); ok {
 			return isAsync
 		}
 	}
@@ -1580,4 +1600,129 @@ func (v *analysisVisitor) findVariableUsageInExpr(expr ast.Expr, lhsVarNames map
 		// For other expression types, we might need to add specific handling
 		// For now, we'll ignore them as they're less common in shadowing scenarios
 	}
+}
+
+// IsWrapperType returns whether the given type should be implemented as a wrapper type alias
+// A wrapper type is a named type that has methods defined on it (but is not a struct or interface)
+func (a *Analysis) IsWrapperType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+
+	// Check if we've already determined this type is a wrapper type
+	if isWrapper, exists := a.WrapperTypes[t]; exists {
+		return isWrapper
+	}
+
+	// For named types, check if they have methods
+	if namedType, ok := t.(*types.Named); ok {
+		// Exclude struct types - they should remain as classes, not wrapper types
+		if _, isStruct := namedType.Underlying().(*types.Struct); isStruct {
+			a.WrapperTypes[t] = false
+			return false
+		}
+
+		// Exclude interface types
+		if _, isInterface := namedType.Underlying().(*types.Interface); isInterface {
+			a.WrapperTypes[t] = false
+			return false
+		}
+
+		// Check if this type has methods defined on it
+		// This works for both local and imported types since the Go type checker
+		// loads method information for all types in the dependency graph
+		if namedType.NumMethods() > 0 {
+			a.WrapperTypes[t] = true
+			return true
+		}
+	}
+
+	// Handle type aliases (Go 1.9+)
+	if aliasType, ok := t.(*types.Alias); ok {
+		// For type aliases, we need to check if the original type (not just underlying) has methods
+		// This is important for cases like os.FileMode = fs.FileMode where fs.FileMode has methods
+
+		// First check the RHS type (what the alias points to)
+		rhs := aliasType.Rhs()
+		if rhs != nil {
+			// Check if the RHS is a named type with methods
+			if namedRhs, ok := rhs.(*types.Named); ok {
+				// Exclude struct types - they should remain as classes, not wrapper types
+				if _, isStruct := namedRhs.Underlying().(*types.Struct); isStruct {
+					a.WrapperTypes[t] = false
+					return false
+				}
+
+				// Exclude interface types
+				if _, isInterface := namedRhs.Underlying().(*types.Interface); isInterface {
+					a.WrapperTypes[t] = false
+					return false
+				}
+
+				// Check if the RHS named type has methods
+				if namedRhs.NumMethods() > 0 {
+					a.WrapperTypes[t] = true
+					return true
+				}
+			}
+		}
+
+		// Fallback: check the underlying type
+		underlying := aliasType.Underlying()
+		if namedUnderlying, ok := underlying.(*types.Named); ok {
+			// Exclude struct types - they should remain as classes, not wrapper types
+			if _, isStruct := namedUnderlying.Underlying().(*types.Struct); isStruct {
+				a.WrapperTypes[t] = false
+				return false
+			}
+
+			// Exclude interface types
+			if _, isInterface := namedUnderlying.Underlying().(*types.Interface); isInterface {
+				a.WrapperTypes[t] = false
+				return false
+			}
+
+			// Check if the underlying named type has methods
+			if namedUnderlying.NumMethods() > 0 {
+				a.WrapperTypes[t] = true
+				return true
+			}
+		}
+
+		// For type aliases to basic types, return false
+		a.WrapperTypes[t] = false
+		return false
+	}
+
+	// Cache negative result
+	a.WrapperTypes[t] = false
+	return false
+}
+
+// GetReceiverMapping returns the receiver variable mapping for a function declaration
+func (a *Analysis) GetReceiverMapping(funcDecl *ast.FuncDecl) string {
+	if funcDecl.Recv != nil && len(funcDecl.Recv.List) > 0 {
+		for _, field := range funcDecl.Recv.List {
+			for _, name := range field.Names {
+				if name != nil && name.Name != "_" {
+					return "receiver"
+				}
+			}
+		}
+	}
+	return ""
+}
+
+// GetIdentifierMapping returns the replacement name for an identifier
+func (a *Analysis) GetIdentifierMapping(ident *ast.Ident) string {
+	if ident == nil {
+		return ""
+	}
+
+	// Check if this identifier has a mapping in NodeData
+	if nodeInfo := a.NodeData[ident]; nodeInfo != nil {
+		return nodeInfo.IdentifierMapping
+	}
+
+	return ""
 }

@@ -34,34 +34,8 @@ export type ReflectValue =
   | Float32Array
   | Float64Array
 
-// Channel direction constants and type
-export class ChanDir {
-  constructor(private _value: number) {}
-
-  valueOf(): number {
-    return this._value
-  }
-
-  toString(): string {
-    switch (this._value) {
-      case 1:
-        return 'RecvDir'
-      case 2:
-        return 'SendDir'
-      case 3:
-        return 'BothDir'
-      default:
-        return 'InvalidDir'
-    }
-  }
-}
-
-export const RecvDir = new ChanDir(1)
-export const SendDir = new ChanDir(2)
-export const BothDir = new ChanDir(3)
-
 // Import Type and Kind from the main type module
-import { Type, Kind, Value } from './type.js'
+import { Type, Kind, Value, Kind_String, ChanDir } from './type.js'
 
 // Struct field representation
 export class StructField {
@@ -205,7 +179,7 @@ export class ValueError extends Error {
 
   constructor(init: { Kind: Kind; Method: string }) {
     super(
-      `reflect: call of reflect.Value.${init.Method} on ${init.Kind.String()} Value`,
+      `reflect: call of reflect.Value.${init.Method} on ${Kind_String(init.Kind)} Value`,
     )
     this.Kind = init.Kind
     this.Method = init.Method

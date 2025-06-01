@@ -1,0 +1,8 @@
+TestFileMode called with mode=-rw-r--r--
+TestFileMode called with mode=-rwxr-xr-x
+TestMyMode called with mode=755, executable=true
+TestMyMode called with mode=600, executable=false
+MkdirAll called with path=/tmp/test, perm=-rwx------
+TestFileMode called with mode=-rw-r--r--
+TestFileMode called with mode=-rwxrwxrwx
+Test completed

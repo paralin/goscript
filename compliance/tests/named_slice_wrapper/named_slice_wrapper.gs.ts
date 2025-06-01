@@ -5,44 +5,28 @@ import * as $ from "@goscript/builtin/index.js";
 
 import * as os from "@goscript/os/index.js"
 
-export class ByName {
-	constructor(private _value: $.Slice<os.FileInfo>) {}
+export type ByName = $.Slice<os.FileInfo>;
 
-	valueOf(): $.Slice<os.FileInfo> {
-		return this._value
-	}
-
-	toString(): string {
-		return String(this._value)
-	}
-
-	static from(value: $.Slice<os.FileInfo>): ByName {
-		return new ByName(value)
-	}
-
-	public Len(): number {
-		const a = this._value
-		return $.len(a)
-	}
-
-	public Less(i: number, j: number): boolean {
-		const a = this._value
-		return a![i]!.Name() < a![j]!.Name()
-	}
-
-	public Swap(i: number, j: number): void {
-		const a = this._value
-		;[a![i], a![j]] = [a![j], a![i]]
-	}
+export function ByName_Len(a: ByName): number {
+	return $.len(a)
 }
+
+export function ByName_Less(a: ByName, i: number, j: number): boolean {
+	return a![i]!.Name() < a![j]!.Name()
+}
+
+export function ByName_Swap(a: ByName, i: number, j: number): void {
+	;[a![i], a![j]] = [a![j], a![i]]
+}
+
 
 export async function main(): Promise<void> {
 	// Create a ByName instance to test the wrapper
-	let files: ByName = new ByName($.makeSlice<os.FileInfo>(2))
-	console.log("Length:", files.Len())
+	let files: ByName = $.makeSlice<os.FileInfo>(2)
+	console.log("Length:", ByName_Len(files))
 
 	// Test type conversion
-	let slice: $.Slice<os.FileInfo> = files.valueOf()
+	let slice: $.Slice<os.FileInfo> = files
 	console.log("Slice length:", $.len(slice))
 }
 

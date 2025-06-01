@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { TypeOf } from './type.js'
+import { TypeOf, Kind_String } from './type.js'
 
 describe('Function Type Detection', () => {
   it('should detect regular function types', () => {
@@ -8,7 +8,7 @@ describe('Function Type Detection', () => {
     }
     const type = TypeOf(regularFunc)
     expect(type.String()).toMatch(/^func/)
-    expect(type.Kind().String()).toBe('func')
+    expect(Kind_String(type.Kind())).toBe('func')
   })
 
   it('should detect GoScript typed functions with __goTypeName', () => {
@@ -19,7 +19,7 @@ describe('Function Type Detection', () => {
     Object.assign(greetFunc, { __goTypeName: 'Greeter' })
     const greetType = TypeOf(greetFunc)
     expect(greetType.String()).toBe('func(string) string')
-    expect(greetType.Kind().String()).toBe('func')
+    expect(Kind_String(greetType.Kind())).toBe('func')
 
     // Test Adder function type
     const addFunc = function (a: number, b: number) {
@@ -28,7 +28,7 @@ describe('Function Type Detection', () => {
     Object.assign(addFunc, { __goTypeName: 'Adder' })
     const addType = TypeOf(addFunc)
     expect(addType.String()).toBe('func(int, int) int')
-    expect(addType.Kind().String()).toBe('func')
+    expect(Kind_String(addType.Kind())).toBe('func')
   })
 
   it('should detect functions with full __typeInfo metadata', () => {
@@ -49,7 +49,7 @@ describe('Function Type Detection', () => {
 
     const type = TypeOf(complexFunc)
     expect(type.String()).toBe('func(int, int) int')
-    expect(type.Kind().String()).toBe('func')
+    expect(Kind_String(type.Kind())).toBe('func')
   })
 
   it('should handle functions with multiple return types', () => {
@@ -70,7 +70,7 @@ describe('Function Type Detection', () => {
 
     const type = TypeOf(multiReturnFunc)
     expect(type.String()).toBe('func() (int, string)')
-    expect(type.Kind().String()).toBe('func')
+    expect(Kind_String(type.Kind())).toBe('func')
   })
 
   it('should handle functions with no parameters', () => {
@@ -88,7 +88,7 @@ describe('Function Type Detection', () => {
 
     const type = TypeOf(noParamFunc)
     expect(type.String()).toBe('func() int')
-    expect(type.Kind().String()).toBe('func')
+    expect(Kind_String(type.Kind())).toBe('func')
   })
 
   it('should handle functions with no return type', () => {
@@ -106,7 +106,7 @@ describe('Function Type Detection', () => {
 
     const type = TypeOf(voidFunc)
     expect(type.String()).toBe('func(int)')
-    expect(type.Kind().String()).toBe('func')
+    expect(Kind_String(type.Kind())).toBe('func')
   })
 
   it('should fallback to generic func for unknown typed functions', () => {
@@ -117,14 +117,14 @@ describe('Function Type Detection', () => {
 
     const type = TypeOf(unknownFunc)
     expect(type.String()).toBe('func')
-    expect(type.Kind().String()).toBe('func')
+    expect(Kind_String(type.Kind())).toBe('func')
   })
 
   it('should handle arrow functions', () => {
     const arrowFunc = (x: number) => x * 2
     const type = TypeOf(arrowFunc)
     expect(type.String()).toMatch(/^func/)
-    expect(type.Kind().String()).toBe('func')
+    expect(Kind_String(type.Kind())).toBe('func')
   })
 
   it('should detect functions that return values vs void functions', () => {

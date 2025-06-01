@@ -17,7 +17,8 @@ export async function main(): Promise<void> {
 	if (mu.TryLock()) {
 		console.log("TryLock succeeded")
 		mu.Unlock()
-	} else {
+	}
+	 else {
 		console.log("TryLock failed")
 	}
 

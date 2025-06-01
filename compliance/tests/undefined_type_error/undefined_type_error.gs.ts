@@ -97,17 +97,39 @@ export class formatter {
 
 	constructor(init?: Partial<{minus?: boolean, plus?: boolean, plusV?: boolean, prec?: number, precPresent?: boolean, sharp?: boolean, sharpV?: boolean, space?: boolean, wid?: number, widPresent?: boolean, zero?: boolean}>) {
 		this._fields = {
-			wid: $.varRef(init?.wid ?? 0),
-			prec: $.varRef(init?.prec ?? 0),
-			widPresent: $.varRef(init?.widPresent ?? false),
-			precPresent: $.varRef(init?.precPresent ?? false),
-			minus: $.varRef(init?.minus ?? false),
-			plus: $.varRef(init?.plus ?? false),
-			sharp: $.varRef(init?.sharp ?? false),
-			space: $.varRef(init?.space ?? false),
-			zero: $.varRef(init?.zero ?? false),
-			plusV: $.varRef(init?.plusV ?? false),
-			sharpV: $.varRef(init?.sharpV ?? false)
+			wid: $.varRef(init?.wid ?? // DEBUG: Field wid has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0),
+			prec: $.varRef(init?.prec ?? // DEBUG: Field prec has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0),
+			widPresent: $.varRef(init?.widPresent ?? // DEBUG: Field widPresent has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			precPresent: $.varRef(init?.precPresent ?? // DEBUG: Field precPresent has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			minus: $.varRef(init?.minus ?? // DEBUG: Field minus has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			plus: $.varRef(init?.plus ?? // DEBUG: Field plus has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			sharp: $.varRef(init?.sharp ?? // DEBUG: Field sharp has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			space: $.varRef(init?.space ?? // DEBUG: Field space has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			zero: $.varRef(init?.zero ?? // DEBUG: Field zero has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			plusV: $.varRef(init?.plusV ?? // DEBUG: Field plusV has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false),
+			sharpV: $.varRef(init?.sharpV ?? // DEBUG: Field sharpV has type bool (*types.Basic)
+			// DEBUG: Using default zero value
+			false)
 		}
 	}
 
@@ -171,8 +193,12 @@ export class printer {
 
 	constructor(init?: Partial<{arg?: null | any, buf?: $.Bytes, fmt?: formatter}>) {
 		this._fields = {
-			buf: $.varRef(init?.buf ?? new Uint8Array(0)),
-			arg: $.varRef(init?.arg ?? null),
+			buf: $.varRef(init?.buf ?? // DEBUG: Field buf has type []byte (*types.Slice)
+			// DEBUG: Using default zero value
+			new Uint8Array(0)),
+			arg: $.varRef(init?.arg ?? // DEBUG: Field arg has type interface{} (*types.Interface)
+			// DEBUG: Using default zero value
+			null),
 			fmt: $.varRef(init?.fmt?.clone() ?? new formatter())
 		}
 	}

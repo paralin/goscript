@@ -22,7 +22,8 @@ export async function main(): Promise<void> {
 				const ok = result.ok
 				if (ok) {
 					console.log("Received value with ok==true:", val) // Should not be reached
-				} else {
+				}
+				 else {
 					console.log("Received zero value with ok==false:", val) // Should be reached
 				}
 			}

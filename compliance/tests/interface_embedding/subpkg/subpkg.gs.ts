@@ -40,8 +40,12 @@ export class MockFile {
 
 	constructor(init?: Partial<{data?: $.Bytes, filename?: string}>) {
 		this._fields = {
-			filename: $.varRef(init?.filename ?? ""),
-			data: $.varRef(init?.data ?? new Uint8Array(0))
+			filename: $.varRef(init?.filename ?? // DEBUG: Field filename has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			""),
+			data: $.varRef(init?.data ?? // DEBUG: Field data has type []byte (*types.Slice)
+			// DEBUG: Using default zero value
+			new Uint8Array(0))
 		}
 	}
 

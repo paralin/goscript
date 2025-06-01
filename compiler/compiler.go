@@ -2,10 +2,10 @@ package compiler
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"go/ast"
 	"go/constant"
-	"go/parser"
 	"go/token"
 	"go/types"
 	"os"
@@ -644,9 +644,6 @@ type GoToTSCompiler struct {
 	pkg *packages.Package
 
 	analysis *Analysis
-
-	// shadowingContext tracks temporary variable mappings when we're in a shadowing context
-	shadowingContext map[string]string
 }
 
 // It initializes the compiler with a `TSCodeWriter` for output,
@@ -654,10 +651,9 @@ type GoToTSCompiler struct {
 // analysis results (`Analysis`) to guide the translation process.
 func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analysis) *GoToTSCompiler {
 	return &GoToTSCompiler{
-		tsw:              tsw,
-		pkg:              pkg,
-		analysis:         analysis,
-		shadowingContext: make(map[string]string),
+		tsw:      tsw,
+		pkg:      pkg,
+		analysis: analysis,
 	}
 }
 
@@ -679,9 +675,9 @@ func (c *GoToTSCompiler) WriteIdent(exp *ast.Ident, accessVarRefedValue bool) {
 		return
 	}
 
-	// Check if we're in a shadowing context and should use a temporary variable
-	if tempVarName, exists := c.shadowingContext[exp.Name]; exists {
-		c.tsw.WriteLiterally(c.sanitizeIdentifier(tempVarName))
+	// Check if this identifier has a pre-computed mapping (e.g., wrapper function receiver)
+	if mappedName := c.analysis.GetIdentifierMapping(exp); mappedName != "" {
+		c.tsw.WriteLiterally(c.sanitizeIdentifier(mappedName))
 		return
 	}
 
@@ -1036,95 +1032,31 @@ func (c *Compiler) copyEmbeddedPackage(embeddedPath string, outputPath string) e
 // GsPackageMetadata holds metadata about a gs/ package
 type GsPackageMetadata struct {
 	// Dependencies lists the import paths that this gs/ package requires
-	Dependencies []string
+	Dependencies []string        `json:"dependencies,omitempty"`
+	AsyncMethods map[string]bool `json:"asyncMethods,omitempty"`
 }
 
-// ReadGsPackageMetadata reads dependency metadata from .go files in a gs/ package
-// It looks for a var variable named "GsDependencies" which should be a slice of strings
-// containing the import paths that this package depends on.
+// ReadGsPackageMetadata reads dependency metadata from meta.json file in a gs/ package
 func (c *Compiler) ReadGsPackageMetadata(gsSourcePath string) (*GsPackageMetadata, error) {
 	metadata := &GsPackageMetadata{
 		Dependencies: []string{},
+		AsyncMethods: make(map[string]bool),
 	}
 
-	// Check if there are any .go files in the gs package directory
-	entries, err := gs.GsOverrides.ReadDir(gsSourcePath)
+	// Try to read meta.json file
+	metaFilePath := filepath.Join(gsSourcePath, "meta.json")
+	content, err := gs.GsOverrides.ReadFile(metaFilePath)
 	if err != nil {
-		return metadata, nil // No metadata files, return empty metadata
+		// No meta.json file found, return empty metadata
+		return metadata, nil
 	}
 
-	// Look for .go files containing metadata
-	for _, entry := range entries {
-		if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") {
-			metadataFilePath := filepath.Join(gsSourcePath, entry.Name())
-
-			// Read the .go file content
-			content, err := gs.GsOverrides.ReadFile(metadataFilePath)
-			if err != nil {
-				continue // Skip files we can't read
-			}
-
-			// Parse the file to extract metadata
-			if deps, err := c.extractDependenciesFromGoFile(content); err == nil {
-				metadata.Dependencies = append(metadata.Dependencies, deps...)
-			}
-		}
+	// Parse the JSON content
+	if err := json.Unmarshal(content, metadata); err != nil {
+		return metadata, fmt.Errorf("failed to parse meta.json in %s: %w", gsSourcePath, err)
 	}
 
 	return metadata, nil
-}
-
-// extractDependenciesFromGoFile parses a .go file and extracts the GsDependencies var
-func (c *Compiler) extractDependenciesFromGoFile(content []byte) ([]string, error) {
-	// Parse the Go file
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, "metadata.go", content, 0)
-	if err != nil {
-		return nil, err
-	}
-
-	var dependencies []string
-
-	// Look for var declarations
-	for _, decl := range file.Decls {
-		if genDecl, ok := decl.(*ast.GenDecl); ok && genDecl.Tok == token.VAR {
-			for _, spec := range genDecl.Specs {
-				if valueSpec, ok := spec.(*ast.ValueSpec); ok {
-					for i, name := range valueSpec.Names {
-						if name.Name == "GsDependencies" {
-							// Found the GsDependencies var, extract its value
-							if i < len(valueSpec.Values) {
-								if deps := c.extractStringSliceFromExpr(valueSpec.Values[i]); deps != nil {
-									dependencies = append(dependencies, deps...)
-								}
-							}
-						}
-					}
-				}
-			}
-		}
-	}
-
-	return dependencies, nil
-}
-
-// extractStringSliceFromExpr extracts string values from a composite literal expression
-func (c *Compiler) extractStringSliceFromExpr(expr ast.Expr) []string {
-	var result []string
-
-	if compLit, ok := expr.(*ast.CompositeLit); ok {
-		for _, elt := range compLit.Elts {
-			if basicLit, ok := elt.(*ast.BasicLit); ok && basicLit.Kind == token.STRING {
-				// Remove quotes from string literal
-				value := basicLit.Value
-				if len(value) >= 2 && value[0] == '"' && value[len(value)-1] == '"' {
-					result = append(result, value[1:len(value)-1])
-				}
-			}
-		}
-	}
-
-	return result
 }
 
 // copyGsPackageWithDependencies copies a gs/ package and all its dependencies recursively

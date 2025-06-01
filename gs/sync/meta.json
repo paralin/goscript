@@ -1,0 +1,19 @@
+{
+  "dependencies": [
+    "unsafe"
+  ],
+  "asyncMethods": {
+    "Mutex.Lock": true,
+    "RWMutex.Lock": true,
+    "RWMutex.RLock": true,
+    "WaitGroup.Wait": true,
+    "Once.Do": true,
+    "Cond.Wait": true,
+    "Map.Delete": true,
+    "Map.Load": true,
+    "Map.LoadAndDelete": true,
+    "Map.LoadOrStore": true,
+    "Map.Range": true,
+    "Map.Store": true
+  }
+} 

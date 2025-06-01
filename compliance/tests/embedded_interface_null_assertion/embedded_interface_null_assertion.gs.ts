@@ -36,7 +36,9 @@ export class MyReader {
 	constructor(init?: Partial<{Reader?: Reader, name?: string}>) {
 		this._fields = {
 			Reader: $.varRef(init?.Reader ?? null),
-			name: $.varRef(init?.name ?? "")
+			name: $.varRef(init?.name ?? // DEBUG: Field name has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			"")
 		}
 	}
 
@@ -85,8 +87,12 @@ export class StringReader {
 
 	constructor(init?: Partial<{data?: string, pos?: number}>) {
 		this._fields = {
-			data: $.varRef(init?.data ?? ""),
-			pos: $.varRef(init?.pos ?? 0)
+			data: $.varRef(init?.data ?? // DEBUG: Field data has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			""),
+			pos: $.varRef(init?.pos ?? // DEBUG: Field pos has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 

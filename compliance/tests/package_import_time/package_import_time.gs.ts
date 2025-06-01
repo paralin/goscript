@@ -28,7 +28,7 @@ export async function main(): Promise<void> {
 	console.log("nanosecond", setTime.Nanosecond())
 
 	// other functions on setTime
-	console.log("weekday", setTime.Weekday()!.String())
+	console.log("weekday", time.Weekday_String(setTime.Weekday()))
 	console.log("location", setTime.Location()!.String())
 }
 

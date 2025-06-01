@@ -40,30 +40,30 @@ export { ValueOf } from './type'
 export function Zero(typ: Type): Value {
   let zeroValue: ReflectValue
 
-  switch (typ.Kind().valueOf()) {
-    case Bool.valueOf():
+  switch (typ.Kind()) {
+    case Bool:
       zeroValue = false
       break
-    case Int.valueOf():
-    case Int8.valueOf():
-    case Int16.valueOf():
-    case Int32.valueOf():
-    case Int64.valueOf():
-    case Uint.valueOf():
-    case Uint8.valueOf():
-    case Uint16.valueOf():
-    case Uint32.valueOf():
-    case Uint64.valueOf():
-    case Uintptr.valueOf():
-    case Float32.valueOf():
-    case Float64.valueOf():
+    case Int:
+    case Int8:
+    case Int16:
+    case Int32:
+    case Int64:
+    case Uint:
+    case Uint8:
+    case Uint16:
+    case Uint32:
+    case Uint64:
+    case Uintptr:
+    case Float32:
+    case Float64:
       zeroValue = 0
       break
-    case String.valueOf():
+    case String:
       zeroValue = ''
       break
-    case Slice.valueOf():
-    case Array.valueOf():
+    case Slice:
+    case Array:
       zeroValue = []
       break
     default:
@@ -116,7 +116,7 @@ function getArrayFromValue(value: Value): unknown[] | null {
 export function Indirect(v: Value): Value {
   // Check if this is a pointer type
   const type = v.Type()
-  if (type.Kind().valueOf() === Ptr.valueOf()) {
+  if (type.Kind() === Ptr) {
     // Ptr kind
     const elemType = type.Elem()
     if (elemType) {
@@ -141,7 +141,7 @@ export function New(typ: Type): Value {
 
 // MakeSlice returns a Value representing a new slice with the specified type, length, and capacity.
 export function MakeSlice(typ: Type, len: number, _cap: number): Value {
-  if (typ.Kind().valueOf() !== Slice.valueOf()) {
+  if (typ.Kind() !== Slice) {
     throw new Error('reflect.MakeSlice of non-slice type')
   }
 
@@ -160,7 +160,7 @@ export function MakeSlice(typ: Type, len: number, _cap: number): Value {
 
 // MakeMap returns a Value representing a new map with the specified type.
 export function MakeMap(typ: Type): Value {
-  if (typ.Kind().valueOf() !== Map.valueOf()) {
+  if (typ.Kind() !== Map) {
     throw new Error('reflect.MakeMap of non-map type')
   }
 
@@ -170,7 +170,7 @@ export function MakeMap(typ: Type): Value {
 
 // Append appends the values x to a slice and returns the resulting slice.
 export function Append(s: Value, x: Value): Value {
-  if (s.Kind().valueOf() !== Slice.valueOf()) {
+  if (s.Kind() !== Slice) {
     throw new Error('reflect.Append of non-slice')
   }
 
@@ -187,7 +187,7 @@ export function Append(s: Value, x: Value): Value {
 
 // MakeChan returns a Value representing a new channel with the specified type.
 export function MakeChan(typ: Type, buffer: number): Value {
-  if (typ.Kind().valueOf() !== Chan.valueOf()) {
+  if (typ.Kind() !== Chan) {
     throw new Error('reflect.MakeChan of non-chan type')
   }
 

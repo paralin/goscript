@@ -18,7 +18,8 @@ export function testVariadicInterface(name: string, ...values: any[]): void {
 			// but we can at least check they're passed correctly
 			if (v != null) {
 				console.log("Value", i, "is not nil")
-			} else {
+			}
+			 else {
 				console.log("Value", i, "is nil")
 			}
 		}
@@ -33,6 +34,6 @@ export async function main(): Promise<void> {
 
 	// Test with slice expansion
 	let values = $.arrayToSlice<null | any>(["a", "b", "c"])
-	testVariadicInterface("test4", ...values!)
+	testVariadicInterface("test4", ...(values ?? []))
 }
 

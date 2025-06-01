@@ -73,7 +73,8 @@ export async function main(): Promise<void> {
 	let { ok: ok } = $.typeAssert<ReadCloser>(rwc, 'ReadCloser')
 	if (ok) {
 		console.log("Embedded interface assertion successful")
-	} else {
+	}
+	 else {
 		console.log("Embedded interface assertion failed")
 	}
 }

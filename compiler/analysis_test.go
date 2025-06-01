@@ -5,6 +5,7 @@ import (
 	"go/parser"
 	"go/token"
 	"go/types"
+	"os"
 	"testing"
 
 	"golang.org/x/tools/go/packages"
@@ -230,5 +231,116 @@ func main() {
 			}
 		}
 		t.Log("")
+	}
+}
+
+// TestWrapperTypeDetection verifies that the analysis correctly identifies wrapper types
+func TestWrapperTypeDetection(t *testing.T) {
+	// Use the actual compliance test case
+	testPath := "../compliance/tests/wrapper_type_args"
+
+	// Load the package using the packages config like the main compiler does
+	cfg := &packages.Config{
+		Mode: packages.NeedName |
+			packages.NeedFiles |
+			packages.NeedCompiledGoFiles |
+			packages.NeedImports |
+			packages.NeedDeps |
+			packages.NeedExportFile |
+			packages.NeedTypes |
+			packages.NeedSyntax |
+			packages.NeedTypesInfo |
+			packages.NeedTypesSizes,
+		Tests: false,
+		Env:   append(os.Environ(), "GOOS=js", "GOARCH=wasm"),
+	}
+
+	pkgs, err := packages.Load(cfg, testPath)
+	if err != nil {
+		t.Fatalf("Failed to load test package: %v", err)
+	}
+
+	if len(pkgs) != 1 {
+		t.Fatalf("Expected 1 package, got %d", len(pkgs))
+	}
+
+	pkg := pkgs[0]
+	if len(pkg.Errors) > 0 {
+		t.Fatalf("Package has errors: %v", pkg.Errors[0])
+	}
+
+	// Run analysis on the first file
+	if len(pkg.Syntax) == 0 {
+		t.Fatal("No syntax files found")
+	}
+
+	analysis := NewAnalysis()
+	cmap := ast.NewCommentMap(pkg.Fset, pkg.Syntax[0], pkg.Syntax[0].Comments)
+	AnalyzeFile(pkg.Syntax[0], pkg, analysis, cmap)
+
+	// Verify the WrapperTypes map was initialized
+	if analysis.WrapperTypes == nil {
+		t.Error("WrapperTypes map was not initialized")
+	}
+
+	// Test some type lookups to verify wrapper type detection works
+	// We'll check if MyMode (which has methods) is detected as a wrapper type
+	scope := pkg.Types.Scope()
+
+	// Check if MyMode is detected as a wrapper type
+	if obj := scope.Lookup("MyMode"); obj != nil {
+		if typeName, ok := obj.(*types.TypeName); ok {
+			isWrapper := analysis.IsWrapperType(typeName.Type())
+			if !isWrapper {
+				t.Errorf("MyMode should be detected as wrapper type, got %v", isWrapper)
+			}
+			t.Logf("MyMode wrapper detection: %v (correct)", isWrapper)
+		}
+	}
+
+	// Test that regular struct types are not detected as wrapper types
+	if obj := scope.Lookup("MyDir"); obj != nil {
+		if typeName, ok := obj.(*types.TypeName); ok {
+			isWrapper := analysis.IsWrapperType(typeName.Type())
+			if isWrapper {
+				t.Errorf("MyDir should not be detected as wrapper type, got %v", isWrapper)
+			}
+			t.Logf("MyDir wrapper detection: %v (correct)", isWrapper)
+		}
+	}
+
+	t.Logf("Analysis completed successfully with %d wrapper types tracked", len(analysis.WrapperTypes))
+}
+
+// TestDiscoverGsPackages verifies that the discoverEmbeddedGsPackages function
+// can find packages in the embedded gs/ directory
+func TestDiscoverGsPackages(t *testing.T) {
+	analysis := NewAnalysis()
+
+	// Test package discovery using the embedded filesystem
+	packages := analysis.discoverEmbeddedGsPackages()
+	t.Logf("Discovered %d packages:", len(packages))
+	for _, pkg := range packages {
+		t.Logf("  - %s", pkg)
+	}
+
+	// We should find at least some packages
+	if len(packages) == 0 {
+		t.Errorf("Expected to find at least one package in gs/ directory")
+	}
+
+	// Check for some known packages that should exist
+	expectedPackages := []string{"sync", "bytes", "strings"}
+	for _, expected := range expectedPackages {
+		found := false
+		for _, pkg := range packages {
+			if pkg == expected {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Logf("Expected package '%s' not found in discovered packages: %v", expected, packages)
+		}
 	}
 }

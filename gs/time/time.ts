@@ -45,13 +45,13 @@ export class Time {
   }
 
   // Weekday returns the day of the week specified by t
-  public Weekday(): WeekdayValue {
+  public Weekday(): Weekday {
     if (this._location.offsetSeconds !== undefined) {
       const offsetMs = this._location.offsetSeconds * 1000
       const adjustedTime = new globalThis.Date(this._date.getTime() + offsetMs)
-      return new WeekdayValue(adjustedTime.getUTCDay() as Weekday)
+      return adjustedTime.getUTCDay() as Weekday
     }
-    return new WeekdayValue(this._date.getDay() as Weekday)
+    return this._date.getDay() as Weekday
   }
 
   // Day returns the day of the month specified by t
@@ -473,19 +473,19 @@ export class Time {
     // If both times have monotonic readings, use them for more accurate duration calculation
     if (this._monotonic !== undefined && u._monotonic !== undefined) {
       const diffNs = this._monotonic - u._monotonic
-      return new Duration(diffNs)
+      return diffNs
     }
 
     // Fallback to Date-based calculation
     const diffMs = this._date.getTime() - u._date.getTime()
     const diffNs = this._nsec - u._nsec
-    return new Duration(diffMs * 1000000 + diffNs) // Convert ms to ns and add ns difference
+    return diffMs * 1000000 + diffNs
   }
 
   // Add adds the duration d to t, returning the sum
   // Preserves monotonic reading if present
   public Add(d: Duration): Time {
-    const durationNs = d.valueOf()
+    const durationNs = d
     const newDate = new globalThis.Date(
       this._date.getTime() + Math.floor(durationNs / 1000000),
     )
@@ -563,38 +563,17 @@ export class Time {
   }
 }
 
-// Duration represents a span of time
-export class Duration {
-  private _nanoseconds: number
+// Duration represents a span of time (nanoseconds)
+export type Duration = number
 
-  constructor(nanoseconds: number) {
-    this._nanoseconds = nanoseconds
-  }
+// Duration comparison function
+export function Duration_lt(receiver: Duration, other: Duration): boolean {
+  return receiver < other
+}
 
-  // Compare this duration with another
-  public lt(other: Duration): boolean {
-    return this._nanoseconds < other._nanoseconds
-  }
-
-  // Multiply duration by a number (for expressions like Hour * 24)
-  public static multiply(duration: Duration, multiplier: number): Duration {
-    return new Duration(duration._nanoseconds * multiplier)
-  }
-
-  // Add support for * operator
-  public multiply(multiplier: number): Duration {
-    return Duration.multiply(this, multiplier)
-  }
-
-  // valueOf returns the primitive number value, allowing direct comparison with < > etc
-  public valueOf(): number {
-    return this._nanoseconds
-  }
-
-  // toString for string representation
-  public toString(): string {
-    return this._nanoseconds.toString() + 'ns'
-  }
+// Duration multiplication function 
+export function Duration_multiply(receiver: Duration, multiplier: number): Duration {
+  return receiver * multiplier
 }
 
 // Override multiplication operator for Duration * number
@@ -602,7 +581,7 @@ export function multiplyDuration(
   duration: Duration,
   multiplier: number,
 ): Duration {
-  return Duration.multiply(duration, multiplier)
+  return duration * multiplier
 }
 
 // Location represents a time zone
@@ -670,21 +649,9 @@ export function WeekdayString(w: Weekday): string {
   return names[w] || 'Unknown'
 }
 
-// WeekdayValue wraps a Weekday enum value and provides methods
-export class WeekdayValue {
-  private _value: Weekday
-
-  constructor(value: Weekday) {
-    this._value = value
-  }
-
-  public valueOf(): number {
-    return this._value
-  }
-
-  public String(): string {
-    return WeekdayString(this._value)
-  }
+// Weekday_String returns the string representation of a Weekday (wrapper function naming)
+export function Weekday_String(w: Weekday): string {
+  return WeekdayString(w)
 }
 
 // ParseError describes a problem parsing a time string
@@ -721,7 +688,7 @@ export class Timer {
   constructor(duration: Duration, callback?: () => void) {
     this._duration = duration
     this._callback = callback
-    const ms = duration.valueOf() / 1000000 // Convert nanoseconds to milliseconds
+    const ms = duration / 1000000 // Convert nanoseconds to milliseconds
 
     if (callback) {
       this._timeout = setTimeout(callback, ms)
@@ -743,7 +710,7 @@ export class Timer {
   // Reset changes the timer to expire after duration d
   public Reset(d: Duration): boolean {
     this.Stop()
-    const ms = d.valueOf() / 1000000
+    const ms = d / 1000000
     if (this._callback) {
       this._timeout = setTimeout(this._callback, ms)
     } else {
@@ -761,7 +728,7 @@ export class Ticker {
 
   constructor(duration: Duration) {
     this._duration = duration
-    const ms = duration.valueOf() / 1000000 // Convert nanoseconds to milliseconds
+    const ms = duration / 1000000 // Convert nanoseconds to milliseconds
     this._interval = setInterval(() => {}, ms)
   }
 
@@ -780,13 +747,13 @@ export class Ticker {
     this.Stop()
     this._stopped = false
     this._duration = d
-    const ms = d.valueOf() / 1000000
+    const ms = d / 1000000
     this._interval = setInterval(() => {}, ms)
   }
 
   // Channel returns an async iterator that yields time values
   public async *Channel(): AsyncIterableIterator<Time> {
-    const ms = this._duration.valueOf() / 1000000
+    const ms = this._duration / 1000000
     while (!this._stopped) {
       await new Promise((resolve) => setTimeout(resolve, ms))
       if (!this._stopped) {
@@ -865,12 +832,12 @@ export function FixedZone(name: string, offset: number): Location {
 }
 
 // Common durations (matching Go's time package constants)
-export const Nanosecond = new Duration(1)
-export const Microsecond = new Duration(1000)
-export const Millisecond = new Duration(1000000)
-export const Second = new Duration(1000000000)
-export const Minute = new Duration(60000000000)
-export const Hour = new Duration(3600000000000)
+export const Nanosecond = 1
+export const Microsecond = 1000
+export const Millisecond = 1000000
+export const Second = 1000000000
+export const Minute = 60000000000
+export const Hour = 3600000000000
 
 // Since returns the time elapsed since t
 // Uses monotonic clock if available for accurate measurement
@@ -886,7 +853,7 @@ export function Until(t: Time): Duration {
 
 // Sleep pauses the current execution for at least the duration d
 export async function Sleep(d: Duration): Promise<void> {
-  const ms = d.valueOf() / 1000000 // Convert nanoseconds to milliseconds
+  const ms = d / 1000000 // Convert nanoseconds to milliseconds
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
@@ -969,7 +936,7 @@ export function ParseDuration(s: string): Duration {
       throw new Error(`time: unknown unit "${unit}" in duration "${s}"`)
   }
 
-  return new Duration(Math.floor(nanoseconds))
+  return nanoseconds
 }
 
 // Parse parses a formatted string and returns the time value it represents

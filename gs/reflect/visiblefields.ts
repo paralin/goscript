@@ -15,7 +15,7 @@ export function VisibleFields(t: Type): $.Slice<StructField> {
   if (t == null) {
     $.panic('reflect: VisibleFields(nil)')
   }
-  if (t!.Kind().valueOf() != 25) {
+  if (t!.Kind() != 25) {
     $.panic('reflect.VisibleFields of non-struct type ' + t!.String())
   }
   let w = new visibleFieldsWalker({
@@ -133,13 +133,13 @@ class visibleFieldsWalker {
         const f = field.clone()
         f.Index = $.append(null, w.index) as number[]
         if (f.Anonymous) {
-          if (f.Type && f.Type.Kind().valueOf() === Ptr.valueOf()) {
+          if (f.Type && f.Type.Kind() === Ptr) {
             const elemType = f.Type.Elem!()
             if (elemType) {
               f.Type = elemType
             }
           }
-          if (f.Type && f.Type.Kind().valueOf() === Struct.valueOf()) {
+          if (f.Type && f.Type.Kind() === Struct) {
             w.walk(f.Type)
           }
         } else {

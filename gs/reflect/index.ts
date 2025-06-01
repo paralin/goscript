@@ -3,15 +3,19 @@ export {
   TypeOf,
   ValueOf,
   Value,
-  Kind,
+  Kind_String,
   ArrayOf,
   SliceOf,
   PointerTo,
   PtrTo,
   MapOf,
   ChanOf,
+  ChanDir_String,
+  RecvDir,
+  SendDir,
+  BothDir,
 } from './type'
-export type { Type } from './type'
+export type { Type, ChanDir, Kind } from './type'
 export { DeepEqual } from './deepequal'
 export {
   Zero,
@@ -28,10 +32,6 @@ export { Swapper } from './swapper'
 
 // Export new types and constants
 export {
-  ChanDir,
-  RecvDir,
-  SendDir,
-  BothDir,
   StructTag,
   ValueError,
   SelectDir,

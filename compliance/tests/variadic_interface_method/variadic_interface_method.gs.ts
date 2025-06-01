@@ -69,7 +69,7 @@ export async function main(): Promise<void> {
 
 	// Test with slice expansion
 	let parts = $.arrayToSlice<string>(["another", "path", "here"])
-	let result4 = b!.Join(...parts!)
+	let result4 = b!.Join(...(parts ?? []))
 	console.log("Result4:", result4)
 }
 

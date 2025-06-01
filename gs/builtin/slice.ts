@@ -500,7 +500,7 @@ export const arrayToSlice = <T>(
   // OPTIMIZATION: For arrays where offset=0 and length=capacity, return the array directly
   // if we're not doing deep conversion
   if (depth === 1) {
-    return arr as Slice<T>
+    return arr
   }
 
   const target = {

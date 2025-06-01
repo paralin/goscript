@@ -236,46 +236,74 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 				} else {
 					// Check if this is a named type with methods and the initializer is a basic value
 					if namedType, isNamed := goType.(*types.Named); isNamed {
-						typeName := namedType.Obj().Name()
-						if c.hasReceiverMethods(typeName) {
-							// Check if the initializer is a basic literal or simple value that needs wrapping
-							needsConstructor := false
-							switch expr := initializerExpr.(type) {
-							case *ast.BasicLit:
-								needsConstructor = true
-							case *ast.Ident:
-								// Check if it's a simple identifier (not a function call or complex expression)
-								if expr.Name != "nil" {
-									// Check if this identifier refers to a value of the underlying type
-									if obj := c.pkg.TypesInfo.Uses[expr]; obj != nil {
-										if objType := obj.Type(); objType != nil {
-											// If the identifier's type matches the underlying type, wrap it
-											if types.Identical(objType, namedType.Underlying()) {
+						// Check if this is a wrapper type first
+						isWrapperType := c.analysis.IsWrapperType(namedType)
+						if isWrapperType {
+							// For wrapper types, no constructor wrapping needed
+							if shouldApplyClone(c.pkg, initializerExpr) {
+								if err := c.WriteValueExpr(initializerExpr); err != nil {
+									return err
+								}
+								c.tsw.WriteLiterally(".clone()")
+							} else {
+								if err := c.WriteValueExpr(initializerExpr); err != nil {
+									return err
+								}
+							}
+						} else {
+							typeName := namedType.Obj().Name()
+							if c.hasReceiverMethods(typeName) {
+								// Check if the initializer is a basic literal or simple value that needs wrapping
+								needsConstructor := false
+								switch expr := initializerExpr.(type) {
+								case *ast.BasicLit:
+									needsConstructor = true
+								case *ast.Ident:
+									// Check if it's a simple identifier (not a function call or complex expression)
+									if expr.Name != "nil" {
+										// Check if this identifier refers to a value of the underlying type
+										if obj := c.pkg.TypesInfo.Uses[expr]; obj != nil {
+											if objType := obj.Type(); objType != nil {
+												// If the identifier's type matches the underlying type, wrap it
+												if types.Identical(objType, namedType.Underlying()) {
+													needsConstructor = true
+												}
+											}
+										}
+									}
+								case *ast.CallExpr:
+									// Check if this is a make() call that returns the underlying type
+									if funIdent, ok := expr.Fun.(*ast.Ident); ok && funIdent.Name == "make" {
+										// Check if the make call returns a type that matches the underlying type
+										if exprType := c.pkg.TypesInfo.TypeOf(expr); exprType != nil {
+											if types.Identical(exprType, namedType.Underlying()) {
 												needsConstructor = true
 											}
 										}
 									}
 								}
-							case *ast.CallExpr:
-								// Check if this is a make() call that returns the underlying type
-								if funIdent, ok := expr.Fun.(*ast.Ident); ok && funIdent.Name == "make" {
-									// Check if the make call returns a type that matches the underlying type
-									if exprType := c.pkg.TypesInfo.TypeOf(expr); exprType != nil {
-										if types.Identical(exprType, namedType.Underlying()) {
-											needsConstructor = true
+
+								if needsConstructor {
+									c.tsw.WriteLiterallyf("new %s(", typeName)
+									if err := c.WriteValueExpr(initializerExpr); err != nil {
+										return err
+									}
+									c.tsw.WriteLiterally(")")
+								} else {
+									// Regular initializer for named type (e.g., function call that returns the type)
+									if shouldApplyClone(c.pkg, initializerExpr) {
+										if err := c.WriteValueExpr(initializerExpr); err != nil {
+											return err
+										}
+										c.tsw.WriteLiterally(".clone()")
+									} else {
+										if err := c.WriteValueExpr(initializerExpr); err != nil {
+											return err
 										}
 									}
 								}
-							}
-
-							if needsConstructor {
-								c.tsw.WriteLiterallyf("new %s(", typeName)
-								if err := c.WriteValueExpr(initializerExpr); err != nil {
-									return err
-								}
-								c.tsw.WriteLiterally(")")
 							} else {
-								// Regular initializer for named type (e.g., function call that returns the type)
+								// Named type without methods, handle normally
 								if shouldApplyClone(c.pkg, initializerExpr) {
 									if err := c.WriteValueExpr(initializerExpr); err != nil {
 										return err
@@ -285,18 +313,6 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 									if err := c.WriteValueExpr(initializerExpr); err != nil {
 										return err
 									}
-								}
-							}
-						} else {
-							// Named type without methods, handle normally
-							if shouldApplyClone(c.pkg, initializerExpr) {
-								if err := c.WriteValueExpr(initializerExpr); err != nil {
-									return err
-								}
-								c.tsw.WriteLiterally(".clone()")
-							} else {
-								if err := c.WriteValueExpr(initializerExpr); err != nil {
-									return err
 								}
 							}
 						}
@@ -316,16 +332,22 @@ func (c *GoToTSCompiler) WriteValueSpec(a *ast.ValueSpec) error {
 				}
 			} else {
 				// No initializer, use the zero value directly
-				// Check if this is a named type with methods
+				// Check if this is a wrapper type first
 				if namedType, isNamed := goType.(*types.Named); isNamed {
-					typeName := namedType.Obj().Name()
-					if c.hasReceiverMethods(typeName) {
-						// For named types with methods, create a new instance with zero value
-						c.tsw.WriteLiterallyf("new %s(", typeName)
-						c.WriteZeroValueForType(namedType.Underlying())
-						c.tsw.WriteLiterally(")")
-					} else {
+					isWrapperType := c.analysis.IsWrapperType(namedType)
+					if isWrapperType {
+						// For wrapper types, just use zero value directly
 						c.WriteZeroValueForType(goType)
+					} else {
+						typeName := namedType.Obj().Name()
+						if c.hasReceiverMethods(typeName) {
+							// For named types with methods, create a new instance with zero value
+							c.tsw.WriteLiterallyf("new %s(", typeName)
+							c.WriteZeroValueForType(namedType.Underlying())
+							c.tsw.WriteLiterally(")")
+						} else {
+							c.WriteZeroValueForType(goType)
+						}
 					}
 				} else {
 					c.WriteZeroValueForType(goType)

@@ -27,7 +27,9 @@ export class MyStruct {
 
 	constructor(init?: Partial<{Value?: number}>) {
 		this._fields = {
-			Value: $.varRef(init?.Value ?? 0)
+			Value: $.varRef(init?.Value ?? // DEBUG: Field Value has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 
@@ -62,7 +64,8 @@ export async function main(): Promise<void> {
 	let { ok: ok } = $.typeAssert<MyStruct>(i, 'MyStruct')
 	if (ok) {
 		console.log("Type assertion successful")
-	} else {
+	}
+	 else {
 		console.log("Type assertion failed")
 	}
 
@@ -72,7 +75,8 @@ export async function main(): Promise<void> {
 	// expected
 	if (ok) {
 		console.log("Type assertion successful")
-	} else {
+	}
+	 else {
 		// expected
 		console.log("Type assertion failed")
 	}
@@ -81,7 +85,8 @@ export async function main(): Promise<void> {
 	let { value: val, ok: ok2 } = $.typeAssert<MyStruct>(i, 'MyStruct')
 	if (!ok2) {
 		console.log("type assertion failed")
-	} else {
+	}
+	 else {
 		console.log("type assertion success", val.Value)
 	}
 }

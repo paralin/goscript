@@ -17,7 +17,9 @@ export class MyStruct {
 
 	constructor(init?: Partial<{myPrivate?: number}>) {
 		this._fields = {
-			myPrivate: $.varRef(init?.myPrivate ?? 0)
+			myPrivate: $.varRef(init?.myPrivate ?? // DEBUG: Field myPrivate has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 

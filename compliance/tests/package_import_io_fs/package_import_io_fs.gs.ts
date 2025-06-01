@@ -44,16 +44,16 @@ export async function main(): Promise<void> {
 	console.log("ModePerm:", $.int(fs.ModePerm))
 
 	// Test FileMode methods
-	let mode = new fs.FileMode((fs.ModeDir.valueOf() | 0o755))
-	console.log("FileMode.IsDir():", mode.IsDir())
-	console.log("FileMode.IsRegular():", mode.IsRegular())
-	console.log("FileMode.Perm():", $.int(mode.Perm()))
-	console.log("FileMode.Type():", $.int(mode.Type()))
-	console.log("FileMode.String():", mode.String())
+	let mode = ((fs.ModeDir | 0o755) as fs.FileMode)
+	console.log("FileMode.IsDir():", fs.FileMode_IsDir(mode))
+	console.log("FileMode.IsRegular():", fs.FileMode_IsRegular(mode))
+	console.log("FileMode.Perm():", $.int(fs.FileMode_Perm(mode)))
+	console.log("FileMode.Type():", $.int(fs.FileMode_Type(mode)))
+	console.log("FileMode.String():", fs.FileMode_String(mode))
 
-	let regularMode = new fs.FileMode(0o644)
-	console.log("Regular file IsDir():", regularMode.IsDir())
-	console.log("Regular file IsRegular():", regularMode.IsRegular())
+	let regularMode = (0o644 as fs.FileMode)
+	console.log("Regular file IsDir():", fs.FileMode_IsDir(regularMode))
+	console.log("Regular file IsRegular():", fs.FileMode_IsRegular(regularMode))
 
 	console.log("test finished")
 }

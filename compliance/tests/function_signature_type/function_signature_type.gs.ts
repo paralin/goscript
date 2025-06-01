@@ -33,7 +33,9 @@ export class MyError {
 
 	constructor(init?: Partial<{s?: string}>) {
 		this._fields = {
-			s: $.varRef(init?.s ?? "")
+			s: $.varRef(init?.s ?? // DEBUG: Field s has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			"")
 		}
 	}
 
@@ -98,7 +100,8 @@ export async function main(): Promise<void> {
 	console.log("fn1 result 1: ", res1, " ")
 	if (err1 != null) {
 		console.log(err1!.Error())
-	} else {
+	}
+	 else {
 		console.log("nil")
 	}
 
@@ -106,7 +109,8 @@ export async function main(): Promise<void> {
 	console.log("fn1 result 2: ", res1_2, " ")
 	if (err1_2 != null) {
 		console.log(err1_2!.Error())
-	} else {
+	}
+	 else {
 		console.log("nil")
 	}
 

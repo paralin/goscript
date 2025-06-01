@@ -9,7 +9,7 @@ import * as syscall from "@goscript/syscall/index.js"
 // Re-export essential types
 export type Time = time.Time;
 export type FileInfo = fs.FileInfo;
-export { FileMode } from "@goscript/io/fs/index.js";
+export type FileMode = fs.FileMode;
 export type DirEntry = fs.DirEntry;
 
 // Export runtime values for ES module compatibility  
@@ -202,4 +202,25 @@ export let ModePerm: fs.FileMode = fs.ModePerm
 export function SameFile(fi1: fs.FileInfo, fi2: fs.FileInfo): boolean {
 	// In JavaScript environment, always return false as we can't compare files
 	return false
+}
+
+// FileMode wrapper functions - re-export from fs module
+export function FileMode_IsDir(receiver: fs.FileMode): boolean {
+	return fs.FileMode_IsDir(receiver)
+}
+
+export function FileMode_IsRegular(receiver: fs.FileMode): boolean {
+	return fs.FileMode_IsRegular(receiver)
+}
+
+export function FileMode_Perm(receiver: fs.FileMode): fs.FileMode {
+	return fs.FileMode_Perm(receiver)
+}
+
+export function FileMode_String(receiver: fs.FileMode): string {
+	return fs.FileMode_String(receiver)
+}
+
+export function FileMode_Type(receiver: fs.FileMode): fs.FileMode {
+	return fs.FileMode_Type(receiver)
 } 

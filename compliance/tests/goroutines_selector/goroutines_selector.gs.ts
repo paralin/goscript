@@ -17,7 +17,9 @@ export class Foo {
 
 	constructor(init?: Partial<{done?: $.Channel<boolean> | null}>) {
 		this._fields = {
-			done: $.varRef(init?.done ?? null)
+			done: $.varRef(init?.done ?? // DEBUG: Field done has type chan bool (*types.Chan)
+			// DEBUG: Using default zero value
+			null)
 		}
 	}
 

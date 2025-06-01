@@ -369,148 +369,133 @@ $.registerInterfaceType(
   ],
 )
 
-export class FileMode {
-  constructor(private _value: number) {}
+export type FileMode = number
 
-  valueOf(): number {
-    return this._value
-  }
+// IsDir reports whether m describes a directory.
+// That is, it tests for the ModeDir bit being set in m.
+export function FileMode_IsDir(receiver: FileMode): boolean {
+  return (receiver & ModeDir) != 0
+}
 
-  toString(): string {
-    return fileModeString(this)
-  }
+// IsRegular reports whether m describes a regular file.
+// That is, it tests that no mode type bits are set.
+export function FileMode_IsRegular(receiver: FileMode): boolean {
+  return (receiver & ModeType) == 0
+}
 
-  static from(value: number): FileMode {
-    return new FileMode(value)
-  }
+// Perm returns the Unix permission bits in m (m & ModePerm).
+export function FileMode_Perm(receiver: FileMode): FileMode {
+  return (receiver & ModePerm) as FileMode
+}
 
-  // IsDir reports whether m describes a directory.
-  // That is, it tests for the ModeDir bit being set in m.
-  IsDir(): boolean {
-    return (this._value & ModeDir.valueOf()) != 0
-  }
+// String returns a textual representation of the file mode.
+export function FileMode_String(receiver: FileMode): string {
+  return fileModeString(receiver)
+}
 
-  // IsRegular reports whether m describes a regular file.
-  // That is, it tests that no mode type bits are set.
-  IsRegular(): boolean {
-    return (this._value & ModeType.valueOf()) == 0
-  }
-
-  // Perm returns the Unix permission bits in m (m & ModePerm).
-  Perm(): FileMode {
-    return new FileMode(this._value & ModePerm.valueOf())
-  }
-
-  // String returns a textual representation of the file mode.
-  String(): string {
-    return fileModeString(this)
-  }
-
-  // Type returns type bits in m (m & ModeType).
-  Type(): FileMode {
-    return new FileMode((this._value & ModeType.valueOf()) >>> 0)
-  }
+// Type returns type bits in m (m & ModeType).
+export function FileMode_Type(receiver: FileMode): FileMode {
+  return ((receiver & ModeType) >>> 0) as FileMode
 }
 
 // The single letters are the abbreviations
 // used by the String method's formatting.
 // d: is a directory
-export let ModeDir: FileMode = new FileMode(2147483648) // 0x80000000
+export let ModeDir: FileMode = 2147483648 // 0x80000000
 
 // a: append-only
-export let ModeAppend: FileMode = new FileMode(1 << 30) // 0x40000000
+export let ModeAppend: FileMode = 1 << 30 // 0x40000000
 
 // l: exclusive use
-export let ModeExclusive: FileMode = new FileMode(1 << 29) // 0x20000000
+export let ModeExclusive: FileMode = 1 << 29 // 0x20000000
 
 // T: temporary file; Plan 9 only
-export let ModeTemporary: FileMode = new FileMode(1 << 28) // 0x10000000
+export let ModeTemporary: FileMode = 1 << 28 // 0x10000000
 
 // L: symbolic link
-export let ModeSymlink: FileMode = new FileMode(1 << 27) // 0x08000000
+export let ModeSymlink: FileMode = 1 << 27 // 0x08000000
 
 // D: device file
-export let ModeDevice: FileMode = new FileMode(1 << 26) // 0x04000000
+export let ModeDevice: FileMode = 1 << 26 // 0x04000000
 
 // p: named pipe (FIFO)
-export let ModeNamedPipe: FileMode = new FileMode(1 << 25) // 0x02000000
+export let ModeNamedPipe: FileMode = 1 << 25 // 0x02000000
 
 // S: Unix domain socket
-export let ModeSocket: FileMode = new FileMode(1 << 24) // 0x01000000
+export let ModeSocket: FileMode = 1 << 24 // 0x01000000
 
 // u: setuid
-export let ModeSetuid: FileMode = new FileMode(1 << 23) // 0x00800000
+export let ModeSetuid: FileMode = 1 << 23 // 0x00800000
 
 // g: setgid
-export let ModeSetgid: FileMode = new FileMode(1 << 22) // 0x00400000
+export let ModeSetgid: FileMode = 1 << 22 // 0x00400000
 
 // c: Unix character device, when ModeDevice is set
-export let ModeCharDevice: FileMode = new FileMode(1 << 21) // 0x00200000
+export let ModeCharDevice: FileMode = 1 << 21 // 0x00200000
 
 // t: sticky
-export let ModeSticky: FileMode = new FileMode(1 << 20) // 0x00100000
+export let ModeSticky: FileMode = 1 << 20 // 0x00100000
 
 // ?: non-regular file; nothing else is known about this file
-export let ModeIrregular: FileMode = new FileMode(1 << 19) // 0x00080000
+export let ModeIrregular: FileMode = 1 << 19 // 0x00080000
 
 // Mask for the type bits. For regular files, none will be set.
-export let ModeType: FileMode = new FileMode(2401763328)
+export let ModeType: FileMode = 2401763328
 
 // Unix permission bits
-export let ModePerm: FileMode = new FileMode(0o777)
+export let ModePerm: FileMode = 0o777
 
 // FileMode methods
 export function fileModeString(mode: FileMode): string {
   const buf: string[] = []
-  const w = mode.valueOf()
+  const w = mode
 
   // File type - these are the main type indicators
-  if (w & ModeDir.valueOf()) buf.push('d')
-  else if (w & ModeSymlink.valueOf()) buf.push('L')
-  else if (w & ModeNamedPipe.valueOf()) buf.push('p')
-  else if (w & ModeSocket.valueOf()) buf.push('S')
-  else if (w & ModeDevice.valueOf()) {
-    if (w & ModeCharDevice.valueOf()) buf.push('c')
+  if (w & ModeDir) buf.push('d')
+  else if (w & ModeSymlink) buf.push('L')
+  else if (w & ModeNamedPipe) buf.push('p')
+  else if (w & ModeSocket) buf.push('S')
+  else if (w & ModeDevice) {
+    if (w & ModeCharDevice) buf.push('c')
     else buf.push('D')
-  }
-  else if (w & ModeIrregular.valueOf()) buf.push('?')
+  } else if (w & ModeIrregular) buf.push('?')
   else buf.push('-')
 
   // Permission bits
-  const perm = w & ModePerm.valueOf()
+  const perm = w & ModePerm
   buf.push(perm & 0o400 ? 'r' : '-')
   buf.push(perm & 0o200 ? 'w' : '-')
-  
+
   // Execute/search for user
   if (perm & 0o100) {
-    if (w & ModeSetuid.valueOf()) buf.push('s')
+    if (w & ModeSetuid) buf.push('s')
     else buf.push('x')
   } else {
-    if (w & ModeSetuid.valueOf()) buf.push('S')
+    if (w & ModeSetuid) buf.push('S')
     else buf.push('-')
   }
-  
+
   buf.push(perm & 0o040 ? 'r' : '-')
   buf.push(perm & 0o020 ? 'w' : '-')
-  
+
   // Execute/search for group
   if (perm & 0o010) {
-    if (w & ModeSetgid.valueOf()) buf.push('s')
+    if (w & ModeSetgid) buf.push('s')
     else buf.push('x')
   } else {
-    if (w & ModeSetgid.valueOf()) buf.push('S')
+    if (w & ModeSetgid) buf.push('S')
     else buf.push('-')
   }
-  
+
   buf.push(perm & 0o004 ? 'r' : '-')
   buf.push(perm & 0o002 ? 'w' : '-')
-  
+
   // Execute/search for other
   if (perm & 0o001) {
-    if (w & ModeSticky.valueOf()) buf.push('t')
+    if (w & ModeSticky) buf.push('t')
     else buf.push('x')
   } else {
-    if (w & ModeSticky.valueOf()) buf.push('T')
+    if (w & ModeSticky) buf.push('T')
     else buf.push('-')
   }
 
@@ -518,7 +503,7 @@ export function fileModeString(mode: FileMode): string {
 }
 
 export function fileModeType(mode: FileMode): FileMode {
-  return new FileMode(mode.valueOf() & ModeType.valueOf())
+  return (mode & ModeType) as FileMode
 }
 
 export class PathError {

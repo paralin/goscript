@@ -3,26 +3,12 @@
 
 import * as $ from "@goscript/builtin/index.js";
 
-export class MyFileMode {
-	constructor(private _value: number) {}
+export type MyFileMode = number;
 
-	valueOf(): number {
-		return this._value
-	}
-
-	toString(): string {
-		return String(this._value)
-	}
-
-	static from(value: number): MyFileMode {
-		return new MyFileMode(value)
-	}
-
-	// Add a method to trigger wrapper class generation
-	public String(): string {
-		return "mode"
-	}
+export function MyFileMode_String(m: MyFileMode): string {
+	return "mode"
 }
+
 
 export class FileStatus {
 	public get mode(): MyFileMode {
@@ -46,8 +32,13 @@ export class FileStatus {
 
 	constructor(init?: Partial<{mode?: MyFileMode, size?: number}>) {
 		this._fields = {
-			mode: $.varRef(init?.mode ?? new MyFileMode(0)),
-			size: $.varRef(init?.size ?? 0)
+			mode: $.varRef(init?.mode ?? // DEBUG: Field mode has type github.com/aperturerobotics/goscript/compliance/tests/named_type_wrapper.MyFileMode (*types.Named)
+			// DEBUG: Package=github.com/aperturerobotics/goscript/compliance/tests/named_type_wrapper, TypeName=github.com/aperturerobotics/goscript/compliance/tests/named_type_wrapper.MyFileMode
+			// DEBUG: Using wrapper type zero value
+			0 as MyFileMode),
+			size: $.varRef(init?.size ?? // DEBUG: Field size has type int64 (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 
@@ -72,18 +63,18 @@ export class FileStatus {
 
 export async function main(): Promise<void> {
 	// Test using the named type directly
-	let mode: MyFileMode = new MyFileMode(0o644)
-	console.log("Mode value:", mode.valueOf())
-	console.log("Mode string:", mode.String())
+	let mode: MyFileMode = 0o644
+	console.log("Mode value:", mode)
+	console.log("Mode string:", MyFileMode_String(mode))
 
 	// Test using in struct
-	let status = new FileStatus({mode: new MyFileMode(0o755), size: 1024})
+	let status = new FileStatus({mode: (0o755 as MyFileMode), size: 1024})
 
-	console.log("Status mode:", status.mode.valueOf())
+	console.log("Status mode:", status.mode)
 	console.log("Status size:", status.size)
 
 	// Test type assertion and conversion
-	let genericMode: MyFileMode = new MyFileMode(0o777)
-	console.log("Generic mode:", genericMode.valueOf())
+	let genericMode: MyFileMode = (0o777 as MyFileMode)
+	console.log("Generic mode:", genericMode)
 }
 

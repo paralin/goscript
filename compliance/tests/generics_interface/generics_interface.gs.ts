@@ -48,8 +48,12 @@ export class ValueContainer<T extends any> {
 
 	constructor(init?: Partial<{count?: number, value?: T}>) {
 		this._fields = {
-			value: $.varRef(init?.value ?? null as any),
-			count: $.varRef(init?.count ?? 0)
+			value: $.varRef(init?.value ?? // DEBUG: Field value has type T (*types.TypeParam)
+			// DEBUG: Using default zero value
+			null as any),
+			count: $.varRef(init?.count ?? // DEBUG: Field count has type int (*types.Basic)
+			// DEBUG: Using default zero value
+			0)
 		}
 	}
 
@@ -102,7 +106,9 @@ export class StringValueContainer {
 
 	constructor(init?: Partial<{value?: string}>) {
 		this._fields = {
-			value: $.varRef(init?.value ?? "")
+			value: $.varRef(init?.value ?? // DEBUG: Field value has type string (*types.Basic)
+			// DEBUG: Using default zero value
+			"")
 		}
 	}
 
@@ -118,7 +124,8 @@ export class StringValueContainer {
 		const s = this
 		if (s.value < other) {
 			return -1
-		} else if (s.value > other) {
+		}
+		 else if (s.value > other) {
 			return 1
 		}
 		return 0

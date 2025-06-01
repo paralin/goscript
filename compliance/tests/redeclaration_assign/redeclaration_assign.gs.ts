@@ -21,7 +21,8 @@ export async function main(): Promise<void> {
 	if (err) {
 		// Use err
 		console.log("err is true")
-	} else {
+	}
+	 else {
 		console.log("err is false")
 	}
 }

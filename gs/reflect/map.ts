@@ -1,4 +1,4 @@
-import { Type, Kind, Value } from './type.js'
+import { Type, Kind, Value, Map as MapKind } from './type.js'
 
 // Simple MapOf implementation using JavaScript Map
 export function MapOf(key: Type, elem: Type): Type {
@@ -17,7 +17,7 @@ class MapType implements Type {
   }
 
   public Kind(): Kind {
-    return new Kind(21) // Map kind
+    return MapKind // Map kind
   }
 
   public Size(): number {

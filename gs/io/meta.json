@@ -1,0 +1,9 @@
+{
+  "dependencies": [
+    "errors",
+    "internal/oserror",
+    "path",
+    "time",
+    "unicode/utf8"
+  ]
+} 

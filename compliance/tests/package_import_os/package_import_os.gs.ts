@@ -11,7 +11,8 @@ export async function main(): Promise<void> {
 		let [wd, err] = os.Getwd()
 		if (err == null) {
 			console.log("Current working directory:", wd)
-		} else {
+		}
+		 else {
 			console.log("Error getting working directory:", err!.Error())
 		}
 	}
@@ -40,7 +41,8 @@ export async function main(): Promise<void> {
 		let [hostname, err] = os.Hostname()
 		if (err == null) {
 			console.log("Hostname:", hostname)
-		} else {
+		}
+		 else {
 			console.log("Error getting hostname:", err!.Error())
 		}
 	}
