@@ -23,7 +23,7 @@ export type Bytes = Uint8Array | Slice<number>
 
 // int converts a value to a Go int type, handling proper signed integer conversion
 // This ensures that values like 2147483648 (2^31) are properly handled according to Go semantics
-export function int(value: number | {valueOf(): number | null}): number {
+export function int(value: number | { valueOf(): number | null }): number {
   // In Go, int is typically 64-bit on 64-bit systems, but for compatibility with JavaScript
   // we need to handle the conversion properly. The issue is that JavaScript's number type
   // can represent values larger than 32-bit signed integers, but when cast in certain contexts
@@ -33,7 +33,7 @@ export function int(value: number | {valueOf(): number | null}): number {
   // since JavaScript numbers can safely represent integers up to Number.MAX_SAFE_INTEGER
   //
   // For this we use Math.trunc.
-  if (typeof value === 'object' && "valueOf" in value) {
+  if (typeof value === 'object' && 'valueOf' in value) {
     return Math.trunc(value.valueOf() ?? 0)
   }
   return Math.trunc(value)
