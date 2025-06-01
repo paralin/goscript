@@ -251,6 +251,92 @@ func (c *GoToTSCompiler) getTypeNameString(typeExpr ast.Expr) string {
 	return "unknown"
 }
 
+// isNamedTypeWithBasicUnderlying checks if a given type is a named type with an underlying basic type.
+// This indicates the type is likely implemented as a TypeScript class with a valueOf() method.
+// It handles multiple levels of named type indirection (e.g., type A B; type B C; type C string).
+func (c *GoToTSCompiler) isNamedTypeWithBasicUnderlying(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+
+	// Check if this is a named type
+	namedType, ok := t.(*types.Named)
+	if !ok {
+		return false
+	}
+
+	// Follow the chain of named types to find the ultimate underlying type
+	// This handles cases like: type A B; type B C; type C string
+	ultimate := namedType
+	for {
+		underlying := ultimate.Underlying()
+		if underlyingNamed, isNamed := underlying.(*types.Named); isNamed {
+			// Continue following the chain
+			ultimate = underlyingNamed
+		} else {
+			// We've reached the final underlying type
+			if _, isBasic := underlying.(*types.Basic); isBasic {
+				// This is a named type with a basic underlying type
+				return true
+			}
+			break
+		}
+	}
+
+	return false
+}
+
+// isNamedNumericType checks if a given type is a named type with an underlying numeric type.
+// This is a specialized version of isNamedTypeWithBasicUnderlying for numeric operations.
+func (c *GoToTSCompiler) isNamedNumericType(t types.Type) bool {
+	if !c.isNamedTypeWithBasicUnderlying(t) {
+		return false
+	}
+
+	// We know it's a named type with basic underlying, now check if it's numeric
+	namedType := t.(*types.Named)
+
+	// Follow the chain to get the final basic type
+	ultimate := namedType
+	for {
+		underlying := ultimate.Underlying()
+		if underlyingNamed, isNamed := underlying.(*types.Named); isNamed {
+			ultimate = underlyingNamed
+		} else {
+			if basicType, isBasic := underlying.(*types.Basic); isBasic {
+				info := basicType.Info()
+				return (info&types.IsInteger) != 0 || (info&types.IsFloat) != 0
+			}
+			break
+		}
+	}
+
+	return false
+}
+
+// needsValueOfForBitwiseOp checks if an operand in a bitwise operation needs .valueOf() to be called
+// This is needed for custom types (like FileMode) that have a valueOf() method and need to be treated as numbers
+func (c *GoToTSCompiler) needsValueOfForBitwiseOp(expr ast.Expr) bool {
+	if c.pkg == nil || c.pkg.TypesInfo == nil {
+		return false
+	}
+
+	exprType := c.pkg.TypesInfo.TypeOf(expr)
+	return c.isNamedNumericType(exprType)
+}
+
+// writeBitwiseOperand writes an operand for a bitwise operation, adding .valueOf() if needed
+func (c *GoToTSCompiler) writeBitwiseOperand(expr ast.Expr) error {
+	if c.needsValueOfForBitwiseOp(expr) {
+		if err := c.WriteValueExpr(expr); err != nil {
+			return err
+		}
+		c.tsw.WriteLiterally(".valueOf()")
+		return nil
+	}
+	return c.WriteValueExpr(expr)
+}
+
 // WriteBinaryExpr translates a Go binary expression (`ast.BinaryExpr`) into its
 // TypeScript equivalent.
 // It handles several cases:
@@ -435,8 +521,15 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 		c.tsw.WriteLiterally("(") // Add opening parenthesis for bitwise operations
 	}
 
-	if err := c.WriteValueExpr(exp.X); err != nil {
-		return fmt.Errorf("failed to write binary expression left operand: %w", err)
+	// For bitwise operations, use special operand writing that adds .valueOf() when needed
+	if isBitwise {
+		if err := c.writeBitwiseOperand(exp.X); err != nil {
+			return fmt.Errorf("failed to write binary expression left operand: %w", err)
+		}
+	} else {
+		if err := c.WriteValueExpr(exp.X); err != nil {
+			return fmt.Errorf("failed to write binary expression left operand: %w", err)
+		}
 	}
 	c.tsw.WriteLiterally(" ")
 	tokStr, ok := TokenToTs(exp.Op)
@@ -446,8 +539,16 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 
 	c.tsw.WriteLiterally(tokStr)
 	c.tsw.WriteLiterally(" ")
-	if err := c.WriteValueExpr(exp.Y); err != nil {
-		return fmt.Errorf("failed to write binary expression right operand: %w", err)
+
+	// For bitwise operations, use special operand writing that adds .valueOf() when needed
+	if isBitwise {
+		if err := c.writeBitwiseOperand(exp.Y); err != nil {
+			return fmt.Errorf("failed to write binary expression right operand: %w", err)
+		}
+	} else {
+		if err := c.WriteValueExpr(exp.Y); err != nil {
+			return fmt.Errorf("failed to write binary expression right operand: %w", err)
+		}
 	}
 
 	if isBitwise {
