@@ -1,1 +1,1 @@
-export { MyStruct } from "./copy_independence.gs.js"
+export type { MyStruct } from "./copy_independence.gs.js"

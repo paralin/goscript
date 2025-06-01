@@ -28,23 +28,23 @@ export async function main(): Promise<void> {
 
 	// Test bitwise operations with local named types
 	console.log("Local bitwise operations:")
-	let result1 = (myInt.valueOf() | 3)
+	let result1 = (myInt | 3)
 	console.log("LocalInt | 3:", $.int(result1))
 
-	let result2 = (myUint.valueOf() & 7)
+	let result2 = (myUint & 7)
 	console.log("LocalUint & 7:", $.int(result2))
 
-	let result3 = (myInt.valueOf() ^ 15)
+	let result3 = (myInt ^ 15)
 	console.log("LocalInt ^ 15:", $.int(result3))
 
 	// Test with constants
 	let localConst: LocalInt = 20
-	let result4 = (20 | myInt.valueOf())
+	let result4 = (20 | myInt)
 	console.log("localConst | myInt:", $.int(result4))
 
 	// Test multi-level indirection
 	let level: LocalLevel1 = 100
-	let result5 = (level.valueOf() | 7)
+	let result5 = (level | 7)
 	console.log("LocalLevel1 | 7:", $.int(result5))
 
 	// Test cross-package named types
@@ -73,7 +73,7 @@ export async function main(): Promise<void> {
 	console.log("subpkg.LevelValue | 0x0F:", $.int(directLevel))
 
 	// Test mixed operations between local and imported types
-	let mixedResult = ((subpkg.UintValue as LocalUint) | myUint.valueOf())
+	let mixedResult = ((subpkg.UintValue as LocalUint) | myUint)
 	console.log("Mixed operation result:", $.int(mixedResult))
 
 	// Test various bitwise operators
@@ -81,12 +81,12 @@ export async function main(): Promise<void> {
 	let base = (42 as LocalInt)
 
 	console.log("base:", $.int(base))
-	console.log("base | 8:", $.int((base.valueOf() | 8)))
-	console.log("base & 15:", $.int((base.valueOf() & 15)))
-	console.log("base ^ 31:", $.int((base.valueOf() ^ 31)))
-	console.log("base << 2:", $.int((base.valueOf() << 2)))
-	console.log("base >> 1:", $.int((base.valueOf() >> 1)))
-	console.log("base &^ 7:", $.int((base.valueOf() & ~ 7))) // AND NOT
+	console.log("base | 8:", $.int((base | 8)))
+	console.log("base & 15:", $.int((base & 15)))
+	console.log("base ^ 31:", $.int((base ^ 31)))
+	console.log("base << 2:", $.int((base << 2)))
+	console.log("base >> 1:", $.int((base >> 1)))
+	console.log("base &^ 7:", $.int((base & ~ 7))) // AND NOT
 
 	// Test with different underlying types
 	console.log("\nDifferent underlying types:")

@@ -31,8 +31,13 @@ export let BoolValue: MyBool = true
 
 export let LevelValue: Level1 = 0x1000
 
-// Helper function
+// Helper function that uses bitwise operations
 export function GetCombinedFlags(): MyUint {
 	return (255 | 0x10)
+}
+
+// Function that tests multi-level indirection
+export function GetLevelValue(): Level1 {
+	return (4096 | 0x0F)
 }
 

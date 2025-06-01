@@ -294,6 +294,24 @@ func (c *GoToTSCompiler) isNamedNumericType(t types.Type) bool {
 	return false
 }
 
+// isWrapperType checks if a type is implemented as a wrapper class with valueOf() method
+// This is true for named types that have methods defined on them
+func (c *GoToTSCompiler) isWrapperType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+
+	// Follow any type aliases to get to the actual named type
+	namedType, ok := t.(*types.Named)
+	if !ok {
+		return false
+	}
+
+	// If the named type has methods, it's implemented as a class with valueOf()
+	numMethods := namedType.NumMethods()
+	return numMethods > 0
+}
+
 // needsValueOfForBitwiseOp checks if an operand in a bitwise operation needs .valueOf() to be called
 // This is needed for custom types (like FileMode) that have a valueOf() method and need to be treated as numbers
 func (c *GoToTSCompiler) needsValueOfForBitwiseOp(expr ast.Expr) bool {
@@ -312,16 +330,20 @@ func (c *GoToTSCompiler) needsValueOfForBitwiseOp(expr ast.Expr) bool {
 		return false
 	}
 
-	// Check if this is a constant value - constants with named types should not get valueOf()
-	// because they resolve to their literal values
+	// Check if this is a compile-time constant of a primitive type
 	if tv, ok := c.pkg.TypesInfo.Types[expr]; ok {
 		if tv.Value != nil {
-			// This is a constant expression, don't add valueOf()
-			return false
+			// This is a constant expression - but only skip valueOf() if it's truly a primitive type
+			// (not a named type with methods that happens to be constant)
+			if _, isBasic := exprType.(*types.Basic); isBasic {
+				// Primitive constant, don't add valueOf()
+				return false
+			}
 		}
 	}
 
-	return c.isNamedNumericType(exprType)
+	// Check if this type is implemented as a wrapper class with valueOf()
+	return c.isWrapperType(exprType)
 }
 
 // writeBitwiseOperand writes an operand for a bitwise operation, adding .valueOf() if needed

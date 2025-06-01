@@ -44,7 +44,7 @@ export async function main(): Promise<void> {
 	console.log("ModePerm:", $.int(fs.ModePerm))
 
 	// Test FileMode methods
-	let mode = new fs.FileMode((fs.ModeDir.valueOf() | 0o755.valueOf()))
+	let mode = new fs.FileMode((fs.ModeDir.valueOf() | 0o755))
 	console.log("FileMode.IsDir():", mode.IsDir())
 	console.log("FileMode.IsRegular():", mode.IsRegular())
 	console.log("FileMode.Perm():", $.int(mode.Perm()))
