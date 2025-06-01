@@ -54,7 +54,7 @@ class fileStat {
 		this._fields = {
 			name: $.varRef(init?.name ?? ""),
 			size: $.varRef(init?.size ?? 0),
-			mode: $.varRef(init?.mode ?? 0),
+			mode: $.varRef(init?.mode ?? new fs.FileMode(0)),
 			modTime: $.varRef(init?.modTime?.clone() ?? time.Now()),
 			sys: $.varRef(init?.sys?.clone() ?? new syscall.Stat_t())
 		}
@@ -79,7 +79,7 @@ class fileStat {
 
 	public IsDir(): boolean {
 		const fileStat = this
-		return (fileStat!.Mode() & fs.ModeDir) !== 0
+		return (fileStat!.Mode().valueOf() & fs.ModeDir.valueOf()) !== 0
 	}
 
 	public Size(): number {
