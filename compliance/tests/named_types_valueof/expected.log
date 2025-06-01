@@ -1,0 +1,34 @@
+Local bitwise operations:
+LocalInt | 3: 11
+LocalUint & 7: 5
+LocalInt ^ 15: 5
+localConst | myInt: 30
+LocalLevel1 | 7: 103
+
+Cross-package operations:
+subpkg.IntValue: 42
+subpkg.UintValue: 255
+subpkg.FloatValue: 3.14
+subpkg.StringValue: hello
+subpkg.BoolValue: true
+subpkg.UintValue | 0x20: 255
+subpkg.LevelValue & 0xFFF: 0
+subpkg.GetCombinedFlags(): 255
+subpkg.LevelValue | 0x0F: 4111
+Mixed operation result: 255
+
+Testing all bitwise operators:
+base: 42
+base | 8: 42
+base & 15: 10
+base ^ 31: 53
+base << 2: 168
+base >> 1: 21
+base &^ 7: 40
+
+Different underlying types:
+LocalFloat: 2.5
+LocalString: test
+LocalBool: true
+LocalFloat * 2.0: 5
+test finished
