@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"go/ast"
+	"go/types"
 )
 
 // WriteDecls iterates through a slice of Go top-level declarations (`ast.Decl`)
@@ -193,6 +194,27 @@ func (c *GoToTSCompiler) writeMethodSignature(decl *ast.FuncDecl) (bool, error) 
 	var isAsync bool
 	if obj := c.pkg.TypesInfo.Defs[decl.Name]; obj != nil {
 		isAsync = c.analysis.IsAsyncFunc(obj)
+
+		// Check if this method must be async due to interface constraints
+		if !isAsync && decl.Recv != nil && len(decl.Recv.List) > 0 {
+			// Get the receiver type
+			receiverType := decl.Recv.List[0].Type
+			if starExpr, ok := receiverType.(*ast.StarExpr); ok {
+				receiverType = starExpr.X
+			}
+
+			if ident, ok := receiverType.(*ast.Ident); ok {
+				// Get the named type for this receiver
+				if receiverObj := c.pkg.TypesInfo.Uses[ident]; receiverObj != nil {
+					if namedType, ok := receiverObj.Type().(*types.Named); ok {
+						// Check if this method must be async due to interface constraints
+						if c.analysis.MustBeAsyncDueToInterface(namedType, decl.Name.Name) {
+							isAsync = true
+						}
+					}
+				}
+			}
+		}
 	}
 
 	// Methods are typically public in the TS output

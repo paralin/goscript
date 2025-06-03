@@ -656,6 +656,14 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 			// Return type
 			c.tsw.WriteLiterally(": ")
 			results := sig.Results()
+
+			// Determine if this interface method should be async based on implementations
+			isMethodAsync := c.analysis.IsInterfaceMethodAsync(iface, method.Name())
+
+			if isMethodAsync {
+				c.tsw.WriteLiterally("Promise<")
+			}
+
 			if results.Len() == 0 {
 				c.tsw.WriteLiterally("void")
 			} else if results.Len() == 1 {
@@ -688,6 +696,11 @@ func (c *GoToTSCompiler) writeInterfaceStructure(iface *types.Interface, astNode
 				}
 				c.tsw.WriteLiterally("]")
 			}
+
+			if isMethodAsync {
+				c.tsw.WriteLiterally(">")
+			}
+
 			c.tsw.WriteLine("") // newline for each method
 		}
 		c.tsw.Indent(-1)

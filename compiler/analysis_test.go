@@ -278,9 +278,9 @@ func TestWrapperTypeDetection(t *testing.T) {
 	cmap := ast.NewCommentMap(pkg.Fset, pkg.Syntax[0], pkg.Syntax[0].Comments)
 	AnalyzeFile(pkg.Syntax[0], pkg, analysis, cmap)
 
-	// Verify the WrapperTypes map was initialized
-	if analysis.WrapperTypes == nil {
-		t.Error("WrapperTypes map was not initialized")
+	// Verify the NamedBasicTypes map was initialized
+	if analysis.NamedBasicTypes == nil {
+		t.Error("NamedBasicTypes map was not initialized")
 	}
 
 	// Test some type lookups to verify wrapper type detection works
@@ -290,7 +290,7 @@ func TestWrapperTypeDetection(t *testing.T) {
 	// Check if MyMode is detected as a wrapper type
 	if obj := scope.Lookup("MyMode"); obj != nil {
 		if typeName, ok := obj.(*types.TypeName); ok {
-			isWrapper := analysis.IsWrapperType(typeName.Type())
+			isWrapper := analysis.IsNamedBasicType(typeName.Type())
 			if !isWrapper {
 				t.Errorf("MyMode should be detected as wrapper type, got %v", isWrapper)
 			}
@@ -301,7 +301,7 @@ func TestWrapperTypeDetection(t *testing.T) {
 	// Test that regular struct types are not detected as wrapper types
 	if obj := scope.Lookup("MyDir"); obj != nil {
 		if typeName, ok := obj.(*types.TypeName); ok {
-			isWrapper := analysis.IsWrapperType(typeName.Type())
+			isWrapper := analysis.IsNamedBasicType(typeName.Type())
 			if isWrapper {
 				t.Errorf("MyDir should not be detected as wrapper type, got %v", isWrapper)
 			}
@@ -309,7 +309,7 @@ func TestWrapperTypeDetection(t *testing.T) {
 		}
 	}
 
-	t.Logf("Analysis completed successfully with %d wrapper types tracked", len(analysis.WrapperTypes))
+	t.Logf("Analysis completed successfully with %d named basic types tracked", len(analysis.NamedBasicTypes))
 }
 
 // TestDiscoverGsPackages verifies that the discoverEmbeddedGsPackages function

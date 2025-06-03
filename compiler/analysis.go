@@ -104,6 +104,19 @@ type GsMetadata struct {
 	AsyncMethods map[string]bool `json:"asyncMethods,omitempty"`
 }
 
+// InterfaceMethodKey uniquely identifies an interface method
+type InterfaceMethodKey struct {
+	InterfaceType string // The string representation of the interface type
+	MethodName    string // The method name
+}
+
+// ImplementationInfo tracks information about a struct that implements an interface method
+type ImplementationInfo struct {
+	StructType    *types.Named // The struct type that implements the interface
+	Method        *types.Func  // The method object
+	IsAsyncByFlow bool         // Whether this implementation is async based on control flow analysis
+}
+
 // Analysis holds information gathered during the analysis phase of the Go code compilation.
 // This data is used to make decisions about how to generate TypeScript code.
 // Analysis is read-only after being built and should not be modified during code generation.
@@ -137,13 +150,21 @@ type Analysis struct {
 	// PackageMetadata holds package-level metadata with structured keys
 	PackageMetadata map[PackageMetadataKey]MethodMetadata
 
-	// WrapperTypes tracks types that should be implemented as wrapper classes
-	// This includes both local types with methods and imported types that are known wrapper types
-	WrapperTypes map[types.Type]bool
+	// NamedBasicTypes tracks types that should be implemented as type aliases with standalone functions
+	// This includes named types with basic underlying types (like uint32, string) that have methods
+	NamedBasicTypes map[types.Type]bool
 
 	// AllPackages stores all loaded packages for dependency analysis
 	// Key: package path, Value: package data
 	AllPackages map[string]*packages.Package
+
+	// InterfaceImplementations tracks which struct types implement which interface methods
+	// This is used to determine interface method async status based on implementations
+	InterfaceImplementations map[InterfaceMethodKey][]ImplementationInfo
+
+	// InterfaceMethodAsyncStatus caches the async status determination for interface methods
+	// This is computed once during analysis and reused during code generation
+	InterfaceMethodAsyncStatus map[InterfaceMethodKey]bool
 }
 
 // PackageAnalysis holds cross-file analysis data for a package
@@ -172,16 +193,18 @@ func NewAnalysis(allPackages map[string]*packages.Package) *Analysis {
 	}
 
 	return &Analysis{
-		VariableUsage:       make(map[types.Object]*VariableUsageInfo),
-		Imports:             make(map[string]*fileImport),
-		FunctionData:        make(map[types.Object]*FunctionInfo),
-		NodeData:            make(map[ast.Node]*NodeInfo),
-		FuncLitData:         make(map[*ast.FuncLit]*FunctionInfo),
-		ReflectedFunctions:  make(map[ast.Node]*ReflectedFunctionInfo),
-		FunctionAssignments: make(map[types.Object]ast.Node),
-		PackageMetadata:     make(map[PackageMetadataKey]MethodMetadata),
-		WrapperTypes:        make(map[types.Type]bool),
-		AllPackages:         allPackages,
+		VariableUsage:              make(map[types.Object]*VariableUsageInfo),
+		Imports:                    make(map[string]*fileImport),
+		FunctionData:               make(map[types.Object]*FunctionInfo),
+		NodeData:                   make(map[ast.Node]*NodeInfo),
+		FuncLitData:                make(map[*ast.FuncLit]*FunctionInfo),
+		ReflectedFunctions:         make(map[ast.Node]*ReflectedFunctionInfo),
+		FunctionAssignments:        make(map[types.Object]ast.Node),
+		PackageMetadata:            make(map[PackageMetadataKey]MethodMetadata),
+		NamedBasicTypes:            make(map[types.Type]bool),
+		AllPackages:                allPackages,
+		InterfaceImplementations:   make(map[InterfaceMethodKey][]ImplementationInfo),
+		InterfaceMethodAsyncStatus: make(map[InterfaceMethodKey]bool),
 	}
 }
 
@@ -739,111 +762,40 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 		return v // Continue traversal
 
 	case *ast.AssignStmt:
-		// Detect variable shadowing in any := assignment
-		if n.Tok == token.DEFINE {
-			shadowingInfo := v.detectVariableShadowing(n)
-			if shadowingInfo != nil {
-				// Store shadowing info on the assignment statement itself
-				if v.analysis.NodeData[n] == nil {
-					v.analysis.NodeData[n] = &NodeInfo{}
-				}
-				v.analysis.NodeData[n].ShadowingInfo = shadowingInfo
+		// Handle variable assignment tracking and generate shadowing information
+		shadowingInfo := v.detectVariableShadowing(n)
+
+		// Store shadowing information if needed for code generation
+		if shadowingInfo != nil {
+			if v.analysis.NodeData[n] == nil {
+				v.analysis.NodeData[n] = &NodeInfo{}
+			}
+			v.analysis.NodeData[n].ShadowingInfo = shadowingInfo
+		}
+
+		// Track assignment relationships for pointer analysis
+		for i, lhsExpr := range n.Lhs {
+			if i < len(n.Rhs) {
+				v.analyzeAssignment(lhsExpr, n.Rhs[i])
 			}
 		}
 
-		// Continue with the existing assignment analysis logic
-		for i, currentLHSExpr := range n.Lhs {
-			if i >= len(n.Rhs) {
-				break // Should not happen in valid Go
-			}
-			currentRHSExpr := n.Rhs[i]
+		// Track interface implementations for assignments to interface variables
+		v.trackInterfaceAssignments(n)
 
-			// --- Analyze RHS to determine assignment type and source object (if any) ---
-			rhsAssignmentType := DirectAssignment
-			var rhsSourceObj types.Object // The variable object on the RHS (e.g., 'y' in x = y or x = &y)
-
-			if unaryExpr, ok := currentRHSExpr.(*ast.UnaryExpr); ok && unaryExpr.Op == token.AND {
-				// RHS is &some_expr
-				rhsAssignmentType = AddressOfAssignment
-				if rhsIdent, ok := unaryExpr.X.(*ast.Ident); ok {
-					// RHS is &variable
-					rhsSourceObj = v.pkg.TypesInfo.ObjectOf(rhsIdent)
+		// Track function assignments (function literals assigned to variables)
+		if len(n.Lhs) == 1 && len(n.Rhs) == 1 {
+			if lhsIdent, ok := n.Lhs[0].(*ast.Ident); ok {
+				if rhsFuncLit, ok := n.Rhs[0].(*ast.FuncLit); ok {
+					// Get the object for the LHS variable
+					if obj := v.pkg.TypesInfo.ObjectOf(lhsIdent); obj != nil {
+						v.analysis.FunctionAssignments[obj] = rhsFuncLit
+					}
 				}
-				// If RHS is &structLit{} or &array[0], rhsSourceObj remains nil.
-				// _, ok := unaryExpr.X.(*ast.CompositeLit); ok
-			} else if rhsIdent, ok := currentRHSExpr.(*ast.Ident); ok {
-				// RHS is variable
-				rhsAssignmentType = DirectAssignment
-				rhsSourceObj = v.pkg.TypesInfo.ObjectOf(rhsIdent)
-			}
-			// If RHS is a literal, function call, etc., rhsSourceObj remains nil.
-
-			// --- Determine the LHS object (if it's a simple variable or a known field) ---
-			var lhsTrackedObj types.Object // The object on the LHS we might record info *for* (e.g. its sources)
-
-			if lhsIdent, ok := currentLHSExpr.(*ast.Ident); ok {
-				if lhsIdent.Name == "_" {
-					continue // Skip blank identifier assignments
-				}
-				lhsTrackedObj = v.pkg.TypesInfo.ObjectOf(lhsIdent)
-
-				// Check if RHS is a function literal and track the assignment
-				if funcLit, ok := currentRHSExpr.(*ast.FuncLit); ok {
-					v.analysis.FunctionAssignments[lhsTrackedObj] = funcLit
-				}
-			} else if selExpr, ok := currentLHSExpr.(*ast.SelectorExpr); ok {
-				// LHS is struct.field or package.Var
-				if selection := v.pkg.TypesInfo.Selections[selExpr]; selection != nil {
-					lhsTrackedObj = selection.Obj() // This is the field or selected var object
-				}
-			} /* else if _, ok := currentLHSExpr.(*ast.StarExpr); ok {
-				// LHS is *pointer.
-				// We don't try to get a types.Object for the dereferenced entity itself to store in VariableUsage.
-				// lhsTrackedObj remains nil. The effect on rhsSourceObj (if its address is taken) is handled below.
-			} */
-			// For other complex LHS (e.g., map_expr[key_expr]), lhsTrackedObj remains nil.
-
-			// --- Record Usage Information ---
-
-			// 1. If LHS is a trackable variable/field, record what's assigned to it (its sources).
-			// We only want to create VariableUsage entries for actual variables/fields.
-			if _, isVar := lhsTrackedObj.(*types.Var); isVar {
-				lhsUsageInfo := v.getOrCreateUsageInfo(lhsTrackedObj)
-				if rhsSourceObj != nil {
-					// Case: var1 = var2  OR  var1 = &var2 OR field1 = var2 OR field1 = &var2
-					lhsUsageInfo.Sources = append(lhsUsageInfo.Sources, AssignmentInfo{
-						Object: rhsSourceObj,
-						Type:   rhsAssignmentType,
-					})
-				} else if rhsAssignmentType == AddressOfAssignment {
-					// Case: var1 = &non_ident_expr (e.g., &T{}) OR field1 = &non_ident_expr
-					// lhsTrackedObj is assigned an address, but not of a named variable.
-					lhsUsageInfo.Sources = append(lhsUsageInfo.Sources, AssignmentInfo{
-						Object: nil, // No specific source variable object
-						Type:   rhsAssignmentType,
-					})
-				}
-				// If rhsSourceObj is nil and rhsAssignmentType is DirectAssignment (e.g. var1 = 10),
-				// no source object to record for LHS sources.
-			}
-
-			// 2. If RHS involved a source variable (rhsSourceObj is not nil),
-			//    record that this source variable was used (its destinations).
-			//    This is CRITICAL for varRefing analysis (e.g., if &rhsSourceObj was assigned).
-			if rhsSourceObj != nil {
-				sourceUsageInfo := v.getOrCreateUsageInfo(rhsSourceObj)
-				// The 'Object' in DestinationInfo is what/where rhsSourceObj (or its address) was assigned TO.
-				// This can be lhsTrackedObj (if LHS was an ident or field).
-				// If LHS was complex (e.g., *ptr, map[k]), lhsTrackedObj might be nil for that DestinationInfo.Object.
-				// Even if lhsTrackedObj is nil for the DestinationInfo.Object, if rhsAssignmentType is AddressOfAssignment,
-				// it's important to record that rhsSourceObj's address was taken.
-				sourceUsageInfo.Destinations = append(sourceUsageInfo.Destinations, AssignmentInfo{
-					Object: lhsTrackedObj, // This can be nil if LHS is complex (*p, map[k])
-					Type:   rhsAssignmentType,
-				})
 			}
 		}
-		return v // Continue traversal
+
+		return v
 
 	case *ast.ReturnStmt:
 		// Initialize NodeData for return statement
@@ -916,6 +868,18 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 			}
 		}
 		return v // Continue traversal
+
+	case *ast.TypeAssertExpr:
+		// Initialize NodeData for type assertion
+		if v.analysis.NodeData[n] == nil {
+			v.analysis.NodeData[n] = &NodeInfo{}
+		}
+		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
+
+		// Track interface implementations when we see type assertions
+		v.trackTypeAssertion(n)
+
+		return v
 	}
 
 	// For all other nodes, continue traversal
@@ -1081,7 +1045,6 @@ func (v *analysisVisitor) couldImplementInterfaceMethod(methodName string, recei
 // AnalyzeFile analyzes a Go source file AST and populates the Analysis struct with information
 // that will be used during code generation to properly handle pointers, variables that need varRefing, etc.
 func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap ast.CommentMap) {
-	// Store the comment map in the analysis object
 	analysis.Cmap = cmap
 
 	// Load package metadata for async function detection
@@ -1129,15 +1092,12 @@ func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap
 		}
 	}
 
-	// Create an analysis visitor to traverse the AST
 	visitor := &analysisVisitor{
-		analysis:        analysis,
-		pkg:             pkg,
-		inAsyncFunction: false,
-		currentReceiver: nil, // Initialize currentReceiver
+		analysis: analysis,
+		pkg:      pkg,
 	}
 
-	// Walk the AST with our visitor
+	// First pass: analyze all declarations and statements
 	ast.Walk(visitor, file)
 
 	// Post-processing: Find all CallExpr nodes and unmark their Fun SelectorExpr as method values
@@ -1153,6 +1113,113 @@ func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap
 		}
 		return true
 	})
+
+	// Second pass: analyze interface implementations now that all function async status is determined
+	interfaceVisitor := &interfaceImplementationVisitor{
+		analysis: analysis,
+		pkg:      pkg,
+	}
+	ast.Walk(interfaceVisitor, file)
+}
+
+// interfaceImplementationVisitor performs a second pass to analyze interface implementations
+type interfaceImplementationVisitor struct {
+	analysis *Analysis
+	pkg      *packages.Package
+}
+
+func (v *interfaceImplementationVisitor) Visit(node ast.Node) ast.Visitor {
+	switch n := node.(type) {
+	case *ast.GenDecl:
+		// Look for interface type specifications
+		for _, spec := range n.Specs {
+			if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+				if interfaceType, ok := typeSpec.Type.(*ast.InterfaceType); ok {
+					// This is an interface declaration, find all potential implementations
+					v.findInterfaceImplementations(typeSpec, interfaceType)
+				}
+			}
+		}
+	}
+	return v
+}
+
+// findInterfaceImplementations finds all struct types that implement the given interface
+func (v *interfaceImplementationVisitor) findInterfaceImplementations(typeSpec *ast.TypeSpec, interfaceAST *ast.InterfaceType) {
+	// Get the interface type from TypesInfo
+	interfaceGoType := v.pkg.TypesInfo.TypeOf(interfaceAST)
+	if interfaceGoType == nil {
+		return
+	}
+
+	interfaceType, ok := interfaceGoType.(*types.Interface)
+	if !ok {
+		return
+	}
+
+	// Look through all packages for potential implementations
+	for _, pkg := range v.analysis.AllPackages {
+		v.findImplementationsInPackage(interfaceType, pkg)
+	}
+}
+
+// findImplementationsInPackage finds implementations of an interface in a specific package
+func (v *interfaceImplementationVisitor) findImplementationsInPackage(interfaceType *types.Interface, pkg *packages.Package) {
+	// Get all named types in the package
+	scope := pkg.Types.Scope()
+	for _, name := range scope.Names() {
+		obj := scope.Lookup(name)
+		if obj == nil {
+			continue
+		}
+
+		// Check if this is a type name
+		typeName, ok := obj.(*types.TypeName)
+		if !ok {
+			continue
+		}
+
+		namedType, ok := typeName.Type().(*types.Named)
+		if !ok {
+			continue
+		}
+
+		// Check if this type implements the interface
+		if types.Implements(namedType, interfaceType) || types.Implements(types.NewPointer(namedType), interfaceType) {
+			v.trackImplementation(interfaceType, namedType)
+		}
+	}
+}
+
+// trackImplementation records that a named type implements an interface
+func (v *interfaceImplementationVisitor) trackImplementation(interfaceType *types.Interface, namedType *types.Named) {
+	// For each method in the interface, find the corresponding implementation
+	for i := 0; i < interfaceType.NumExplicitMethods(); i++ {
+		interfaceMethod := interfaceType.ExplicitMethod(i)
+
+		// Find the method in the implementing type
+		structMethod := v.findMethodInType(namedType, interfaceMethod.Name())
+		if structMethod != nil {
+			// Determine if this implementation is async
+			isAsync := false
+			if funcInfo := v.analysis.FunctionData[structMethod]; funcInfo != nil {
+				isAsync = funcInfo.IsAsync
+			}
+
+			v.analysis.TrackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+		}
+	}
+}
+
+// findMethodInType finds a method with the given name in a named type
+func (v *interfaceImplementationVisitor) findMethodInType(namedType *types.Named, methodName string) *types.Func {
+	for i := 0; i < namedType.NumMethods(); i++ {
+		method := namedType.Method(i)
+		if method.Name() == methodName {
+			return method
+		}
+	}
+	return nil
 }
 
 // getNamedReturns retrieves the named returns for a function
@@ -1336,10 +1403,6 @@ func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
 
 // LoadPackageMetadata loads metadata from gs packages using embedded JSON files
 func (a *Analysis) LoadPackageMetadata() {
-	// Use the embedded filesystem from gs.go
-	// The GsOverrides embed.FS should be available but we need to import it
-	// For now, let's iterate through known packages and load their meta.json files
-
 	// Discover all packages in the embedded gs/ directory
 	packagePaths := a.discoverEmbeddedGsPackages()
 
@@ -1731,117 +1794,106 @@ func (v *analysisVisitor) findVariableUsageInExpr(expr ast.Expr, lhsVarNames map
 	}
 }
 
-// IsWrapperType returns whether the given type should be implemented as a wrapper class
-// This includes both local types with methods and imported types that are known wrapper types
-func (a *Analysis) IsWrapperType(t types.Type) bool {
-	if t == nil {
+// TrackInterfaceImplementation records that a struct type implements an interface method
+func (a *Analysis) TrackInterfaceImplementation(interfaceType *types.Interface, structType *types.Named, method *types.Func, isAsync bool) {
+	key := InterfaceMethodKey{
+		InterfaceType: interfaceType.String(),
+		MethodName:    method.Name(),
+	}
+
+	implementation := ImplementationInfo{
+		StructType:    structType,
+		Method:        method,
+		IsAsyncByFlow: isAsync,
+	}
+
+	a.InterfaceImplementations[key] = append(a.InterfaceImplementations[key], implementation)
+}
+
+// IsInterfaceMethodAsync determines if an interface method should be async based on its implementations
+func (a *Analysis) IsInterfaceMethodAsync(interfaceType *types.Interface, methodName string) bool {
+	key := InterfaceMethodKey{
+		InterfaceType: interfaceType.String(),
+		MethodName:    methodName,
+	}
+
+	// Check if we've already computed this
+	if result, exists := a.InterfaceMethodAsyncStatus[key]; exists {
+		return result
+	}
+
+	// Find all implementations of this interface method
+	implementations, exists := a.InterfaceImplementations[key]
+	if !exists {
+		// No implementations found, default to sync
+		a.InterfaceMethodAsyncStatus[key] = false
 		return false
 	}
 
-	// Check if we've already determined this type is a wrapper type
-	if isWrapper, exists := a.WrapperTypes[t]; exists {
-		return isWrapper
-	}
-
-	// For named types, check if they have methods and underlying primitive types
-	if namedType, ok := t.(*types.Named); ok {
-		// Exclude struct types - they should remain as classes, not wrapper types
-		if _, isStruct := namedType.Underlying().(*types.Struct); isStruct {
-			a.WrapperTypes[t] = false
-			return false
-		}
-
-		// Exclude interface types
-		if _, isInterface := namedType.Underlying().(*types.Interface); isInterface {
-			a.WrapperTypes[t] = false
-			return false
-		}
-
-		// Check if this type has methods defined on it
-		if namedType.NumMethods() > 0 {
-			// Additional check: the underlying type should be a basic type (primitive)
-			// This distinguishes wrapper types from complex types with methods
-			underlying := namedType.Underlying()
-
-			if isBasicType(underlying) {
-				a.WrapperTypes[t] = true
-				return true
-			}
-
-			// For non-basic underlying types with methods, still consider them wrapper types
-			// if they're not structs or interfaces (already excluded above)
-			a.WrapperTypes[t] = true
+	// If ANY implementation is async, the interface method is async
+	for _, impl := range implementations {
+		if impl.IsAsyncByFlow {
+			a.InterfaceMethodAsyncStatus[key] = true
 			return true
 		}
 	}
 
-	// Handle type aliases (Go 1.9+)
-	if aliasType, ok := t.(*types.Alias); ok {
-		// For type aliases, we need to check the RHS (right-hand side) type
-		// For example, if we have: type FileMode = fs.FileMode
-		// We need to check if fs.FileMode has methods
-		rhs := aliasType.Rhs()
-
-		if rhsNamed, ok := rhs.(*types.Named); ok {
-			// Check if the RHS named type has methods and a basic underlying type
-			if rhsNamed.NumMethods() > 0 {
-				underlying := rhsNamed.Underlying()
-
-				// Exclude struct types
-				if _, isStruct := underlying.(*types.Struct); isStruct {
-					a.WrapperTypes[t] = false
-					return false
-				}
-
-				// Exclude interface types
-				if _, isInterface := underlying.(*types.Interface); isInterface {
-					a.WrapperTypes[t] = false
-					return false
-				}
-
-				if isBasicType(underlying) {
-					a.WrapperTypes[t] = true
-					return true
-				}
-
-				// For non-basic underlying types with methods, still consider them wrapper types
-				// if they're not structs or interfaces (already excluded above)
-				a.WrapperTypes[t] = true
-				return true
-			}
-		}
-
-		// Fallback: check the underlying type for older Go versions or different alias patterns
-		underlying := aliasType.Underlying()
-		if namedUnderlying, ok := underlying.(*types.Named); ok {
-			if namedUnderlying.NumMethods() > 0 && isBasicType(namedUnderlying.Underlying()) {
-				a.WrapperTypes[t] = true
-				return true
-			}
-		}
-	}
-
-	// Cache negative result
-	a.WrapperTypes[t] = false
+	// All implementations are sync
+	a.InterfaceMethodAsyncStatus[key] = false
 	return false
 }
 
-// isBasicType checks if a type is a basic/primitive type
-func isBasicType(t types.Type) bool {
-	if t == nil {
-		return false
+// MustBeAsyncDueToInterface checks if a struct method must be async due to interface constraints
+func (a *Analysis) MustBeAsyncDueToInterface(structType *types.Named, methodName string) bool {
+	// Find all interfaces that this struct implements
+	for key, implementations := range a.InterfaceImplementations {
+		if key.MethodName != methodName {
+			continue
+		}
+
+		// Check if this struct is among the implementations
+		for _, impl := range implementations {
+			if impl.StructType == structType {
+				// This struct implements this interface method
+				// Check if the interface method is marked as async
+				interfaceType := a.findInterfaceTypeByString(key.InterfaceType)
+				if interfaceType != nil && a.IsInterfaceMethodAsync(interfaceType, methodName) {
+					return true
+				}
+			}
+		}
 	}
 
-	switch underlying := t.(type) {
-	case *types.Basic:
-		// Basic types like int, string, bool, etc.
-		return true
-	case *types.Pointer:
-		// Pointers to basic types could also be considered for wrapper types
-		return isBasicType(underlying.Elem())
-	default:
-		return false
+	return false
+}
+
+// findInterfaceTypeByString finds an interface type by its string representation
+// This is a helper method for MustBeAsyncDueToInterface
+func (a *Analysis) findInterfaceTypeByString(interfaceString string) *types.Interface {
+	// This is a simplified implementation - in practice, we might need to store
+	// the actual interface types in our tracking data structure
+	for _, pkg := range a.AllPackages {
+		for _, syntax := range pkg.Syntax {
+			for _, decl := range syntax.Decls {
+				if genDecl, ok := decl.(*ast.GenDecl); ok {
+					for _, spec := range genDecl.Specs {
+						if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+							if interfaceType, ok := typeSpec.Type.(*ast.InterfaceType); ok {
+								if goType := pkg.TypesInfo.TypeOf(interfaceType); goType != nil {
+									if iface, ok := goType.(*types.Interface); ok {
+										if iface.String() == interfaceString {
+											return iface
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
 	}
+	return nil
 }
 
 // GetReceiverMapping returns the receiver variable mapping for a function declaration
@@ -1870,4 +1922,242 @@ func (a *Analysis) GetIdentifierMapping(ident *ast.Ident) string {
 	}
 
 	return ""
+}
+
+// trackTypeAssertion analyzes type assertions and records interface implementations
+func (v *analysisVisitor) trackTypeAssertion(typeAssert *ast.TypeAssertExpr) {
+	// Get the type being asserted to
+	assertedType := v.pkg.TypesInfo.TypeOf(typeAssert.Type)
+	if assertedType == nil {
+		return
+	}
+
+	// Check if the asserted type is an interface
+	interfaceType, isInterface := assertedType.Underlying().(*types.Interface)
+	if !isInterface {
+		return
+	}
+
+	// Get the type of the expression being asserted
+	exprType := v.pkg.TypesInfo.TypeOf(typeAssert.X)
+	if exprType == nil {
+		return
+	}
+
+	// Handle pointer types by getting the element type
+	if ptrType, isPtr := exprType.(*types.Pointer); isPtr {
+		exprType = ptrType.Elem()
+	}
+
+	// Check if the expression type is a named struct type
+	namedType, isNamed := exprType.(*types.Named)
+	if !isNamed {
+		return
+	}
+
+	// For each method in the interface, check if the struct implements it
+	for i := 0; i < interfaceType.NumExplicitMethods(); i++ {
+		interfaceMethod := interfaceType.ExplicitMethod(i)
+
+		// Find the corresponding method in the struct type
+		structMethod := v.findStructMethod(namedType, interfaceMethod.Name())
+		if structMethod != nil {
+			// Determine if this struct method is async based on control flow analysis
+			isAsync := false
+			if obj := structMethod; obj != nil {
+				if funcInfo := v.analysis.FunctionData[obj]; funcInfo != nil {
+					isAsync = funcInfo.IsAsync
+				}
+			}
+
+			// Track this interface implementation
+			v.analysis.TrackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+		}
+	}
+}
+
+// findStructMethod finds a method with the given name on a named type
+func (v *analysisVisitor) findStructMethod(namedType *types.Named, methodName string) *types.Func {
+	// Check methods directly on the type
+	for i := 0; i < namedType.NumMethods(); i++ {
+		method := namedType.Method(i)
+		if method.Name() == methodName {
+			return method
+		}
+	}
+	return nil
+}
+
+// analyzeAssignment analyzes a single assignment for pointer analysis
+func (v *analysisVisitor) analyzeAssignment(lhsExpr, rhsExpr ast.Expr) {
+	// Determine RHS assignment type and source object
+	rhsAssignmentType := DirectAssignment
+	var rhsSourceObj types.Object
+
+	if unaryExpr, ok := rhsExpr.(*ast.UnaryExpr); ok && unaryExpr.Op == token.AND {
+		// RHS is &some_expr
+		rhsAssignmentType = AddressOfAssignment
+		if rhsIdent, ok := unaryExpr.X.(*ast.Ident); ok {
+			rhsSourceObj = v.pkg.TypesInfo.ObjectOf(rhsIdent)
+		}
+	} else if rhsIdent, ok := rhsExpr.(*ast.Ident); ok {
+		// RHS is variable
+		rhsAssignmentType = DirectAssignment
+		rhsSourceObj = v.pkg.TypesInfo.ObjectOf(rhsIdent)
+	}
+
+	// Determine LHS object
+	var lhsTrackedObj types.Object
+
+	if lhsIdent, ok := lhsExpr.(*ast.Ident); ok {
+		if lhsIdent.Name != "_" {
+			lhsTrackedObj = v.pkg.TypesInfo.ObjectOf(lhsIdent)
+		}
+	} else if selExpr, ok := lhsExpr.(*ast.SelectorExpr); ok {
+		if selection := v.pkg.TypesInfo.Selections[selExpr]; selection != nil {
+			lhsTrackedObj = selection.Obj()
+		}
+	}
+
+	// Record usage information
+	if _, isVar := lhsTrackedObj.(*types.Var); isVar {
+		lhsUsageInfo := v.getOrCreateUsageInfo(lhsTrackedObj)
+		if rhsSourceObj != nil {
+			lhsUsageInfo.Sources = append(lhsUsageInfo.Sources, AssignmentInfo{
+				Object: rhsSourceObj,
+				Type:   rhsAssignmentType,
+			})
+		} else if rhsAssignmentType == AddressOfAssignment {
+			lhsUsageInfo.Sources = append(lhsUsageInfo.Sources, AssignmentInfo{
+				Object: nil,
+				Type:   rhsAssignmentType,
+			})
+		}
+	}
+
+	if rhsSourceObj != nil {
+		sourceUsageInfo := v.getOrCreateUsageInfo(rhsSourceObj)
+		sourceUsageInfo.Destinations = append(sourceUsageInfo.Destinations, AssignmentInfo{
+			Object: lhsTrackedObj,
+			Type:   rhsAssignmentType,
+		})
+	}
+}
+
+// trackInterfaceAssignments tracks interface implementations in assignment statements
+func (v *analysisVisitor) trackInterfaceAssignments(assignStmt *ast.AssignStmt) {
+	// For each assignment, check if we're assigning a struct to an interface variable
+	for i, lhsExpr := range assignStmt.Lhs {
+		if i >= len(assignStmt.Rhs) {
+			continue
+		}
+		rhsExpr := assignStmt.Rhs[i]
+
+		// Get the type of the LHS (destination)
+		lhsType := v.pkg.TypesInfo.TypeOf(lhsExpr)
+		if lhsType == nil {
+			continue
+		}
+
+		// Check if LHS is an interface type
+		interfaceType, isInterface := lhsType.Underlying().(*types.Interface)
+		if !isInterface {
+			continue
+		}
+
+		// Get the type of the RHS (source)
+		rhsType := v.pkg.TypesInfo.TypeOf(rhsExpr)
+		if rhsType == nil {
+			continue
+		}
+
+		// Handle pointer types
+		if ptrType, isPtr := rhsType.(*types.Pointer); isPtr {
+			rhsType = ptrType.Elem()
+		}
+
+		// Check if RHS is a named struct type
+		namedType, isNamed := rhsType.(*types.Named)
+		if !isNamed {
+			continue
+		}
+
+		// Track implementations for all interface methods
+		for j := 0; j < interfaceType.NumExplicitMethods(); j++ {
+			interfaceMethod := interfaceType.ExplicitMethod(j)
+
+			structMethod := v.findStructMethod(namedType, interfaceMethod.Name())
+			if structMethod != nil {
+				// Determine if this struct method is async
+				isAsync := false
+				if funcInfo := v.analysis.FunctionData[structMethod]; funcInfo != nil {
+					isAsync = funcInfo.IsAsync
+				}
+
+				v.analysis.TrackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+			}
+		}
+	}
+}
+
+// IsNamedBasicType returns whether the given type should be implemented as a type alias with standalone functions
+// This applies to named types with basic underlying types (like uint32, string, etc.) that have methods
+// It excludes struct types, which should remain as classes
+func (a *Analysis) IsNamedBasicType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+
+	// Check if we already have this result cached
+	if result, exists := a.NamedBasicTypes[t]; exists {
+		return result
+	}
+
+	var originalType types.Type = t
+	var foundMethods bool
+
+	// Traverse the type chain to find any type with methods
+	for {
+		switch typed := t.(type) {
+		case *types.Named:
+			// Built-in types cannot be named basic types
+			if typed.Obj().Pkg() == nil {
+				return false
+			}
+
+			// Check if this named type has methods
+			if typed.NumMethods() > 0 {
+				foundMethods = true
+			}
+
+			// Check underlying type
+			underlying := typed.Underlying()
+			switch underlying.(type) {
+			case *types.Struct, *types.Interface:
+				return false
+			}
+			t = underlying
+
+		case *types.Alias:
+			// Built-in types cannot be named basic types
+			if typed.Obj().Pkg() == nil {
+				return false
+			}
+			t = typed.Underlying()
+
+		default:
+			// We've reached a non-named, non-alias type
+			// Check if it's a supported type with methods
+			switch t.(type) {
+			case *types.Basic, *types.Slice, *types.Array, *types.Map:
+				if foundMethods {
+					a.NamedBasicTypes[originalType] = true
+					return true
+				}
+				return false
+			default:
+				return false
+			}
+		}
+	}
 }

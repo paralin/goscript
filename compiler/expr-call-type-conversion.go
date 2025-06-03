@@ -81,7 +81,7 @@ func (c *GoToTSCompiler) writeArrayTypeConversion(exp *ast.CallExpr) (handled bo
 			// Check if the argument is a named type with a slice underlying type
 			if namedArgType, isNamed := argType.(*types.Named); isNamed {
 				// Check if the named type has receiver methods (is a wrapper type)
-				if c.analysis.IsWrapperType(namedArgType) {
+				if c.analysis.IsNamedBasicType(namedArgType) {
 					// Check if the underlying type matches the target slice type
 					if sliceUnderlying, isSlice := namedArgType.Underlying().(*types.Slice); isSlice {
 						// Get the target slice type
@@ -216,7 +216,7 @@ func (c *GoToTSCompiler) writeTypeConversion(exp *ast.CallExpr, funIdent *ast.Id
 				if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
 					if namedArgType, isNamed := argType.(*types.Named); isNamed {
 						// Check if the argument type is a wrapper type
-						if c.analysis.IsWrapperType(namedArgType) {
+						if c.analysis.IsNamedBasicType(namedArgType) {
 							// Check if we're converting to the underlying type
 							targetType := typeName.Type()
 							underlyingType := namedArgType.Underlying()
@@ -247,7 +247,7 @@ func (c *GoToTSCompiler) writeTypeConversion(exp *ast.CallExpr, funIdent *ast.Id
 					return true, nil
 				} else {
 					// Check if this is a wrapper type
-					isWrapperType := c.analysis.IsWrapperType(typeName.Type())
+					isWrapperType := c.analysis.IsNamedBasicType(typeName.Type())
 					if isWrapperType {
 						// For wrapper types, use type casting instead of constructor calls
 						c.tsw.WriteLiterally("(")
@@ -372,7 +372,7 @@ func (c *GoToTSCompiler) writeIntConversion(exp *ast.CallExpr) error {
 	if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
 		if namedArgType, isNamed := argType.(*types.Named); isNamed {
 			// Check if the argument type is a wrapper type
-			if c.analysis.IsWrapperType(namedArgType) {
+			if c.analysis.IsNamedBasicType(namedArgType) {
 				// Check if we're converting to int (the underlying type)
 				if types.Identical(types.Typ[types.Int], namedArgType.Underlying()) {
 					// This is a conversion from a wrapper type to int
@@ -409,7 +409,7 @@ func (c *GoToTSCompiler) writeQualifiedTypeConversion(exp *ast.CallExpr, selecto
 				if argType := c.pkg.TypesInfo.TypeOf(arg); argType != nil {
 					if namedArgType, isNamed := argType.(*types.Named); isNamed {
 						// Check if the argument type is a wrapper type
-						if c.analysis.IsWrapperType(namedArgType) {
+						if c.analysis.IsNamedBasicType(namedArgType) {
 							// Check if we're converting to the underlying type
 							targetType := typeName.Type()
 							underlyingType := namedArgType.Underlying()
@@ -440,7 +440,7 @@ func (c *GoToTSCompiler) writeQualifiedTypeConversion(exp *ast.CallExpr, selecto
 					return true, nil
 				} else {
 					// Check if this is a wrapper type
-					isWrapperType := c.analysis.IsWrapperType(typeName.Type())
+					isWrapperType := c.analysis.IsNamedBasicType(typeName.Type())
 					if isWrapperType {
 						// For wrapper types, use type casting instead of constructor calls
 						c.tsw.WriteLiterally("(")

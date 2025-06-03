@@ -169,7 +169,7 @@ func (c *GoToTSCompiler) writeCallArguments(exp *ast.CallExpr) error {
 func (c *GoToTSCompiler) writeArgumentWithTypeHandling(arg ast.Expr, funcSig *types.Signature, argIndex int) error {
 	if funcSig != nil && argIndex < funcSig.Params().Len() {
 		paramType := funcSig.Params().At(argIndex).Type()
-		isWrapper := c.analysis.IsWrapperType(paramType)
+		isWrapper := c.analysis.IsNamedBasicType(paramType)
 
 		if isWrapper {
 			// For wrapper types (now type aliases), no auto-wrapping is needed
@@ -234,7 +234,7 @@ func (c *GoToTSCompiler) getImportAlias(pkgPath string) string {
 func (c *GoToTSCompiler) writeAutoWrappedArgument(arg ast.Expr, expectedType types.Type) error {
 	// For wrapper types (now type aliases), no auto-wrapping is needed
 	// Just use type casting if the types don't match exactly
-	if c.analysis.IsWrapperType(expectedType) {
+	if c.analysis.IsNamedBasicType(expectedType) {
 		argType := c.pkg.TypesInfo.TypeOf(arg)
 
 		// Only add type casting if needed
@@ -271,39 +271,70 @@ func (c *GoToTSCompiler) writeWrapperTypeMethodCall(exp *ast.CallExpr, selectorE
 		return false, nil
 	}
 
-	// Check if this is a wrapper type
-	if !c.analysis.IsWrapperType(baseType) {
+	// Check if this is a wrapper type using the analysis
+	isWrapperType := c.analysis.IsNamedBasicType(baseType)
+
+	// Special handling for type aliases to basic types that might have wrapper functions
+	// Even if IsNamedBasicType returns false, we should check for known wrapper type patterns
+	var typeName string
+	if !isWrapperType {
+		// Check if this is a type alias to a basic type that might have wrapper methods
+		if aliasType, ok := baseType.(*types.Alias); ok {
+			if aliasType.Obj() != nil && aliasType.Obj().Pkg() != nil {
+				// Check if the underlying type is a basic type
+				underlying := aliasType.Underlying()
+				if _, isBasic := underlying.(*types.Basic); isBasic {
+					// This is a type alias to a basic type - treat it as a potential wrapper type
+					isWrapperType = true
+					if aliasType.Obj().Pkg() != c.pkg.Types {
+						// Imported type alias like os.FileMode
+						if importAlias := c.getImportAlias(aliasType.Obj().Pkg().Path()); importAlias != "" {
+							typeName = importAlias + "." + aliasType.Obj().Name()
+						} else {
+							typeName = aliasType.Obj().Name()
+						}
+					} else {
+						// Local type alias
+						typeName = aliasType.Obj().Name()
+					}
+				}
+			}
+		}
+	}
+
+	if !isWrapperType {
 		return false, nil
 	}
 
-	// Get the type name for the function call
-	var typeName string
-	if namedType, ok := baseType.(*types.Named); ok {
-		if obj := namedType.Obj(); obj != nil {
-			if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
-				// Imported type like os.FileMode
-				if importAlias := c.getImportAlias(obj.Pkg().Path()); importAlias != "" {
-					typeName = importAlias + "." + obj.Name()
+	// Get the type name for the function call if not already set
+	if typeName == "" {
+		if namedType, ok := baseType.(*types.Named); ok {
+			if obj := namedType.Obj(); obj != nil {
+				if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
+					// Imported type like os.FileMode
+					if importAlias := c.getImportAlias(obj.Pkg().Path()); importAlias != "" {
+						typeName = importAlias + "." + obj.Name()
+					} else {
+						typeName = obj.Name()
+					}
 				} else {
+					// Local type
 					typeName = obj.Name()
 				}
-			} else {
-				// Local type
-				typeName = obj.Name()
 			}
-		}
-	} else if aliasType, ok := baseType.(*types.Alias); ok {
-		if obj := aliasType.Obj(); obj != nil {
-			if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
-				// Imported type alias
-				if importAlias := c.getImportAlias(obj.Pkg().Path()); importAlias != "" {
-					typeName = importAlias + "." + obj.Name()
+		} else if aliasType, ok := baseType.(*types.Alias); ok {
+			if obj := aliasType.Obj(); obj != nil {
+				if obj.Pkg() != nil && obj.Pkg() != c.pkg.Types {
+					// Imported type alias
+					if importAlias := c.getImportAlias(obj.Pkg().Path()); importAlias != "" {
+						typeName = importAlias + "." + obj.Name()
+					} else {
+						typeName = obj.Name()
+					}
 				} else {
+					// Local type alias
 					typeName = obj.Name()
 				}
-			} else {
-				// Local type alias
-				typeName = obj.Name()
 			}
 		}
 	}
