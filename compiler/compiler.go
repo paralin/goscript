@@ -168,28 +168,39 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			visit(pkg)
 		}
 
-		// Replace pkgs with all packages
-		pkgs = allPkgs
+		// Now we have collected all dependencies, but they only have minimal information.
+		// We need to reload them with complete type information for compilation.
+		// Collect all package paths from the dependency graph
+		var pkgPaths []string
+		pkgPathSet := make(map[string]bool) // Use set to avoid duplicates
 
-		/*
-			// Now load all packages with full mode to get complete type information
-			var pkgPaths []string
-			for _, pkg := range pkgs {
-				if pkg.PkgPath != "" {
-					pkgPaths = append(pkgPaths, pkg.PkgPath)
-				}
+		for _, pkg := range allPkgs {
+			if pkg.PkgPath != "" && !pkgPathSet[pkg.PkgPath] {
+				pkgPaths = append(pkgPaths, pkg.PkgPath)
+				pkgPathSet[pkg.PkgPath] = true
 			}
+		}
 
-			// Reload all packages with full mode
-			// TODO: Can we get rid of this? This would be very slow!
+		// Reload all collected packages with complete type information
+		if len(pkgPaths) > 0 {
+			c.le.Debugf("Reloading %d packages with complete type information", len(pkgPaths))
+
 			fullOpts := c.opts
 			fullOpts.Context = ctx
+			// Use LoadAllSyntax to get complete type information, syntax trees, and type checking
 			fullOpts.Mode = packages.LoadAllSyntax
-			pkgs, err = packages.Load(&fullOpts, pkgPaths...)
+
+			reloadedPkgs, err := packages.Load(&fullOpts, pkgPaths...)
 			if err != nil {
-				return fmt.Errorf("failed to reload packages with full mode: %w", err)
+				return nil, fmt.Errorf("failed to reload packages with complete type information: %w", err)
 			}
-		*/
+
+			// Replace the minimal packages with the fully loaded ones
+			pkgs = reloadedPkgs
+		} else {
+			// No packages to reload, use the original set
+			pkgs = allPkgs
+		}
 	}
 
 	// If DisableEmitBuiltin is false, we need to copy the builtin package to the output directory

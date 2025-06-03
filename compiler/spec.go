@@ -617,7 +617,6 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 
 	c.tsw.WriteImport(impName, tsImportPath+"/index.js")
 }
-
 func (c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
 	c.tsw.WriteLiterally(fieldName)
 	c.tsw.WriteLiterally(": $.varRef(")
