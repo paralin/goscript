@@ -1,1 +1,1 @@
-export type { MyStruct } from "./varref_struct.gs.js"
+export { MyStruct } from "./varref_struct.gs.js"

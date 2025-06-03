@@ -17,9 +17,7 @@ export class buffer {
 
 	constructor(init?: Partial<{data?: $.Bytes}>) {
 		this._fields = {
-			data: $.varRef(init?.data ?? // DEBUG: Field data has type []byte (*types.Slice)
-			// DEBUG: Using default zero value
-			new Uint8Array(0))
+			data: $.varRef(init?.data ?? new Uint8Array(0))
 		}
 	}
 

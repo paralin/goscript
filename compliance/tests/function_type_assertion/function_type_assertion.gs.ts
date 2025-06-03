@@ -37,9 +37,7 @@ export class FuncContainer {
 
 	constructor(init?: Partial<{myFunc?: null | any}>) {
 		this._fields = {
-			myFunc: $.varRef(init?.myFunc ?? // DEBUG: Field myFunc has type interface{} (*types.Interface)
-			// DEBUG: Using default zero value
-			null)
+			myFunc: $.varRef(init?.myFunc ?? null)
 		}
 	}
 

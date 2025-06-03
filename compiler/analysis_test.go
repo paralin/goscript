@@ -171,7 +171,7 @@ func parseAndAnalyze(t *testing.T, code string) (*Analysis, map[string]types.Obj
 	pkg.Types = typePkg
 
 	// Run analysis
-	analysis := NewAnalysis()
+	analysis := NewAnalysis(nil)
 	cmap := ast.NewCommentMap(fset, file, file.Comments)
 	AnalyzeFile(file, pkg, analysis, cmap)
 
@@ -274,7 +274,7 @@ func TestWrapperTypeDetection(t *testing.T) {
 		t.Fatal("No syntax files found")
 	}
 
-	analysis := NewAnalysis()
+	analysis := NewAnalysis(nil)
 	cmap := ast.NewCommentMap(pkg.Fset, pkg.Syntax[0], pkg.Syntax[0].Comments)
 	AnalyzeFile(pkg.Syntax[0], pkg, analysis, cmap)
 
@@ -315,7 +315,7 @@ func TestWrapperTypeDetection(t *testing.T) {
 // TestDiscoverGsPackages verifies that the discoverEmbeddedGsPackages function
 // can find packages in the embedded gs/ directory
 func TestDiscoverGsPackages(t *testing.T) {
-	analysis := NewAnalysis()
+	analysis := NewAnalysis(nil)
 
 	// Test package discovery using the embedded filesystem
 	packages := analysis.discoverEmbeddedGsPackages()

@@ -40,12 +40,8 @@ export class Pair<T extends any> {
 
 	constructor(init?: Partial<{First?: T, Second?: T}>) {
 		this._fields = {
-			First: $.varRef(init?.First ?? // DEBUG: Field First has type T (*types.TypeParam)
-			// DEBUG: Using default zero value
-			null as any),
-			Second: $.varRef(init?.Second ?? // DEBUG: Field Second has type T (*types.TypeParam)
-			// DEBUG: Using default zero value
-			null as any)
+			First: $.varRef(init?.First ?? null as any),
+			Second: $.varRef(init?.Second ?? null as any)
 		}
 	}
 

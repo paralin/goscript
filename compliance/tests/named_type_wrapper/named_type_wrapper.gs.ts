@@ -32,13 +32,8 @@ export class FileStatus {
 
 	constructor(init?: Partial<{mode?: MyFileMode, size?: number}>) {
 		this._fields = {
-			mode: $.varRef(init?.mode ?? // DEBUG: Field mode has type github.com/aperturerobotics/goscript/compliance/tests/named_type_wrapper.MyFileMode (*types.Named)
-			// DEBUG: Package=github.com/aperturerobotics/goscript/compliance/tests/named_type_wrapper, TypeName=github.com/aperturerobotics/goscript/compliance/tests/named_type_wrapper.MyFileMode
-			// DEBUG: Using wrapper type zero value
-			0 as MyFileMode),
-			size: $.varRef(init?.size ?? // DEBUG: Field size has type int64 (*types.Basic)
-			// DEBUG: Using default zero value
-			0)
+			mode: $.varRef(init?.mode ?? 0 as MyFileMode),
+			size: $.varRef(init?.size ?? 0)
 		}
 	}
 

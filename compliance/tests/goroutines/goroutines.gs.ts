@@ -25,12 +25,8 @@ export class Message {
 
 	constructor(init?: Partial<{priority?: number, text?: string}>) {
 		this._fields = {
-			priority: $.varRef(init?.priority ?? // DEBUG: Field priority has type int (*types.Basic)
-			// DEBUG: Using default zero value
-			0),
-			text: $.varRef(init?.text ?? // DEBUG: Field text has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			"")
+			priority: $.varRef(init?.priority ?? 0),
+			text: $.varRef(init?.text ?? "")
 		}
 	}
 

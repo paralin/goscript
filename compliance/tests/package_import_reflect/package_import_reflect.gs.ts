@@ -27,12 +27,8 @@ export class Person {
 
 	constructor(init?: Partial<{Age?: number, Name?: string}>) {
 		this._fields = {
-			Name: $.varRef(init?.Name ?? // DEBUG: Field Name has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			""),
-			Age: $.varRef(init?.Age ?? // DEBUG: Field Age has type int (*types.Basic)
-			// DEBUG: Using default zero value
-			0)
+			Name: $.varRef(init?.Name ?? ""),
+			Age: $.varRef(init?.Age ?? 0)
 		}
 	}
 

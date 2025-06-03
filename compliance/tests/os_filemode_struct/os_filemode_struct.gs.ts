@@ -27,12 +27,8 @@ export class file {
 
 	constructor(init?: Partial<{mode?: os.FileMode, name?: string}>) {
 		this._fields = {
-			mode: $.varRef(init?.mode ?? // DEBUG: Field mode has type os.FileMode (*types.Alias)
-			// DEBUG: Using wrapper type zero value
-			0 as os.FileMode),
-			name: $.varRef(init?.name ?? // DEBUG: Field name has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			"")
+			mode: $.varRef(init?.mode ?? 0 as os.FileMode),
+			name: $.varRef(init?.name ?? "")
 		}
 	}
 

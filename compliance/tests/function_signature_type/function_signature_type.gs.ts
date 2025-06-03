@@ -33,9 +33,7 @@ export class MyError {
 
 	constructor(init?: Partial<{s?: string}>) {
 		this._fields = {
-			s: $.varRef(init?.s ?? // DEBUG: Field s has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			"")
+			s: $.varRef(init?.s ?? "")
 		}
 	}
 

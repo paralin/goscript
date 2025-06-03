@@ -15,12 +15,7 @@ export class rtype {
 
   Pointers(): boolean {
     const k = this.kind
-    return (
-      k === Ptr ||
-      k === Map ||
-      k === Slice ||
-      k === Interface
-    )
+    return k === Ptr || k === Map || k === Slice || k === Interface
   }
 }
 
@@ -127,13 +122,13 @@ export const BothDir: ChanDir = 3
 export function ChanDir_String(d: ChanDir): string {
   switch (d) {
     case RecvDir:
-      return "RecvDir"
+      return 'RecvDir'
     case SendDir:
-      return "SendDir"  
+      return 'SendDir'
     case BothDir:
-      return "BothDir"
+      return 'BothDir'
     default:
-      return "ChanDir(" + d + ")"
+      return 'ChanDir(' + d + ')'
   }
 }
 

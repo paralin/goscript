@@ -61,12 +61,7 @@ export function multiplyDuration(duration: any, multiplier: number): any {
  * @throws {Error} If the input type is unsupported or cannot be normalized.
  */
 export function normalizeBytes(
-  bytes:
-    | Uint8Array
-    | number[]
-    | null
-    | undefined
-    | { data: number[] },
+  bytes: Uint8Array | number[] | null | undefined | { data: number[] },
 ): Uint8Array {
   if (bytes === null || bytes === undefined) {
     return new Uint8Array(0)
@@ -90,7 +85,6 @@ export function normalizeBytes(
   if (Array.isArray(bytes)) {
     return new Uint8Array(bytes)
   }
-
 
   throw new Error(`Cannot normalize bytes of type ${typeof bytes}: ${bytes}`)
 }

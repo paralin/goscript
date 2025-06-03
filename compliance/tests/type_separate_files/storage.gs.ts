@@ -26,12 +26,8 @@ export class storage {
 
 	constructor(init?: Partial<{children?: Map<string, Map<string, file | null> | null> | null, files?: Map<string, file | null> | null}>) {
 		this._fields = {
-			files: $.varRef(init?.files ?? // DEBUG: Field files has type map[string]*github.com/aperturerobotics/goscript/compliance/tests/type_separate_files.file (*types.Map)
-			// DEBUG: Using default zero value
-			null),
-			children: $.varRef(init?.children ?? // DEBUG: Field children has type map[string]map[string]*github.com/aperturerobotics/goscript/compliance/tests/type_separate_files.file (*types.Map)
-			// DEBUG: Using default zero value
-			null)
+			files: $.varRef(init?.files ?? null),
+			children: $.varRef(init?.children ?? null)
 		}
 	}
 

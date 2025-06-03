@@ -74,7 +74,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 		}
 
 		// Check if this is an async function call
-		_ = c.writeAsyncCall(exp, funIdent)
+		c.writeAsyncCallIfNeeded(exp)
 
 		// Not a special built-in, treat as a regular function call
 		if err := c.WriteValueExpr(expFun); err != nil {
@@ -99,7 +99,7 @@ func (c *GoToTSCompiler) WriteCallExpr(exp *ast.CallExpr) error {
 
 	// Handle non-identifier function expressions (method calls, function literals, etc.)
 	// Check if this is an async method call (e.g., mu.Lock())
-	_ = c.writeAsyncMethodCall(exp)
+	c.writeAsyncCallIfNeeded(exp)
 
 	// If expFun is a function literal, it needs to be wrapped in parentheses for IIFE syntax
 	if _, isFuncLit := expFun.(*ast.FuncLit); isFuncLit {

@@ -86,6 +86,24 @@ type NodeInfo struct {
 	IdentifierMapping string         // replacement name for this identifier (e.g., receiver -> "receiver")
 }
 
+// PackageMetadataKey represents a key for looking up package metadata
+type PackageMetadataKey struct {
+	PackagePath string // Full package path (e.g., "github.com/aperturerobotics/util/csync")
+	TypeName    string // Type name (e.g., "Mutex")
+	MethodName  string // Method name (e.g., "Lock")
+}
+
+// MethodMetadata represents metadata about a method
+type MethodMetadata struct {
+	IsAsync bool // Whether the method is async
+}
+
+// GsMetadata represents the structure of a meta.json file in gs/ packages
+type GsMetadata struct {
+	Dependencies []string        `json:"dependencies,omitempty"`
+	AsyncMethods map[string]bool `json:"asyncMethods,omitempty"`
+}
+
 // Analysis holds information gathered during the analysis phase of the Go code compilation.
 // This data is used to make decisions about how to generate TypeScript code.
 // Analysis is read-only after being built and should not be modified during code generation.
@@ -116,12 +134,16 @@ type Analysis struct {
 	// FunctionAssignments tracks which function literals are assigned to which variables
 	FunctionAssignments map[types.Object]ast.Node
 
-	// PackageMetadata holds package-level metadata
-	PackageMetadata map[string]interface{}
+	// PackageMetadata holds package-level metadata with structured keys
+	PackageMetadata map[PackageMetadataKey]MethodMetadata
 
 	// WrapperTypes tracks types that should be implemented as wrapper classes
 	// This includes both local types with methods and imported types that are known wrapper types
 	WrapperTypes map[types.Type]bool
+
+	// AllPackages stores all loaded packages for dependency analysis
+	// Key: package path, Value: package data
+	AllPackages map[string]*packages.Package
 }
 
 // PackageAnalysis holds cross-file analysis data for a package
@@ -143,14 +165,12 @@ type PackageAnalysis struct {
 	TypeCalls map[string]map[string][]string
 }
 
-// GsMetadata represents the structure of a meta.json file in gs/ packages
-type GsMetadata struct {
-	Dependencies []string        `json:"dependencies,omitempty"`
-	AsyncMethods map[string]bool `json:"asyncMethods,omitempty"`
-}
-
 // NewAnalysis creates a new Analysis instance.
-func NewAnalysis() *Analysis {
+func NewAnalysis(allPackages map[string]*packages.Package) *Analysis {
+	if allPackages == nil {
+		allPackages = make(map[string]*packages.Package)
+	}
+
 	return &Analysis{
 		VariableUsage:       make(map[types.Object]*VariableUsageInfo),
 		Imports:             make(map[string]*fileImport),
@@ -159,8 +179,9 @@ func NewAnalysis() *Analysis {
 		FuncLitData:         make(map[*ast.FuncLit]*FunctionInfo),
 		ReflectedFunctions:  make(map[ast.Node]*ReflectedFunctionInfo),
 		FunctionAssignments: make(map[types.Object]ast.Node),
-		PackageMetadata:     make(map[string]interface{}),
+		PackageMetadata:     make(map[PackageMetadataKey]MethodMetadata),
 		WrapperTypes:        make(map[types.Type]bool),
+		AllPackages:         allPackages,
 	}
 }
 
@@ -947,11 +968,11 @@ func (v *analysisVisitor) containsAsyncOperations(node ast.Node) bool {
 
 								// Check if the type is from an imported package
 								if typePkg := namedType.Obj().Pkg(); typePkg != nil && typePkg != v.pkg.Types {
-									// Use the actual package name from the type information
-									pkgName := typePkg.Name()
+									// Use the full package path from the type information (not just the package name)
+									pkgPath := typePkg.Path()
 
 									// Check if this method is async based on metadata
-									if v.analysis.IsMethodAsync(pkgName, typeName, methodName) {
+									if v.analysis.IsMethodAsync(pkgPath, typeName, methodName) {
 										hasAsync = true
 										return false
 									}
@@ -1336,10 +1357,16 @@ func (a *Analysis) LoadPackageMetadata() {
 					typeName := parts[0]
 					methodName := parts[1]
 					// The key format is "pkgName.TypeNameMethodNameInfo"
-					key := pkgPath + "." + typeName + methodName + "Info"
+					key := PackageMetadataKey{
+						PackagePath: pkgPath,
+						TypeName:    typeName,
+						MethodName:  methodName,
+					}
 
 					// Store the async value directly in PackageMetadata
-					a.PackageMetadata[key] = isAsync
+					a.PackageMetadata[key] = MethodMetadata{
+						IsAsync: isAsync,
+					}
 				}
 			}
 		}
@@ -1391,18 +1418,120 @@ func (a *Analysis) loadGsMetadata(metaFilePath string) *GsMetadata {
 }
 
 // IsMethodAsync checks if a method call is async based on package metadata
-func (a *Analysis) IsMethodAsync(pkgName, typeName, methodName string) bool {
+func (a *Analysis) IsMethodAsync(pkgPath, typeName, methodName string) bool {
+	// First, check existing metadata for internal packages
 	// The metadata keys are stored as "pkgName.TypeNameMethodNameInfo"
 	// e.g., "sync.MutexLockInfo", "sync.WaitGroupWaitInfo", etc.
-	key := pkgName + "." + typeName + methodName + "Info"
+	key := PackageMetadataKey{
+		PackagePath: pkgPath,
+		TypeName:    typeName,
+		MethodName:  methodName,
+	}
 
-	if asyncValue, exists := a.PackageMetadata[key]; exists {
-		if isAsync, ok := asyncValue.(bool); ok {
-			return isAsync
+	if metadata, exists := a.PackageMetadata[key]; exists {
+		return metadata.IsAsync
+	}
+
+	// If no metadata found, check if we can analyze the method from dependency packages
+	return a.analyzeExternalMethodAsync(pkgPath, typeName, methodName)
+}
+
+// analyzeExternalMethodAsync analyzes external package methods to determine if they're async
+// using the same logic we use for internal methods
+func (a *Analysis) analyzeExternalMethodAsync(pkgPath, typeName, methodName string) bool {
+	// Look up the package in our loaded packages
+	pkg, exists := a.AllPackages[pkgPath]
+	if !exists {
+		return false
+	}
+
+	// Find the method definition in the package
+	for _, syntax := range pkg.Syntax {
+		for _, decl := range syntax.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+				// Check if this is a method with the right name and receiver type
+				if funcDecl.Name.Name == methodName && funcDecl.Recv != nil {
+					// Check the receiver type
+					if len(funcDecl.Recv.List) > 0 {
+						receiverType := funcDecl.Recv.List[0].Type
+
+						// Handle pointer receivers
+						if starExpr, ok := receiverType.(*ast.StarExpr); ok {
+							receiverType = starExpr.X
+						}
+
+						if ident, ok := receiverType.(*ast.Ident); ok {
+							if ident.Name == typeName {
+								// Found the method! Now check if it's async
+								if funcDecl.Body != nil {
+									return a.containsAsyncOperations(funcDecl.Body, pkg)
+								}
+							}
+						}
+					}
+				}
+			}
 		}
 	}
 
 	return false
+}
+
+// containsAsyncOperations checks if a node contains any async operations for a specific package
+func (a *Analysis) containsAsyncOperations(node ast.Node, pkg *packages.Package) bool {
+	var hasAsync bool
+
+	ast.Inspect(node, func(n ast.Node) bool {
+		if n == nil {
+			return false
+		}
+
+		switch s := n.(type) {
+		case *ast.SendStmt:
+			// Channel send operation (ch <- value)
+			hasAsync = true
+			return false
+
+		case *ast.UnaryExpr:
+			// Channel receive operation (<-ch)
+			if s.Op == token.ARROW {
+				hasAsync = true
+				return false
+			}
+
+		case *ast.CallExpr:
+			// Check for select statements and other async operations
+			if ident, ok := s.Fun.(*ast.Ident); ok {
+				// Look for calls to select-related functions or other async operations
+				if obj := pkg.TypesInfo.Uses[ident]; obj != nil {
+					// Check if this function is from the context package (like context.Background, etc.)
+					if obj.Pkg() != nil && obj.Pkg().Path() == "context" {
+						hasAsync = true
+						return false
+					}
+				}
+			}
+
+			// Check if the method takes a context parameter, which usually indicates async behavior
+			if len(s.Args) > 0 {
+				for _, arg := range s.Args {
+					if argType := pkg.TypesInfo.TypeOf(arg); argType != nil {
+						if named, ok := argType.(*types.Named); ok {
+							if named.Obj() != nil && named.Obj().Pkg() != nil &&
+								named.Obj().Pkg().Path() == "context" && named.Obj().Name() == "Context" {
+								hasAsync = true
+								return false
+							}
+						}
+					}
+				}
+			}
+		}
+
+		return true
+	})
+
+	return hasAsync
 }
 
 // NeedsReflectionMetadata returns whether the given function node needs reflection type metadata

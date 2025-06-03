@@ -55,15 +55,9 @@ export class MockFile {
 
 	constructor(init?: Partial<{content?: $.Bytes, filename?: string, position?: number}>) {
 		this._fields = {
-			filename: $.varRef(init?.filename ?? // DEBUG: Field filename has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			""),
-			content: $.varRef(init?.content ?? // DEBUG: Field content has type []byte (*types.Slice)
-			// DEBUG: Using default zero value
-			new Uint8Array(0)),
-			position: $.varRef(init?.position ?? // DEBUG: Field position has type int64 (*types.Basic)
-			// DEBUG: Using default zero value
-			0)
+			filename: $.varRef(init?.filename ?? ""),
+			content: $.varRef(init?.content ?? new Uint8Array(0)),
+			position: $.varRef(init?.position ?? 0)
 		}
 	}
 
@@ -177,9 +171,7 @@ export class file {
 	constructor(init?: Partial<{File?: File, name?: string}>) {
 		this._fields = {
 			File: $.varRef(init?.File ?? null),
-			name: $.varRef(init?.name ?? // DEBUG: Field name has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			"")
+			name: $.varRef(init?.name ?? "")
 		}
 	}
 
@@ -262,9 +254,7 @@ export class qualifiedFile {
 	constructor(init?: Partial<{File?: subpkg.File, metadata?: string}>) {
 		this._fields = {
 			File: $.varRef(init?.File ?? null),
-			metadata: $.varRef(init?.metadata ?? // DEBUG: Field metadata has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			"")
+			metadata: $.varRef(init?.metadata ?? "")
 		}
 	}
 

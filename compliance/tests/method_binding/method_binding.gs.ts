@@ -17,9 +17,7 @@ export class Counter {
 
 	constructor(init?: Partial<{value?: number}>) {
 		this._fields = {
-			value: $.varRef(init?.value ?? // DEBUG: Field value has type int (*types.Basic)
-			// DEBUG: Using default zero value
-			0)
+			value: $.varRef(init?.value ?? 0)
 		}
 	}
 

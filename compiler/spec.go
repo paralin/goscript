@@ -136,27 +136,8 @@ func (c *GoToTSCompiler) writeRegularFieldInitializer(fieldName string, fieldTyp
 
 	c.tsw.WriteLiterallyf("init?.%s ?? ", fieldName)
 
-	// Debugging: print field type info
-	if astType != nil {
-		if named, ok := fieldType.(*types.Named); ok {
-			if pkgPath := named.Obj().Pkg().Path(); pkgPath != "" {
-				c.tsw.WriteCommentLinef("DEBUG: Field %s has type %s (%T)", fieldName, fieldType, fieldType)
-			}
-		} else {
-			c.tsw.WriteCommentLinef("DEBUG: Field %s has type %s (%T)", fieldName, fieldType, fieldType)
-		}
-		if typeName, ok := c.pkg.TypesInfo.TypeOf(astType).(*types.Named); ok {
-			pkgPath := ""
-			if typeName.Obj().Pkg() != nil {
-				pkgPath = typeName.Obj().Pkg().Path()
-			}
-			c.tsw.WriteCommentLinef("DEBUG: Package=%s, TypeName=%s", pkgPath, typeName)
-		}
-	}
-
 	// Priority 1: Check if this is a wrapper type
 	if c.analysis.IsWrapperType(fieldType) {
-		c.tsw.WriteCommentLinef("DEBUG: Using wrapper type zero value")
 		// For wrapper types, use the zero value of the underlying type with type casting
 		if named, ok := fieldType.(*types.Named); ok {
 			c.WriteZeroValueForType(named.Underlying())
@@ -175,27 +156,23 @@ func (c *GoToTSCompiler) writeRegularFieldInitializer(fieldName string, fieldTyp
 
 	// Priority 2: Handle imported types with basic underlying types (like os.FileMode)
 	if c.isImportedBasicType(fieldType) {
-		c.tsw.WriteCommentLinef("DEBUG: Using imported basic type zero value")
 		c.writeImportedBasicTypeZeroValue(fieldType)
 		return
 	}
 
 	// Priority 3: Handle named types
 	if named, isNamed := fieldType.(*types.Named); isNamed {
-		c.tsw.WriteCommentLinef("DEBUG: Using named type zero value")
 		c.writeNamedTypeZeroValue(named)
 		return
 	}
 
 	// Priority 4: Handle type aliases
 	if alias, isAlias := fieldType.(*types.Alias); isAlias {
-		c.tsw.WriteCommentLinef("DEBUG: Using type alias zero value")
 		c.writeTypeAliasZeroValue(alias, astType)
 		return
 	}
 
 	// Default: use WriteZeroValueForType
-	c.tsw.WriteCommentLinef("DEBUG: Using default zero value")
 	c.WriteZeroValueForType(fieldType)
 }
 
@@ -617,6 +594,7 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 
 	c.tsw.WriteImport(impName, tsImportPath+"/index.js")
 }
+
 func (c *GoToTSCompiler) writeClonedFieldInitializer(fieldName string, fieldType types.Type, isEmbedded bool) {
 	c.tsw.WriteLiterally(fieldName)
 	c.tsw.WriteLiterally(": $.varRef(")

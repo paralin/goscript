@@ -35,13 +35,8 @@ export class MyStruct {
 
 	constructor(init?: Partial<{PointerField?: $.VarRef<number> | null, interfaceField?: MyInterface}>) {
 		this._fields = {
-			PointerField: $.varRef(init?.PointerField ?? // DEBUG: Field PointerField has type *int (*types.Pointer)
-			// DEBUG: Using default zero value
-			null),
-			interfaceField: $.varRef(init?.interfaceField ?? // DEBUG: Field interfaceField has type github.com/aperturerobotics/goscript/compliance/tests/struct_pointer_interface_fields.MyInterface (*types.Named)
-			// DEBUG: Package=github.com/aperturerobotics/goscript/compliance/tests/struct_pointer_interface_fields, TypeName=github.com/aperturerobotics/goscript/compliance/tests/struct_pointer_interface_fields.MyInterface
-			// DEBUG: Using named type zero value
-			null)
+			PointerField: $.varRef(init?.PointerField ?? null),
+			interfaceField: $.varRef(init?.interfaceField ?? null)
 		}
 	}
 

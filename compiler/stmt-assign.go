@@ -117,6 +117,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 					}
 				}
 				c.tsw.WriteLiterally("] = ")
+				// Add await if the call is async
+				c.writeAsyncCallIfNeeded(callExpr)
 				c.WriteValueExpr(callExpr)
 				c.tsw.WriteLine("")
 				return nil
@@ -165,6 +167,8 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 
 			// Write a temporary variable to hold the function call result
 			c.tsw.WriteLiterally("  const _tmp = ")
+			// Add await if the call is async
+			c.writeAsyncCallIfNeeded(callExpr)
 			if err := c.WriteValueExpr(callExpr); err != nil {
 				return fmt.Errorf("failed to write RHS call expression in assignment: %w", err)
 			}
@@ -287,10 +291,9 @@ func (c *GoToTSCompiler) WriteStmtAssign(exp *ast.AssignStmt) error {
 		}
 		c.tsw.WriteLiterally("] = ")
 
-		// Write the right-hand side (the function call)
-		if err := c.WriteValueExpr(callExpr); err != nil {
-			return fmt.Errorf("failed to write RHS call expression in assignment: %w", err)
-		}
+		// Add await if the call is async
+		c.writeAsyncCallIfNeeded(callExpr)
+		c.WriteValueExpr(callExpr)
 
 		c.tsw.WriteLine("")
 		return nil

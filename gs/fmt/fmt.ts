@@ -202,7 +202,11 @@ let stdout = {
   write: (data: string) => {
     // Use process.stdout.write if available (Node.js), otherwise fallback to console.log
     // but we need to avoid adding extra newlines that console.log adds
-    if (typeof process !== 'undefined' && process.stdout && process.stdout.write) {
+    if (
+      typeof process !== 'undefined' &&
+      process.stdout &&
+      process.stdout.write
+    ) {
       process.stdout.write(data)
     } else {
       // In browser environments, we need to use console.log but handle newlines carefully

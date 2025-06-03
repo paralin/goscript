@@ -72,7 +72,11 @@ func NewCompiler(conf *Config, le *logrus.Entry, opts *packages.Config) (*Compil
 		packages.NeedTypesInfo |
 		packages.NeedTypesSizes
 
-	return &Compiler{config: *conf, le: le, opts: *opts}, nil
+	return &Compiler{
+		config: *conf,
+		le:     le,
+		opts:   *opts,
+	}, nil
 }
 
 // CompilationResult contains information about what was compiled
@@ -141,7 +145,6 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			// Check if this package has a handwritten equivalent
 			if hasHandwrittenEquivalent(pkg.PkgPath) {
 				// Add this package but don't visit its dependencies
-				// c.le.Debugf("Skipping dependencies of handwritten package: %s", pkg.PkgPath)
 				return
 			}
 
@@ -149,13 +152,11 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			for _, imp := range pkg.Imports {
 				// Skip protobuf-go-lite packages and their dependencies
 				if isProtobufGoLitePackage(imp.PkgPath) {
-					// c.le.Debugf("Skipping protobuf-go-lite package: %s", imp.PkgPath)
 					continue
 				}
 
 				// Skip packages that are only used by .pb.go files
 				if isPackageOnlyUsedByProtobufFiles(pkg, imp.PkgPath) {
-					// c.le.Debugf("Skipping package only used by .pb.go files: %s", imp.PkgPath)
 					continue
 				}
 
@@ -217,6 +218,12 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 	// Track which gs packages have been processed to avoid duplicates
 	processedGsPackages := make(map[string]bool)
 
+	// Create a map of all loaded packages for dependency analysis
+	allPackages := make(map[string]*packages.Package)
+	for _, pkg := range pkgs {
+		allPackages[pkg.PkgPath] = pkg
+	}
+
 	// Compile all packages
 	for _, pkg := range pkgs {
 		// Check if the package has a handwritten equivalent
@@ -248,7 +255,7 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 			continue
 		}
 
-		pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkg)
+		pkgCompiler, err := NewPackageCompiler(c.le, &c.config, pkg, allPackages)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create package compiler for %s: %w", pkg.PkgPath, err)
 		}
@@ -273,6 +280,7 @@ type PackageCompiler struct {
 	compilerConf *Config
 	outputPath   string
 	pkg          *packages.Package
+	allPackages  map[string]*packages.Package
 }
 
 // NewPackageCompiler creates a new `PackageCompiler` for a given Go package.
@@ -283,12 +291,14 @@ func NewPackageCompiler(
 	le *logrus.Entry,
 	compilerConf *Config,
 	pkg *packages.Package,
+	allPackages map[string]*packages.Package,
 ) (*PackageCompiler, error) {
 	res := &PackageCompiler{
 		le:           le,
 		pkg:          pkg,
 		compilerConf: compilerConf,
 		outputPath:   ComputeModulePath(compilerConf.OutputPath, pkg.PkgPath),
+		allPackages:  allPackages,
 	}
 
 	return res, nil
@@ -403,6 +413,7 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 		// Find which symbols this file exports
 		var valueSymbols []string
 		var typeSymbols []string
+		var structSymbols []string // New: Track structs separately
 
 		// Find the corresponding syntax file
 		for i, syntax := range c.pkg.Syntax {
@@ -426,9 +437,15 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 						switch s := spec.(type) {
 						case *ast.TypeSpec:
 							if s.Name.IsExported() {
-								// All type declarations (interfaces, structs, type definitions, type aliases)
-								// become TypeScript types and must be exported with "export type"
-								typeSymbols = append(typeSymbols, s.Name.Name)
+								// Check if this is a struct type
+								if _, isStruct := s.Type.(*ast.StructType); isStruct {
+									// Structs become TypeScript classes and need both type and value exports
+									structSymbols = append(structSymbols, s.Name.Name)
+								} else {
+									// Other type declarations (interfaces, type definitions, type aliases)
+									// become TypeScript types and must be exported with "export type"
+									typeSymbols = append(typeSymbols, s.Name.Name)
+								}
 							}
 						case *ast.ValueSpec:
 							for _, name := range s.Names {
@@ -448,6 +465,17 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 			sort.Strings(valueSymbols)
 			exportLine := fmt.Sprintf("export { %s } from \"./%s.js\"\n",
 				strings.Join(valueSymbols, ", "), fileName)
+			if _, err := indexFile.WriteString(exportLine); err != nil {
+				return err
+			}
+		}
+
+		// Write struct exports (both as types and values)
+		if len(structSymbols) > 0 {
+			sort.Strings(structSymbols)
+			// Export classes as values (which makes them available as both types and values in TypeScript)
+			exportLine := fmt.Sprintf("export { %s } from \"./%s.js\"\n",
+				strings.Join(structSymbols, ", "), fileName)
 			if _, err := indexFile.WriteString(exportLine); err != nil {
 				return err
 			}
@@ -474,7 +502,7 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 // `Compile` method to generate the TypeScript code.
 func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File, packageAnalysis *PackageAnalysis) error {
 	// Create a new analysis instance for per-file data
-	analysis := NewAnalysis()
+	analysis := NewAnalysis(p.allPackages)
 
 	// Create comment map for the file
 	cmap := ast.NewCommentMap(p.pkg.Fset, syntax, syntax.Comments)

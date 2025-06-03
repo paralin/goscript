@@ -571,8 +571,11 @@ export function Duration_lt(receiver: Duration, other: Duration): boolean {
   return receiver < other
 }
 
-// Duration multiplication function 
-export function Duration_multiply(receiver: Duration, multiplier: number): Duration {
+// Duration multiplication function
+export function Duration_multiply(
+  receiver: Duration,
+  multiplier: number,
+): Duration {
   return receiver * multiplier
 }
 

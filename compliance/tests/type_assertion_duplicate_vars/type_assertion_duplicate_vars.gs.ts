@@ -93,12 +93,8 @@ export class Container {
 
 	constructor(init?: Partial<{hasA?: boolean, hasB?: boolean}>) {
 		this._fields = {
-			hasA: $.varRef(init?.hasA ?? // DEBUG: Field hasA has type bool (*types.Basic)
-			// DEBUG: Using default zero value
-			false),
-			hasB: $.varRef(init?.hasB ?? // DEBUG: Field hasB has type bool (*types.Basic)
-			// DEBUG: Using default zero value
-			false)
+			hasA: $.varRef(init?.hasA ?? false),
+			hasB: $.varRef(init?.hasB ?? false)
 		}
 	}
 

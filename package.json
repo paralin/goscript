@@ -61,7 +61,7 @@
     "release:commit": "git reset && git add package.json && git commit -s -m \"release: v$npm_package_version\" && git tag v$npm_package_version",
     "release:publish": "git push && git push --tags && npm run build && npm publish",
     "lint": "npm run lint:go && npm run lint:js",
-    "lint:go": "make lint",
+    "lint:go": "golangci-lint run .",
     "lint:js": "eslint -c eslint.config.mjs ./",
     "lint:js:fix": "eslint -c eslint.config.mjs ./ --fix",
     "prepare": "husky",

@@ -17,9 +17,7 @@ export class content {
 
 	constructor(init?: Partial<{bytes?: $.Bytes}>) {
 		this._fields = {
-			bytes: $.varRef(init?.bytes ?? // DEBUG: Field bytes has type []byte (*types.Slice)
-			// DEBUG: Using default zero value
-			new Uint8Array(0))
+			bytes: $.varRef(init?.bytes ?? new Uint8Array(0))
 		}
 	}
 

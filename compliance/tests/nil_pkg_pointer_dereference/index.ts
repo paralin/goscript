@@ -1,1 +1,1 @@
-export type { ComplexStruct, NestedStruct } from "./complex_imports.gs.js"
+export { TestStruct } from "./nil_pkg_pointer_dereference.gs.js"

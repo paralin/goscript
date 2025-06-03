@@ -288,8 +288,6 @@ func (c *GoToTSCompiler) writeTypeConversion(exp *ast.CallExpr, funIdent *ast.Id
 						c.tsw.WriteLiterally(funIdent.String())
 						c.tsw.WriteLiterally("(")
 
-						fmt.Printf("DEBUG: Type conversion constructor for %s\n", funIdent.String())
-
 						// Use auto-wrapping for the constructor argument
 						// The constructor parameter type is the underlying type of the named type
 						// For MyMode (which is type MyMode os.FileMode), the constructor expects os.FileMode
@@ -298,8 +296,6 @@ func (c *GoToTSCompiler) writeTypeConversion(exp *ast.CallExpr, funIdent *ast.Id
 							// For named types, the constructor expects the underlying type
 							constructorParamType = namedType.Underlying()
 						}
-
-						fmt.Printf("DEBUG: Constructor param type: %v\n", constructorParamType)
 
 						if err := c.writeAutoWrappedArgument(exp.Args[0], constructorParamType); err != nil {
 							return true, fmt.Errorf("failed to write argument for type constructor: %w", err)

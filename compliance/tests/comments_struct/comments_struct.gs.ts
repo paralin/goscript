@@ -27,12 +27,8 @@ export class TestStruct {
 
 	constructor(init?: Partial<{IntField?: number, StringField?: string}>) {
 		this._fields = {
-			IntField: $.varRef(init?.IntField ?? // DEBUG: Field IntField has type int (*types.Basic)
-			// DEBUG: Using default zero value
-			0),
-			StringField: $.varRef(init?.StringField ?? // DEBUG: Field StringField has type string (*types.Basic)
-			// DEBUG: Using default zero value
-			"")
+			IntField: $.varRef(init?.IntField ?? 0),
+			StringField: $.varRef(init?.StringField ?? "")
 		}
 	}
 

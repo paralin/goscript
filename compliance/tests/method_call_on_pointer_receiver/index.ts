@@ -1,1 +1,1 @@
-export type { MyStruct } from "./method_call_on_pointer_receiver.gs.js"
+export { MyStruct } from "./method_call_on_pointer_receiver.gs.js"

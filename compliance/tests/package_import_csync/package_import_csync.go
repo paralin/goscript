@@ -35,11 +35,11 @@ func main() {
 		defer relLock()
 
 		// Critical section
-		println("worker", id, "entered critical section")
+		// println("worker", id, "entered critical section") - non-deterministic, leave commented out
 		current := counter
 		time.Sleep(100 * time.Millisecond) // Simulate work
 		counter = current + 1
-		println("worker", id, "incremented counter to", counter)
+		// println("worker", id, "incremented counter to", counter) - non-deterministic, leave commented out
 	}
 
 	// Start worker goroutines
