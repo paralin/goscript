@@ -1602,8 +1602,8 @@ func (v *analysisVisitor) findVariableUsageInExpr(expr ast.Expr, lhsVarNames map
 	}
 }
 
-// IsWrapperType returns whether the given type should be implemented as a wrapper type alias
-// A wrapper type is a named type that has methods defined on it (but is not a struct or interface)
+// IsWrapperType returns whether the given type should be implemented as a wrapper class
+// This includes both local types with methods and imported types that are known wrapper types
 func (a *Analysis) IsWrapperType(t types.Type) bool {
 	if t == nil {
 		return false
@@ -1614,7 +1614,7 @@ func (a *Analysis) IsWrapperType(t types.Type) bool {
 		return isWrapper
 	}
 
-	// For named types, check if they have methods
+	// For named types, check if they have methods and underlying primitive types
 	if namedType, ok := t.(*types.Named); ok {
 		// Exclude struct types - they should remain as classes, not wrapper types
 		if _, isStruct := namedType.Underlying().(*types.Struct); isStruct {
@@ -1629,9 +1629,18 @@ func (a *Analysis) IsWrapperType(t types.Type) bool {
 		}
 
 		// Check if this type has methods defined on it
-		// This works for both local and imported types since the Go type checker
-		// loads method information for all types in the dependency graph
 		if namedType.NumMethods() > 0 {
+			// Additional check: the underlying type should be a basic type (primitive)
+			// This distinguishes wrapper types from complex types with methods
+			underlying := namedType.Underlying()
+
+			if isBasicType(underlying) {
+				a.WrapperTypes[t] = true
+				return true
+			}
+
+			// For non-basic underlying types with methods, still consider them wrapper types
+			// if they're not structs or interfaces (already excluded above)
 			a.WrapperTypes[t] = true
 			return true
 		}
@@ -1639,64 +1648,71 @@ func (a *Analysis) IsWrapperType(t types.Type) bool {
 
 	// Handle type aliases (Go 1.9+)
 	if aliasType, ok := t.(*types.Alias); ok {
-		// For type aliases, we need to check if the original type (not just underlying) has methods
-		// This is important for cases like os.FileMode = fs.FileMode where fs.FileMode has methods
-
-		// First check the RHS type (what the alias points to)
+		// For type aliases, we need to check the RHS (right-hand side) type
+		// For example, if we have: type FileMode = fs.FileMode
+		// We need to check if fs.FileMode has methods
 		rhs := aliasType.Rhs()
-		if rhs != nil {
-			// Check if the RHS is a named type with methods
-			if namedRhs, ok := rhs.(*types.Named); ok {
-				// Exclude struct types - they should remain as classes, not wrapper types
-				if _, isStruct := namedRhs.Underlying().(*types.Struct); isStruct {
+
+		if rhsNamed, ok := rhs.(*types.Named); ok {
+			// Check if the RHS named type has methods and a basic underlying type
+			if rhsNamed.NumMethods() > 0 {
+				underlying := rhsNamed.Underlying()
+
+				// Exclude struct types
+				if _, isStruct := underlying.(*types.Struct); isStruct {
 					a.WrapperTypes[t] = false
 					return false
 				}
 
 				// Exclude interface types
-				if _, isInterface := namedRhs.Underlying().(*types.Interface); isInterface {
+				if _, isInterface := underlying.(*types.Interface); isInterface {
 					a.WrapperTypes[t] = false
 					return false
 				}
 
-				// Check if the RHS named type has methods
-				if namedRhs.NumMethods() > 0 {
+				if isBasicType(underlying) {
 					a.WrapperTypes[t] = true
 					return true
 				}
-			}
-		}
 
-		// Fallback: check the underlying type
-		underlying := aliasType.Underlying()
-		if namedUnderlying, ok := underlying.(*types.Named); ok {
-			// Exclude struct types - they should remain as classes, not wrapper types
-			if _, isStruct := namedUnderlying.Underlying().(*types.Struct); isStruct {
-				a.WrapperTypes[t] = false
-				return false
-			}
-
-			// Exclude interface types
-			if _, isInterface := namedUnderlying.Underlying().(*types.Interface); isInterface {
-				a.WrapperTypes[t] = false
-				return false
-			}
-
-			// Check if the underlying named type has methods
-			if namedUnderlying.NumMethods() > 0 {
+				// For non-basic underlying types with methods, still consider them wrapper types
+				// if they're not structs or interfaces (already excluded above)
 				a.WrapperTypes[t] = true
 				return true
 			}
 		}
 
-		// For type aliases to basic types, return false
-		a.WrapperTypes[t] = false
-		return false
+		// Fallback: check the underlying type for older Go versions or different alias patterns
+		underlying := aliasType.Underlying()
+		if namedUnderlying, ok := underlying.(*types.Named); ok {
+			if namedUnderlying.NumMethods() > 0 && isBasicType(namedUnderlying.Underlying()) {
+				a.WrapperTypes[t] = true
+				return true
+			}
+		}
 	}
 
 	// Cache negative result
 	a.WrapperTypes[t] = false
 	return false
+}
+
+// isBasicType checks if a type is a basic/primitive type
+func isBasicType(t types.Type) bool {
+	if t == nil {
+		return false
+	}
+
+	switch underlying := t.(type) {
+	case *types.Basic:
+		// Basic types like int, string, bool, etc.
+		return true
+	case *types.Pointer:
+		// Pointers to basic types could also be considered for wrapper types
+		return isBasicType(underlying.Elem())
+	default:
+		return false
+	}
 }
 
 // GetReceiverMapping returns the receiver variable mapping for a function declaration
