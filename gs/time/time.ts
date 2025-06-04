@@ -5,21 +5,32 @@ export class Time {
   private _monotonic?: number // high-resolution monotonic timestamp in nanoseconds
   private _location: Location // timezone location
 
-  constructor(
+  constructor(_props?: {}) {
+    // Default constructor creates a zero time (Unix epoch in UTC)
+    this._date = new globalThis.Date(0)
+    this._nsec = 0
+    this._monotonic = undefined
+    this._location = UTC
+  }
+
+  // create is a static factory method that creates a Time instance with specific parameters
+  public static create(
     date: globalThis.Date,
     nsec: number = 0,
     monotonic?: number,
     location?: Location,
-  ) {
-    this._date = new globalThis.Date(date.getTime())
-    this._nsec = nsec
-    this._monotonic = monotonic
-    this._location = location || UTC
+  ): Time {
+    const time = new Time()
+    time._date = new globalThis.Date(date.getTime())
+    time._nsec = nsec
+    time._monotonic = monotonic
+    time._location = location || UTC
+    return time
   }
 
   // clone returns a copy of this Time instance
   public clone(): Time {
-    return new Time(this._date, this._nsec, this._monotonic, this._location)
+    return Time.create(this._date, this._nsec, this._monotonic, this._location)
   }
 
   // Unix returns t as a Unix time, the number of seconds elapsed since January 1, 1970 UTC
@@ -492,7 +503,7 @@ export class Time {
     const newNsec = this._nsec + (durationNs % 1000000)
     const newMonotonic =
       this._monotonic !== undefined ? this._monotonic + durationNs : undefined
-    return new Time(newDate, newNsec, newMonotonic, this._location)
+    return Time.create(newDate, newNsec, newMonotonic, this._location)
   }
 
   // Equal reports whether t and u represent the same time instant
@@ -531,7 +542,7 @@ export class Time {
   public Round(_d: Duration): Time {
     // Implementation would round to nearest duration
     // For now, simplified version that strips monotonic reading
-    return new Time(this._date, this._nsec, undefined, this._location)
+    return Time.create(this._date, this._nsec, undefined, this._location)
   }
 
   // Truncate returns the result of rounding t down to a multiple of d
@@ -539,7 +550,7 @@ export class Time {
   public Truncate(_d: Duration): Time {
     // Implementation would truncate to duration
     // For now, simplified version that strips monotonic reading
-    return new Time(this._date, this._nsec, undefined, this._location)
+    return Time.create(this._date, this._nsec, undefined, this._location)
   }
 
   // String returns the time formatted as a string
@@ -778,7 +789,7 @@ export function Now(): Time {
     monotonic = performance.now() * 1000000
   }
 
-  return new Time(date, 0, monotonic)
+  return Time.create(date, 0, monotonic)
 }
 
 // Date returns the Time corresponding to
@@ -823,7 +834,7 @@ export function Date(
       Math.floor(nsec / 1000000),
     )
   }
-  return new Time(date, nsec % 1000000000, undefined, loc) // No monotonic reading
+  return Time.create(date, nsec % 1000000000, undefined, loc) // No monotonic reading
 }
 
 // Common locations
@@ -874,13 +885,13 @@ export const Kitchen = '3:04PM'
 export function Unix(sec: number, nsec: number = 0): Time {
   const ms = sec * 1000 + Math.floor(nsec / 1000000)
   const remainingNsec = nsec % 1000000
-  return new Time(new globalThis.Date(ms), remainingNsec, undefined, UTC)
+  return Time.create(new globalThis.Date(ms), remainingNsec, undefined, UTC)
 }
 
 // UnixMilli returns the local Time corresponding to the given Unix time,
 // msec milliseconds since January 1, 1970 UTC
 export function UnixMilli(msec: number): Time {
-  return new Time(new globalThis.Date(msec), 0, undefined, UTC)
+  return Time.create(new globalThis.Date(msec), 0, undefined, UTC)
 }
 
 // UnixMicro returns the local Time corresponding to the given Unix time,
@@ -888,7 +899,7 @@ export function UnixMilli(msec: number): Time {
 export function UnixMicro(usec: number): Time {
   const ms = Math.floor(usec / 1000)
   const nsec = (usec % 1000) * 1000
-  return new Time(new globalThis.Date(ms), nsec, undefined, UTC)
+  return Time.create(new globalThis.Date(ms), nsec, undefined, UTC)
 }
 
 // UnixNano returns the local Time corresponding to the given Unix time,
@@ -896,7 +907,7 @@ export function UnixMicro(usec: number): Time {
 export function UnixNano(nsec: number): Time {
   const ms = Math.floor(nsec / 1000000)
   const remainingNsec = nsec % 1000000
-  return new Time(new globalThis.Date(ms), remainingNsec, undefined, UTC)
+  return Time.create(new globalThis.Date(ms), remainingNsec, undefined, UTC)
 }
 
 // ParseDuration parses a duration string
@@ -968,7 +979,7 @@ export function ParseInLocation(
         `parsing time "${value}" as "${layout}": cannot parse`,
       )
     }
-    return new Time(date, 0, undefined, loc)
+    return Time.create(date, 0, undefined, loc)
   }
 
   if (layout === DateTime || layout === '2006-01-02 15:04:05') {
@@ -982,7 +993,7 @@ export function ParseInLocation(
         `parsing time "${value}" as "${layout}": cannot parse`,
       )
     }
-    return new Time(date, 0, undefined, loc)
+    return Time.create(date, 0, undefined, loc)
   }
 
   // Fallback to standard Date parsing
@@ -996,7 +1007,7 @@ export function ParseInLocation(
       `parsing time "${value}" as "${layout}": cannot parse`,
     )
   }
-  return new Time(date, 0, undefined, loc)
+  return Time.create(date, 0, undefined, loc)
 }
 
 // After waits for the duration to elapse and then returns the current time

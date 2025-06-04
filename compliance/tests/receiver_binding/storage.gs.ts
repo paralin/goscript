@@ -41,26 +41,31 @@ export class storage {
 
 	// Very simple method - just field access
 	public Len(): number {
+		const s = this
 		return $.len(s.bytes)
 	}
 
 	// Very simple method - just field assignment
 	public Truncate(): void {
+		const s = this
 		s.bytes = new Uint8Array(0)
 	}
 
 	// Simple method - field access in return
 	public Name(): string {
+		const s = this
 		return s.name
 	}
 
 	// Simple method - field assignment with parameter
 	public SetName(name: string): void {
+		const s = this
 		s.name = name
 	}
 
 	// Simple method - field access with built-in function call
 	public IsEmpty(): boolean {
+		const s = this
 		return $.len(s.bytes) == 0
 	}
 

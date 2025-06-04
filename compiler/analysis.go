@@ -1042,202 +1042,113 @@ func (v *analysisVisitor) couldImplementInterfaceMethod(methodName string, recei
 	return false
 }
 
-// AnalyzeFile analyzes a Go source file AST and populates the Analysis struct with information
-// that will be used during code generation to properly handle pointers, variables that need varRefing, etc.
-func AnalyzeFile(file *ast.File, pkg *packages.Package, analysis *Analysis, cmap ast.CommentMap) {
-	analysis.Cmap = cmap
+// AnalyzePackageFiles analyzes all Go source files in a package and populates the Analysis struct
+// with information that will be used during code generation to properly handle pointers,
+// variables that need varRefing, receiver usage, etc. This replaces the old file-by-file analysis.
+func AnalyzePackageFiles(pkg *packages.Package, allPackages map[string]*packages.Package) *Analysis {
+	analysis := NewAnalysis(allPackages)
 
 	// Load package metadata for async function detection
 	analysis.LoadPackageMetadata()
 
-	// Process imports from the file
-	for _, imp := range file.Imports {
-		path := ""
-		if imp.Path != nil {
-			path = imp.Path.Value
-			// Remove quotes from the import path string
-			path = path[1 : len(path)-1]
+	// Process imports from all files in the package
+	for _, file := range pkg.Syntax {
+		// Create comment map for each file and store it (we'll merge them if needed)
+		cmap := ast.NewCommentMap(pkg.Fset, file, file.Comments)
+		if len(analysis.Cmap) == 0 {
+			analysis.Cmap = cmap
+		} else {
+			// Merge comment maps from multiple files
+			for node, comments := range cmap {
+				analysis.Cmap[node] = append(analysis.Cmap[node], comments...)
+			}
 		}
 
-		// Store the import in the analysis
-		if path != "" {
-			name := ""
-			if imp.Name != nil {
-				name = imp.Name.Name
+		// Process imports from this file
+		for _, imp := range file.Imports {
+			path := ""
+			if imp.Path != nil {
+				path = imp.Path.Value
+				// Remove quotes from the import path string
+				path = path[1 : len(path)-1]
 			}
 
-			fileImp := &fileImport{
-				importPath: path,
-				importVars: make(map[string]struct{}),
-			}
-
-			// Use the import name or the actual package name as the key
-			var key string
-			if name != "" {
-				// Explicit alias provided
-				key = name
-			} else {
-				// No explicit alias, use the actual package name from type information
-				// This handles cases where package name differs from the last path segment
-				if actualName, err := getActualPackageName(path, pkg.Imports); err == nil {
-					key = actualName
-				} else {
-					// Fallback to last segment of path if package not found in type information
-					pts := strings.Split(path, "/")
-					key = pts[len(pts)-1]
+			// Store the import in the analysis
+			if path != "" {
+				name := ""
+				if imp.Name != nil {
+					name = imp.Name.Name
 				}
-			}
 
-			analysis.Imports[key] = fileImp
+				fileImp := &fileImport{
+					importPath: path,
+					importVars: make(map[string]struct{}),
+				}
+
+				// Use the import name or the actual package name as the key
+				var key string
+				if name != "" {
+					// Explicit alias provided
+					key = name
+				} else {
+					// No explicit alias, use the actual package name from type information
+					// This handles cases where package name differs from the last path segment
+					if actualName, err := getActualPackageName(path, pkg.Imports); err == nil {
+						key = actualName
+					} else {
+						// Fallback to last segment of path if package not found in type information
+						pts := strings.Split(path, "/")
+						key = pts[len(pts)-1]
+					}
+				}
+
+				analysis.Imports[key] = fileImp
+			}
 		}
 	}
 
+	// Create visitor for the entire package
 	visitor := &analysisVisitor{
 		analysis: analysis,
 		pkg:      pkg,
 	}
 
-	// First pass: analyze all declarations and statements
-	ast.Walk(visitor, file)
+	// First pass: analyze all declarations and statements across all files
+	for _, file := range pkg.Syntax {
+		ast.Walk(visitor, file)
+	}
 
 	// Post-processing: Find all CallExpr nodes and unmark their Fun SelectorExpr as method values
 	// This distinguishes between method calls (obj.Method()) and method values (obj.Method)
-	ast.Inspect(file, func(n ast.Node) bool {
-		if callExpr, ok := n.(*ast.CallExpr); ok {
-			if selExpr, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
-				// This SelectorExpr is the function being called, so it's NOT a method value
-				if nodeInfo := analysis.NodeData[selExpr]; nodeInfo != nil {
-					nodeInfo.IsMethodValue = false
+	for _, file := range pkg.Syntax {
+		ast.Inspect(file, func(n ast.Node) bool {
+			if callExpr, ok := n.(*ast.CallExpr); ok {
+				if selExpr, ok := callExpr.Fun.(*ast.SelectorExpr); ok {
+					// This SelectorExpr is the function being called, so it's NOT a method value
+					if nodeInfo := analysis.NodeData[selExpr]; nodeInfo != nil {
+						nodeInfo.IsMethodValue = false
+					}
 				}
 			}
-		}
-		return true
-	})
+			return true
+		})
+	}
 
 	// Second pass: analyze interface implementations now that all function async status is determined
 	interfaceVisitor := &interfaceImplementationVisitor{
 		analysis: analysis,
 		pkg:      pkg,
 	}
-	ast.Walk(interfaceVisitor, file)
-}
-
-// interfaceImplementationVisitor performs a second pass to analyze interface implementations
-type interfaceImplementationVisitor struct {
-	analysis *Analysis
-	pkg      *packages.Package
-}
-
-func (v *interfaceImplementationVisitor) Visit(node ast.Node) ast.Visitor {
-	switch n := node.(type) {
-	case *ast.GenDecl:
-		// Look for interface type specifications
-		for _, spec := range n.Specs {
-			if typeSpec, ok := spec.(*ast.TypeSpec); ok {
-				if interfaceType, ok := typeSpec.Type.(*ast.InterfaceType); ok {
-					// This is an interface declaration, find all potential implementations
-					v.findInterfaceImplementations(typeSpec, interfaceType)
-				}
-			}
-		}
-	}
-	return v
-}
-
-// findInterfaceImplementations finds all struct types that implement the given interface
-func (v *interfaceImplementationVisitor) findInterfaceImplementations(typeSpec *ast.TypeSpec, interfaceAST *ast.InterfaceType) {
-	// Get the interface type from TypesInfo
-	interfaceGoType := v.pkg.TypesInfo.TypeOf(interfaceAST)
-	if interfaceGoType == nil {
-		return
+	for _, file := range pkg.Syntax {
+		ast.Walk(interfaceVisitor, file)
 	}
 
-	interfaceType, ok := interfaceGoType.(*types.Interface)
-	if !ok {
-		return
-	}
-
-	// Look through all packages for potential implementations
-	for _, pkg := range v.analysis.AllPackages {
-		v.findImplementationsInPackage(interfaceType, pkg)
-	}
+	return analysis
 }
 
-// findImplementationsInPackage finds implementations of an interface in a specific package
-func (v *interfaceImplementationVisitor) findImplementationsInPackage(interfaceType *types.Interface, pkg *packages.Package) {
-	// Get all named types in the package
-	scope := pkg.Types.Scope()
-	for _, name := range scope.Names() {
-		obj := scope.Lookup(name)
-		if obj == nil {
-			continue
-		}
-
-		// Check if this is a type name
-		typeName, ok := obj.(*types.TypeName)
-		if !ok {
-			continue
-		}
-
-		namedType, ok := typeName.Type().(*types.Named)
-		if !ok {
-			continue
-		}
-
-		// Check if this type implements the interface
-		if types.Implements(namedType, interfaceType) || types.Implements(types.NewPointer(namedType), interfaceType) {
-			v.trackImplementation(interfaceType, namedType)
-		}
-	}
-}
-
-// trackImplementation records that a named type implements an interface
-func (v *interfaceImplementationVisitor) trackImplementation(interfaceType *types.Interface, namedType *types.Named) {
-	// For each method in the interface, find the corresponding implementation
-	for i := 0; i < interfaceType.NumExplicitMethods(); i++ {
-		interfaceMethod := interfaceType.ExplicitMethod(i)
-
-		// Find the method in the implementing type
-		structMethod := v.findMethodInType(namedType, interfaceMethod.Name())
-		if structMethod != nil {
-			// Determine if this implementation is async
-			isAsync := false
-			if funcInfo := v.analysis.FunctionData[structMethod]; funcInfo != nil {
-				isAsync = funcInfo.IsAsync
-			}
-
-			v.analysis.trackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
-		}
-	}
-}
-
-// findMethodInType finds a method with the given name in a named type
-func (v *interfaceImplementationVisitor) findMethodInType(namedType *types.Named, methodName string) *types.Func {
-	for i := 0; i < namedType.NumMethods(); i++ {
-		method := namedType.Method(i)
-		if method.Name() == methodName {
-			return method
-		}
-	}
-	return nil
-}
-
-// getNamedReturns retrieves the named returns for a function
-func (v *analysisVisitor) getNamedReturns(funcDecl *ast.FuncDecl) []string {
-	var namedReturns []string
-	if funcDecl.Type != nil && funcDecl.Type.Results != nil {
-		for _, field := range funcDecl.Type.Results.List {
-			for _, name := range field.Names {
-				namedReturns = append(namedReturns, name.Name)
-			}
-		}
-	}
-	return namedReturns
-}
-
-// AnalyzePackage performs package-level analysis to collect function definitions
+// AnalyzePackageImports performs package-level analysis to collect function definitions
 // and calls across all files in the package for auto-import generation
-func AnalyzePackage(pkg *packages.Package) *PackageAnalysis {
+func AnalyzePackageImports(pkg *packages.Package) *PackageAnalysis {
 	analysis := NewPackageAnalysis()
 
 	// First pass: collect all function definitions per file
@@ -2160,4 +2071,117 @@ func (a *Analysis) IsNamedBasicType(t types.Type) bool {
 			}
 		}
 	}
+}
+
+// interfaceImplementationVisitor performs a second pass to analyze interface implementations
+type interfaceImplementationVisitor struct {
+	analysis *Analysis
+	pkg      *packages.Package
+}
+
+func (v *interfaceImplementationVisitor) Visit(node ast.Node) ast.Visitor {
+	switch n := node.(type) {
+	case *ast.GenDecl:
+		// Look for interface type specifications
+		for _, spec := range n.Specs {
+			if typeSpec, ok := spec.(*ast.TypeSpec); ok {
+				if interfaceType, ok := typeSpec.Type.(*ast.InterfaceType); ok {
+					// This is an interface declaration, find all potential implementations
+					v.findInterfaceImplementations(interfaceType)
+				}
+			}
+		}
+	}
+	return v
+}
+
+// findInterfaceImplementations finds all struct types that implement the given interface
+func (v *interfaceImplementationVisitor) findInterfaceImplementations(interfaceAST *ast.InterfaceType) {
+	// Get the interface type from TypesInfo
+	interfaceGoType := v.pkg.TypesInfo.TypeOf(interfaceAST)
+	if interfaceGoType == nil {
+		return
+	}
+
+	interfaceType, ok := interfaceGoType.(*types.Interface)
+	if !ok {
+		return
+	}
+
+	// Look through all packages for potential implementations
+	for _, pkg := range v.analysis.AllPackages {
+		v.findImplementationsInPackage(interfaceType, pkg)
+	}
+}
+
+// findImplementationsInPackage finds implementations of an interface in a specific package
+func (v *interfaceImplementationVisitor) findImplementationsInPackage(interfaceType *types.Interface, pkg *packages.Package) {
+	// Get all named types in the package
+	scope := pkg.Types.Scope()
+	for _, name := range scope.Names() {
+		obj := scope.Lookup(name)
+		if obj == nil {
+			continue
+		}
+
+		// Check if this is a type name
+		typeName, ok := obj.(*types.TypeName)
+		if !ok {
+			continue
+		}
+
+		namedType, ok := typeName.Type().(*types.Named)
+		if !ok {
+			continue
+		}
+
+		// Check if this type implements the interface
+		if types.Implements(namedType, interfaceType) || types.Implements(types.NewPointer(namedType), interfaceType) {
+			v.trackImplementation(interfaceType, namedType)
+		}
+	}
+}
+
+// trackImplementation records that a named type implements an interface
+func (v *interfaceImplementationVisitor) trackImplementation(interfaceType *types.Interface, namedType *types.Named) {
+	// For each method in the interface, find the corresponding implementation
+	for i := 0; i < interfaceType.NumExplicitMethods(); i++ {
+		interfaceMethod := interfaceType.ExplicitMethod(i)
+
+		// Find the method in the implementing type
+		structMethod := v.findMethodInType(namedType, interfaceMethod.Name())
+		if structMethod != nil {
+			// Determine if this implementation is async
+			isAsync := false
+			if funcInfo := v.analysis.FunctionData[structMethod]; funcInfo != nil {
+				isAsync = funcInfo.IsAsync
+			}
+
+			v.analysis.trackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+		}
+	}
+}
+
+// findMethodInType finds a method with the given name in a named type
+func (v *interfaceImplementationVisitor) findMethodInType(namedType *types.Named, methodName string) *types.Func {
+	for i := 0; i < namedType.NumMethods(); i++ {
+		method := namedType.Method(i)
+		if method.Name() == methodName {
+			return method
+		}
+	}
+	return nil
+}
+
+// getNamedReturns retrieves the named returns for a function
+func (v *analysisVisitor) getNamedReturns(funcDecl *ast.FuncDecl) []string {
+	var namedReturns []string
+	if funcDecl.Type != nil && funcDecl.Type.Results != nil {
+		for _, field := range funcDecl.Type.Results.List {
+			for _, name := range field.Names {
+				namedReturns = append(namedReturns, name.Name)
+			}
+		}
+	}
+	return namedReturns
 }

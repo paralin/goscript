@@ -325,7 +325,10 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 	}
 
 	// Perform package-level analysis for auto-imports
-	packageAnalysis := AnalyzePackage(c.pkg)
+	packageAnalysis := AnalyzePackageImports(c.pkg)
+
+	// Perform comprehensive package-level analysis for code generation
+	analysis := AnalyzePackageFiles(c.pkg, c.allPackages)
 
 	// Track all compiled files for later generating the index.ts
 	compiledFiles := make([]string, 0, len(c.pkg.CompiledGoFiles))
@@ -363,7 +366,7 @@ func (c *PackageCompiler) Compile(ctx context.Context) error {
 
 		// log just the filename
 		c.le.Debugf("GS: %s", filepath.Base(fileName))
-		if err := c.CompileFile(ctx, fileName, f, packageAnalysis); err != nil {
+		if err := c.CompileFile(ctx, fileName, f, analysis, packageAnalysis); err != nil {
 			return err
 		}
 
@@ -495,21 +498,11 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 }
 
 // CompileFile handles the compilation of a single Go source file to TypeScript.
-// It first performs a pre-compilation analysis of the file using `AnalyzeFile`
-// to gather information necessary for accurate TypeScript generation (e.g.,
-// about varRefing, async functions, defer statements).
+// It uses the pre-computed package-level analysis for accurate TypeScript generation
+// (e.g., about varRefing, async functions, defer statements, receiver usage across files).
 // Then, it creates a `FileCompiler` instance for the file and invokes its
 // `Compile` method to generate the TypeScript code.
-func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File, packageAnalysis *PackageAnalysis) error {
-	// Create a new analysis instance for per-file data
-	analysis := NewAnalysis(p.allPackages)
-
-	// Create comment map for the file
-	cmap := ast.NewCommentMap(p.pkg.Fset, syntax, syntax.Comments)
-
-	// Analyze the file before compiling
-	AnalyzeFile(syntax, p.pkg, analysis, cmap)
-
+func (p *PackageCompiler) CompileFile(ctx context.Context, name string, syntax *ast.File, analysis *Analysis, packageAnalysis *PackageAnalysis) error {
 	fileCompiler, err := NewFileCompiler(p.compilerConf, p.pkg, syntax, name, analysis, packageAnalysis)
 	if err != nil {
 		return err

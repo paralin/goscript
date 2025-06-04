@@ -269,11 +269,9 @@ export function TODO(): Context {
 }
 
 // WithCancel returns a copy of parent with a new Done channel
-export function WithCancel(
-  parent: Context,
-): [ContextNonNil, CancelFunc] {
+export function WithCancel(parent: Context): [ContextNonNil, CancelFunc] {
   if (parent === null) {
-    throw new Error("cannot create context from nil parent")
+    throw new Error('cannot create context from nil parent')
   }
   const ctx = new cancelContext(parent)
   ctx.propagateCancel()
@@ -291,7 +289,7 @@ export function WithCancelCause(
   parent: Context,
 ): [ContextNonNil, CancelCauseFunc] {
   if (parent === null) {
-    throw new Error("cannot create context from nil parent")
+    throw new Error('cannot create context from nil parent')
   }
   const ctx = new cancelContext(parent)
   ctx.propagateCancel()
@@ -319,7 +317,7 @@ export function WithDeadlineCause(
   cause: $.GoError,
 ): [ContextNonNil, CancelFunc] {
   if (parent === null) {
-    throw new Error("cannot create context from nil parent")
+    throw new Error('cannot create context from nil parent')
   }
   // Check if parent deadline is already earlier
   const [parentDeadline, ok] = parent.Deadline()
@@ -358,13 +356,9 @@ export function WithTimeoutCause(
 }
 
 // WithValue returns a copy of parent with the value associated with key
-export function WithValue(
-  parent: Context,
-  key: any,
-  val: any,
-): ContextNonNil {
+export function WithValue(parent: Context, key: any, val: any): ContextNonNil {
   if (parent === null) {
-    throw new Error("cannot create context from nil parent")
+    throw new Error('cannot create context from nil parent')
   }
   return new valueContext(parent, key, val)
 }
@@ -372,7 +366,7 @@ export function WithValue(
 // WithoutCancel returns a context that inherits values but not cancellation
 export function WithoutCancel(parent: Context): ContextNonNil {
   if (parent === null) {
-    throw new Error("cannot create context from nil parent")
+    throw new Error('cannot create context from nil parent')
   }
   return new withoutCancelContext(parent)
 }
@@ -395,12 +389,9 @@ export function Cause(ctx: Context): $.GoError {
 }
 
 // AfterFunc runs f in a separate goroutine after ctx is done
-export function AfterFunc(
-  ctx: Context,
-  f: () => void,
-): () => boolean {
+export function AfterFunc(ctx: Context, f: () => void): () => boolean {
   if (ctx === null) {
-    throw new Error("cannot create context from nil parent")
+    throw new Error('cannot create context from nil parent')
   }
   let stopped = false
   let done = false

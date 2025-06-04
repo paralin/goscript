@@ -160,6 +160,7 @@ func parseAndAnalyze(t *testing.T, code string) (*Analysis, map[string]types.Obj
 			Defs:  make(map[*ast.Ident]types.Object),
 			Uses:  make(map[*ast.Ident]types.Object),
 		},
+		Fset: fset,
 	}
 
 	// Type check the package
@@ -170,10 +171,8 @@ func parseAndAnalyze(t *testing.T, code string) (*Analysis, map[string]types.Obj
 	}
 	pkg.Types = typePkg
 
-	// Run analysis
-	analysis := NewAnalysis(nil)
-	cmap := ast.NewCommentMap(fset, file, file.Comments)
-	AnalyzeFile(file, pkg, analysis, cmap)
+	// Run package-level analysis
+	analysis := AnalyzePackageFiles(pkg, nil)
 
 	// Collect variable objects
 	objects := make(map[string]types.Object)
@@ -269,14 +268,12 @@ func TestWrapperTypeDetection(t *testing.T) {
 		t.Fatalf("Package has errors: %v", pkg.Errors[0])
 	}
 
-	// Run analysis on the first file
+	// Run package-level analysis
 	if len(pkg.Syntax) == 0 {
 		t.Fatal("No syntax files found")
 	}
 
-	analysis := NewAnalysis(nil)
-	cmap := ast.NewCommentMap(pkg.Fset, pkg.Syntax[0], pkg.Syntax[0].Comments)
-	AnalyzeFile(pkg.Syntax[0], pkg, analysis, cmap)
+	analysis := AnalyzePackageFiles(pkg, nil)
 
 	// Verify the NamedBasicTypes map was initialized
 	if analysis.NamedBasicTypes == nil {
