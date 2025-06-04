@@ -1,0 +1,5 @@
+Name: test
+Length: 5
+Empty: false
+Length after truncate: 0
+New name: new_name

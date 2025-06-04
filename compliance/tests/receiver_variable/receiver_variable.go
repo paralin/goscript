@@ -122,6 +122,15 @@ func (c *content) getData(index int) ([]byte, error) {
 	return []byte{byte(index), byte(index + 1)}, nil
 }
 
+// Simple methods that should trigger receiver binding but might not
+func (c *content) Truncate() {
+	c.bytes = make([]byte, 0)
+}
+
+func (c *content) Len() int {
+	return len(c.bytes)
+}
+
 func main() {
 	c := &content{
 		name:  "test",
