@@ -451,13 +451,29 @@ func (c *GoToTSCompiler) WriteStmtIf(exp *ast.IfStmt) error {
 		if c.analysis.HasVariableShadowing(exp) {
 			shadowingInfo := c.analysis.GetShadowingInfo(exp)
 			if shadowingInfo != nil {
-				// Create temporary variables BEFORE the block to avoid temporal dead zone
+				// Handle variable shadowing by creating temporary variables
 				for varName, tempVarName := range shadowingInfo.TempVariables {
-					// Declare: const _temp_x = x (using the outer scope value)
 					c.tsw.WriteLiterally("const ")
 					c.tsw.WriteLiterally(tempVarName)
 					c.tsw.WriteLiterally(" = ")
-					c.tsw.WriteLiterally(varName)
+
+					// Check if this is a built-in function and handle it directly
+					if c.isBuiltinFunction(varName) {
+						c.tsw.WriteLiterally("$.")
+						c.tsw.WriteLiterally(varName)
+					} else {
+						// Get the original object for this shadowed variable
+						if originalObj, exists := shadowingInfo.ShadowedVariables[varName]; exists {
+							// Create an identifier with the original name and use WriteValueExpr to properly resolve it
+							originalIdent := &ast.Ident{Name: varName}
+							// Set the identifier in the Uses map so WriteValueExpr can find the object
+							c.pkg.TypesInfo.Uses[originalIdent] = originalObj
+							c.WriteValueExpr(originalIdent)
+						} else {
+							// Fallback to literal name if no object found (shouldn't happen in normal cases)
+							c.tsw.WriteLiterally(varName)
+						}
+					}
 					c.tsw.WriteLine("")
 				}
 			}
@@ -943,11 +959,27 @@ func (c *GoToTSCompiler) WriteStmtLabeled(stmt *ast.LabeledStmt) error {
 func (c *GoToTSCompiler) writeShadowedAssignment(stmt *ast.AssignStmt, shadowingInfo *ShadowingInfo) error {
 	// First, create temporary variables for the shadowed variables
 	for varName, tempVarName := range shadowingInfo.TempVariables {
-		// Declare: const _temp_x = x (using the outer scope value)
 		c.tsw.WriteLiterally("const ")
 		c.tsw.WriteLiterally(tempVarName)
 		c.tsw.WriteLiterally(" = ")
-		c.tsw.WriteLiterally(varName)
+
+		// Check if this is a built-in function and handle it directly
+		if c.isBuiltinFunction(varName) {
+			c.tsw.WriteLiterally("$.")
+			c.tsw.WriteLiterally(varName)
+		} else {
+			// Get the original object for this shadowed variable
+			if originalObj, exists := shadowingInfo.ShadowedVariables[varName]; exists {
+				// Create an identifier with the original name and use WriteValueExpr to properly resolve it
+				originalIdent := &ast.Ident{Name: varName}
+				// Set the identifier in the Uses map so WriteValueExpr can find the object
+				c.pkg.TypesInfo.Uses[originalIdent] = originalObj
+				c.WriteValueExpr(originalIdent)
+			} else {
+				// Fallback to literal name if no object found (shouldn't happen in normal cases)
+				c.tsw.WriteLiterally(varName)
+			}
+		}
 		c.tsw.WriteLine("")
 	}
 
@@ -1112,4 +1144,26 @@ func (c *GoToTSCompiler) writeShadowedRHSExpression(expr ast.Expr, shadowingInfo
 		// For other expression types, fall back to normal WriteValueExpr
 		return c.WriteValueExpr(expr)
 	}
+}
+
+// isBuiltinFunction checks if the given name is a Go built-in function
+func (c *GoToTSCompiler) isBuiltinFunction(name string) bool {
+	builtins := map[string]bool{
+		"len":     true,
+		"cap":     true,
+		"make":    true,
+		"new":     true,
+		"append":  true,
+		"copy":    true,
+		"delete":  true,
+		"complex": true,
+		"real":    true,
+		"imag":    true,
+		"close":   true,
+		"panic":   true,
+		"recover": true,
+		"print":   true,
+		"println": true,
+	}
+	return builtins[name]
 }
