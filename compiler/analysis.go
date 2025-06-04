@@ -218,6 +218,28 @@ func NewPackageAnalysis() *PackageAnalysis {
 	}
 }
 
+// ensureNodeData ensures that NodeData exists for a given node and returns it
+func (a *Analysis) ensureNodeData(node ast.Node) *NodeInfo {
+	if node == nil {
+		return nil
+	}
+	if a.NodeData[node] == nil {
+		a.NodeData[node] = &NodeInfo{}
+	}
+	return a.NodeData[node]
+}
+
+// ensureFunctionData ensures that FunctionData exists for a given object and returns it
+func (a *Analysis) ensureFunctionData(obj types.Object) *FunctionInfo {
+	if obj == nil {
+		return nil
+	}
+	if a.FunctionData[obj] == nil {
+		a.FunctionData[obj] = &FunctionInfo{}
+	}
+	return a.FunctionData[obj]
+}
+
 // NeedsDefer returns whether the given node needs defer handling.
 func (a *Analysis) NeedsDefer(node ast.Node) bool {
 	if node == nil {
@@ -431,10 +453,8 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 	}
 
 	// Initialize and store async state for the current node
-	if v.analysis.NodeData[node] == nil {
-		v.analysis.NodeData[node] = &NodeInfo{}
-	}
-	v.analysis.NodeData[node].InAsyncContext = v.inAsyncFunction
+	nodeInfo := v.analysis.ensureNodeData(node)
+	nodeInfo.InAsyncContext = v.inAsyncFunction
 
 	switch n := node.(type) {
 	case *ast.GenDecl:
@@ -507,382 +527,365 @@ func (v *analysisVisitor) Visit(node ast.Node) ast.Visitor {
 				}
 			}
 		}
-		// Continue traversal AFTER processing the declaration itself
-		// to handle expressions within initial values if needed.
-		// However, the core usage tracking is done above.
-		// Let standard traversal handle children.
 		return v
 
 	case *ast.FuncDecl:
-		// Save original states to restore after visiting
-		originalInAsync := v.inAsyncFunction
-		originalFuncObj := v.currentFuncObj
-		originalFuncDecl := v.currentFuncDecl
-		originalFuncLit := v.currentFuncLit
-		originalReceiver := v.currentReceiver
+		return v.visitFuncDecl(n)
 
-		// Reset for current function
-		v.currentFuncName = n.Name.Name
-		v.currentFuncDecl = n
-		v.currentFuncLit = nil
-		v.currentReceiver = nil
+	case *ast.FuncLit:
+		return v.visitFuncLit(n)
 
-		// Determine if this function declaration is async based on its body
-		isAsync := false
-		if n.Body != nil {
-			containsAsyncOps := v.containsAsyncOperations(n.Body)
-			if containsAsyncOps {
-				// Get the object for this function declaration
-				if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
-					v.analysis.FunctionData[obj] = &FunctionInfo{
-						IsAsync:      true,
-						NamedReturns: v.getNamedReturns(n),
-					}
-					isAsync = true
-				}
+	case *ast.BlockStmt:
+		return v.visitBlockStmt(n)
+
+	case *ast.UnaryExpr:
+		// We handle address-of (&) within AssignStmt where it's actually used.
+		return v
+
+	case *ast.CallExpr:
+		return v.visitCallExpr(n)
+
+	case *ast.SelectorExpr:
+		return v.visitSelectorExpr(n)
+
+	case *ast.AssignStmt:
+		return v.visitAssignStmt(n)
+
+	case *ast.ReturnStmt:
+		return v.visitReturnStmt(n)
+
+	case *ast.DeclStmt:
+		return v.visitDeclStmt(n)
+
+	case *ast.IfStmt:
+		return v.visitIfStmt(n)
+
+	case *ast.TypeAssertExpr:
+		return v.visitTypeAssertExpr(n)
+	}
+
+	// For all other nodes, continue traversal
+	return v
+}
+
+// visitFuncDecl handles function declaration analysis
+func (v *analysisVisitor) visitFuncDecl(n *ast.FuncDecl) ast.Visitor {
+	// Save original states to restore after visiting
+	originalInAsync := v.inAsyncFunction
+	originalFuncObj := v.currentFuncObj
+	originalFuncDecl := v.currentFuncDecl
+	originalFuncLit := v.currentFuncLit
+	originalReceiver := v.currentReceiver
+
+	// Reset for current function
+	v.currentFuncName = n.Name.Name
+	v.currentFuncDecl = n
+	v.currentFuncLit = nil
+	v.currentReceiver = nil
+
+	// Determine if this function declaration is async based on its body
+	isAsync := false
+	if n.Body != nil {
+		containsAsyncOps := v.containsAsyncOperations(n.Body)
+		if containsAsyncOps {
+			// Get the object for this function declaration
+			if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
+				funcInfo := v.analysis.ensureFunctionData(obj)
+				funcInfo.IsAsync = true
+				funcInfo.NamedReturns = v.getNamedReturns(n)
+				isAsync = true
 			}
 		}
-		if v.analysis.NodeData[n] == nil {
-			v.analysis.NodeData[n] = &NodeInfo{}
-		}
-		v.analysis.NodeData[n].InAsyncContext = isAsync
+	}
+	nodeInfo := v.analysis.ensureNodeData(n)
+	nodeInfo.InAsyncContext = isAsync
 
-		// Set current receiver if this is a method
-		if n.Recv != nil && len(n.Recv.List) > 0 {
-			// Assuming a single receiver for simplicity for now
-			if len(n.Recv.List[0].Names) > 0 {
-				if ident := n.Recv.List[0].Names[0]; ident != nil && ident.Name != "_" {
-					if def := v.pkg.TypesInfo.Defs[ident]; def != nil {
-						if vr, ok := def.(*types.Var); ok {
-							v.currentReceiver = vr
-							// Add the receiver variable to the VariableUsage map
-							// to ensure it is properly analyzed for varRefing
-							v.getOrCreateUsageInfo(v.currentReceiver)
+	// Set current receiver if this is a method
+	if n.Recv != nil && len(n.Recv.List) > 0 {
+		// Assuming a single receiver for simplicity for now
+		if len(n.Recv.List[0].Names) > 0 {
+			if ident := n.Recv.List[0].Names[0]; ident != nil && ident.Name != "_" {
+				if def := v.pkg.TypesInfo.Defs[ident]; def != nil {
+					if vr, ok := def.(*types.Var); ok {
+						v.currentReceiver = vr
+						// Add the receiver variable to the VariableUsage map
+						v.getOrCreateUsageInfo(v.currentReceiver)
 
-							// Check if receiver is used in method body
-							receiverUsed := false
-							if n.Body != nil {
-								if v.isInterfaceMethod(n) {
-									receiverUsed = true
-								} else {
-									receiverUsed = v.containsReceiverUsage(n.Body, vr)
-								}
+						// Check if receiver is used in method body
+						receiverUsed := false
+						if n.Body != nil {
+							if v.isInterfaceMethod(n) {
+								receiverUsed = true
+							} else {
+								receiverUsed = v.containsReceiverUsage(n.Body, vr)
 							}
+						}
 
-							// Update function data with receiver usage info
-							if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
-								if v.analysis.FunctionData[obj] == nil {
-									v.analysis.FunctionData[obj] = &FunctionInfo{}
-								}
-								v.analysis.FunctionData[obj].ReceiverUsed = receiverUsed
-							}
+						// Update function data with receiver usage info
+						if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
+							funcInfo := v.analysis.ensureFunctionData(obj)
+							funcInfo.ReceiverUsed = receiverUsed
 						}
 					}
 				}
 			}
 		}
+	}
 
-		// Store named return variables (sanitized for TypeScript)
-		if n.Type != nil && n.Type.Results != nil {
-			var namedReturns []string
-			for _, field := range n.Type.Results.List {
-				for _, name := range field.Names {
-					namedReturns = append(namedReturns, sanitizeIdentifier(name.Name))
-				}
-			}
-			if len(namedReturns) > 0 {
-				if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
-					if v.analysis.FunctionData[obj] == nil {
-						v.analysis.FunctionData[obj] = &FunctionInfo{}
-					}
-					v.analysis.FunctionData[obj].NamedReturns = namedReturns
-				}
+	// Store named return variables (sanitized for TypeScript)
+	if n.Type != nil && n.Type.Results != nil {
+		var namedReturns []string
+		for _, field := range n.Type.Results.List {
+			for _, name := range field.Names {
+				namedReturns = append(namedReturns, sanitizeIdentifier(name.Name))
 			}
 		}
-
-		// Update visitor state for this function
-		v.inAsyncFunction = isAsync
-		v.currentFuncObj = v.pkg.TypesInfo.ObjectOf(n.Name)
-		v.analysis.NodeData[n].InAsyncContext = isAsync // Ensure FuncDecl node itself is marked
-
-		if n.Body != nil {
-			// Check if the body contains any defer statements
-			if v.containsDefer(n.Body) {
-				if v.analysis.NodeData[n] == nil {
-					v.analysis.NodeData[n] = &NodeInfo{}
-				}
-				v.analysis.NodeData[n].NeedsDefer = true
-			}
-
-			// Visit the body with updated state
-			ast.Walk(v, n.Body)
-		}
-
-		// Restore states after visiting
-		defer func() {
-			v.currentFuncName = ""
-			v.inAsyncFunction = originalInAsync
-			v.currentReceiver = originalReceiver
-			v.currentFuncObj = originalFuncObj
-			v.currentFuncDecl = originalFuncDecl
-			v.currentFuncLit = originalFuncLit
-		}()
-		return nil // Stop traversal here, ast.Walk handled the body
-
-	case *ast.FuncLit:
-		// Save original inAsyncFunction state to restore after visiting
-		originalInAsync := v.inAsyncFunction
-		originalFuncDecl := v.currentFuncDecl
-		originalFuncLit := v.currentFuncLit
-
-		// Set current function literal
-		v.currentFuncDecl = nil
-		v.currentFuncLit = n
-
-		// Determine if this function literal is async based on its body
-		isAsync := v.containsAsyncOperations(n.Body)
-		if v.analysis.NodeData[n] == nil {
-			v.analysis.NodeData[n] = &NodeInfo{}
-		}
-		v.analysis.NodeData[n].InAsyncContext = isAsync
-
-		// Store named return variables for function literal
-		if n.Type != nil && n.Type.Results != nil {
-			var namedReturns []string
-			for _, field := range n.Type.Results.List {
-				for _, name := range field.Names {
-					namedReturns = append(namedReturns, name.Name)
-				}
-			}
-			if len(namedReturns) > 0 {
-				v.analysis.FuncLitData[n] = &FunctionInfo{
-					IsAsync:      isAsync,
-					NamedReturns: namedReturns,
-				}
+		if len(namedReturns) > 0 {
+			if obj := v.pkg.TypesInfo.ObjectOf(n.Name); obj != nil {
+				funcInfo := v.analysis.ensureFunctionData(obj)
+				funcInfo.NamedReturns = namedReturns
 			}
 		}
+	}
 
-		v.inAsyncFunction = isAsync
+	// Update visitor state for this function
+	v.inAsyncFunction = isAsync
+	v.currentFuncObj = v.pkg.TypesInfo.ObjectOf(n.Name)
 
+	if n.Body != nil {
 		// Check if the body contains any defer statements
-		if n.Body != nil && v.containsDefer(n.Body) {
-			if v.analysis.NodeData[n] == nil {
-				v.analysis.NodeData[n] = &NodeInfo{}
-			}
-			v.analysis.NodeData[n].NeedsDefer = true
+		if v.containsDefer(n.Body) {
+			nodeInfo.NeedsDefer = true
 		}
 
 		// Visit the body with updated state
 		ast.Walk(v, n.Body)
+	}
 
-		// Restore inAsyncFunction state after visiting
+	// Restore states after visiting
+	defer func() {
+		v.currentFuncName = ""
 		v.inAsyncFunction = originalInAsync
+		v.currentReceiver = originalReceiver
+		v.currentFuncObj = originalFuncObj
 		v.currentFuncDecl = originalFuncDecl
 		v.currentFuncLit = originalFuncLit
-		return nil // Stop traversal here, ast.Walk handled the body
+	}()
+	return nil // Stop traversal here, ast.Walk handled the body
+}
 
-	case *ast.BlockStmt:
-		if n == nil || len(n.List) == 0 {
-			break
-		}
+// visitFuncLit handles function literal analysis
+func (v *analysisVisitor) visitFuncLit(n *ast.FuncLit) ast.Visitor {
+	// Save original inAsyncFunction state to restore after visiting
+	originalInAsync := v.inAsyncFunction
+	originalFuncDecl := v.currentFuncDecl
+	originalFuncLit := v.currentFuncLit
 
-		// Initialize NodeData for this block
-		if v.analysis.NodeData[n] == nil {
-			v.analysis.NodeData[n] = &NodeInfo{}
-		}
+	// Set current function literal
+	v.currentFuncDecl = nil
+	v.currentFuncLit = n
 
-		// Check for defer statements in this block
-		if v.containsDefer(n) {
-			v.analysis.NodeData[n].NeedsDefer = true
-		}
+	// Determine if this function literal is async based on its body
+	isAsync := v.containsAsyncOperations(n.Body)
+	nodeInfo := v.analysis.ensureNodeData(n)
+	nodeInfo.InAsyncContext = isAsync
 
-		// Store async state for this block
-		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
-
-		return v
-
-	case *ast.UnaryExpr:
-		// We handle address-of (&) within AssignStmt where it's actually used.
-		// Standalone &x doesn't directly assign, but its usage in assignments
-		// or function calls determines varRefing. Assignments are handled below.
-		// Function calls like foo(&x) would require different tracking if needed.
-		// TODO: for now, we focus on assignments
-		return v
-
-	case *ast.CallExpr:
-		// Check if this is a function call that might be async
-		if funcIdent, ok := n.Fun.(*ast.Ident); ok {
-			// Get the object for this function call
-			if obj := v.pkg.TypesInfo.Uses[funcIdent]; obj != nil && v.analysis.IsAsyncFunc(obj) {
-				// We're calling an async function, so mark current function as async if we're in one
-				if v.currentFuncObj != nil {
-					v.analysis.FunctionData[v.currentFuncObj] = &FunctionInfo{
-						IsAsync:      true,
-						NamedReturns: v.getNamedReturns(v.currentFuncDecl),
-					}
-					v.inAsyncFunction = true // Update visitor state
-					// Mark the FuncDecl node itself if possible (might need to store the node too)
-					for nodeAst := range v.analysis.NodeData { // Find the node to update
-						if fd, ok := nodeAst.(*ast.FuncDecl); ok && v.pkg.TypesInfo.ObjectOf(fd.Name) == v.currentFuncObj {
-							if v.analysis.NodeData[nodeAst] == nil {
-								v.analysis.NodeData[nodeAst] = &NodeInfo{}
-							}
-							v.analysis.NodeData[nodeAst].InAsyncContext = true
-						}
-					}
-				}
+	// Store named return variables for function literal
+	if n.Type != nil && n.Type.Results != nil {
+		var namedReturns []string
+		for _, field := range n.Type.Results.List {
+			for _, name := range field.Names {
+				namedReturns = append(namedReturns, name.Name)
 			}
 		}
-
-		// Check for reflect function calls that operate on functions
-		v.checkReflectUsage(n)
-
-		// Store async state for this call expression
-		if v.analysis.NodeData[n] == nil {
-			v.analysis.NodeData[n] = &NodeInfo{}
-		}
-		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
-
-		return v
-
-	case *ast.SelectorExpr:
-		// Initialize NodeData for this selector expression
-		if v.analysis.NodeData[n] == nil {
-			v.analysis.NodeData[n] = &NodeInfo{}
-		}
-		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
-
-		// Check if this is a method value (method being used as a value, not called immediately)
-		if selection := v.pkg.TypesInfo.Selections[n]; selection != nil {
-			if selection.Kind() == types.MethodVal {
-				// This is a method value - mark it for binding during code generation
-				v.analysis.NodeData[n].IsMethodValue = true
+		if len(namedReturns) > 0 {
+			v.analysis.FuncLitData[n] = &FunctionInfo{
+				IsAsync:      isAsync,
+				NamedReturns: namedReturns,
 			}
 		}
-		return v // Continue traversal
+	}
 
-	case *ast.AssignStmt:
-		// Handle variable assignment tracking and generate shadowing information
-		shadowingInfo := v.detectVariableShadowing(n)
+	v.inAsyncFunction = isAsync
 
-		// Store shadowing information if needed for code generation
-		if shadowingInfo != nil {
-			if v.analysis.NodeData[n] == nil {
-				v.analysis.NodeData[n] = &NodeInfo{}
-			}
-			v.analysis.NodeData[n].ShadowingInfo = shadowingInfo
-		}
+	// Check if the body contains any defer statements
+	if n.Body != nil && v.containsDefer(n.Body) {
+		nodeInfo.NeedsDefer = true
+	}
 
-		// Track assignment relationships for pointer analysis
-		for i, lhsExpr := range n.Lhs {
-			if i < len(n.Rhs) {
-				v.analyzeAssignment(lhsExpr, n.Rhs[i])
-			}
-		}
+	// Visit the body with updated state
+	ast.Walk(v, n.Body)
 
-		// Track interface implementations for assignments to interface variables
-		v.trackInterfaceAssignments(n)
+	// Restore inAsyncFunction state after visiting
+	v.inAsyncFunction = originalInAsync
+	v.currentFuncDecl = originalFuncDecl
+	v.currentFuncLit = originalFuncLit
+	return nil // Stop traversal here, ast.Walk handled the body
+}
 
-		// Track function assignments (function literals assigned to variables)
-		if len(n.Lhs) == 1 && len(n.Rhs) == 1 {
-			if lhsIdent, ok := n.Lhs[0].(*ast.Ident); ok {
-				if rhsFuncLit, ok := n.Rhs[0].(*ast.FuncLit); ok {
-					// Get the object for the LHS variable
-					if obj := v.pkg.TypesInfo.ObjectOf(lhsIdent); obj != nil {
-						v.analysis.FunctionAssignments[obj] = rhsFuncLit
-					}
-				}
-			}
-		}
-
-		return v
-
-	case *ast.ReturnStmt:
-		// Initialize NodeData for return statement
-		if v.analysis.NodeData[n] == nil {
-			v.analysis.NodeData[n] = &NodeInfo{}
-		}
-
-		// Record the enclosing function/literal for this return statement
-		if v.currentFuncDecl != nil {
-			v.analysis.NodeData[n].EnclosingFuncDecl = v.currentFuncDecl
-		} else if v.currentFuncLit != nil {
-			v.analysis.NodeData[n].EnclosingFuncLit = v.currentFuncLit
-		}
-
-		// Check if it's a bare return
-		if len(n.Results) == 0 {
-			if v.currentFuncDecl != nil {
-				// Check if the enclosing function declaration has named returns
-				if obj := v.pkg.TypesInfo.ObjectOf(v.currentFuncDecl.Name); obj != nil {
-					if _, ok := v.analysis.FunctionData[obj]; ok {
-						if v.analysis.NodeData[n] == nil {
-							v.analysis.NodeData[n] = &NodeInfo{}
-						}
-						v.analysis.NodeData[n].IsBareReturn = true
-					}
-				}
-			} else if v.currentFuncLit != nil {
-				// Check if the enclosing function literal has named returns
-				if _, ok := v.analysis.FuncLitData[v.currentFuncLit]; ok {
-					if v.analysis.NodeData[n] == nil {
-						v.analysis.NodeData[n] = &NodeInfo{}
-					}
-					v.analysis.NodeData[n].IsBareReturn = true
-				}
-			}
-		}
-		return v // Continue traversal
-
-	case *ast.DeclStmt:
-		// Handle declarations inside functions (const, var, type declarations within function bodies)
-		// These should not have export modifiers in TypeScript
-		if genDecl, ok := n.Decl.(*ast.GenDecl); ok {
-			// Check if we're inside a function (either FuncDecl or FuncLit)
-			isInsideFunction := v.currentFuncDecl != nil || v.currentFuncLit != nil
-
-			if isInsideFunction {
-				// Mark all specs in this declaration as being inside a function
-				for _, spec := range genDecl.Specs {
-					if v.analysis.NodeData[spec] == nil {
-						v.analysis.NodeData[spec] = &NodeInfo{}
-					}
-					v.analysis.NodeData[spec].IsInsideFunction = true
-				}
-			}
-		}
-		return v // Continue traversal
-
-	case *ast.IfStmt:
-		// Detect variable shadowing in if statement initializations
-		if n.Init != nil {
-			if assignStmt, ok := n.Init.(*ast.AssignStmt); ok && assignStmt.Tok == token.DEFINE {
-				shadowingInfo := v.detectVariableShadowing(assignStmt)
-				if shadowingInfo != nil {
-					// Initialize NodeData for this if statement
-					if v.analysis.NodeData[n] == nil {
-						v.analysis.NodeData[n] = &NodeInfo{}
-					}
-					v.analysis.NodeData[n].ShadowingInfo = shadowingInfo
-				}
-			}
-		}
-		return v // Continue traversal
-
-	case *ast.TypeAssertExpr:
-		// Initialize NodeData for type assertion
-		if v.analysis.NodeData[n] == nil {
-			v.analysis.NodeData[n] = &NodeInfo{}
-		}
-		v.analysis.NodeData[n].InAsyncContext = v.inAsyncFunction
-
-		// Track interface implementations when we see type assertions
-		v.trackTypeAssertion(n)
-
+// visitBlockStmt handles block statement analysis
+func (v *analysisVisitor) visitBlockStmt(n *ast.BlockStmt) ast.Visitor {
+	if n == nil || len(n.List) == 0 {
 		return v
 	}
 
-	// For all other nodes, continue traversal
+	// Initialize NodeData for this block
+	nodeInfo := v.analysis.ensureNodeData(n)
+
+	// Check for defer statements in this block
+	if v.containsDefer(n) {
+		nodeInfo.NeedsDefer = true
+	}
+
+	return v
+}
+
+// visitCallExpr handles call expression analysis
+func (v *analysisVisitor) visitCallExpr(n *ast.CallExpr) ast.Visitor {
+	// Check if this is a function call that might be async
+	if funcIdent, ok := n.Fun.(*ast.Ident); ok {
+		// Get the object for this function call
+		if obj := v.pkg.TypesInfo.Uses[funcIdent]; obj != nil && v.analysis.IsAsyncFunc(obj) {
+			// We're calling an async function, so mark current function as async if we're in one
+			if v.currentFuncObj != nil {
+				funcInfo := v.analysis.ensureFunctionData(v.currentFuncObj)
+				funcInfo.IsAsync = true
+				funcInfo.NamedReturns = v.getNamedReturns(v.currentFuncDecl)
+				v.inAsyncFunction = true // Update visitor state
+				// Mark the FuncDecl node itself if possible
+				for nodeAst := range v.analysis.NodeData {
+					if fd, ok := nodeAst.(*ast.FuncDecl); ok && v.pkg.TypesInfo.ObjectOf(fd.Name) == v.currentFuncObj {
+						nodeInfo := v.analysis.ensureNodeData(nodeAst)
+						nodeInfo.InAsyncContext = true
+					}
+				}
+			}
+		}
+	}
+
+	// Check for reflect function calls that operate on functions
+	v.checkReflectUsage(n)
+
+	return v
+}
+
+// visitSelectorExpr handles selector expression analysis
+func (v *analysisVisitor) visitSelectorExpr(n *ast.SelectorExpr) ast.Visitor {
+	// Check if this is a method value (method being used as a value, not called immediately)
+	if selection := v.pkg.TypesInfo.Selections[n]; selection != nil {
+		if selection.Kind() == types.MethodVal {
+			// This is a method value - mark it for binding during code generation
+			nodeInfo := v.analysis.ensureNodeData(n)
+			nodeInfo.IsMethodValue = true
+		}
+	}
+	return v
+}
+
+// visitAssignStmt handles assignment statement analysis
+func (v *analysisVisitor) visitAssignStmt(n *ast.AssignStmt) ast.Visitor {
+	// Handle variable assignment tracking and generate shadowing information
+	shadowingInfo := v.detectVariableShadowing(n)
+
+	// Store shadowing information if needed for code generation
+	if shadowingInfo != nil {
+		nodeInfo := v.analysis.ensureNodeData(n)
+		nodeInfo.ShadowingInfo = shadowingInfo
+	}
+
+	// Track assignment relationships for pointer analysis
+	for i, lhsExpr := range n.Lhs {
+		if i < len(n.Rhs) {
+			v.analyzeAssignment(lhsExpr, n.Rhs[i])
+		}
+	}
+
+	// Track interface implementations for assignments to interface variables
+	v.trackInterfaceAssignments(n)
+
+	// Track function assignments (function literals assigned to variables)
+	if len(n.Lhs) == 1 && len(n.Rhs) == 1 {
+		if lhsIdent, ok := n.Lhs[0].(*ast.Ident); ok {
+			if rhsFuncLit, ok := n.Rhs[0].(*ast.FuncLit); ok {
+				// Get the object for the LHS variable
+				if obj := v.pkg.TypesInfo.ObjectOf(lhsIdent); obj != nil {
+					v.analysis.FunctionAssignments[obj] = rhsFuncLit
+				}
+			}
+		}
+	}
+
+	return v
+}
+
+// visitReturnStmt handles return statement analysis
+func (v *analysisVisitor) visitReturnStmt(n *ast.ReturnStmt) ast.Visitor {
+	nodeInfo := v.analysis.ensureNodeData(n)
+
+	// Record the enclosing function/literal for this return statement
+	if v.currentFuncDecl != nil {
+		nodeInfo.EnclosingFuncDecl = v.currentFuncDecl
+	} else if v.currentFuncLit != nil {
+		nodeInfo.EnclosingFuncLit = v.currentFuncLit
+	}
+
+	// Check if it's a bare return
+	if len(n.Results) == 0 {
+		if v.currentFuncDecl != nil {
+			// Check if the enclosing function declaration has named returns
+			if obj := v.pkg.TypesInfo.ObjectOf(v.currentFuncDecl.Name); obj != nil {
+				if _, ok := v.analysis.FunctionData[obj]; ok {
+					nodeInfo.IsBareReturn = true
+				}
+			}
+		} else if v.currentFuncLit != nil {
+			// Check if the enclosing function literal has named returns
+			if _, ok := v.analysis.FuncLitData[v.currentFuncLit]; ok {
+				nodeInfo.IsBareReturn = true
+			}
+		}
+	}
+	return v
+}
+
+// visitDeclStmt handles declaration statement analysis
+func (v *analysisVisitor) visitDeclStmt(n *ast.DeclStmt) ast.Visitor {
+	// Handle declarations inside functions (const, var, type declarations within function bodies)
+	// These should not have export modifiers in TypeScript
+	if genDecl, ok := n.Decl.(*ast.GenDecl); ok {
+		// Check if we're inside a function (either FuncDecl or FuncLit)
+		isInsideFunction := v.currentFuncDecl != nil || v.currentFuncLit != nil
+
+		if isInsideFunction {
+			// Mark all specs in this declaration as being inside a function
+			for _, spec := range genDecl.Specs {
+				nodeInfo := v.analysis.ensureNodeData(spec)
+				nodeInfo.IsInsideFunction = true
+			}
+		}
+	}
+	return v
+}
+
+// visitIfStmt handles if statement analysis
+func (v *analysisVisitor) visitIfStmt(n *ast.IfStmt) ast.Visitor {
+	// Detect variable shadowing in if statement initializations
+	if n.Init != nil {
+		if assignStmt, ok := n.Init.(*ast.AssignStmt); ok && assignStmt.Tok == token.DEFINE {
+			shadowingInfo := v.detectVariableShadowing(assignStmt)
+			if shadowingInfo != nil {
+				nodeInfo := v.analysis.ensureNodeData(n)
+				nodeInfo.ShadowingInfo = shadowingInfo
+			}
+		}
+	}
+	return v
+}
+
+// visitTypeAssertExpr handles type assertion expression analysis
+func (v *analysisVisitor) visitTypeAssertExpr(n *ast.TypeAssertExpr) ast.Visitor {
+	// Track interface implementations when we see type assertions
+	v.trackTypeAssertion(n)
 	return v
 }
 
