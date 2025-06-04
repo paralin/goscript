@@ -1047,6 +1047,10 @@ func (c *GoToTSCompiler) writeShadowedRHSExpression(expr ast.Expr, shadowingInfo
 		if err := c.writeShadowedRHSExpression(e.Fun, shadowingInfo); err != nil {
 			return err
 		}
+
+		// Add non-null assertion for function calls (same logic as WriteCallExpr)
+		c.addNonNullAssertion(e.Fun)
+
 		c.tsw.WriteLiterally("(")
 		for i, arg := range e.Args {
 			if i > 0 {

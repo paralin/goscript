@@ -1,7 +1,7 @@
-# Named Function Type Call Non-Null Assertion Issue
+# Named Function Type Call Non-Null Assertion Issue - RESOLVED ✅
 
 ## Issue Description
-The reported issue was specifically with **named function types** from external packages (like `filepath.WalkFunc`) not generating non-null assertions (`!`) when called. The example given was:
+The reported issue was specifically with **named function types** from external packages (like `filepath.WalkFunc`) not generating non-null assertions (`!`) when called in **variable shadowing scenarios**. The example given was:
 
 ```go
 func walk(fs billy.Filesystem, path string, info os.FileInfo, walkFn filepath.WalkFunc) error {
@@ -11,9 +11,9 @@ func walk(fs billy.Filesystem, path string, info os.FileInfo, walkFn filepath.Wa
 }
 ```
 
-This should generate `walkFn!(filename, fileInfo, err)` but was reportedly generating `walkFn(filename, fileInfo, err)` (missing the `!` operator).
+This should generate `walkFn!(filename, fileInfo, err)` but was generating `walkFn(filename, fileInfo, err)` (missing the `!` operator) in variable shadowing scenarios.
 
-However, when examining actual compiler output, the user provided this specific example:
+The user provided this specific problematic TypeScript output:
 
 ```typescript
 export function walk(fs: billy.Filesystem, path: string, info: os.FileInfo, walkFn: filepath.WalkFunc | null): $.GoError {
@@ -24,95 +24,120 @@ export function walk(fs: billy.Filesystem, path: string, info: os.FileInfo, walk
 }
 ```
 
-## Analysis of Compiler Code
+## Root Cause Analysis
 
-I examined the `addNonNullAssertion` function in `compiler/expr-call-async.go` (lines 68-96) which handles when the `!` operator is added:
+After creating multiple compliance tests and examining the compiler code, I discovered that:
+
+1. **Non-shadowing scenarios worked correctly**: Function calls outside of variable shadowing scenarios correctly generated the `!` operator.
+
+2. **Variable shadowing scenarios were broken**: The issue only occurred when variable shadowing was involved and the compiler generated temporary variables like `_temp_err`.
+
+3. **The bug was in `writeShadowedRHSExpression`**: In `compiler/stmt.go`, the `writeShadowedRHSExpression` function handled `*ast.CallExpr` manually but bypassed the `addNonNullAssertion` logic from the main `WriteCallExpr` function.
+
+## The Fix
+
+The issue was in `compiler/stmt.go` lines 1050-1062 in the `writeShadowedRHSExpression` function:
 
 ```go
-func (c *GoToTSCompiler) addNonNullAssertion(expFun ast.Expr) {
-    if funType := c.pkg.TypesInfo.TypeOf(expFun); funType != nil {
-        if _, ok := funType.Underlying().(*types.Signature); ok {
-            // Check if this is a function parameter identifier that needs not-null assertion
-            if ident, isIdent := expFun.(*ast.Ident); isIdent {
-                // Check if this identifier is a function parameter
-                if obj := c.pkg.TypesInfo.Uses[ident]; obj != nil {
-                    if _, isVar := obj.(*types.Var); isVar {
-                        // This is a variable (including function parameters)
-                        // Function parameters that are function types need ! assertion
-                        c.tsw.WriteLiterally("!")
-                    }
-                }
-            } else if _, isNamed := funType.(*types.Named); isNamed {
-                c.tsw.WriteLiterally("!")
-            }
-        }
-        // ... additional logic for nullable function return types
+case *ast.CallExpr:
+    // Handle function calls - replace identifiers in arguments with temp variables
+    if err := c.writeShadowedRHSExpression(e.Fun, shadowingInfo); err != nil {
+        return err
     }
-}
+    c.tsw.WriteLiterally("(")
+    // ... argument handling ...
+    c.tsw.WriteLiterally(")")
+    return nil
+```
+
+**Fixed version:**
+```go
+case *ast.CallExpr:
+    // Handle function calls - replace identifiers in arguments with temp variables
+    if err := c.writeShadowedRHSExpression(e.Fun, shadowingInfo); err != nil {
+        return err
+    }
+    
+    // Add non-null assertion for function calls (same logic as WriteCallExpr)
+    c.addNonNullAssertion(e.Fun)
+    
+    c.tsw.WriteLiterally("(")
+    // ... argument handling ...
+    c.tsw.WriteLiterally(")")
+    return nil
 ```
 
 ## Test Cases Created
 
-### 1. First Test: `nullable_function_param_call`
-- Tested explicitly nullable function parameters (`WalkFunc | null`)
-- **Result**: ✅ Compiler correctly generates `!` operator
+### 1. `nullable_function_param_call` ✅
+- Tested explicitly nullable function parameters
+- **Result**: Always worked correctly
 
-### 2. Second Test: `named_function_type_call`
-- Tested named function types from external packages (`filepath.WalkFunc`)
-- Tested custom named function types (`WalkFunc`)
-- **Result**: ✅ Compiler correctly generates `!` operator
+### 2. `named_function_type_call` ✅
+- Tested named function types without variable shadowing
+- **Result**: Always worked correctly
 
-### 3. Third Test: `filepath_walkfunc_call`
-- Tested the exact `filepath.WalkFunc` scenario from user's example
-- **Result**: ✅ Compiler correctly generates `!` operator
+### 3. `filepath_walkfunc_call` ✅  
+- Tested exact `filepath.WalkFunc` scenario without variable shadowing
+- **Result**: Always worked correctly
 
-All three tests show that `filepath.WalkFunc` parameters are correctly typed as `filepath.WalkFunc | null` and calls are generated with the `!` operator.
+### 4. `function_call_variable_shadowing` ✅
+- **Reproduced the exact issue**: Variable shadowing scenarios with missing `!` operators
+- **Verified the fix**: All scenarios now work correctly
 
-## Generated TypeScript (Correct Behavior):
+## Before and After
+
+### Before the Fix (❌ Missing `!` operators):
 ```typescript
-// All test cases correctly generate the ! operator
-export function walk(fs: Filesystem, path: string, info: os.FileInfo, walkFn: filepath.WalkFunc | null): $.GoError {
-    let err = walkFn!(filename, fileInfo, null)  // ✅ Correct: ! operator present
-    if (err != null && err != filepath.SkipDir) {
-        return err
+export function walkWithShadowing(fs: Filesystem, path: string, info: os.FileInfo, walkFn: filepath.WalkFunc | null): $.GoError {
+    const _temp_err = err
+    {
+        let err = walkFn(path, fileInfo, _temp_err)  // ❌ Missing !
+        if (err != null && err != filepath.SkipDir) {
+            return err
+        }
     }
 }
 
-export function walkFiles(rootPath: string, walkFn: filepath.WalkFunc | null): $.GoError {
-    return walkFn!(rootPath, null, null)  // ✅ Correct: ! operator present
-}
-
-export function processPath(walkFn: filepath.WalkFunc | null): void {
-    walkFn!("test", null, null)  // ✅ Correct: ! operator present
-    if (walkFn!("test", null, null) != null) {  // ✅ Correct: ! operator present
-        console.log("Error occurred")
+export function testShadowing1(walkFn: filepath.WalkFunc | null): $.GoError {
+    const _temp_err = err
+    {
+        let err = walkFn("test1", null, _temp_err)  // ❌ Missing !
+        if (err != null) {
+            return err
+        }
     }
 }
 ```
 
-## Discrepancy Analysis
+### After the Fix (✅ With `!` operators):
+```typescript
+export function walkWithShadowing(fs: Filesystem, path: string, info: os.FileInfo, walkFn: filepath.WalkFunc | null): $.GoError {
+    const _temp_err = err
+    {
+        let err = walkFn!(path, fileInfo, _temp_err)  // ✅ Fixed: ! operator present
+        if (err != null && err != filepath.SkipDir) {
+            return err
+        }
+    }
+}
 
-There's a discrepancy between:
-1. **My test results**: All show correct `!` operator generation
-2. **User's actual output**: Shows missing `!` operator
-
-### Possible Explanations:
-
-1. **Version differences**: The user might be using a different version of the compiler than what I'm testing
-2. **Different code context**: The issue might only occur in specific contexts not covered by my tests
-3. **Specific compilation flags**: Different build flags or compilation settings might affect the behavior
-4. **Variable naming**: The user's example shows `_temp_err` which suggests variable shadowing might be involved
-
-## Next Steps Needed
-
-To properly diagnose this issue, we need:
-
-1. **Exact reproduction**: The user should provide the exact Go source code that produces the problematic TypeScript
-2. **Compiler version**: Confirm which version/commit of the compiler is being used
-3. **Build flags**: Any specific build flags or compilation settings being used
-4. **Full context**: The complete function and file context where the issue occurs
+export function testShadowing1(walkFn: filepath.WalkFunc | null): $.GoError {
+    const _temp_err = err
+    {
+        let err = walkFn!("test1", null, _temp_err)  // ✅ Fixed: ! operator present
+        if (err != null) {
+            return err
+        }
+    }
+}
+```
 
 ## Compliance Test Status
-✅ **ALL TESTS PASSED** - All three tests pass and generate the expected TypeScript output with proper non-null assertions.
+✅ **ALL TESTS PASS** - All four compliance tests now pass and generate correct TypeScript with proper non-null assertions.
 
-However, since the user is seeing different behavior, there may be a specific scenario not covered by these tests that needs investigation. 
+## Summary
+- **Issue**: Missing `!` operators in variable shadowing scenarios for function parameter calls
+- **Root Cause**: `writeShadowedRHSExpression` bypassed the `addNonNullAssertion` logic
+- **Fix**: Added `c.addNonNullAssertion(e.Fun)` to the `*ast.CallExpr` case in `writeShadowedRHSExpression`
+- **Result**: ✅ **RESOLVED** - All function calls now correctly generate `!` operators regardless of variable shadowing 
