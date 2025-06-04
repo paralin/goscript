@@ -1206,7 +1206,7 @@ func (v *interfaceImplementationVisitor) trackImplementation(interfaceType *type
 				isAsync = funcInfo.IsAsync
 			}
 
-			v.analysis.TrackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+			v.analysis.trackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
 		}
 	}
 }
@@ -1794,8 +1794,8 @@ func (v *analysisVisitor) findVariableUsageInExpr(expr ast.Expr, lhsVarNames map
 	}
 }
 
-// TrackInterfaceImplementation records that a struct type implements an interface method
-func (a *Analysis) TrackInterfaceImplementation(interfaceType *types.Interface, structType *types.Named, method *types.Func, isAsync bool) {
+// trackInterfaceImplementation records that a struct type implements an interface method
+func (a *Analysis) trackInterfaceImplementation(interfaceType *types.Interface, structType *types.Named, method *types.Func, isAsync bool) {
 	key := InterfaceMethodKey{
 		InterfaceType: interfaceType.String(),
 		MethodName:    method.Name(),
@@ -1971,7 +1971,7 @@ func (v *analysisVisitor) trackTypeAssertion(typeAssert *ast.TypeAssertExpr) {
 			}
 
 			// Track this interface implementation
-			v.analysis.TrackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+			v.analysis.trackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
 		}
 	}
 }
@@ -2094,7 +2094,7 @@ func (v *analysisVisitor) trackInterfaceAssignments(assignStmt *ast.AssignStmt) 
 					isAsync = funcInfo.IsAsync
 				}
 
-				v.analysis.TrackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+				v.analysis.trackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
 			}
 		}
 	}
