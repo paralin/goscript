@@ -106,7 +106,7 @@ export async function testMixedReturns(ctx: context.Context): Promise<string> {
 	console.log("Performing additional work...")
 
 	// Simulate some work
-	time.Sleep($.multiplyDuration(10, time.Millisecond))
+	await time.Sleep(10 * time.Millisecond)
 
 	return "completed_normally"
 }
@@ -201,7 +201,7 @@ export async function testReturnCase(ctx: context.Context): Promise<string> {
 	console.log("Performing additional work...")
 
 	// Simulate some work
-	time.Sleep($.multiplyDuration(10, time.Millisecond))
+	await time.Sleep(10 * time.Millisecond)
 
 	return "completed_normally"
 }

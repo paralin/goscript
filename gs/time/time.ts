@@ -592,14 +592,6 @@ export function Duration_multiply(
   return receiver * multiplier
 }
 
-// Override multiplication operator for Duration * number
-export function multiplyDuration(
-  duration: Duration,
-  multiplier: number,
-): Duration {
-  return duration * multiplier
-}
-
 // Location represents a time zone
 export class Location {
   private _name: string

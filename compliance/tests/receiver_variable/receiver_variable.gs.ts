@@ -53,12 +53,12 @@ export class content {
 		return cloned
 	}
 
-	public WriteAt(p: $.Bytes, off: number): [number, $.GoError] {
+	public async WriteAt(p: $.Bytes, off: number): Promise<[number, $.GoError]> {
 		const c = this
 		if (off < 0) {
 			return [0, errors.New("negative offset")]
 		}
-		c.m.Lock()
+		await c.m.Lock()
 		let prev = $.len(c.bytes)
 		let diff = $.int(off) - prev
 		if (diff > 0) {
@@ -72,14 +72,14 @@ export class content {
 		return [$.len(p), null]
 	}
 
-	public ReadAt(b: $.Bytes, off: number): [number, $.GoError] {
+	public async ReadAt(b: $.Bytes, off: number): Promise<[number, $.GoError]> {
 		const c = this
 		let n: number = 0
 		let err: $.GoError = null
 		if (off < 0) {
 			return [0, errors.New("negative offset")]
 		}
-		c.m.RLock()
+		await c.m.RLock()
 		let size = ($.len(c.bytes) as number)
 		if (off >= size) {
 			c.m.RUnlock()
@@ -98,20 +98,20 @@ export class content {
 		return [n, err]
 	}
 
-	public Size(): number {
+	public async Size(): Promise<number> {
 		const c = this
 		using __defer = new $.DisposableStack();
-		c.m.RLock()
+		await c.m.RLock()
 		__defer.defer(() => {
 			c.m.RUnlock()
 		});
 		return $.len(c.bytes)
 	}
 
-	public Clear(): void {
+	public async Clear(): Promise<void> {
 		const c = this
 		using __defer = new $.DisposableStack();
-		c.m.Lock()
+		await c.m.Lock()
 		__defer.defer(() => {
 			c.m.Unlock()
 		});
@@ -125,10 +125,10 @@ export class content {
 	}
 
 	// Method with complex variable scoping
-	public ComplexMethod(): $.GoError {
+	public async ComplexMethod(): Promise<$.GoError> {
 		const c = this
 		using __defer = new $.DisposableStack();
-		c.m.Lock()
+		await c.m.Lock()
 		__defer.defer(() => {
 			c.m.Unlock()
 		});
@@ -199,13 +199,13 @@ export async function main(): Promise<void> {
 
 	// Test basic functionality that should work
 	{
-		let err = c.ComplexMethod()
+		let err = await c.ComplexMethod()
 		if (err != null) {
 			console.log("Error:", err!.Error())
 			return 
 		}
 	}
 
-	console.log("Complex method completed, size:", c.Size())
+	console.log("Complex method completed, size:", await c.Size())
 }
 

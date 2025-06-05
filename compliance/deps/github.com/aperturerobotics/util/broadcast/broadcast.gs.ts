@@ -46,10 +46,10 @@ export class Broadcast {
 	//
 	// broadcast closes the wait channel, if any.
 	// getWaitCh returns a channel that will be closed when broadcast is called.
-	public HoldLock(cb: ((broadcast: (() => void) | null, getWaitCh: (() => $.Channel<{  }> | null) | null) => void) | null): void {
+	public async HoldLock(cb: ((broadcast: (() => void) | null, getWaitCh: (() => $.Channel<{  }> | null) | null) => void) | null): Promise<void> {
 		const c = this
 		using __defer = new $.DisposableStack();
-		c.mtx.Lock()
+		await c.mtx.Lock()
 		__defer.defer(() => {
 			c.mtx.Unlock()
 		});
@@ -73,13 +73,13 @@ export class Broadcast {
 
 	// HoldLockMaybeAsync locks the mutex and calls the callback if possible.
 	// If the mutex cannot be locked right now, starts a new Goroutine to wait for it.
-	public HoldLockMaybeAsync(cb: ((broadcast: (() => void) | null, getWaitCh: (() => $.Channel<{  }> | null) | null) => void) | null): void {
+	public async HoldLockMaybeAsync(cb: ((broadcast: (() => void) | null, getWaitCh: (() => $.Channel<{  }> | null) | null) => void) | null): Promise<void> {
 		const c = this
 		using __defer = new $.DisposableStack();
-		let holdBroadcastLock = (lock: boolean): void => {
+		let holdBroadcastLock = async (lock: boolean): Promise<void> => {
 			using __defer = new $.DisposableStack();
 			if (lock) {
-				c.mtx.Lock()
+				await c.mtx.Lock()
 			}
 			// use defer to catch panic cases
 			__defer.defer(() => {
@@ -115,7 +115,7 @@ export class Broadcast {
 
 			let done: boolean = false
 			let err: $.GoError = null
-			c.HoldLock((broadcast: (() => void) | null, getWaitCh: (() => $.Channel<{  }> | null) | null): void => {
+			await c.HoldLock((broadcast: (() => void) | null, getWaitCh: (() => $.Channel<{  }> | null) | null): void => {
 				;[done, err] = cb!(broadcast, getWaitCh)
 				if (!done && err == null) {
 					waitCh = getWaitCh!()
@@ -126,7 +126,7 @@ export class Broadcast {
 				return err
 			}
 
-			const [_selectHasReturn3801024, _selectValue3801024] = await $.selectStatement([
+			const [_selectHasReturn3797351, _selectValue3797351] = await $.selectStatement([
 				{
 					id: 0,
 					isSend: false,
@@ -143,10 +143,10 @@ export class Broadcast {
 					}
 				},
 			], false)
-			if (_selectHasReturn3801024) {
-				return _selectValue3801024!
+			if (_selectHasReturn3797351) {
+				return _selectValue3797351!
 			}
-			// If _selectHasReturn3801024 is false, continue execution
+			// If _selectHasReturn3797351 is false, continue execution
 		}
 	}
 

@@ -12,12 +12,12 @@ import * as time from "@goscript/time/index.js"
 import * as csync from "@goscript/github.com/aperturerobotics/util/csync/index.js"
 
 export async function main(): Promise<void> {
-	await using __defer = new $.AsyncDisposableStack();
+	using __defer = new $.DisposableStack();
 	let mtx: csync.Mutex = new csync.Mutex()
 	let counter: number = 0
 	let wg: sync.WaitGroup = new sync.WaitGroup()
 
-	let [ctx, cancel] = context.WithTimeout(context.Background(), $.multiplyDuration(5, time.Second))
+	let [ctx, cancel] = context.WithTimeout(context.Background(), 5 * time.Second)
 	__defer.defer(() => {
 		cancel!()
 	});
@@ -37,13 +37,13 @@ export async function main(): Promise<void> {
 
 	// println("worker", id, "incremented counter to", counter) - non-deterministic, leave commented out
 	let worker = async (id: number): Promise<void> => {
-		await using __defer = new $.AsyncDisposableStack();
+		using __defer = new $.DisposableStack();
 		__defer.defer(() => {
 			wg.Done()
 		});
 
 		// Try to acquire the lock
-		let [relLock, err] = await await mtx.Lock(ctx)
+		let [relLock, err] = await mtx.Lock(ctx)
 		if (err != null) {
 			console.log("worker", id, "failed to acquire lock:", err!.Error())
 			return 
@@ -55,7 +55,7 @@ export async function main(): Promise<void> {
 		// Critical section
 		// println("worker", id, "entered critical section") - non-deterministic, leave commented out
 		let current = counter
-		time.Sleep($.multiplyDuration(100, time.Millisecond)) // Simulate work
+		await time.Sleep(100 * time.Millisecond) // Simulate work
 
 		// println("worker", id, "incremented counter to", counter) - non-deterministic, leave commented out
 		counter = current + 1
