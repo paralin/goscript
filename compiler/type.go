@@ -278,7 +278,7 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 				// Write the qualified name: importAlias.TypeName
 				c.tsw.WriteLiterally(importAlias)
 				c.tsw.WriteLiterally(".")
-				c.tsw.WriteLiterally(t.Obj().Name())
+				c.tsw.WriteLiterally(c.sanitizeIdentifier(t.Obj().Name()))
 
 				// For generic types, include type arguments
 				if t.TypeArgs() != nil && t.TypeArgs().Len() > 0 {
@@ -306,7 +306,7 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 				// Write the qualified name: importAlias.TypeName
 				c.tsw.WriteLiterally(importAlias)
 				c.tsw.WriteLiterally(".")
-				c.tsw.WriteLiterally(t.Obj().Name())
+				c.tsw.WriteLiterally(c.sanitizeIdentifier(t.Obj().Name()))
 
 				// For generic types, include type arguments
 				if t.TypeArgs() != nil && t.TypeArgs().Len() > 0 {
@@ -330,7 +330,7 @@ func (c *GoToTSCompiler) WriteNamedType(t *types.Named) {
 	}
 
 	// Use Obj().Name() for the original defined name (local types or unmatched imports)
-	c.tsw.WriteLiterally(t.Obj().Name())
+	c.tsw.WriteLiterally(c.sanitizeIdentifier(t.Obj().Name()))
 
 	// For generic types, include type arguments
 	if t.TypeArgs() != nil && t.TypeArgs().Len() > 0 {

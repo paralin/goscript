@@ -1,0 +1,11 @@
+Test 1: Basic Promise with string
+Result: hello world
+Test 2: Pre-resolved Promise with int
+Result: 42
+Test 3: Promise with error
+Error: context deadline exceeded
+Test 4: Cannot set result twice
+First set success: true
+Second set success: false
+Final result: 100
+All tests completed

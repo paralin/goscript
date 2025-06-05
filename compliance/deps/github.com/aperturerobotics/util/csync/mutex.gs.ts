@@ -90,7 +90,7 @@ export class Mutex {
 			return [release, null]
 		}
 		for (; ; ) {
-			await $.selectStatement([
+			const [_selectHasReturn4127803, _selectValue4127803] = await $.selectStatement([
 				{
 					id: 0,
 					isSend: false,
@@ -108,6 +108,10 @@ export class Mutex {
 					}
 				},
 			], false)
+			if (_selectHasReturn4127803) {
+				return _selectValue4127803!
+			}
+			// If _selectHasReturn4127803 is false, continue execution
 
 			// keep waiting for the lock
 

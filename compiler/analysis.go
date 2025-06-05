@@ -911,6 +911,11 @@ func (v *analysisVisitor) containsAsyncOperations(node ast.Node) bool {
 				return false
 			}
 
+		case *ast.SelectStmt:
+			// Select statement with channel operations
+			hasAsync = true
+			return false
+
 		case *ast.CallExpr:
 			// Check if we're calling a function known to be async
 			if funcIdent, ok := s.Fun.(*ast.Ident); ok {
@@ -928,8 +933,18 @@ func (v *analysisVisitor) containsAsyncOperations(node ast.Node) bool {
 					// Get the type of the receiver
 					if obj := v.pkg.TypesInfo.Uses[ident]; obj != nil {
 						if varObj, ok := obj.(*types.Var); ok {
-							// Get the type name and package
-							if namedType, ok := varObj.Type().(*types.Named); ok {
+							// Handle both direct named types and pointer to named types
+							var namedType *types.Named
+							switch t := varObj.Type().(type) {
+							case *types.Named:
+								namedType = t
+							case *types.Pointer:
+								if nt, isNamed := t.Elem().(*types.Named); isNamed {
+									namedType = nt
+								}
+							}
+
+							if namedType != nil {
 								typeName := namedType.Obj().Name()
 								methodName := selExpr.Sel.Name
 
@@ -944,13 +959,12 @@ func (v *analysisVisitor) containsAsyncOperations(node ast.Node) bool {
 										return false
 									}
 								}
+								// Note: Local method async detection is handled during code generation to avoid circular dependencies
 							}
 						}
 					}
 				}
 			}
-
-			// TODO: Add detection of method calls on async types
 		}
 
 		return true

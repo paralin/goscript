@@ -136,11 +136,6 @@ func (c *GoToTSCompiler) writeRegularFieldInitializer(fieldName string, fieldTyp
 
 	c.tsw.WriteLiterallyf("init?.%s ?? ", fieldName)
 
-	// Debug for Mode field specifically
-	if fieldName == "Mode" {
-		fmt.Printf("DEBUG Mode field: Type=%T, String=%s\n", fieldType, fieldType.String())
-	}
-
 	// Priority 1: Check if this is a wrapper type
 	if c.analysis.IsNamedBasicType(fieldType) {
 		// For wrapper types, use the zero value of the underlying type with type casting
@@ -161,35 +156,22 @@ func (c *GoToTSCompiler) writeRegularFieldInitializer(fieldName string, fieldTyp
 
 	// Priority 2: Handle imported types with basic underlying types (like os.FileMode)
 	if c.isImportedBasicType(fieldType) {
-		if fieldName == "Mode" {
-			fmt.Printf("DEBUG Mode field: Using imported basic type zero value\n")
-		}
 		c.writeImportedBasicTypeZeroValue(fieldType)
 		return
 	}
 
 	// Priority 3: Handle named types
 	if named, isNamed := fieldType.(*types.Named); isNamed {
-		if fieldName == "Mode" {
-			fmt.Printf("DEBUG Mode field: Using named type zero value\n")
-		}
 		c.writeNamedTypeZeroValue(named)
 		return
 	}
 
 	// Priority 4: Handle type aliases
 	if alias, isAlias := fieldType.(*types.Alias); isAlias {
-		if fieldName == "Mode" {
-			fmt.Printf("DEBUG Mode field: Using type alias zero value\n")
-		}
 		c.writeTypeAliasZeroValue(alias, astType)
 		return
 	}
 
-	// Default: use WriteZeroValueForType
-	if fieldName == "Mode" {
-		fmt.Printf("DEBUG Mode field: Using default WriteZeroValueForType\n")
-	}
 	c.WriteZeroValueForType(fieldType)
 }
 
@@ -241,7 +223,6 @@ func (c *GoToTSCompiler) isImportedBasicType(fieldType types.Type) bool {
 func (c *GoToTSCompiler) writeImportedBasicTypeZeroValue(fieldType types.Type) {
 	if named, ok := fieldType.(*types.Named); ok {
 		underlying := named.Underlying()
-		fmt.Printf("DEBUG writeImportedBasicTypeZeroValue: Named type, underlying=%T\n", underlying)
 		// Write zero value of underlying type with type casting
 		c.WriteZeroValueForType(underlying)
 		c.tsw.WriteLiterally(" as ")
@@ -251,7 +232,6 @@ func (c *GoToTSCompiler) writeImportedBasicTypeZeroValue(fieldType types.Type) {
 
 	if alias, ok := fieldType.(*types.Alias); ok {
 		underlying := alias.Underlying()
-		fmt.Printf("DEBUG writeImportedBasicTypeZeroValue: Alias type, underlying=%T\n", underlying)
 		// Write zero value of underlying type with type casting
 		c.WriteZeroValueForType(underlying)
 		c.tsw.WriteLiterally(" as ")
@@ -260,7 +240,6 @@ func (c *GoToTSCompiler) writeImportedBasicTypeZeroValue(fieldType types.Type) {
 	}
 
 	// Fallback (should not happen if isImportedBasicType was correct)
-	fmt.Printf("DEBUG writeImportedBasicTypeZeroValue: Fallback path\n")
 	c.WriteZeroValueForType(fieldType)
 }
 

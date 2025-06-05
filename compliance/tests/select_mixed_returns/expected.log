@@ -1,0 +1,12 @@
+Test 1: Non-returning case (ch2)
+Received from ch2: 42
+Processing ch2 value...
+Continuing execution after select
+Performing additional work...
+Final result: completed_normally
+
+Test 2: Returning case (ch1)
+Received from ch1: test_message
+Final result: ch1_result
+
+All tests completed

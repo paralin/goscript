@@ -43,7 +43,7 @@ export async function main(): Promise<void> {
 		});
 
 		// Try to acquire the lock
-		let [relLock, err] = await await mtx.Lock(ctx)
+		let [relLock, err] = await mtx.Lock(ctx)
 		if (err != null) {
 			console.log("worker", id, "failed to acquire lock:", err!.Error())
 			return 
@@ -76,7 +76,7 @@ export async function main(): Promise<void> {
 		done.close()
 	})
 
-	await $.selectStatement([
+	const [_selectHasReturn4130845, _selectValue4130845] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -94,6 +94,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], false)
+	if (_selectHasReturn4130845) {
+		return _selectValue4130845!
+	}
+	// If _selectHasReturn4130845 is false, continue execution
 
 	console.log("Final counter value:", counter)
 	if (counter != numWorkers) {

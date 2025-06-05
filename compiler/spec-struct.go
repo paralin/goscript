@@ -37,7 +37,7 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 	c.tsw.WriteLine("{")
 	c.tsw.Indent(1)
 
-	className := a.Name.Name
+	className := sanitizeIdentifier(a.Name.Name)
 
 	goStructType, ok := c.pkg.TypesInfo.Defs[a.Name].Type().(*types.Named)
 	if !ok {
@@ -231,10 +231,10 @@ func (c *GoToTSCompiler) WriteStructTypeSpec(a *ast.TypeSpec, t *ast.StructType)
 			// Check for both simple identifiers (Pair) and generic types (Pair[T])
 			var recvTypeName string
 			if ident, ok := recvType.(*ast.Ident); ok {
-				recvTypeName = ident.Name
+				recvTypeName = sanitizeIdentifier(ident.Name)
 			} else if indexExpr, ok := recvType.(*ast.IndexExpr); ok {
 				if ident, ok := indexExpr.X.(*ast.Ident); ok {
-					recvTypeName = ident.Name
+					recvTypeName = sanitizeIdentifier(ident.Name)
 				}
 			}
 

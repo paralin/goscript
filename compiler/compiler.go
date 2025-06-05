@@ -433,7 +433,7 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 				switch d := decl.(type) {
 				case *ast.FuncDecl:
 					if d.Recv == nil && d.Name.IsExported() {
-						valueSymbols = append(valueSymbols, d.Name.Name)
+						valueSymbols = append(valueSymbols, sanitizeIdentifier(d.Name.Name))
 					}
 				case *ast.GenDecl:
 					for _, spec := range d.Specs {
@@ -443,17 +443,17 @@ func (c *PackageCompiler) generateIndexFile(compiledFiles []string) error {
 								// Check if this is a struct type
 								if _, isStruct := s.Type.(*ast.StructType); isStruct {
 									// Structs become TypeScript classes and need both type and value exports
-									structSymbols = append(structSymbols, s.Name.Name)
+									structSymbols = append(structSymbols, sanitizeIdentifier(s.Name.Name))
 								} else {
 									// Other type declarations (interfaces, type definitions, type aliases)
 									// become TypeScript types and must be exported with "export type"
-									typeSymbols = append(typeSymbols, s.Name.Name)
+									typeSymbols = append(typeSymbols, sanitizeIdentifier(s.Name.Name))
 								}
 							}
 						case *ast.ValueSpec:
 							for _, name := range s.Names {
 								if name.IsExported() {
-									valueSymbols = append(valueSymbols, name.Name)
+									valueSymbols = append(valueSymbols, sanitizeIdentifier(name.Name))
 								}
 							}
 						}
@@ -676,6 +676,10 @@ type GoToTSCompiler struct {
 	pkg *packages.Package
 
 	analysis *Analysis
+
+	// awaitedCalls tracks which call expressions have already been processed
+	// to avoid adding double await keywords
+	awaitedCalls map[*ast.CallExpr]bool
 }
 
 // It initializes the compiler with a `TSCodeWriter` for output,

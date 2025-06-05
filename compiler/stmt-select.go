@@ -8,6 +8,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+// caseEndsWithReturn checks if a case body ends with a return statement
+func (c *GoToTSCompiler) caseEndsWithReturn(body []ast.Stmt) bool {
+	if len(body) == 0 {
+		return false
+	}
+
+	// Check if the last statement is a return statement
+	lastStmt := body[len(body)-1]
+	_, isReturn := lastStmt.(*ast.ReturnStmt)
+	return isReturn
+}
+
 // WriteStmtSelect translates a Go `select` statement into an asynchronous
 // TypeScript operation using the `$.selectStatement` runtime helper.
 // Go's `select` provides non-deterministic choice over channel operations.
@@ -38,8 +50,29 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 	// Variable to track whether we have a default case
 	hasDefault := false
 
+	// Analyze if all cases end with return statements
+	allCasesReturn := true
+	for _, stmt := range exp.Body.List {
+		if commClause, ok := stmt.(*ast.CommClause); ok {
+			if commClause.Comm == nil {
+				// Default case - check if it ends with return
+				if !c.caseEndsWithReturn(commClause.Body) {
+					allCasesReturn = false
+				}
+			} else {
+				// Regular case - check if it ends with return
+				if !c.caseEndsWithReturn(commClause.Body) {
+					allCasesReturn = false
+				}
+			}
+		}
+	}
+
+	// Generate unique variable names for this select statement
+	selectID := fmt.Sprintf("%d", exp.Pos()) // Use AST position for uniqueness
+
 	// Start the selectStatement call and the array literal
-	c.tsw.WriteLiterally("await $.selectStatement(")
+	c.tsw.WriteLiterallyf("const [_selectHasReturn%s, _selectValue%s] = await $.selectStatement(", selectID, selectID)
 	c.tsw.WriteLine("[") // Put bracket on new line
 	c.tsw.Indent(1)
 
@@ -206,6 +239,24 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 	c.tsw.WriteLiterallyf("%t", hasDefault)
 	c.tsw.WriteLiterally(")")
 	c.tsw.WriteLine("")
+
+	// Add code to handle the return value from selectStatement
+	c.tsw.WriteLiterallyf("if (_selectHasReturn%s) {", selectID)
+	c.tsw.WriteLine("")
+	c.tsw.Indent(1)
+	c.tsw.WriteLiterallyf("return _selectValue%s!", selectID)
+	c.tsw.WriteLine("")
+	c.tsw.Indent(-1)
+	c.tsw.WriteLine("}")
+
+	// If all cases return, add a TypeScript-satisfying fallback return
+	if allCasesReturn {
+		c.tsw.WriteLine("// All cases should return, this fallback should never execute")
+		c.tsw.WriteLine("throw new Error('Unexpected: select statement did not return when all cases should return')")
+	} else {
+		c.tsw.WriteLiterallyf("// If _selectHasReturn%s is false, continue execution", selectID)
+		c.tsw.WriteLine("")
+	}
 
 	return nil
 }

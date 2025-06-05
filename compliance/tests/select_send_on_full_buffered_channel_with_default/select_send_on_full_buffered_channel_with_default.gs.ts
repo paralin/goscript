@@ -12,7 +12,7 @@ export async function main(): Promise<void> {
 	// Should not be reached
 
 	// Should be reached
-	await $.selectStatement([
+	const [_selectHasReturn163, _selectValue163] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -31,5 +31,9 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
+	if (_selectHasReturn163) {
+		return _selectValue163!
+	}
+	// If _selectHasReturn163 is false, continue execution
 }
 

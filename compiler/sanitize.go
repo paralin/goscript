@@ -11,8 +11,7 @@ func sanitizeIdentifier(name string) string {
 
 	// Handle TypeScript built-in types that conflict with Go type parameter names
 	builtinTypes := map[string]string{
-		"Map": "MapType",
-		// Add other built-in types as needed
+		"Promise": "PromiseType",
 	}
 
 	if replacement, exists := builtinTypes[name]; exists {

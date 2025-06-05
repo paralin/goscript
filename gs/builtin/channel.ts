@@ -88,7 +88,7 @@ export interface SelectCase<T> {
   channel: Channel<any> | ChannelRef<any> | null // Allow null and ChannelRef
   value?: any // Value to send for send cases
   // Optional handlers for when this case is selected
-  onSelected?: (result: SelectResult<T>) => Promise<void>
+  onSelected?: (result: SelectResult<T>) => Promise<any>
 }
 
 /**
@@ -99,14 +99,14 @@ export interface SelectCase<T> {
  * @param hasDefault Whether there is a default case
  * @returns A promise that resolves with the result of the selected case
  */
-export async function selectStatement<T>(
+export async function selectStatement<T, V=void>(
   cases: SelectCase<T>[],
   hasDefault: boolean = false,
-): Promise<void> {
+): Promise<[boolean, V]> {
   if (cases.length === 0 && !hasDefault) {
     // Go spec: If there are no cases, the select statement blocks forever.
     // Emulate blocking forever with a promise that never resolves.
-    return new Promise<void>(() => {}) // Promise never resolves
+    return new Promise<[boolean, V]>(() => {}) // Promise never resolves
   }
 
   // 1. Check for ready (non-blocking) operations
@@ -143,19 +143,21 @@ export async function selectStatement<T>(
           selectedCase.id,
         )
         if (selectedCase.onSelected) {
-          await selectedCase.onSelected(result as SelectResult<T>) // Await the handler
+          const handlerResult = await selectedCase.onSelected(result as SelectResult<T>)
+          return [handlerResult !== undefined, handlerResult as V]
         }
       } else {
         const result = await selectedCase.channel.selectReceive(selectedCase.id)
         if (selectedCase.onSelected) {
-          await selectedCase.onSelected(result) // Await the handler
+          const handlerResult = await selectedCase.onSelected(result)
+          return [handlerResult !== undefined, handlerResult as V]
         }
       }
     } else {
       // This case should ideally not happen if channel is required for non-default cases
       console.error('Selected case without a channel:', selectedCase)
     }
-    return // Return after executing a ready case
+    return [false, undefined as V] // Return after executing a ready case
   }
 
   // 2. If no operations are ready and there's a default case, select default
@@ -164,13 +166,14 @@ export async function selectStatement<T>(
     const defaultCase = cases.find((c) => c.id === -1)
     if (defaultCase && defaultCase.onSelected) {
       // Execute the onSelected handler for the default case
-      await defaultCase.onSelected({
+      const handlerResult = await defaultCase.onSelected({
         value: undefined,
         ok: false,
         id: -1,
-      } as SelectResult<T>) // Await the handler
+      } as SelectResult<T>)
+      return [handlerResult !== undefined, handlerResult as V]
     }
-    return // Return after executing the default case
+    return [false, undefined as V] // Return after executing the default case
   }
 
   // 3. If no operations are ready and no default case, block until one is ready
@@ -190,16 +193,19 @@ export async function selectStatement<T>(
   // If all non-default cases have nil channels, we effectively block forever
   if (blockingPromises.length === 0) {
     // No valid channels to operate on, block forever (unless there's a default)
-    return new Promise<void>(() => {}) // Promise never resolves
+    return new Promise<[boolean, V]>(() => {}) // Promise never resolves
   }
 
   const result = await Promise.race(blockingPromises)
   // Execute onSelected handler for the selected case
   const selectedCase = cases.find((c) => c.id === result.id)
   if (selectedCase && selectedCase.onSelected) {
-    await selectedCase.onSelected(result) // Await the handler
+    const handlerResult = await selectedCase.onSelected(result)
+    return [handlerResult !== undefined, handlerResult as V]
   }
+
   // No explicit return needed here, as the function will implicitly return after the await
+  return [false, undefined as V]
 }
 
 /**

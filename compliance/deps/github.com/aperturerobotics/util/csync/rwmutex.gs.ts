@@ -134,7 +134,7 @@ export class RWMutex {
 			return [release, null]
 		}
 		for (; ; ) {
-			await $.selectStatement([
+			const [_selectHasReturn4123788, _selectValue4123788] = await $.selectStatement([
 				{
 					id: 0,
 					isSend: false,
@@ -152,6 +152,10 @@ export class RWMutex {
 					}
 				},
 			], false)
+			if (_selectHasReturn4123788) {
+				return _selectValue4123788!
+			}
+			// If _selectHasReturn4123788 is false, continue execution
 
 			m.bcast.HoldLock((broadcast: (() => void) | null, getWaitCh: (() => $.Channel<{  }> | null) | null): void => {
 				if (write) {

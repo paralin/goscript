@@ -20,7 +20,7 @@ export async function run(ctx: context.Context): Promise<void> {
 	})
 
 	// Check that myCh is not readable yet
-	await $.selectStatement([
+	const [_selectHasReturn2803517, _selectValue2803517] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -38,6 +38,10 @@ export async function run(ctx: context.Context): Promise<void> {
 			}
 		},
 	], true)
+	if (_selectHasReturn2803517) {
+		return _selectValue2803517!
+	}
+	// If _selectHasReturn2803517 is false, continue execution
 
 	// Cancel context which should trigger the goroutine
 	sctxCancel!()
