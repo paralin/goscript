@@ -59,4 +59,4 @@ export function Getpagesize(): number {
   // Return a standard page size for JavaScript environment
   // Most systems use 4096 bytes as the default page size
   return 4096
-} 
+}

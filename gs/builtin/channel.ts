@@ -99,7 +99,7 @@ export interface SelectCase<T> {
  * @param hasDefault Whether there is a default case
  * @returns A promise that resolves with the result of the selected case
  */
-export async function selectStatement<T, V=void>(
+export async function selectStatement<T, V = void>(
   cases: SelectCase<T>[],
   hasDefault: boolean = false,
 ): Promise<[boolean, V]> {
@@ -143,7 +143,9 @@ export async function selectStatement<T, V=void>(
           selectedCase.id,
         )
         if (selectedCase.onSelected) {
-          const handlerResult = await selectedCase.onSelected(result as SelectResult<T>)
+          const handlerResult = await selectedCase.onSelected(
+            result as SelectResult<T>,
+          )
           return [handlerResult !== undefined, handlerResult as V]
         }
       } else {
@@ -265,18 +267,32 @@ export async function chanRecvWithOk<T>(
  * @param direction Optional direction for the channel. Default is 'both' (bidirectional).
  * @returns A new channel instance or channel reference.
  */
-export const makeChannel = <T>(
+export function makeChannel<T>(
+  bufferSize: number,
+  zeroValue: T,
+  direction: 'send',
+): SendOnlyChannelRef<T>
+export function makeChannel<T>(
+  bufferSize: number,
+  zeroValue: T,
+  direction: 'receive',
+): ReceiveOnlyChannelRef<T>
+export function makeChannel<T>(
+  bufferSize: number,
+  zeroValue: T,
+  direction?: 'both',
+): Channel<T>
+export function makeChannel<T>(
   bufferSize: number,
   zeroValue: T,
   direction: 'send' | 'receive' | 'both' = 'both',
-): Channel<T> | ChannelRef<T> => {
+): Channel<T> | ChannelRef<T> {
   const channel = new BufferedChannel<T>(bufferSize, zeroValue)
 
-  // Wrap the channel with the appropriate ChannelRef based on direction
   if (direction === 'send') {
-    return new SendOnlyChannelRef<T>(channel) as ChannelRef<T>
+    return new SendOnlyChannelRef<T>(channel)
   } else if (direction === 'receive') {
-    return new ReceiveOnlyChannelRef<T>(channel) as ChannelRef<T>
+    return new ReceiveOnlyChannelRef<T>(channel)
   } else {
     return channel
   }

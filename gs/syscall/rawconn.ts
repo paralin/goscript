@@ -20,4 +20,4 @@ export class StubRawConn implements RawConn {
       Error: () => 'operation not implemented in JavaScript environment',
     }
   }
-} 
+}

@@ -110,6 +110,13 @@ type InterfaceMethodKey struct {
 	MethodName    string // The method name
 }
 
+// MethodKey uniquely identifies a method for async analysis
+type MethodKey struct {
+	PackagePath  string // Package path
+	ReceiverType string // Receiver type name (empty for package-level functions)
+	MethodName   string // Method or function name
+}
+
 // ImplementationInfo tracks information about a struct that implements an interface method
 type ImplementationInfo struct {
 	StructType    *types.Named // The struct type that implements the interface
@@ -165,6 +172,10 @@ type Analysis struct {
 	// InterfaceMethodAsyncStatus caches the async status determination for interface methods
 	// This is computed once during analysis and reused during code generation
 	InterfaceMethodAsyncStatus map[InterfaceMethodKey]bool
+
+	// MethodAsyncStatus stores the async status of all methods analyzed
+	// This is computed once during analysis and reused during code generation
+	MethodAsyncStatus map[MethodKey]bool
 }
 
 // PackageAnalysis holds cross-file analysis data for a package
@@ -205,6 +216,7 @@ func NewAnalysis(allPackages map[string]*packages.Package) *Analysis {
 		AllPackages:                allPackages,
 		InterfaceImplementations:   make(map[InterfaceMethodKey][]ImplementationInfo),
 		InterfaceMethodAsyncStatus: make(map[InterfaceMethodKey]bool),
+		MethodAsyncStatus:          make(map[MethodKey]bool),
 	}
 }
 
@@ -430,6 +442,9 @@ type analysisVisitor struct {
 
 	// currentFuncLit tracks the *ast.FuncLit of the function literal we're currently analyzing.
 	currentFuncLit *ast.FuncLit
+
+	// visitingMethods tracks methods currently being analyzed to prevent infinite recursion
+	visitingMethods map[MethodKey]bool
 }
 
 // getOrCreateUsageInfo retrieves or creates the VariableUsageInfo for a given object.
@@ -1126,8 +1141,9 @@ func AnalyzePackageFiles(pkg *packages.Package, allPackages map[string]*packages
 
 	// Create visitor for the entire package
 	visitor := &analysisVisitor{
-		analysis: analysis,
-		pkg:      pkg,
+		analysis:        analysis,
+		pkg:             pkg,
+		visitingMethods: make(map[MethodKey]bool),
 	}
 
 	// First pass: analyze all declarations and statements across all files
@@ -1151,7 +1167,10 @@ func AnalyzePackageFiles(pkg *packages.Package, allPackages map[string]*packages
 		})
 	}
 
-	// Second pass: analyze interface implementations now that all function async status is determined
+	// Second pass: comprehensive async analysis for all methods
+	visitor.analyzeAllMethodsAsync()
+
+	// Third pass: analyze interface implementations now that all function async status is determined
 	interfaceVisitor := &interfaceImplementationVisitor{
 		analysis: analysis,
 		pkg:      pkg,
@@ -1342,22 +1361,32 @@ func (a *Analysis) LoadPackageMetadata() {
 		if metadata := a.loadGsMetadata(metaFilePath); metadata != nil {
 			// Store async method information
 			for methodKey, isAsync := range metadata.AsyncMethods {
-				// Convert "Type.Method" format to our internal key format
+				// Convert method key to our internal key format
 				parts := strings.Split(methodKey, ".")
-				if len(parts) == 2 {
-					typeName := parts[0]
-					methodName := parts[1]
-					// The key format is "pkgName.TypeNameMethodNameInfo"
-					key := PackageMetadataKey{
-						PackagePath: pkgPath,
-						TypeName:    typeName,
-						MethodName:  methodName,
-					}
+				var typeName, methodName string
 
-					// Store the async value directly in PackageMetadata
-					a.PackageMetadata[key] = MethodMetadata{
-						IsAsync: isAsync,
-					}
+				if len(parts) == 2 {
+					// "Type.Method" format for methods
+					typeName = parts[0]
+					methodName = parts[1]
+				} else if len(parts) == 1 {
+					// "Function" format for package-level functions
+					typeName = "" // Empty type name for package-level functions
+					methodName = parts[0]
+				} else {
+					// Skip invalid formats
+					continue
+				}
+
+				key := PackageMetadataKey{
+					PackagePath: pkgPath,
+					TypeName:    typeName,
+					MethodName:  methodName,
+				}
+
+				// Store the async value directly in PackageMetadata
+				a.PackageMetadata[key] = MethodMetadata{
+					IsAsync: isAsync,
 				}
 			}
 		}
@@ -1410,7 +1439,18 @@ func (a *Analysis) loadGsMetadata(metaFilePath string) *GsMetadata {
 
 // IsMethodAsync checks if a method call is async based on package metadata
 func (a *Analysis) IsMethodAsync(pkgPath, typeName, methodName string) bool {
-	// First, check existing metadata for internal packages
+	// First, check pre-computed method async status
+	methodKey := MethodKey{
+		PackagePath:  pkgPath,
+		ReceiverType: typeName,
+		MethodName:   methodName,
+	}
+
+	if status, exists := a.MethodAsyncStatus[methodKey]; exists {
+		return status
+	}
+
+	// Fall back to existing metadata for internal packages
 	// The metadata keys are stored as "pkgName.TypeNameMethodNameInfo"
 	// e.g., "sync.MutexLockInfo", "sync.WaitGroupWaitInfo", etc.
 	key := PackageMetadataKey{
@@ -2201,4 +2241,306 @@ func (v *analysisVisitor) getNamedReturns(funcDecl *ast.FuncDecl) []string {
 		}
 	}
 	return namedReturns
+}
+
+// analyzeAllMethodsAsync performs comprehensive async analysis on all methods in all packages
+func (v *analysisVisitor) analyzeAllMethodsAsync() {
+	// Analyze methods in current package
+	v.analyzePackageMethodsAsync(v.pkg)
+
+	// Analyze methods in all dependency packages
+	for _, pkg := range v.analysis.AllPackages {
+		if pkg != v.pkg {
+			v.analyzePackageMethodsAsync(pkg)
+		}
+	}
+}
+
+// analyzePackageMethodsAsync analyzes all methods in a specific package
+func (v *analysisVisitor) analyzePackageMethodsAsync(pkg *packages.Package) {
+	for _, file := range pkg.Syntax {
+		for _, decl := range file.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+				v.analyzeMethodAsync(funcDecl, pkg)
+			}
+		}
+	}
+}
+
+// analyzeMethodAsync determines if a method is async and stores the result
+func (v *analysisVisitor) analyzeMethodAsync(funcDecl *ast.FuncDecl, pkg *packages.Package) {
+	methodKey := v.getMethodKey(funcDecl, pkg)
+
+	// Check if already analyzed
+	if _, exists := v.analysis.MethodAsyncStatus[methodKey]; exists {
+		return
+	}
+
+	// Check for cycles
+	if v.visitingMethods[methodKey] {
+		// Cycle detected, assume sync to break recursion
+		v.analysis.MethodAsyncStatus[methodKey] = false
+		return
+	}
+
+	// Mark as visiting
+	v.visitingMethods[methodKey] = true
+
+	// Determine if method is async
+	isAsync := false
+
+	// For external packages, prioritize metadata over body analysis
+	// The metadata represents the intended async behavior in TypeScript
+	if pkg.Types != v.pkg.Types {
+		// External package: check metadata first, fall back to body analysis
+		isAsync = v.checkExternalMethodMetadata(methodKey.PackagePath, methodKey.ReceiverType, methodKey.MethodName)
+	} else {
+		// Local package: analyze method body
+		if funcDecl.Body != nil {
+			isAsync = v.containsAsyncOperationsComplete(funcDecl.Body, pkg)
+		}
+	}
+
+	// Store result
+	v.analysis.MethodAsyncStatus[methodKey] = isAsync
+
+	// Unmark as visiting
+	delete(v.visitingMethods, methodKey)
+}
+
+// getMethodKey creates a unique key for a method
+func (v *analysisVisitor) getMethodKey(funcDecl *ast.FuncDecl, pkg *packages.Package) MethodKey {
+	packagePath := pkg.Types.Path()
+	methodName := funcDecl.Name.Name
+	receiverType := ""
+
+	if funcDecl.Recv != nil && len(funcDecl.Recv.List) > 0 {
+		// Get receiver type name
+		if len(funcDecl.Recv.List[0].Names) > 0 {
+			if def := pkg.TypesInfo.Defs[funcDecl.Recv.List[0].Names[0]]; def != nil {
+				if vr, ok := def.(*types.Var); ok {
+					receiverType = v.getTypeName(vr.Type())
+				}
+			}
+		}
+	}
+
+	return MethodKey{
+		PackagePath:  packagePath,
+		ReceiverType: receiverType,
+		MethodName:   methodName,
+	}
+}
+
+// getTypeName extracts a clean type name from a types.Type
+func (v *analysisVisitor) getTypeName(t types.Type) string {
+	switch typ := t.(type) {
+	case *types.Named:
+		return typ.Obj().Name()
+	case *types.Pointer:
+		return v.getTypeName(typ.Elem())
+	default:
+		return typ.String()
+	}
+}
+
+// containsAsyncOperationsComplete is a comprehensive async detection that handles method calls
+func (v *analysisVisitor) containsAsyncOperationsComplete(node ast.Node, pkg *packages.Package) bool {
+	var hasAsync bool
+
+	ast.Inspect(node, func(n ast.Node) bool {
+		if n == nil {
+			return false
+		}
+
+		switch s := n.(type) {
+		case *ast.SendStmt:
+			// Channel send operation (ch <- value)
+			hasAsync = true
+			return false
+
+		case *ast.UnaryExpr:
+			// Channel receive operation (<-ch)
+			if s.Op == token.ARROW {
+				hasAsync = true
+				return false
+			}
+
+		case *ast.SelectStmt:
+			// Select statement with channel operations
+			hasAsync = true
+			return false
+
+		case *ast.CallExpr:
+			// Check if we're calling a function known to be async
+			if v.isCallAsync(s, pkg) {
+				hasAsync = true
+				return false
+			}
+		}
+
+		return true
+	})
+
+	return hasAsync
+}
+
+// isCallAsync determines if a call expression is async
+func (v *analysisVisitor) isCallAsync(callExpr *ast.CallExpr, pkg *packages.Package) bool {
+	switch fun := callExpr.Fun.(type) {
+	case *ast.Ident:
+		// Direct function call
+		if obj := pkg.TypesInfo.Uses[fun]; obj != nil {
+			if funcObj, ok := obj.(*types.Func); ok {
+				return v.isFunctionAsync(funcObj, pkg)
+			}
+		}
+
+	case *ast.SelectorExpr:
+		// Method call
+		if selection := pkg.TypesInfo.Selections[fun]; selection != nil {
+			if methodObj := selection.Obj(); methodObj != nil {
+				return v.isMethodAsyncFromSelection(fun, methodObj, pkg)
+			}
+		}
+	}
+
+	return false
+}
+
+// isFunctionAsync checks if a function object is async
+func (v *analysisVisitor) isFunctionAsync(funcObj *types.Func, pkg *packages.Package) bool {
+	// Check if it's from external package metadata
+	if funcObj.Pkg() != nil && funcObj.Pkg() != pkg.Types {
+		return v.analysis.IsMethodAsync(funcObj.Pkg().Path(), "", funcObj.Name())
+	}
+
+	// Check internal method status
+	methodKey := MethodKey{
+		PackagePath:  pkg.Types.Path(),
+		ReceiverType: "",
+		MethodName:   funcObj.Name(),
+	}
+
+	if status, exists := v.analysis.MethodAsyncStatus[methodKey]; exists {
+		return status
+	}
+
+	// Not analyzed yet, analyze now
+	if funcDecl := v.findFunctionDecl(funcObj.Name(), pkg); funcDecl != nil {
+		v.analyzeMethodAsync(funcDecl, pkg)
+		if status, exists := v.analysis.MethodAsyncStatus[methodKey]; exists {
+			return status
+		}
+	}
+
+	return false
+}
+
+// isMethodAsyncFromSelection checks if a method call is async based on selection
+func (v *analysisVisitor) isMethodAsyncFromSelection(selExpr *ast.SelectorExpr, methodObj types.Object, pkg *packages.Package) bool {
+	// Get receiver type
+	if ident, ok := selExpr.X.(*ast.Ident); ok {
+		if obj := pkg.TypesInfo.Uses[ident]; obj != nil {
+			if varObj, ok := obj.(*types.Var); ok {
+				receiverType := v.getTypeName(varObj.Type())
+
+				// Check if it's from external package
+				if methodFunc, ok := methodObj.(*types.Func); ok {
+					if methodFunc.Pkg() != nil && methodFunc.Pkg() != pkg.Types {
+						return v.analysis.IsMethodAsync(methodFunc.Pkg().Path(), receiverType, methodFunc.Name())
+					}
+				}
+
+				// Check internal method status
+				methodKey := MethodKey{
+					PackagePath:  pkg.Types.Path(),
+					ReceiverType: receiverType,
+					MethodName:   methodObj.Name(),
+				}
+
+				if status, exists := v.analysis.MethodAsyncStatus[methodKey]; exists {
+					return status
+				}
+
+				// Not analyzed yet, find and analyze
+				if funcDecl := v.findMethodDecl(receiverType, methodObj.Name(), pkg); funcDecl != nil {
+					v.analyzeMethodAsync(funcDecl, pkg)
+					if status, exists := v.analysis.MethodAsyncStatus[methodKey]; exists {
+						return status
+					}
+				}
+			}
+		}
+	}
+
+	return false
+}
+
+// findFunctionDecl finds a function declaration by name in a package
+func (v *analysisVisitor) findFunctionDecl(funcName string, pkg *packages.Package) *ast.FuncDecl {
+	for _, file := range pkg.Syntax {
+		for _, decl := range file.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+				if funcDecl.Name.Name == funcName && funcDecl.Recv == nil {
+					return funcDecl
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// findMethodDecl finds a method declaration by receiver type and method name
+func (v *analysisVisitor) findMethodDecl(receiverType, methodName string, pkg *packages.Package) *ast.FuncDecl {
+	for _, file := range pkg.Syntax {
+		for _, decl := range file.Decls {
+			if funcDecl, ok := decl.(*ast.FuncDecl); ok {
+				if funcDecl.Name.Name == methodName && funcDecl.Recv != nil {
+					if len(funcDecl.Recv.List) > 0 && len(funcDecl.Recv.List[0].Names) > 0 {
+						if def := pkg.TypesInfo.Defs[funcDecl.Recv.List[0].Names[0]]; def != nil {
+							if vr, ok := def.(*types.Var); ok {
+								if v.getTypeName(vr.Type()) == receiverType {
+									return funcDecl
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// checkExternalMethodMetadata checks if an external method is async based on package metadata
+func (v *analysisVisitor) checkExternalMethodMetadata(pkgPath, receiverType, methodName string) bool {
+	// Check package metadata first
+	key := PackageMetadataKey{
+		PackagePath: pkgPath,
+		TypeName:    receiverType,
+		MethodName:  methodName,
+	}
+
+	if metadata, exists := v.analysis.PackageMetadata[key]; exists {
+		return metadata.IsAsync
+	}
+
+	// Fall back to analyzing external method from source if available
+	return v.analysis.analyzeExternalMethodAsync(pkgPath, receiverType, methodName)
+}
+
+// IsLocalMethodAsync checks if a local method is async using pre-computed analysis
+func (a *Analysis) IsLocalMethodAsync(pkgPath, receiverType, methodName string) bool {
+	methodKey := MethodKey{
+		PackagePath:  pkgPath,
+		ReceiverType: receiverType,
+		MethodName:   methodName,
+	}
+
+	if status, exists := a.MethodAsyncStatus[methodKey]; exists {
+		return status
+	}
+
+	return false
 }

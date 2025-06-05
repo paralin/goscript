@@ -26,4 +26,4 @@ export const S_IFIFO = 0o010000
 export const S_IFSOCK = 0o140000
 export const S_ISUID = 0o004000
 export const S_ISGID = 0o002000
-export const S_ISVTX = 0o001000 
+export const S_ISVTX = 0o001000

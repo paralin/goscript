@@ -43,7 +43,7 @@ export async function main(): Promise<void> {
 		});
 
 		// Try to acquire the lock
-		let [relLock, err] = await mtx.Lock(ctx)
+		let [relLock, err] = await await mtx.Lock(ctx)
 		if (err != null) {
 			console.log("worker", id, "failed to acquire lock:", err!.Error())
 			return 

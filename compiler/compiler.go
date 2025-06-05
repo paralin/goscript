@@ -676,10 +676,6 @@ type GoToTSCompiler struct {
 	pkg *packages.Package
 
 	analysis *Analysis
-
-	// awaitedCalls tracks which call expressions have already been processed
-	// to avoid adding double await keywords
-	awaitedCalls map[*ast.CallExpr]bool
 }
 
 // It initializes the compiler with a `TSCodeWriter` for output,

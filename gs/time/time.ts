@@ -1,3 +1,5 @@
+import { makeChannel, ChannelRef, makeChannelRef } from '../builtin/channel.js'
+
 // Time represents a time instant with nanosecond precision
 export class Time {
   private _date: globalThis.Date
@@ -1010,10 +1012,24 @@ export function ParseInLocation(
   return Time.create(date, 0, undefined, loc)
 }
 
-// After waits for the duration to elapse and then returns the current time
-export async function After(d: Duration): Promise<Time> {
-  await Sleep(d)
-  return Now()
+// After waits for the duration to elapse and then sends the current time on the returned channel
+export function After(d: Duration): ChannelRef<Time> {
+  const ms = d / 1000000 // Convert nanoseconds to milliseconds
+
+  // Create a buffered channel with capacity 1
+  const channel = makeChannel(1, new Time(), 'receive')
+
+  // Start a timer that will send the current time after the duration
+  setTimeout(async () => {
+    try {
+      // We need to access the underlying channel to send to it
+      await channel.send(Now())
+    } catch (e) {
+      // Channel might be closed, ignore the error
+    }
+  }, ms)
+
+  return makeChannelRef(channel, 'receive')
 }
 
 // AfterFunc waits for the duration to elapse and then calls f
@@ -1056,6 +1072,6 @@ export function LoadLocationFromTZData(
   name: string,
   _data: Uint8Array,
 ): Location {
-  // In a real implementation, this would parse the timezone data
+  // TODO: parse the timezone data
   return new Location(name)
 }

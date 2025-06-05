@@ -15,4 +15,4 @@ export interface RawConn {
   Control(f: (fd: uintptr) => void): $.GoError
   Read(f: (fd: uintptr) => boolean): $.GoError
   Write(f: (fd: uintptr) => boolean): $.GoError
-} 
+}
