@@ -22,7 +22,7 @@ export async function main(): Promise<void> {
 	console.log("NumGoroutine:", runtime.NumGoroutine())
 
 	// Test GC (should be no-op)
-	runtime.GC()
+	await runtime.GC()
 	console.log("GC called successfully")
 }
 

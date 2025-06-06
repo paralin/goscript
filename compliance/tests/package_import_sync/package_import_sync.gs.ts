@@ -45,14 +45,14 @@ export async function main(): Promise<void> {
 	console.log("Final counter:", counter)
 
 	// Test OnceFunc
-	let onceFunc = sync.OnceFunc((): void => {
+	let onceFunc = await sync.OnceFunc((): void => {
 		console.log("OnceFunc executed")
 	})
 	onceFunc!()
 	onceFunc!() // Should not execute again
 
 	// Test OnceValue
-	let onceValue = sync.OnceValue((): number => {
+	let onceValue = await sync.OnceValue((): number => {
 		console.log("OnceValue function executed")
 		return 42
 	})

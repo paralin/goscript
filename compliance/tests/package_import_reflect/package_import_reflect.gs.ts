@@ -87,8 +87,8 @@ export async function main(): Promise<void> {
 	let a = $.arrayToSlice<number>([1, 2, 3])
 	let b = $.arrayToSlice<number>([1, 2, 3])
 	let c = $.arrayToSlice<number>([1, 2, 4])
-	console.log("DeepEqual a==b:", reflect.DeepEqual(a, b))
-	console.log("DeepEqual a==c:", reflect.DeepEqual(a, c))
+	console.log("DeepEqual a==b:", await reflect.DeepEqual(a, b))
+	console.log("DeepEqual a==c:", await reflect.DeepEqual(a, c))
 
 	// Test Zero value
 	let zeroInt = reflect.Zero(reflect.TypeOf(42)).clone()
@@ -96,11 +96,11 @@ export async function main(): Promise<void> {
 
 	// Test type construction functions
 	let intType = reflect.TypeOf(0)
-	let sliceType = reflect.SliceOf(intType)
+	let sliceType = await reflect.SliceOf(intType)
 	console.log("SliceOf int:", sliceType!.String())
 	console.log("SliceOf kind:", reflect.Kind_String(sliceType!.Kind()))
 
-	let arrayType = reflect.ArrayOf(5, intType)
+	let arrayType = await reflect.ArrayOf(5, intType)
 	console.log("ArrayOf 5 int:", arrayType!.String())
 	console.log("ArrayOf kind:", reflect.Kind_String(arrayType!.Kind()))
 
@@ -168,7 +168,7 @@ export async function main(): Promise<void> {
 	console.log("Different types:", intType1!.String() == stringType!.String())
 
 	// Test map type construction
-	let mapType = reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0))
+	let mapType = await reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0))
 	console.log("MapOf string->int:", mapType!.String())
 	console.log("MapOf kind:", reflect.Kind_String(mapType!.Kind()))
 
@@ -221,13 +221,13 @@ export async function main(): Promise<void> {
 	console.log("Enhanced API tests:")
 
 	// Test MakeSlice
-	let sliceTypeInt = reflect.SliceOf(reflect.TypeOf(0))
+	let sliceTypeInt = await reflect.SliceOf(reflect.TypeOf(0))
 	let newSlice = reflect.MakeSlice(sliceTypeInt, 3, 5).clone()
 	console.log("MakeSlice len:", newSlice.Len())
 	console.log("MakeSlice type:", newSlice.Type()!.String())
 
 	// Test MakeMap
-	let mapTypeStr = reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0))
+	let mapTypeStr = await reflect.MapOf(reflect.TypeOf(""), reflect.TypeOf(0))
 	let newMap = reflect.MakeMap(mapTypeStr).clone()
 	console.log("MakeMap type:", newMap.Type()!.String())
 
@@ -237,7 +237,7 @@ export async function main(): Promise<void> {
 	console.log("Append result len:", appendedSlice.Len())
 
 	// Test channel types
-	let chanType = reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
+	let chanType = await reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0))
 	console.log("ChanOf type:", chanType!.String())
 	console.log("ChanOf kind:", reflect.Kind_String(chanType!.Kind()))
 
@@ -246,14 +246,14 @@ export async function main(): Promise<void> {
 	console.log("MakeChan type:", newChan.Type()!.String())
 
 	// Test different channel directions
-	let sendOnlyChan = reflect.ChanOf(reflect.SendDir, reflect.TypeOf(""))
+	let sendOnlyChan = await reflect.ChanOf(reflect.SendDir, reflect.TypeOf(""))
 	console.log("SendOnly chan type:", sendOnlyChan!.String())
 
-	let recvOnlyChan = reflect.ChanOf(reflect.RecvDir, reflect.TypeOf(true))
+	let recvOnlyChan = await reflect.ChanOf(reflect.RecvDir, reflect.TypeOf(true))
 	console.log("RecvOnly chan type:", recvOnlyChan!.String())
 
 	// Test channels with different element types
-	let stringChanType = reflect.ChanOf(reflect.BothDir, reflect.TypeOf(""))
+	let stringChanType = await reflect.ChanOf(reflect.BothDir, reflect.TypeOf(""))
 	let stringChan = reflect.MakeChan(stringChanType, 5).clone()
 	console.log("String chan type:", stringChan.Type()!.String())
 	console.log("String chan elem type:", stringChan.Type()!.Elem()!.String())
@@ -270,8 +270,8 @@ export async function main(): Promise<void> {
 	console.log("Chan size:", chanType!.Size())
 
 	// Test Select functionality
-	let intChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0)), 1).clone()
-	let strChan = reflect.MakeChan(reflect.ChanOf(reflect.BothDir, reflect.TypeOf("")), 1).clone()
+	let intChan = reflect.MakeChan(await reflect.ChanOf(reflect.BothDir, reflect.TypeOf(0)), 1).clone()
+	let strChan = reflect.MakeChan(await reflect.ChanOf(reflect.BothDir, reflect.TypeOf("")), 1).clone()
 
 	// Send values to only the string channel to make select deterministic
 	strChan.Send(reflect.ValueOf("hello"))

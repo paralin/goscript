@@ -1990,8 +1990,9 @@ func (v *analysisVisitor) analyzeAllMethodsAsync() {
 	// Analyze methods in current package
 	v.analyzePackageMethodsAsync(v.pkg)
 
+	// Analyze methods in all dependency packages
 	for _, pkg := range v.analysis.AllPackages {
-		if pkg != v.pkg && pkg.Types.Path() == v.pkg.Types.Path() {
+		if pkg != v.pkg {
 			v.analyzePackageMethodsAsync(pkg)
 		}
 	}

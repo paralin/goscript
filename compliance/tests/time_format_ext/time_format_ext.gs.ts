@@ -7,7 +7,7 @@ import * as time from "@goscript/time/index.js"
 
 export async function main(): Promise<void> {
 	// Fixed time with a specific offset and nanoseconds
-	let locPDT = time.FixedZone("PDT", -7 * 60 * 60) // -07:00
+	let locPDT = await time.FixedZone("PDT", -7 * 60 * 60) // -07:00
 	let t1 = time.Date(2025, time.May, 25, 17, 42, 56, 123456789, locPDT).clone()
 
 	console.log("--- Specific Time (2025-05-25 17:42:56.123456789 -0700 PDT) ---")
@@ -33,7 +33,7 @@ export async function main(): Promise<void> {
 	console.log("Layout Combined  -> " + t1.Format("Mon Jan _2 15:04:05.999999999 Z07:00 2006"))
 
 	// Fixed time with zero nanoseconds for trimming tests
-	let locPST = time.FixedZone("PST", -8 * 60 * 60) // -08:00
+	let locPST = await time.FixedZone("PST", -8 * 60 * 60) // -08:00
 	let t2 = time.Date(2025, time.May, 25, 17, 42, 56, 0, locPST).clone()
 	console.log("--- Specific Time (2025-05-25 17:42:56.000 -0800 PST) ---")
 	console.log("Layout .999 (zero ns) -> " + t2.Format("15:04:05.999"))
