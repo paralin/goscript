@@ -90,6 +90,18 @@ func (c *GoToTSCompiler) writeAsyncCallIfNeeded(exp *ast.CallExpr) bool {
 			}
 		}
 
+		methodName := fun.Sel.Name
+
+		// Check if target type is an interface
+		if interfaceType, isInterface := targetType.Underlying().(*types.Interface); isInterface {
+			// Interface method call: use interface method async analysis
+			if c.analysis.IsInterfaceMethodAsync(interfaceType, methodName) {
+				c.tsw.WriteLiterally("await ")
+				return true
+			}
+			return false
+		}
+
 		// Get the named type from the target type
 		var namedType *types.Named
 		var namedTypeOk bool
@@ -109,7 +121,6 @@ func (c *GoToTSCompiler) writeAsyncCallIfNeeded(exp *ast.CallExpr) bool {
 		}
 
 		typeName := namedType.Obj().Name()
-		methodName := fun.Sel.Name
 
 		// Determine the package path for the method
 		var pkgPath string
