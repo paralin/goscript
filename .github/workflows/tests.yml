@@ -56,5 +56,9 @@ jobs:
           git status --porcelain=v1 compliance/ | grep -q "^" && {
             echo "Error: Found git-dirty files in compliance/ directory"
             git status --porcelain=v1 compliance/
+            echo "=== Git diff for modified files ==="
+            git diff compliance/
+            echo "=== Git diff --stat ==="
+            git diff --stat compliance/
             exit 1
           } || echo "No git-dirty files found in compliance/ directory"

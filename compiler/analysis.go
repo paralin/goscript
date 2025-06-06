@@ -1264,14 +1264,7 @@ func (a *Analysis) discoverEmbeddedGsPackages() []string {
 	// Iterate through all entries in gs/
 	for _, entry := range entries {
 		if entry.IsDir() {
-			packageName := entry.Name()
-
-			// Skip special directories like github.com
-			if strings.Contains(packageName, ".") {
-				continue
-			}
-
-			packageList = append(packageList, packageName)
+			packageList = append(packageList, entry.Name())
 		}
 	}
 
