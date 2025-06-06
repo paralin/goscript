@@ -1,0 +1,24 @@
+{
+  "asyncMethods": {
+    "IsControl": false,
+    "IsDigit": false,
+    "IsGraphic": false,
+    "IsLetter": false,
+    "IsLower": false,
+    "IsMark": false,
+    "IsNumber": false,
+    "IsPrint": false,
+    "IsPunct": false,
+    "IsSpace": false,
+    "IsSymbol": false,
+    "IsTitle": false,
+    "IsUpper": false,
+    "ToLower": false,
+    "ToTitle": false,
+    "ToUpper": false,
+    "SimpleFold": false,
+    "In": false,
+    "Is": false,
+    "IsOneOf": false
+  }
+} 
