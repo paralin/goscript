@@ -126,7 +126,7 @@ export class Broadcast {
 				return err
 			}
 
-			const [_selectHasReturn3797351, _selectValue3797351] = await $.selectStatement([
+			const [_selectHasReturn3861158, _selectValue3861158] = await $.selectStatement([
 				{
 					id: 0,
 					isSend: false,
@@ -143,10 +143,10 @@ export class Broadcast {
 					}
 				},
 			], false)
-			if (_selectHasReturn3797351) {
-				return _selectValue3797351!
+			if (_selectHasReturn3861158) {
+				return _selectValue3861158!
 			}
-			// If _selectHasReturn3797351 is false, continue execution
+			// If _selectHasReturn3861158 is false, continue execution
 		}
 	}
 

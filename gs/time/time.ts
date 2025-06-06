@@ -1009,16 +1009,11 @@ export function After(d: Duration): ChannelRef<Time> {
   const ms = d / 1000000 // Convert nanoseconds to milliseconds
 
   // Create a buffered channel with capacity 1
-  const channel = makeChannel(1, new Time(), 'receive')
+  const channel = makeChannel(1, new Time(), 'both')
 
   // Start a timer that will send the current time after the duration
   setTimeout(async () => {
-    try {
-      // We need to access the underlying channel to send to it
-      await channel.send(Now())
-    } catch (e) {
-      // Channel might be closed, ignore the error
-    }
+    channel.send(Now()).catch(() => {})
   }, ms)
 
   return makeChannelRef(channel, 'receive')
