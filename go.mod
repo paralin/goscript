@@ -1,6 +1,6 @@
 module github.com/aperturerobotics/goscript
 
-go 1.24.3
+go 1.24.4
 
 require (
 	github.com/aperturerobotics/cli v1.0.0
