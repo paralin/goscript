@@ -10,7 +10,7 @@ export async function main(): Promise<void> {
 	console.log("Test 1: Select with nil channel and default")
 	let nilCh: $.Channel<number> | null = null
 
-	const [_selectHasReturn193, _selectValue193] = await $.selectStatement([
+	const [_select_has_return_288e, _select_value_288e] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -37,17 +37,17 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_selectHasReturn193) {
-		return _selectValue193!
+	if (_select_has_return_288e) {
+		return _select_value_288e!
 	}
-	// If _selectHasReturn193 is false, continue execution
+	// If _select_has_return_288e is false, continue execution
 
 	// Test 2: Multiple nil channels in select with default
 	console.log("\nTest 2: Select with multiple nil channels and default")
 	let nilCh1: $.Channel<string> | null = null
 	let nilCh2: $.Channel<string> | null = null
 
-	const [_selectHasReturn583, _selectValue583] = await $.selectStatement([
+	const [_select_has_return_461c, _select_value_461c] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -83,10 +83,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_selectHasReturn583) {
-		return _selectValue583!
+	if (_select_has_return_461c) {
+		return _select_value_461c!
 	}
-	// If _selectHasReturn583 is false, continue execution
+	// If _select_has_return_461c is false, continue execution
 
 	// Test 3: Mix of nil and valid channels in select
 	console.log("\nTest 3: Select with mix of nil and valid channels")
@@ -94,7 +94,7 @@ export async function main(): Promise<void> {
 	let validCh = $.makeChannel<boolean>(1, false, 'both')
 	await $.chanSend(validCh, true)
 
-	const [_selectHasReturn1100, _selectValue1100] = await $.selectStatement([
+	const [_select_has_return_c672, _select_value_c672] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -130,10 +130,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_selectHasReturn1100) {
-		return _selectValue1100!
+	if (_select_has_return_c672) {
+		return _select_value_c672!
 	}
-	// If _selectHasReturn1100 is false, continue execution
+	// If _select_has_return_c672 is false, continue execution
 
 	console.log("\nAll nil channel tests completed")
 }

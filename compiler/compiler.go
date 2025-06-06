@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"go/ast"
@@ -685,6 +687,34 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 		pkg:      pkg,
 		analysis: analysis,
 	}
+}
+
+// getDeterministicID generates a deterministic unique ID based on file position
+// This replaces the non-deterministic Pos() values to ensure reproducible builds
+func (c *GoToTSCompiler) getDeterministicID(pos token.Pos) string {
+	if !pos.IsValid() {
+		return "0000"
+	}
+
+	// Get file position information
+	position := c.pkg.Fset.Position(pos)
+
+	// Create a deterministic string to hash based on filename + line + column
+	// This ensures the same source location always generates the same ID
+	filename := position.Filename
+	if filename == "" {
+		filename = "unknown"
+	}
+
+	// Create a string that uniquely identifies this position
+	positionStr := fmt.Sprintf("%s:%d:%d", filename, position.Line, position.Column)
+
+	// Hash the position string with SHA256
+	hash := sha256.Sum256([]byte(positionStr))
+
+	// Convert to hex and take the last 4 characters (lowercase)
+	hexStr := hex.EncodeToString(hash[:])
+	return hexStr[len(hexStr)-4:]
 }
 
 // --- Exported Node-Specific Writers ---

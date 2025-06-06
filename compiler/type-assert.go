@@ -96,8 +96,8 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 		// For selector expressions as ok, we need to use temporary variables approach
 		if okIsSelectorExpr {
 			// Use temporary variables approach similar to SelectorExpr case
-			tempValName := fmt.Sprintf("_gs_ta_val_%d_", typeAssertExpr.Pos()) // Unique name based on AST position
-			tempOkName := fmt.Sprintf("_gs_ta_ok_%d_", typeAssertExpr.Pos())   // Unique name based on AST position
+			tempValName := fmt.Sprintf("_gs_ta_val_%s", c.getDeterministicID(typeAssertExpr.Pos())) // Unique name based on deterministic position
+			tempOkName := fmt.Sprintf("_gs_ta_ok_%s", c.getDeterministicID(typeAssertExpr.Pos()))   // Unique name based on deterministic position
 
 			// Declare temporary variables:
 			// let _gs_ta_val_: AssertedTypeTS;
@@ -217,8 +217,8 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 
 	case *ast.SelectorExpr:
 		// Handle s.field, ok := expr.(Type)
-		tempValName := fmt.Sprintf("_gs_ta_val_%d_", typeAssertExpr.Pos()) // Unique name based on AST position
-		tempOkName := fmt.Sprintf("_gs_ta_ok_%d_", typeAssertExpr.Pos())   // Unique name based on AST position
+		tempValName := fmt.Sprintf("_gs_ta_val_%s", c.getDeterministicID(typeAssertExpr.Pos())) // Unique name based on deterministic position
+		tempOkName := fmt.Sprintf("_gs_ta_ok_%s", c.getDeterministicID(typeAssertExpr.Pos()))   // Unique name based on deterministic position
 
 		// Declare temporary variables:
 		// let _gs_ta_val_: AssertedTypeTS;
@@ -284,8 +284,8 @@ func (c *GoToTSCompiler) writeTypeAssert(lhs []ast.Expr, typeAssertExpr *ast.Typ
 	case *ast.IndexExpr:
 		// Handle slice[index], ok := expr.(Type) or map[key], ok := expr.(Type)
 		// Use unique temporary variable names to avoid redeclaration
-		tempValName := fmt.Sprintf("_gs_ta_val_%d_", vLHS.Pos()) // Unique name based on AST position
-		tempOkName := fmt.Sprintf("_gs_ta_ok_%d_", vLHS.Pos())   // Unique name based on AST position
+		tempValName := fmt.Sprintf("_gs_ta_val_%s", c.getDeterministicID(vLHS.Pos())) // Unique name based on deterministic position
+		tempOkName := fmt.Sprintf("_gs_ta_ok_%s", c.getDeterministicID(vLHS.Pos()))   // Unique name based on deterministic position
 
 		// Declare temporary variables:
 		// let _gs_ta_val_N_: AssertedTypeTS;
