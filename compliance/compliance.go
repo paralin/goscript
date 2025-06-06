@@ -391,11 +391,9 @@ func copyDependenciesToDepsFromResult(t *testing.T, parentModulePath, testDir st
 	}
 
 	if len(dependencyPackages) == 0 {
-		t.Logf("No dependency packages found for test %s", filepath.Base(testDir))
+		// t.Logf("No dependency packages found for test %s", filepath.Base(testDir))
 		return
 	}
-
-	t.Logf("Found %d dependency packages: %v", len(dependencyPackages), dependencyPackages)
 
 	// For each dependency package, copy it to compliance/deps/
 	for _, depPkg := range dependencyPackages {
@@ -408,21 +406,17 @@ func copyDependenciesToDepsFromResult(t *testing.T, parentModulePath, testDir st
 
 		// Check if the source path exists
 		if _, err := os.Stat(sourcePath); os.IsNotExist(err) {
-			t.Logf("Warning: dependency package source not found at %s", sourcePath)
 			continue
 		}
 
-		t.Logf("Copying dependency package %s from %s to %s", depPkg, sourcePath, destDir)
-
 		// Remove existing directory if it exists
 		if err := os.RemoveAll(destDir); err != nil {
-			t.Logf("warning: failed to remove existing deps directory %s: %v", destDir, err)
+			t.Fatal(err.Error())
 		}
 
 		// Create destination directory
 		if err := os.MkdirAll(destDir, 0o755); err != nil {
-			t.Logf("warning: failed to create deps directory %s: %v", destDir, err)
-			continue
+			t.Fatal(err.Error())
 		}
 
 		// Copy all files from the dependency package
@@ -445,7 +439,7 @@ func copyDependenciesToDepsFromResult(t *testing.T, parentModulePath, testDir st
 			return copyFile(srcPath, destPath)
 		})
 		if err != nil {
-			t.Logf("warning: failed to copy dependency package %s: %v", depPkg, err)
+			t.Fatalf(err.Error())
 		}
 	}
 }

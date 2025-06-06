@@ -184,8 +184,6 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 
 		// Reload all collected packages with complete type information
 		if len(pkgPaths) > 0 {
-			c.le.Debugf("Reloading %d packages with complete type information", len(pkgPaths))
-
 			fullOpts := c.opts
 			fullOpts.Context = ctx
 			// Use LoadAllSyntax to get complete type information, syntax trees, and type checking
