@@ -699,15 +699,20 @@ func (c *GoToTSCompiler) getDeterministicID(pos token.Pos) string {
 	// Get file position information
 	position := c.pkg.Fset.Position(pos)
 
-	// Create a deterministic string to hash based on filename + line + column
-	// This ensures the same source location always generates the same ID
-	filename := position.Filename
-	if filename == "" {
-		filename = "unknown"
+	// Use package path + base filename + line + column for deterministic hashing
+	// This avoids absolute path differences between build environments
+	baseFilename := filepath.Base(position.Filename)
+	if baseFilename == "" {
+		baseFilename = "unknown"
 	}
 
-	// Create a string that uniquely identifies this position
-	positionStr := fmt.Sprintf("%s:%d:%d", filename, position.Line, position.Column)
+	packagePath := c.pkg.PkgPath
+	if packagePath == "" {
+		packagePath = "main"
+	}
+
+	// Create a string that uniquely identifies this position using only relative/stable info
+	positionStr := fmt.Sprintf("%s:%s:%d:%d", packagePath, baseFilename, position.Line, position.Column)
 
 	// Hash the position string with SHA256
 	hash := sha256.Sum256([]byte(positionStr))

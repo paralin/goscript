@@ -84,7 +84,7 @@ export class PromiseType<T extends any> {
 		if (p.isResolved) {
 			return [p.result, p.err]
 		}
-		const [_select_has_return_379b, _select_value_379b] = await $.selectStatement([
+		const [_select_has_return_7e31, _select_value_7e31] = await $.selectStatement([
 			{
 				id: 0,
 				isSend: false,
@@ -103,8 +103,8 @@ export class PromiseType<T extends any> {
 				}
 			},
 		], false)
-		if (_select_has_return_379b) {
-			return _select_value_379b!
+		if (_select_has_return_7e31) {
+			return _select_value_7e31!
 		}
 		// All cases should return, this fallback should never execute
 		throw new Error('Unexpected: select statement did not return when all cases should return')

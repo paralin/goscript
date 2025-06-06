@@ -20,7 +20,7 @@ export async function run(ctx: context.Context): Promise<void> {
 	})
 
 	// Check that myCh is not readable yet
-	const [_select_has_return_cf1b, _select_value_cf1b] = await $.selectStatement([
+	const [_select_has_return_5348, _select_value_5348] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -38,10 +38,10 @@ export async function run(ctx: context.Context): Promise<void> {
 			}
 		},
 	], true)
-	if (_select_has_return_cf1b) {
-		return _select_value_cf1b!
+	if (_select_has_return_5348) {
+		return _select_value_5348!
 	}
-	// If _select_has_return_cf1b is false, continue execution
+	// If _select_has_return_5348 is false, continue execution
 
 	// Cancel context which should trigger the goroutine
 	sctxCancel!()

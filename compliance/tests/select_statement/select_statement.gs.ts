@@ -9,7 +9,7 @@ export async function main(): Promise<void> {
 	let ch1 = $.makeChannel<string>(1, "", 'both')
 
 	// First test: empty channel, should hit default
-	const [_select_has_return_3dc8, _select_value_3dc8] = await $.selectStatement([
+	const [_select_has_return_4a57, _select_value_4a57] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -28,16 +28,16 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_select_has_return_3dc8) {
-		return _select_value_3dc8!
+	if (_select_has_return_4a57) {
+		return _select_value_4a57!
 	}
-	// If _select_has_return_3dc8 is false, continue execution
+	// If _select_has_return_4a57 is false, continue execution
 
 	// Now put something in the channel
 	await $.chanSend(ch1, "hello")
 
 	// Second test: should read from channel
-	const [_select_has_return_ac5b, _select_value_ac5b] = await $.selectStatement([
+	const [_select_has_return_b3b0, _select_value_b3b0] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -56,10 +56,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_select_has_return_ac5b) {
-		return _select_value_ac5b!
+	if (_select_has_return_b3b0) {
+		return _select_value_b3b0!
 	}
-	// If _select_has_return_ac5b is false, continue execution
+	// If _select_has_return_b3b0 is false, continue execution
 
 	// Test 3: Select with channel closing and ok value
 	let ch2 = $.makeChannel<number>(1, 0, 'both')
@@ -67,7 +67,7 @@ export async function main(): Promise<void> {
 	ch2.close()
 
 	// First receive gets the buffered value
-	const [_select_has_return_5800, _select_value_5800] = await $.selectStatement([
+	const [_select_has_return_1cea, _select_value_1cea] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -92,13 +92,13 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_select_has_return_5800) {
-		return _select_value_5800!
+	if (_select_has_return_1cea) {
+		return _select_value_1cea!
 	}
-	// If _select_has_return_5800 is false, continue execution
+	// If _select_has_return_1cea is false, continue execution
 
 	// Second receive gets the zero value with ok==false
-	const [_select_has_return_23f4, _select_value_23f4] = await $.selectStatement([
+	const [_select_has_return_e25c, _select_value_e25c] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -123,16 +123,16 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_select_has_return_23f4) {
-		return _select_value_23f4!
+	if (_select_has_return_e25c) {
+		return _select_value_e25c!
 	}
-	// If _select_has_return_23f4 is false, continue execution
+	// If _select_has_return_e25c is false, continue execution
 
 	// Test 5: Send operations
 	let ch3 = $.makeChannel<number>(1, 0, 'both')
 
 	// First send should succeed (buffer not full)
-	const [_select_has_return_cfae, _select_value_cfae] = await $.selectStatement([
+	const [_select_has_return_79d6, _select_value_79d6] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -151,13 +151,13 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_select_has_return_cfae) {
-		return _select_value_cfae!
+	if (_select_has_return_79d6) {
+		return _select_value_79d6!
 	}
-	// If _select_has_return_cfae is false, continue execution
+	// If _select_has_return_79d6 is false, continue execution
 
 	// Second send should hit default (buffer full)
-	const [_select_has_return_7c2d, _select_value_7c2d] = await $.selectStatement([
+	const [_select_has_return_692f, _select_value_692f] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: true,
@@ -176,10 +176,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], true)
-	if (_select_has_return_7c2d) {
-		return _select_value_7c2d!
+	if (_select_has_return_692f) {
+		return _select_value_692f!
 	}
-	// If _select_has_return_7c2d is false, continue execution
+	// If _select_has_return_692f is false, continue execution
 
 	// Test 7: Multiple channel select (with known values)
 	let ch4 = $.makeChannel<string>(1, "", 'both')
@@ -188,7 +188,7 @@ export async function main(): Promise<void> {
 	await $.chanSend(ch4, "from ch4")
 
 	// Should select ch4 because it has data, ch5 is empty
-	const [_select_has_return_1c49, _select_value_1c49] = await $.selectStatement([
+	const [_select_has_return_e661, _select_value_e661] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -208,16 +208,16 @@ export async function main(): Promise<void> {
 			}
 		},
 	], false)
-	if (_select_has_return_1c49) {
-		return _select_value_1c49!
+	if (_select_has_return_e661) {
+		return _select_value_e661!
 	}
-	// If _select_has_return_1c49 is false, continue execution
+	// If _select_has_return_e661 is false, continue execution
 
 	// Now ch4 is empty and ch5 is empty
 	await $.chanSend(ch5, "from ch5")
 
 	// Should select ch5 because it has data, ch4 is empty
-	const [_select_has_return_7c87, _select_value_7c87] = await $.selectStatement([
+	const [_select_has_return_e25d, _select_value_e25d] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -237,10 +237,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], false)
-	if (_select_has_return_7c87) {
-		return _select_value_7c87!
+	if (_select_has_return_e25d) {
+		return _select_value_e25d!
 	}
-	// If _select_has_return_7c87 is false, continue execution
+	// If _select_has_return_e25d is false, continue execution
 
 	// Test 9: Channel closing test case for a separate test
 	let chClose = $.makeChannel<boolean>(0, false, 'both')

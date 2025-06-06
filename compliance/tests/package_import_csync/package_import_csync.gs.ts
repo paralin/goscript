@@ -76,7 +76,7 @@ export async function main(): Promise<void> {
 		done.close()
 	})
 
-	const [_select_has_return_d3ab, _select_value_d3ab] = await $.selectStatement([
+	const [_select_has_return_08c5, _select_value_08c5] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -94,10 +94,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], false)
-	if (_select_has_return_d3ab) {
-		return _select_value_d3ab!
+	if (_select_has_return_08c5) {
+		return _select_value_08c5!
 	}
-	// If _select_has_return_d3ab is false, continue execution
+	// If _select_has_return_08c5 is false, continue execution
 
 	console.log("Final counter value:", counter)
 	if (counter != numWorkers) {
