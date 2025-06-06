@@ -1,20 +1,10 @@
-import { Type, Value } from './type.js'
+import { Type, Value, ValueOf } from './type.js'
 import { uintptr } from './types.js'
-import { ValueOf } from './value.js'
 
 import * as iter from '@goscript/iter/index.js'
 
 export function rangeNum<
   T extends
-    | number
-    | number
-    | number
-    | number
-    | number
-    | number
-    | number
-    | number
-    | number
     | number
     | uintptr,
   N extends number | number,
