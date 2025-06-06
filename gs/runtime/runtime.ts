@@ -3,7 +3,7 @@ export const GOOS = 'js'
 export const GOARCH = 'wasm'
 
 // Version returns the Go version as a string
-export const GOVERSION = 'go1.24.3'
+export const GOVERSION = 'go1.24.4'
 export function Version(): string {
   return GOVERSION
 }

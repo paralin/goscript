@@ -747,11 +747,11 @@ func (v *analysisVisitor) visitBlockStmt(n *ast.BlockStmt) ast.Visitor {
 
 // visitCallExpr handles call expression analysis
 func (v *analysisVisitor) visitCallExpr(n *ast.CallExpr) ast.Visitor {
-	// Note: Async function call detection is now handled by the second analysis phase
-	// This ensures consistent handling of all async patterns including external packages
-
 	// Check for reflect function calls that operate on functions
 	v.checkReflectUsage(n)
+
+	// Track interface implementations from function call arguments
+	v.trackInterfaceCallArguments(n)
 
 	return v
 }
@@ -1025,10 +1025,7 @@ func AnalyzePackageFiles(pkg *packages.Package, allPackages map[string]*packages
 		})
 	}
 
-	// Second pass: comprehensive async analysis for all methods
-	visitor.analyzeAllMethodsAsync()
-
-	// Third pass: analyze interface implementations now that all function async status is determined
+	// Second pass: analyze interface implementations first
 	interfaceVisitor := &interfaceImplementationVisitor{
 		analysis: analysis,
 		pkg:      pkg,
@@ -1036,6 +1033,13 @@ func AnalyzePackageFiles(pkg *packages.Package, allPackages map[string]*packages
 	for _, file := range pkg.Syntax {
 		ast.Walk(interfaceVisitor, file)
 	}
+
+	// Third pass: comprehensive async analysis for all methods
+	visitor.analyzeAllMethodsAsync()
+
+	// Fourth pass: update interface implementation async status based on completed method analysis
+	// This must happen after method analysis but before any interface queries
+	visitor.updateInterfaceImplementationAsyncStatus()
 
 	return analysis
 }
@@ -1525,8 +1529,11 @@ func (a *Analysis) IsInterfaceMethodAsync(interfaceType *types.Interface, method
 		MethodName:    methodName,
 	}
 
+	fmt.Printf("DEBUG: IsInterfaceMethodAsync called for %s.%s\n", interfaceType.String(), methodName)
+
 	// Check if we've already computed this
 	if result, exists := a.InterfaceMethodAsyncStatus[key]; exists {
+		fmt.Printf("DEBUG: Cached result for %s.%s: %t\n", interfaceType.String(), methodName, result)
 		return result
 	}
 
@@ -1534,19 +1541,49 @@ func (a *Analysis) IsInterfaceMethodAsync(interfaceType *types.Interface, method
 	implementations, exists := a.InterfaceImplementations[key]
 	if !exists {
 		// No implementations found, default to sync
+		fmt.Printf("DEBUG: No implementations found for %s.%s\n", interfaceType.String(), methodName)
 		a.InterfaceMethodAsyncStatus[key] = false
 		return false
 	}
 
+	fmt.Printf("DEBUG: Found %d implementations for %s.%s\n", len(implementations), interfaceType.String(), methodName)
+
+	// Update implementations with current async status before checking
+	for i := range implementations {
+		impl := &implementations[i]
+
+		// Create method key for this implementation
+		methodKey := MethodKey{
+			PackagePath:  impl.StructType.Obj().Pkg().Path(),
+			ReceiverType: impl.StructType.Obj().Name(),
+			MethodName:   impl.Method.Name(),
+		}
+
+		// Update with current async status from method analysis
+		if isAsync, exists := a.MethodAsyncStatus[methodKey]; exists {
+			if impl.IsAsyncByFlow != isAsync {
+				fmt.Printf("DEBUG: Updating implementation %s.%s: old async=%t, new async=%t\n",
+					impl.StructType.Obj().Name(), impl.Method.Name(), impl.IsAsyncByFlow, isAsync)
+				impl.IsAsyncByFlow = isAsync
+			}
+		}
+	}
+
+	// Store the updated implementations back to the map
+	a.InterfaceImplementations[key] = implementations
+
 	// If ANY implementation is async, the interface method is async
 	for _, impl := range implementations {
+		fmt.Printf("DEBUG: Implementation %s.%s is async: %t\n", impl.StructType.Obj().Name(), methodName, impl.IsAsyncByFlow)
 		if impl.IsAsyncByFlow {
+			fmt.Printf("DEBUG: Interface method %s.%s is ASYNC due to %s.%s\n", interfaceType.String(), methodName, impl.StructType.Obj().Name(), methodName)
 			a.InterfaceMethodAsyncStatus[key] = true
 			return true
 		}
 	}
 
 	// All implementations are sync
+	fmt.Printf("DEBUG: Interface method %s.%s is SYNC (all implementations are sync)\n", interfaceType.String(), methodName)
 	a.InterfaceMethodAsyncStatus[key] = false
 	return false
 }
@@ -1798,6 +1835,67 @@ func (v *analysisVisitor) trackInterfaceAssignments(assignStmt *ast.AssignStmt) 
 				isAsync := v.analysis.IsAsyncFunc(structMethod)
 
 				v.analysis.trackInterfaceImplementation(interfaceType, namedType, structMethod, isAsync)
+			}
+		}
+	}
+}
+
+// trackInterfaceCallArguments analyzes function call arguments to detect interface implementations
+func (v *analysisVisitor) trackInterfaceCallArguments(callExpr *ast.CallExpr) {
+	// Get the function signature to determine parameter types
+	var funcType *types.Signature
+
+	if callFunType := v.pkg.TypesInfo.TypeOf(callExpr.Fun); callFunType != nil {
+		if sig, ok := callFunType.(*types.Signature); ok {
+			funcType = sig
+		}
+	}
+
+	if funcType == nil {
+		return
+	}
+
+	// Check each argument against its corresponding parameter
+	params := funcType.Params()
+	for i, arg := range callExpr.Args {
+		if i >= params.Len() {
+			break // More arguments than parameters (variadic case)
+		}
+
+		paramType := params.At(i).Type()
+
+		// Check if the parameter is an interface type
+		interfaceType, isInterface := paramType.Underlying().(*types.Interface)
+		if !isInterface {
+			continue
+		}
+
+		// Get the type of the argument
+		argType := v.pkg.TypesInfo.TypeOf(arg)
+		if argType == nil {
+			continue
+		}
+
+		// Handle pointer types
+		if ptrType, isPtr := argType.(*types.Pointer); isPtr {
+			argType = ptrType.Elem()
+		}
+
+		// Check if argument is a named struct type
+		namedType, isNamed := argType.(*types.Named)
+		if !isNamed {
+			continue
+		}
+
+		// Track implementations for all interface methods
+		for j := 0; j < interfaceType.NumExplicitMethods(); j++ {
+			interfaceMethod := interfaceType.ExplicitMethod(j)
+
+			structMethod := v.findStructMethod(namedType, interfaceMethod.Name())
+			if structMethod != nil {
+				// Note: Don't determine async status here - it will be determined later after method analysis
+				// For now, just track the implementation relationship without async status
+				v.analysis.trackInterfaceImplementation(interfaceType, namedType, structMethod, false)
 			}
 		}
 	}
@@ -2197,7 +2295,16 @@ func (v *analysisVisitor) isCallAsync(callExpr *ast.CallExpr, pkg *packages.Pack
 			}
 		}
 
-		// Method call on objects
+		// Check if this is an interface method call
+		if receiverType := pkg.TypesInfo.TypeOf(fun.X); receiverType != nil {
+			if interfaceType, isInterface := receiverType.Underlying().(*types.Interface); isInterface {
+				methodName := fun.Sel.Name
+				// For interface method calls, check if the interface method is async
+				return v.analysis.IsInterfaceMethodAsync(interfaceType, methodName)
+			}
+		}
+
+		// Method call on concrete objects
 		if selection := pkg.TypesInfo.Selections[fun]; selection != nil {
 			if methodObj := selection.Obj(); methodObj != nil {
 				return v.isMethodAsyncFromSelection(fun, methodObj, pkg)
@@ -2375,4 +2482,32 @@ func (a *Analysis) IsLocalMethodAsync(pkgPath, receiverType, methodName string) 
 	}
 
 	return false
+}
+
+// updateInterfaceImplementationAsyncStatus updates interface implementations with correct async status
+// This runs after method async analysis is complete
+func (v *analysisVisitor) updateInterfaceImplementationAsyncStatus() {
+	// Iterate through all tracked interface implementations and update their async status
+	for key, implementations := range v.analysis.InterfaceImplementations {
+		// Remove duplicates first
+		seenMethods := make(map[string]bool)
+		uniqueImplementations := []ImplementationInfo{}
+
+		for _, impl := range implementations {
+			methodKey := impl.StructType.Obj().Name() + "." + key.MethodName
+			if !seenMethods[methodKey] {
+				seenMethods[methodKey] = true
+
+				// Now that method async analysis is complete, get the correct async status
+				isAsync := v.analysis.IsAsyncFunc(impl.Method)
+
+				// Update the implementation with the correct async status
+				impl.IsAsyncByFlow = isAsync
+				uniqueImplementations = append(uniqueImplementations, impl)
+			}
+		}
+
+		// Store the updated implementations without duplicates
+		v.analysis.InterfaceImplementations[key] = uniqueImplementations
+	}
 }
