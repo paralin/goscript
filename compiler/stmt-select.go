@@ -69,10 +69,10 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 	}
 
 	// Generate unique variable names for this select statement
-	selectID := fmt.Sprintf("%d", exp.Pos()) // Use AST position for uniqueness
+	selectID := c.getDeterministicID(exp.Pos()) // Use deterministic position-based ID
 
 	// Start the selectStatement call and the array literal
-	c.tsw.WriteLiterallyf("const [_selectHasReturn%s, _selectValue%s] = await $.selectStatement(", selectID, selectID)
+	c.tsw.WriteLiterallyf("const [_select_has_return_%s, _select_value_%s] = await $.selectStatement(", selectID, selectID)
 	c.tsw.WriteLine("[") // Put bracket on new line
 	c.tsw.Indent(1)
 
@@ -241,10 +241,10 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 	c.tsw.WriteLine("")
 
 	// Add code to handle the return value from selectStatement
-	c.tsw.WriteLiterallyf("if (_selectHasReturn%s) {", selectID)
+	c.tsw.WriteLiterallyf("if (_select_has_return_%s) {", selectID)
 	c.tsw.WriteLine("")
 	c.tsw.Indent(1)
-	c.tsw.WriteLiterallyf("return _selectValue%s!", selectID)
+	c.tsw.WriteLiterallyf("return _select_value_%s!", selectID)
 	c.tsw.WriteLine("")
 	c.tsw.Indent(-1)
 	c.tsw.WriteLine("}")
@@ -254,7 +254,7 @@ func (c *GoToTSCompiler) WriteStmtSelect(exp *ast.SelectStmt) error {
 		c.tsw.WriteLine("// All cases should return, this fallback should never execute")
 		c.tsw.WriteLine("throw new Error('Unexpected: select statement did not return when all cases should return')")
 	} else {
-		c.tsw.WriteLiterallyf("// If _selectHasReturn%s is false, continue execution", selectID)
+		c.tsw.WriteLiterallyf("// If _select_has_return_%s is false, continue execution", selectID)
 		c.tsw.WriteLine("")
 	}
 

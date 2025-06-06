@@ -343,7 +343,7 @@ export function WithTimeout(
   parent: Context,
   timeout: number,
 ): [ContextNonNil, CancelFunc] {
-  return WithDeadline(parent, new Date(Date.now() + timeout))
+  return WithDeadline(parent, new Date(Date.now() + timeout / 1000000))
 }
 
 // WithTimeoutCause is like WithTimeout but also sets the cause
@@ -352,7 +352,11 @@ export function WithTimeoutCause(
   timeout: number,
   cause: $.GoError,
 ): [ContextNonNil, CancelFunc] {
-  return WithDeadlineCause(parent, new Date(Date.now() + timeout), cause)
+  return WithDeadlineCause(
+    parent,
+    new Date(Date.now() + timeout / 1000000),
+    cause,
+  )
 }
 
 // WithValue returns a copy of parent with the value associated with key

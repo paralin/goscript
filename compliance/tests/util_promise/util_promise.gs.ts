@@ -84,7 +84,7 @@ export class PromiseType<T extends any> {
 		if (p.isResolved) {
 			return [p.result, p.err]
 		}
-		const [_selectHasReturn2804312, _selectValue2804312] = await $.selectStatement([
+		const [_select_has_return_7e31, _select_value_7e31] = await $.selectStatement([
 			{
 				id: 0,
 				isSend: false,
@@ -103,8 +103,8 @@ export class PromiseType<T extends any> {
 				}
 			},
 		], false)
-		if (_selectHasReturn2804312) {
-			return _selectValue2804312!
+		if (_select_has_return_7e31) {
+			return _select_value_7e31!
 		}
 		// All cases should return, this fallback should never execute
 		throw new Error('Unexpected: select statement did not return when all cases should return')
@@ -146,7 +146,7 @@ export async function main(): Promise<void> {
 		p1!.SetResult("hello world", null)
 	})
 
-	let [result1, err1] = await await p1!.Await(ctx)
+	let [result1, err1] = await p1!.Await(ctx)
 	if (err1 != null) {
 		console.log("Error:", err1!.Error())
 	}
@@ -157,7 +157,7 @@ export async function main(): Promise<void> {
 	// Test 2: Pre-resolved Promise with int
 	console.log("Test 2: Pre-resolved Promise with int")
 	let p2 = NewPromiseWithResult<number>(42, null)
-	let [result2, err2] = await await p2!.Await(ctx)
+	let [result2, err2] = await p2!.Await(ctx)
 	if (err2 != null) {
 		console.log("Error:", err2!.Error())
 	}
@@ -168,7 +168,7 @@ export async function main(): Promise<void> {
 	// Test 3: Promise with error
 	console.log("Test 3: Promise with error")
 	let p3 = NewPromiseWithResult<boolean>(false, context.DeadlineExceeded)
-	let [result3, err3] = await await p3!.Await(ctx)
+	let [result3, err3] = await p3!.Await(ctx)
 	if (err3 != null) {
 		console.log("Error:", err3!.Error())
 	}
@@ -184,7 +184,7 @@ export async function main(): Promise<void> {
 	console.log("First set success:", success1)
 	console.log("Second set success:", success2)
 
-	let [result4, err4] = await await p4!.Await(ctx)
+	let [result4, err4] = await p4!.Await(ctx)
 	if (err4 != null) {
 		console.log("Error:", err4!.Error())
 	}

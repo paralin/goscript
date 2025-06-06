@@ -17,7 +17,7 @@ jobs:
     strategy:
       matrix:
         go: ['1.24']
-        node: [23.x]
+        node: [24.x]
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -56,5 +56,9 @@ jobs:
           git status --porcelain=v1 compliance/ | grep -q "^" && {
             echo "Error: Found git-dirty files in compliance/ directory"
             git status --porcelain=v1 compliance/
+            echo "=== Git diff for modified files ==="
+            git diff compliance/
+            echo "=== Git diff --stat ==="
+            git diff --stat compliance/
             exit 1
           } || echo "No git-dirty files found in compliance/ directory"

@@ -8,7 +8,7 @@ import * as os from "@goscript/os/index.js"
 export async function main(): Promise<void> {
 	// Test Getwd - works with mock data
 	{
-		let [wd, err] = os.Getwd()
+		let [wd, err] = await os.Getwd()
 		if (err == null) {
 			console.log("Current working directory:", wd)
 		}

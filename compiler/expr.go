@@ -405,50 +405,6 @@ func (c *GoToTSCompiler) WriteBinaryExpr(exp *ast.BinaryExpr) error {
 		return nil
 	}
 
-	// Check for Duration arithmetic operations (multiplication)
-	if exp.Op == token.MUL && c.pkg != nil && c.pkg.TypesInfo != nil {
-		leftType := c.pkg.TypesInfo.TypeOf(exp.X)
-		rightType := c.pkg.TypesInfo.TypeOf(exp.Y)
-
-		// Check if left operand is a Duration type (from time package)
-		if leftType != nil {
-			if namedType, ok := leftType.(*types.Named); ok {
-				if namedType.Obj().Pkg() != nil && namedType.Obj().Pkg().Path() == "time" && namedType.Obj().Name() == "Duration" {
-					// Duration * number -> Duration.multiply(duration, number)
-					c.tsw.WriteLiterally("$.multiplyDuration(")
-					if err := c.WriteValueExpr(exp.X); err != nil {
-						return fmt.Errorf("failed to write Duration in multiplication: %w", err)
-					}
-					c.tsw.WriteLiterally(", ")
-					if err := c.WriteValueExpr(exp.Y); err != nil {
-						return fmt.Errorf("failed to write multiplier in Duration multiplication: %w", err)
-					}
-					c.tsw.WriteLiterally(")")
-					return nil
-				}
-			}
-		}
-
-		// Check if right operand is a Duration type (number * Duration)
-		if rightType != nil {
-			if namedType, ok := rightType.(*types.Named); ok {
-				if namedType.Obj().Pkg() != nil && namedType.Obj().Pkg().Path() == "time" && namedType.Obj().Name() == "Duration" {
-					// number * Duration -> Duration.multiply(duration, number)
-					c.tsw.WriteLiterally("$.multiplyDuration(")
-					if err := c.WriteValueExpr(exp.Y); err != nil {
-						return fmt.Errorf("failed to write Duration in multiplication: %w", err)
-					}
-					c.tsw.WriteLiterally(", ")
-					if err := c.WriteValueExpr(exp.X); err != nil {
-						return fmt.Errorf("failed to write multiplier in Duration multiplication: %w", err)
-					}
-					c.tsw.WriteLiterally(")")
-					return nil
-				}
-			}
-		}
-	}
-
 	// Check if the operator is a bitwise operator
 	isBitwise := false
 	switch exp.Op {

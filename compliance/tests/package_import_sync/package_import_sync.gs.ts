@@ -45,14 +45,14 @@ export async function main(): Promise<void> {
 	console.log("Final counter:", counter)
 
 	// Test OnceFunc
-	let onceFunc = sync.OnceFunc((): void => {
+	let onceFunc = await sync.OnceFunc((): void => {
 		console.log("OnceFunc executed")
 	})
 	onceFunc!()
 	onceFunc!() // Should not execute again
 
 	// Test OnceValue
-	let onceValue = sync.OnceValue((): number => {
+	let onceValue = await sync.OnceValue((): number => {
 		console.log("OnceValue function executed")
 		return 42
 	})
@@ -66,14 +66,14 @@ export async function main(): Promise<void> {
 	console.log("Stored key1")
 
 	{
-		let [val, ok] = await await m.Load("key1")
+		let [val, ok] = await m.Load("key1")
 		if (ok) {
 			console.log("Loaded key1:", val)
 		}
 	}
 
 	{
-		let [val, loaded] = await await m.LoadOrStore("key2", "value2")
+		let [val, loaded] = await m.LoadOrStore("key2", "value2")
 		if (!loaded) {
 			console.log("Stored key2:", val)
 		}
@@ -86,7 +86,7 @@ export async function main(): Promise<void> {
 
 	await m.Delete("key1")
 	{
-		let [, ok] = await await m.Load("key1")
+		let [, ok] = await m.Load("key1")
 		if (!ok) {
 			console.log("key1 deleted successfully")
 		}

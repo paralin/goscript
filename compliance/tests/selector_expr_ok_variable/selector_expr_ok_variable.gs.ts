@@ -45,10 +45,10 @@ export async function main(): Promise<void> {
 
 	// This should trigger the error: ok expression is not an identifier: *ast.SelectorExpr
 	// The 'ok' variable is result.ok (a selector expression) instead of a simple identifier
-	let _gs_ta_val_302_: number
-	let _gs_ta_ok_302_: boolean
-	({ value: _gs_ta_val_302_, ok: _gs_ta_ok_302_ } = $.typeAssert<number>(x, {kind: $.TypeKind.Basic, name: 'number'}))
-	result.ok = _gs_ta_ok_302_
+	let _gs_ta_val_ee16: number
+	let _gs_ta_ok_ee16: boolean
+	({ value: _gs_ta_val_ee16, ok: _gs_ta_ok_ee16 } = $.typeAssert<number>(x, {kind: $.TypeKind.Basic, name: 'number'}))
+	result.ok = _gs_ta_ok_ee16
 
 	console.log("Type assertion successful:", result.ok)
 }

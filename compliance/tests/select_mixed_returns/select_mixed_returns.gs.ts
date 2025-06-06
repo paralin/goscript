@@ -28,7 +28,7 @@ export async function testMixedReturns(ctx: context.Context): Promise<string> {
 	// Case 5: No return, just print and continue
 
 	// Default case: No return, just print and continue
-	const [_selectHasReturn2803577, _selectValue2803577] = await $.selectStatement([
+	const [_select_has_return_db2a, _select_value_db2a] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -96,17 +96,17 @@ export async function testMixedReturns(ctx: context.Context): Promise<string> {
 			}
 		},
 	], true)
-	if (_selectHasReturn2803577) {
-		return _selectValue2803577!
+	if (_select_has_return_db2a) {
+		return _select_value_db2a!
 	}
-	// If _selectHasReturn2803577 is false, continue execution
+	// If _select_has_return_db2a is false, continue execution
 
 	// This code should execute when cases 2, 4, 5, or default are selected
 	console.log("Continuing execution after select")
 	console.log("Performing additional work...")
 
 	// Simulate some work
-	time.Sleep($.multiplyDuration(10, time.Millisecond))
+	await time.Sleep(10 * time.Millisecond)
 
 	return "completed_normally"
 }
@@ -132,7 +132,7 @@ export async function testReturnCase(ctx: context.Context): Promise<string> {
 	// Case 5: No return, just print and continue
 
 	// Default case: No return, just print and continue
-	const [_selectHasReturn2804936, _selectValue2804936] = await $.selectStatement([
+	const [_select_has_return_2dfa, _select_value_2dfa] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -191,17 +191,17 @@ export async function testReturnCase(ctx: context.Context): Promise<string> {
 			}
 		},
 	], true)
-	if (_selectHasReturn2804936) {
-		return _selectValue2804936!
+	if (_select_has_return_2dfa) {
+		return _select_value_2dfa!
 	}
-	// If _selectHasReturn2804936 is false, continue execution
+	// If _select_has_return_2dfa is false, continue execution
 
 	// This code should NOT execute for ch1 case (which returns)
 	console.log("Continuing execution after select")
 	console.log("Performing additional work...")
 
 	// Simulate some work
-	time.Sleep($.multiplyDuration(10, time.Millisecond))
+	await time.Sleep(10 * time.Millisecond)
 
 	return "completed_normally"
 }

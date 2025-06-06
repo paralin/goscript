@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"go/ast"
@@ -184,8 +186,6 @@ func (c *Compiler) CompilePackages(ctx context.Context, patterns ...string) (*Co
 
 		// Reload all collected packages with complete type information
 		if len(pkgPaths) > 0 {
-			c.le.Debugf("Reloading %d packages with complete type information", len(pkgPaths))
-
 			fullOpts := c.opts
 			fullOpts.Context = ctx
 			// Use LoadAllSyntax to get complete type information, syntax trees, and type checking
@@ -687,6 +687,39 @@ func NewGoToTSCompiler(tsw *TSCodeWriter, pkg *packages.Package, analysis *Analy
 		pkg:      pkg,
 		analysis: analysis,
 	}
+}
+
+// getDeterministicID generates a deterministic unique ID based on file position
+// This replaces the non-deterministic Pos() values to ensure reproducible builds
+func (c *GoToTSCompiler) getDeterministicID(pos token.Pos) string {
+	if !pos.IsValid() {
+		return "0000"
+	}
+
+	// Get file position information
+	position := c.pkg.Fset.Position(pos)
+
+	// Use package path + base filename + line + column for deterministic hashing
+	// This avoids absolute path differences between build environments
+	baseFilename := filepath.Base(position.Filename)
+	if baseFilename == "" {
+		baseFilename = "unknown"
+	}
+
+	packagePath := c.pkg.PkgPath
+	if packagePath == "" {
+		packagePath = "main"
+	}
+
+	// Create a string that uniquely identifies this position using only relative/stable info
+	positionStr := fmt.Sprintf("%s:%s:%d:%d", packagePath, baseFilename, position.Line, position.Column)
+
+	// Hash the position string with SHA256
+	hash := sha256.Sum256([]byte(positionStr))
+
+	// Convert to hex and take the last 4 characters (lowercase)
+	hexStr := hex.EncodeToString(hash[:])
+	return hexStr[len(hexStr)-4:]
 }
 
 // --- Exported Node-Specific Writers ---

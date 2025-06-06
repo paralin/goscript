@@ -6,7 +6,7 @@ import * as $ from "@goscript/builtin/index.js";
 import * as context from "@goscript/context/index.js"
 
 export async function run(ctx: context.Context): Promise<void> {
-	await using __defer = new $.AsyncDisposableStack();
+	using __defer = new $.DisposableStack();
 	let [sctx, sctxCancel] = context.WithCancel(ctx)
 	__defer.defer(() => {
 		sctxCancel!()
@@ -20,7 +20,7 @@ export async function run(ctx: context.Context): Promise<void> {
 	})
 
 	// Check that myCh is not readable yet
-	const [_selectHasReturn2803517, _selectValue2803517] = await $.selectStatement([
+	const [_select_has_return_5348, _select_value_5348] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -38,10 +38,10 @@ export async function run(ctx: context.Context): Promise<void> {
 			}
 		},
 	], true)
-	if (_selectHasReturn2803517) {
-		return _selectValue2803517!
+	if (_select_has_return_5348) {
+		return _select_value_5348!
 	}
-	// If _selectHasReturn2803517 is false, continue execution
+	// If _select_has_return_5348 is false, continue execution
 
 	// Cancel context which should trigger the goroutine
 	sctxCancel!()

@@ -1,0 +1,16 @@
+{
+  "asyncMethods": {
+    "Background": false,
+    "TODO": false,
+    "WithCancel": false,
+    "WithCancelCause": false,
+    "WithDeadline": false,
+    "WithDeadlineCause": false,
+    "WithTimeout": false,
+    "WithTimeoutCause": false,
+    "WithValue": false,
+    "WithoutCancel": false,
+    "Cause": false,
+    "AfterFunc": false
+  }
+} 

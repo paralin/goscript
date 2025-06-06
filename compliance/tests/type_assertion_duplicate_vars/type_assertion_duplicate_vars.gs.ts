@@ -123,14 +123,14 @@ export async function main(): Promise<void> {
 	let c = new Container({})
 
 	// Multiple type assertions that should generate unique variable names
-	let _gs_ta_val_418_: ConcreteA
-	let _gs_ta_ok_418_: boolean
-	({ value: _gs_ta_val_418_, ok: _gs_ta_ok_418_ } = $.typeAssert<ConcreteA>(iface, 'ConcreteA'))
-	c.hasA = _gs_ta_ok_418_
-	let _gs_ta_val_449_: ConcreteB
-	let _gs_ta_ok_449_: boolean
-	({ value: _gs_ta_val_449_, ok: _gs_ta_ok_449_ } = $.typeAssert<ConcreteB>(iface, 'ConcreteB'))
-	c.hasB = _gs_ta_ok_449_
+	let _gs_ta_val_e051: ConcreteA
+	let _gs_ta_ok_e051: boolean
+	({ value: _gs_ta_val_e051, ok: _gs_ta_ok_e051 } = $.typeAssert<ConcreteA>(iface, 'ConcreteA'))
+	c.hasA = _gs_ta_ok_e051
+	let _gs_ta_val_d761: ConcreteB
+	let _gs_ta_ok_d761: boolean
+	({ value: _gs_ta_val_d761, ok: _gs_ta_ok_d761 } = $.typeAssert<ConcreteB>(iface, 'ConcreteB'))
+	c.hasB = _gs_ta_ok_d761
 
 	console.log("hasA:", c.hasA)
 	console.log("hasB:", c.hasB)

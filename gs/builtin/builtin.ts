@@ -36,17 +36,6 @@ export function int(value: number): number {
   return Math.trunc(value)
 }
 
-// Duration multiplication helper for time package operations
-// Handles expressions like time.Hour * 24
-export function multiplyDuration(duration: any, multiplier: number): any {
-  // Duration is now a number type alias, so just multiply directly
-  if (typeof duration === 'number') {
-    return duration * multiplier
-  }
-
-  throw new Error(`Cannot multiply duration of type ${typeof duration}`)
-}
-
 /**
  * Normalizes various byte representations into a `Uint8Array` for protobuf compatibility.
  *

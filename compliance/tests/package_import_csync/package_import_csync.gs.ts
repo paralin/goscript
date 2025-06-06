@@ -12,12 +12,12 @@ import * as time from "@goscript/time/index.js"
 import * as csync from "@goscript/github.com/aperturerobotics/util/csync/index.js"
 
 export async function main(): Promise<void> {
-	await using __defer = new $.AsyncDisposableStack();
+	using __defer = new $.DisposableStack();
 	let mtx: csync.Mutex = new csync.Mutex()
 	let counter: number = 0
 	let wg: sync.WaitGroup = new sync.WaitGroup()
 
-	let [ctx, cancel] = context.WithTimeout(context.Background(), $.multiplyDuration(5, time.Second))
+	let [ctx, cancel] = context.WithTimeout(context.Background(), 5 * time.Second)
 	__defer.defer(() => {
 		cancel!()
 	});
@@ -37,13 +37,13 @@ export async function main(): Promise<void> {
 
 	// println("worker", id, "incremented counter to", counter) - non-deterministic, leave commented out
 	let worker = async (id: number): Promise<void> => {
-		await using __defer = new $.AsyncDisposableStack();
+		using __defer = new $.DisposableStack();
 		__defer.defer(() => {
 			wg.Done()
 		});
 
 		// Try to acquire the lock
-		let [relLock, err] = await await mtx.Lock(ctx)
+		let [relLock, err] = await mtx.Lock(ctx)
 		if (err != null) {
 			console.log("worker", id, "failed to acquire lock:", err!.Error())
 			return 
@@ -55,7 +55,7 @@ export async function main(): Promise<void> {
 		// Critical section
 		// println("worker", id, "entered critical section") - non-deterministic, leave commented out
 		let current = counter
-		time.Sleep($.multiplyDuration(100, time.Millisecond)) // Simulate work
+		await time.Sleep(100 * time.Millisecond) // Simulate work
 
 		// println("worker", id, "incremented counter to", counter) - non-deterministic, leave commented out
 		counter = current + 1
@@ -76,7 +76,7 @@ export async function main(): Promise<void> {
 		done.close()
 	})
 
-	const [_selectHasReturn4130845, _selectValue4130845] = await $.selectStatement([
+	const [_select_has_return_08c5, _select_value_08c5] = await $.selectStatement([
 		{
 			id: 0,
 			isSend: false,
@@ -94,10 +94,10 @@ export async function main(): Promise<void> {
 			}
 		},
 	], false)
-	if (_selectHasReturn4130845) {
-		return _selectValue4130845!
+	if (_select_has_return_08c5) {
+		return _select_value_08c5!
 	}
-	// If _selectHasReturn4130845 is false, continue execution
+	// If _select_has_return_08c5 is false, continue execution
 
 	console.log("Final counter value:", counter)
 	if (counter != numWorkers) {
