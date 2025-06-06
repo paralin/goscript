@@ -4,8 +4,8 @@ export {
   SearchFloat64s,
   SearchInts,
   SearchStrings,
-} from './search.gs'
-export { Slice, SliceIsSorted, SliceStable } from './slice.gs'
+} from './search.gs.js'
+export { Slice, SliceIsSorted, SliceStable } from './slice.gs.js'
 export {
   Float64Slice,
   Float64s,
@@ -20,5 +20,5 @@ export {
   StringSlice,
   Strings,
   StringsAreSorted,
-} from './sort.gs'
-export type { Interface } from './sort.gs'
+} from './sort.gs.js'
+export type { Interface } from './sort.gs.js'

@@ -1,3 +1,4 @@
+import * as $ from '@goscript/builtin/index.js'
 import {
   Array,
   Bool,
@@ -26,15 +27,11 @@ import {
   Invalid,
 } from './type.js'
 import { ReflectValue, SelectCase, SelectRecv, SelectDefault } from './types.js'
-import * as $ from '@goscript/builtin/index.js'
 
 interface ChannelObject {
   _sendQueue?: unknown[]
   send?: (value: unknown) => void
 }
-
-// Re-export ValueOf from type.ts for compatibility
-export { ValueOf } from './type'
 
 // Zero returns a Value representing the zero value for the specified type.
 export function Zero(typ: Type): Value {

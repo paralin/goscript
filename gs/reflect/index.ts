@@ -14,9 +14,9 @@ export {
   RecvDir,
   SendDir,
   BothDir,
-} from './type'
-export type { Type, ChanDir, Kind } from './type'
-export { DeepEqual } from './deepequal'
+} from './type.js'
+export type { Type, ChanDir, Kind } from './type.js'
+export { DeepEqual } from './deepequal.js'
 export {
   Zero,
   Copy,
@@ -27,8 +27,8 @@ export {
   Append,
   MakeChan,
   Select,
-} from './value'
-export { Swapper } from './swapper'
+} from './value.js'
+export { Swapper } from './swapper.js'
 
 // Export new types and constants
 export {
@@ -39,7 +39,7 @@ export {
   SelectRecv,
   SelectDefault,
   bitVector,
-} from './types'
+} from './types.js'
 export type {
   uintptr,
   Pointer,
@@ -49,7 +49,7 @@ export type {
   SliceHeader,
   StringHeader,
   MapIter,
-} from './types'
+} from './types.js'
 
 // Export kind constants
 export {
@@ -80,4 +80,4 @@ export {
   String,
   Struct,
   UnsafePointer,
-} from './type'
+} from './type.js'

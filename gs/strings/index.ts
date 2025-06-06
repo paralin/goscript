@@ -9,4 +9,3 @@ export {
   SplitSeq,
   SplitAfterSeq,
 } from './iter.js'
-// Clone and Compare are already exported from strings.js, so we don't re-export them
