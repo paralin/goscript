@@ -1,11 +1,11 @@
 module example
 
-go 1.24.3
+go 1.24.4
 
 replace github.com/aperturerobotics/goscript => ../../
 
 require (
-	github.com/aperturerobotics/goscript v0.0.16-0.20250513042023-5a3a4a237cb1
+	github.com/aperturerobotics/goscript v0.0.52-0.20250605114752-2e735b9b0cee
 	github.com/sirupsen/logrus v1.9.3
 )
 
