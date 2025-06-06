@@ -439,7 +439,7 @@ func copyDependenciesToDepsFromResult(t *testing.T, parentModulePath, testDir st
 			return copyFile(srcPath, destPath)
 		})
 		if err != nil {
-			t.Fatalf(err.Error())
+			t.Fatal(err.Error())
 		}
 	}
 }
