@@ -1035,11 +1035,8 @@ func AnalyzePackageFiles(pkg *packages.Package, allPackages map[string]*packages
 	}
 
 	// Third pass: comprehensive async analysis for all methods
+	// Interface implementation async status is now updated on-demand in IsInterfaceMethodAsync
 	visitor.analyzeAllMethodsAsync()
-
-	// Fourth pass: update interface implementation async status based on completed method analysis
-	// This must happen after method analysis but before any interface queries
-	visitor.updateInterfaceImplementationAsyncStatus()
 
 	return analysis
 }
@@ -1529,11 +1526,8 @@ func (a *Analysis) IsInterfaceMethodAsync(interfaceType *types.Interface, method
 		MethodName:    methodName,
 	}
 
-	fmt.Printf("DEBUG: IsInterfaceMethodAsync called for %s.%s\n", interfaceType.String(), methodName)
-
 	// Check if we've already computed this
 	if result, exists := a.InterfaceMethodAsyncStatus[key]; exists {
-		fmt.Printf("DEBUG: Cached result for %s.%s: %t\n", interfaceType.String(), methodName, result)
 		return result
 	}
 
@@ -1541,12 +1535,9 @@ func (a *Analysis) IsInterfaceMethodAsync(interfaceType *types.Interface, method
 	implementations, exists := a.InterfaceImplementations[key]
 	if !exists {
 		// No implementations found, default to sync
-		fmt.Printf("DEBUG: No implementations found for %s.%s\n", interfaceType.String(), methodName)
 		a.InterfaceMethodAsyncStatus[key] = false
 		return false
 	}
-
-	fmt.Printf("DEBUG: Found %d implementations for %s.%s\n", len(implementations), interfaceType.String(), methodName)
 
 	// Update implementations with current async status before checking
 	for i := range implementations {
@@ -1561,11 +1552,7 @@ func (a *Analysis) IsInterfaceMethodAsync(interfaceType *types.Interface, method
 
 		// Update with current async status from method analysis
 		if isAsync, exists := a.MethodAsyncStatus[methodKey]; exists {
-			if impl.IsAsyncByFlow != isAsync {
-				fmt.Printf("DEBUG: Updating implementation %s.%s: old async=%t, new async=%t\n",
-					impl.StructType.Obj().Name(), impl.Method.Name(), impl.IsAsyncByFlow, isAsync)
-				impl.IsAsyncByFlow = isAsync
-			}
+			impl.IsAsyncByFlow = isAsync
 		}
 	}
 
@@ -1574,16 +1561,13 @@ func (a *Analysis) IsInterfaceMethodAsync(interfaceType *types.Interface, method
 
 	// If ANY implementation is async, the interface method is async
 	for _, impl := range implementations {
-		fmt.Printf("DEBUG: Implementation %s.%s is async: %t\n", impl.StructType.Obj().Name(), methodName, impl.IsAsyncByFlow)
 		if impl.IsAsyncByFlow {
-			fmt.Printf("DEBUG: Interface method %s.%s is ASYNC due to %s.%s\n", interfaceType.String(), methodName, impl.StructType.Obj().Name(), methodName)
 			a.InterfaceMethodAsyncStatus[key] = true
 			return true
 		}
 	}
 
 	// All implementations are sync
-	fmt.Printf("DEBUG: Interface method %s.%s is SYNC (all implementations are sync)\n", interfaceType.String(), methodName)
 	a.InterfaceMethodAsyncStatus[key] = false
 	return false
 }

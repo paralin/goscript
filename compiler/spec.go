@@ -521,7 +521,6 @@ func (c *GoToTSCompiler) WriteTypeSpec(a *ast.TypeSpec) error {
 
 // WriteInterfaceTypeSpec writes the TypeScript type for a Go interface type.
 func (c *GoToTSCompiler) WriteInterfaceTypeSpec(a *ast.TypeSpec, t *ast.InterfaceType) error {
-	fmt.Printf("DEBUG: WriteInterfaceTypeSpec called for %s\n", a.Name.Name)
 	// Add export for Go-exported interfaces (but not if inside a function)
 	isInsideFunction := false
 	if nodeInfo := c.analysis.NodeData[a]; nodeInfo != nil {
