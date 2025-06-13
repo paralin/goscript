@@ -623,6 +623,9 @@ func (c *GoToTSCompiler) WriteImportSpec(a *ast.ImportSpec) {
 		}
 	}
 
+	// Apply sanitization to handle known names like "Promise" -> "PromiseType"
+	impName = c.sanitizeIdentifier(impName)
+
 	// All Go package imports are mapped to the @goscript/ scope.
 	// The TypeScript compiler will resolve these using tsconfig paths to either
 	// handwritten versions (in .goscript-assets) or transpiled versions (in goscript).

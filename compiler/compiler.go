@@ -595,10 +595,15 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 		for _, sourceFile := range sourceFiles {
 			functions := imports[sourceFile]
 			if len(functions) > 0 {
+				// Apply sanitization to function names
+				var sanitizedFunctions []string
+				for _, fn := range functions {
+					sanitizedFunctions = append(sanitizedFunctions, sanitizeIdentifier(fn))
+				}
 				// Sort functions for consistent output
-				sort.Strings(functions)
+				sort.Strings(sanitizedFunctions)
 				c.codeWriter.WriteLinef("import { %s } from \"./%s.gs.js\";",
-					strings.Join(functions, ", "), sourceFile)
+					strings.Join(sanitizedFunctions, ", "), sourceFile)
 			}
 		}
 	}
@@ -649,10 +654,15 @@ func (c *FileCompiler) Compile(ctx context.Context) error {
 				}
 
 				if len(nonProtobufTypes) > 0 {
+					// Apply sanitization to type names
+					var sanitizedTypes []string
+					for _, typeName := range nonProtobufTypes {
+						sanitizedTypes = append(sanitizedTypes, sanitizeIdentifier(typeName))
+					}
 					// Sort types for consistent output
-					sort.Strings(nonProtobufTypes)
+					sort.Strings(sanitizedTypes)
 					c.codeWriter.WriteLinef("import { %s } from \"./%s.gs.js\";",
-						strings.Join(nonProtobufTypes, ", "), sourceFile)
+						strings.Join(sanitizedTypes, ", "), sourceFile)
 				}
 			}
 		}
